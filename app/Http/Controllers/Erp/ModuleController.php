@@ -1,0 +1,2159 @@
+<?php
+
+namespace App\Http\Controllers\Erp;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+
+class ModuleController extends Controller
+{
+    private $customers = [
+        [
+            'customer_id' => 'CUST-001',
+            'name' => 'North Harbor Trading',
+            'tin' => '000-345-111-000',
+            'vat_classification' => '12%',
+            'contact_person' => 'Angela Reyes',
+            'email' => 'billing@northharbor.test',
+            'phone' => '+63 917 100 2040',
+            'address' => 'North Harbor Center, Manila',
+            'terms' => '30 Days',
+            'currency' => 'PHP',
+            'class' => 'MANILA',
+            'ar_account' => 'A/Trade-Billing Invoice',
+            'credit_limit' => '500,000.00',
+            'credit_status' => 'Within Limit',
+        ],
+        [
+            'customer_id' => 'CUST-002',
+            'name' => 'Blue Anchor Logistics',
+            'tin' => '000-888-221-000',
+            'vat_classification' => 'zero-rated',
+            'contact_person' => 'Mark Lim',
+            'email' => 'billing@blueanchor.test',
+            'phone' => '+63 922 881 1130',
+            'address' => 'Pier 7, Cebu City',
+            'terms' => '60 Days',
+            'currency' => 'USD',
+            'class' => 'CEBU',
+            'ar_account' => 'A/R Trade-SOA A',
+            'credit_limit' => '250,000.00',
+            'credit_status' => 'Watchlist',
+        ],
+        [
+            'customer_id' => 'CUST-003',
+            'name' => 'Island Prime Foods',
+            'tin' => '000-744-902-000',
+            'vat_classification' => 'exempt',
+            'contact_person' => 'Carlo Dizon',
+            'email' => 'ap@islandprime.test',
+            'phone' => '+63 945 221 0199',
+            'address' => 'San Fernando, Pampanga',
+            'terms' => '90 Days',
+            'currency' => 'PHP',
+            'class' => 'PAMPANGA',
+            'ar_account' => 'A/R Trade-Debit Note',
+            'credit_limit' => '150,000.00',
+            'credit_status' => 'Within Limit',
+        ],
+    ];
+
+    private $suppliers = [
+        [
+            'supplier_id' => 'SUP-001',
+            'name' => 'Metro Industrial Supply',
+            'tin' => '000-901-881-000',
+            'vat_classification' => '12%',
+            'contact_person' => 'Dennis Co',
+            'email' => 'ap@metroindustrial.test',
+            'phone' => '+63 917 455 9081',
+            'address' => 'Binondo, Manila',
+            'terms' => '30 Days',
+            'currency' => 'PHP',
+            'class' => 'MANILA',
+            'ap_account' => 'Accounts Payable Trade',
+            'payment_method' => 'Cheque',
+            'withholding_tax' => '5% EWT',
+        ],
+        [
+            'supplier_id' => 'SUP-002',
+            'name' => 'Pacific Fuel Services',
+            'tin' => '000-510-294-000',
+            'vat_classification' => '12%',
+            'contact_person' => 'Liza Tan',
+            'email' => 'billing@pacificfuel.test',
+            'phone' => '+63 932 448 2098',
+            'address' => 'Mandaue City, Cebu',
+            'terms' => '60 Days',
+            'currency' => 'PHP',
+            'class' => 'CEBU',
+            'ap_account' => 'Accounts Payable Trade',
+            'payment_method' => 'Bank Transfer',
+            'withholding_tax' => '2% EWT',
+        ],
+        [
+            'supplier_id' => 'SUP-003',
+            'name' => 'Harbor Office Center',
+            'tin' => '000-772-130-000',
+            'vat_classification' => 'exempt',
+            'contact_person' => 'Ruth Garcia',
+            'email' => 'sales@harboroffice.test',
+            'phone' => '+63 921 770 3310',
+            'address' => 'San Fernando, Pampanga',
+            'terms' => '30 Days',
+            'currency' => 'PHP',
+            'class' => 'PAMPANGA',
+            'ap_account' => 'Operating Expense Payable',
+            'payment_method' => 'Online Transfer',
+            'withholding_tax' => '0%',
+        ],
+    ];
+
+    private $users = [
+        ['user_id' => 'USR-001', 'name' => 'Maria Santos', 'email' => 'maria.santos@seajet.test', 'role' => 'Admin', 'department' => 'Accounting', 'branch' => 'Main', 'status' => 'Active', 'last_login' => '2026-05-24 09:15'],
+        ['user_id' => 'USR-002', 'name' => 'John Cruz', 'email' => 'john.cruz@seajet.test', 'role' => 'Finance', 'department' => 'Finance', 'branch' => 'Main', 'status' => 'Active', 'last_login' => '2026-05-24 08:55'],
+        ['user_id' => 'USR-003', 'name' => 'Ana Reyes', 'email' => 'ana.reyes@seajet.test', 'role' => 'Viewer', 'department' => 'Management', 'branch' => 'All', 'status' => 'Active', 'last_login' => '2026-05-23 17:20'],
+        ['user_id' => 'USR-004', 'name' => 'Leo Garcia', 'email' => 'leo.garcia@seajet.test', 'role' => 'Purchasing', 'department' => 'Purchasing', 'branch' => 'Cebu', 'status' => 'Pending Invite', 'last_login' => '-'],
+    ];
+
+    public function show($module)
+    {
+        $modules = $this->modules();
+        abort_unless(isset($modules[$module]), 404);
+
+        return view('erp.modules.show', [
+            'moduleKey' => $module,
+            'module' => $modules[$module],
+        ]);
+    }
+
+    public function invoicePreview()
+    {
+        return view('erp.print.invoice', [
+            'positions' => $this->invoicePrintPositions(),
+            'settings' => $this->invoicePrintSettings(),
+            'fieldStyles' => $this->invoicePrintFieldStyles(),
+            'customFields' => $this->invoicePrintCustomFields(),
+            'print' => $this->billingPrintPreviewData(),
+        ]);
+    }
+
+    public function notifications()
+    {
+        return view('erp.utility.notifications');
+    }
+
+    public function action($action)
+    {
+        $details = $this->actionDetails($action);
+
+        return view('erp.utility.action', [
+            'action' => ucwords(str_replace('-', ' ', $action)),
+            'slug' => $action,
+            'details' => $details,
+        ]);
+    }
+
+    public function export($type)
+    {
+        return view('erp.utility.export', [
+            'type' => strtoupper(str_replace('-', ' ', $type)),
+        ]);
+    }
+
+    public function approvalMatrix()
+    {
+        $approvalLevels = [
+            ['Billing Invoice', 'Create / revise invoice', 'Sales', 'Accounting', 'Finance Manager', '50,000.00+', 'Requires Shipment Job ID and customer credit check'],
+            ['Customer Credit', 'Credit limit override', 'Accounting', 'Finance Manager', 'Admin', 'Any override', '90-day terms and overdue accounts require approval'],
+            ['Vendor Bill', 'Record supplier bill', 'Purchasing', 'Accounting', 'Finance Manager', '25,000.00+', 'Requires supplier, client tag, WHT, and Shipment Job ID'],
+            ['AP Payment', 'Bank, cheque, online transfer', 'Accounting', 'Finance Manager', 'Admin', '10,000.00+', 'Approved payment required before check voucher release'],
+            ['Bank Reconciliation', 'Finalize reconciliation', 'Finance', 'Finance Manager', 'Admin', 'All accounts', 'Outstanding checks/deposits must be reviewed'],
+            ['FX Revaluation', 'Post realized/unrealized FX', 'Accounting', 'Finance Manager', 'Admin', 'USD entries', 'Posts to GL after rate review'],
+            ['Tax Filing', 'VAT/EWT/CWT summaries', 'Accounting', 'Finance Manager', 'Admin', 'All filings', 'Summary lists and audit trail required'],
+            ['User Access', 'Role and permission changes', 'Admin', 'Admin', 'Owner', 'All changes', 'Login and activity logs retained'],
+        ];
+
+        $rolePermissions = [
+            ['Admin', 'Full access', 'Approve all', 'Manage users, roles, company, branch, and posting controls'],
+            ['Accounting', 'AR, AP, GL, Tax', 'Prepare only', 'Create invoices, journals, bills, receipts, tax summaries'],
+            ['Finance', 'Banking, payments, reports', 'Level 1 approval', 'Approve payments, bank reconciliation, cash position'],
+            ['Sales', 'Customers, billing requests', 'Prepare only', 'Create customer records and billing drafts'],
+            ['Purchasing', 'Suppliers, vendor bills', 'Prepare only', 'Create suppliers, PO requests, vendor bill drafts'],
+            ['Viewer', 'Read-only reports', 'No approval', 'Dashboard, reports, printable forms'],
+        ];
+
+        $pendingApprovals = [
+            ['AP Payment', 'PV-2026-00312', 'Metro Industrial Supply', 'JOB-SEA-2026-0423', '127,900.00', 'Finance Manager'],
+            ['Credit Override', 'CUST-002', 'Blue Anchor Logistics', 'SOAA-2026-00211', '250,000.00', 'Admin'],
+            ['FX Revaluation', 'FX-2026-00008', 'Metrobank USD Collections', 'BANK-FX-0007', '250.00', 'Finance Manager'],
+        ];
+
+        return view('erp.admin.approval-matrix', compact('approvalLevels', 'rolePermissions', 'pendingApprovals'));
+    }
+
+    private function actionDetails($slug)
+    {
+        $defaults = [
+            'title' => ucwords(str_replace('-', ' ', $slug)),
+            'subtitle' => 'Operational workspace with records, controls, audit trail, and next-step actions.',
+            'primary' => ['label' => 'Dashboard', 'route' => route('erp.dashboard'), 'icon' => 'bi-house'],
+            'secondary' => ['label' => 'Export', 'route' => route('erp.export', $slug), 'icon' => 'bi-file-earmark-excel'],
+            'cards' => [
+                ['Open Items', '12'],
+                ['For Review', '4'],
+                ['Posted Today', '8'],
+                ['Audit Status', 'Enabled'],
+            ],
+            'steps' => ['Create or select record', 'Review required fields', 'Submit for approval or posting', 'Print, export, or audit'],
+            'columns' => ['Reference', 'Module', 'Owner', 'Status', 'Last Update'],
+            'rows' => [
+                ['REC-2026-0001', 'ERP', 'Accounting', 'Draft', '2026-05-24'],
+                ['REC-2026-0002', 'ERP', 'Finance', 'For Review', '2026-05-24'],
+                ['REC-2026-0003', 'ERP', 'Admin', 'Posted', '2026-05-23'],
+            ],
+        ];
+
+        $actions = [
+            'invite-user' => [
+                'title' => 'Invite User',
+                'subtitle' => 'Send user invitations and assign role, department, branch, and access scope.',
+                'primary' => ['label' => 'Users & Access', 'route' => route('erp.modules.show', 'users'), 'icon' => 'bi-people'],
+                'cards' => [['Pending Invites', '3'], ['Active Users', '18'], ['Departments', '6'], ['Login Logs', 'Enabled']],
+                'steps' => ['Enter user email and full name', 'Select role and department', 'Assign company and branch access', 'Send invitation and record audit log'],
+                'columns' => ['Invite No.', 'User', 'Role', 'Department', 'Status'],
+                'rows' => [
+                    ['INV-2026-001', 'new.accounting@seajet.test', 'Accounting', 'Accounting', 'Pending'],
+                    ['INV-2026-002', 'warehouse@seajet.test', 'Viewer', 'Operations', 'Pending'],
+                    ['INV-2026-003', 'finance.lead@seajet.test', 'Finance', 'Finance', 'Accepted'],
+                ],
+            ],
+            'create-role' => [
+                'title' => 'Create Role',
+                'subtitle' => 'Define role permissions for modules, approval limits, and report access.',
+                'primary' => ['label' => 'Approval Matrix', 'route' => route('erp.approval-matrix'), 'icon' => 'bi-check2-square'],
+                'cards' => [['Roles', '7'], ['Permission Groups', '12'], ['Approval Roles', '4'], ['Restricted Roles', '2']],
+                'steps' => ['Name the role', 'Select module permissions', 'Assign approval limits', 'Save and audit role changes'],
+                'columns' => ['Role', 'Access Scope', 'Approval Rights', 'Users', 'Status'],
+                'rows' => [
+                    ['Admin', 'Full ERP', 'All approvals', '2', 'Active'],
+                    ['Accounting', 'AR/AP/GL/Tax', 'Prepare only', '6', 'Active'],
+                    ['Finance', 'Banking/Reports/AP Payment', 'Level 1', '3', 'Active'],
+                ],
+            ],
+            'audit-logs' => [
+                'title' => 'Audit Logs',
+                'subtitle' => 'Activity log for create, update, approval, posting, print, export, and login events.',
+                'primary' => ['label' => 'Tax Audit Trail', 'route' => route('erp.tax.audit-trail'), 'icon' => 'bi-clock-history'],
+                'cards' => [['Events Today', '42'], ['Approvals', '9'], ['Exports', '6'], ['Failed Logins', '0']],
+                'steps' => ['Filter by date, user, module, or action', 'Review before and after values', 'Export audit results', 'Attach findings to period close'],
+                'columns' => ['Date / Time', 'User', 'Action', 'Reference', 'Module'],
+                'rows' => [
+                    ['2026-05-24 14:10', 'Maria Santos', 'Posted VAT computation', 'BI-2026-01042', 'Tax'],
+                    ['2026-05-24 13:45', 'Ana Reyes', 'Approved AP payment', 'PV-2026-00312', 'Payables'],
+                    ['2026-05-24 11:20', 'John Cruz', 'Updated bank reconciliation', 'BPI-PHP-001', 'Banking'],
+                ],
+            ],
+            'create-pr' => [
+                'title' => 'Create Purchase Request',
+                'subtitle' => 'Prepare purchase requests before PO approval and supplier bill entry.',
+                'primary' => ['label' => 'Purchasing Module', 'route' => route('erp.modules.show', 'purchasing'), 'icon' => 'bi-cart-check'],
+                'cards' => [['Draft PRs', '5'], ['For Approval', '2'], ['Converted to PO', '8'], ['Rejected', '1']],
+                'steps' => ['Enter request department and branch', 'Add supplier or item/service details', 'Attach supporting documents', 'Submit for approval'],
+                'columns' => ['PR No.', 'Department', 'Supplier', 'Amount', 'Status'],
+                'rows' => [
+                    ['PR-2026-0042', 'Operations', 'Pacific Fuel Services', '76,880.00', 'For Approval'],
+                    ['PR-2026-0041', 'Admin', 'Harbor Office Center', '18,000.00', 'Draft'],
+                    ['PR-2026-0040', 'Accounting', 'Metro Industrial Supply', '127,900.00', 'Approved'],
+                ],
+            ],
+            'create-po' => [
+                'title' => 'Create Purchase Order',
+                'subtitle' => 'Issue purchase orders from approved requests with supplier terms and approval control.',
+                'primary' => ['label' => 'Vendor Bill Entry', 'route' => route('erp.payables.vendor-bills.create'), 'icon' => 'bi-receipt'],
+                'cards' => [['Open POs', '11'], ['Receiving', '4'], ['Closed', '19'], ['Overdue', '1']],
+                'steps' => ['Select approved PR', 'Confirm supplier terms and currency', 'Review tax and delivery details', 'Approve and send PO'],
+                'columns' => ['PO No.', 'Supplier', 'Branch', 'Amount', 'Status'],
+                'rows' => [
+                    ['PO-2026-00491', 'Metro Industrial Supply', 'Main', '127,900.00', 'Approved'],
+                    ['PO-2026-00490', 'Pacific Fuel Services', 'Cebu', '76,880.00', 'Receiving'],
+                    ['PO-2026-00489', 'Harbor Office Center', 'Pampanga', '18,000.00', 'Closed'],
+                ],
+            ],
+            'receive-goods-services' => [
+                'title' => 'Receive Goods / Services',
+                'subtitle' => 'Record service completion or goods receiving before supplier bill approval.',
+                'primary' => ['label' => 'Vendor Bill Entry', 'route' => route('erp.payables.vendor-bills.create'), 'icon' => 'bi-receipt'],
+                'cards' => [['For Receiving', '4'], ['Received Today', '6'], ['Partial', '2'], ['Matched', '9']],
+                'steps' => ['Select PO', 'Confirm quantity or service completion', 'Attach delivery or service proof', 'Match to supplier bill'],
+                'columns' => ['Receiving No.', 'PO No.', 'Supplier', 'Shipment Job ID', 'Status'],
+                'rows' => [
+                    ['RCV-2026-0028', 'PO-2026-00490', 'Pacific Fuel Services', 'JOB-SEA-2026-0398', 'Partial'],
+                    ['RCV-2026-0027', 'PO-2026-00491', 'Metro Industrial Supply', 'JOB-SEA-2026-0423', 'Matched'],
+                    ['RCV-2026-0026', 'PO-2026-00489', 'Harbor Office Center', 'JOB-SEA-2026-0365', 'Closed'],
+                ],
+            ],
+            'supplier-performance' => [
+                'title' => 'Supplier Performance',
+                'subtitle' => 'Review supplier delivery, quality, payment terms, and AP aging performance.',
+                'primary' => ['label' => 'Supplier Masterlist', 'route' => route('erp.suppliers.index'), 'icon' => 'bi-building'],
+                'cards' => [['Active Suppliers', '23'], ['On-time Rate', '94%'], ['Open Bills', '7'], ['Preferred', '8']],
+                'steps' => ['Review delivery status', 'Check bill accuracy and terms', 'Monitor aging and payment history', 'Update supplier rating'],
+                'columns' => ['Supplier', 'Terms', 'On-time', 'Open Bills', 'Rating'],
+                'rows' => [
+                    ['Metro Industrial Supply', '30 Days', '97%', '2', 'Preferred'],
+                    ['Pacific Fuel Services', '60 Days', '92%', '3', 'Active'],
+                    ['Harbor Office Center', '30 Days', '89%', '1', 'Watchlist'],
+                ],
+            ],
+            'deposit-collection' => [
+                'title' => 'Deposit Collection',
+                'subtitle' => 'Prepare collected customer payments for bank deposit and reconciliation.',
+                'primary' => ['label' => 'Record Bank Transaction', 'route' => route('erp.banking.transactions.create'), 'icon' => 'bi-bank'],
+                'cards' => [['Undeposited', '55,800.00'], ['Deposited Today', '43,200.00'], ['Checks', '4'], ['Bank Transfer', '6']],
+                'steps' => ['Select receipts for deposit', 'Choose bank account', 'Record deposit reference', 'Match in bank reconciliation'],
+                'columns' => ['Receipt No.', 'Customer', 'Method', 'Amount', 'Status'],
+                'rows' => [
+                    ['OR-2026-00618', 'North Harbor Trading', 'Bank Transfer', '43,200.00', 'Deposited'],
+                    ['AR-2026-00109', 'Island Prime Foods', 'Check', '12,800.00', 'For Deposit'],
+                    ['COLA-2026-00031', 'Blue Anchor Logistics', 'USD Transfer', '1,840.00', 'Matched'],
+                ],
+            ],
+            'fund-transfer' => [
+                'title' => 'Fund Transfer',
+                'subtitle' => 'Transfer funds between cash or bank accounts with FX tracking when currency changes.',
+                'primary' => ['label' => 'Cashbook', 'route' => route('erp.banking.cashbook'), 'icon' => 'bi-journal-text'],
+                'cards' => [['Pending Transfers', '2'], ['Completed Today', '3'], ['FX Transfers', '1'], ['Bank Accounts', '3']],
+                'steps' => ['Select source and destination account', 'Enter transfer amount and currency', 'Add bank reference', 'Post to cashbook and reconcile'],
+                'columns' => ['Transfer No.', 'From', 'To', 'Amount', 'Status'],
+                'rows' => [
+                    ['FT-2026-0011', 'BPI Operating - PHP', 'BDO Payroll - PHP', '200,000.00', 'Released'],
+                    ['FT-2026-0010', 'Metrobank USD Collections', 'BPI Operating - PHP', '5,000.00 USD', 'FX Posted'],
+                    ['FT-2026-0009', 'Cash on Hand', 'BPI Operating - PHP', '25,000.00', 'Matched'],
+                ],
+            ],
+            'check-monitoring' => [
+                'title' => 'Check Monitoring',
+                'subtitle' => 'Track released, post-dated, cleared, and bounced checks.',
+                'primary' => ['label' => 'Print Checks', 'route' => route('erp.payables.check-print'), 'icon' => 'bi-printer'],
+                'cards' => [['Released', '8'], ['Post-dated', '5'], ['Cleared', '22'], ['Bounced', '0']],
+                'steps' => ['Record check details', 'Monitor release date', 'Update clearing status', 'Reconcile bank movement'],
+                'columns' => ['Check No.', 'Supplier', 'Bank', 'Amount', 'Status'],
+                'rows' => [
+                    ['CHK-10291', 'Metro Industrial Supply', 'BPI Operating', '127,900.00', 'Released'],
+                    ['CHK-10290', 'Harbor Office Center', 'BPI Operating', '18,000.00', 'Cleared'],
+                    ['CHK-10289', 'Pacific Fuel Services', 'Metrobank USD', '1,325.00 USD', 'Post-dated'],
+                ],
+            ],
+            'view-record' => [
+                'title' => 'Record Details',
+                'subtitle' => 'Read-only record view with workflow status, audit trail, and related documents.',
+                'primary' => ['label' => 'Dashboard', 'route' => route('erp.dashboard'), 'icon' => 'bi-house'],
+                'cards' => [['Status', 'Active'], ['Attachments', '2'], ['Audit Events', '5'], ['Approvals', '1']],
+                'steps' => ['Review header details', 'Inspect related ledger and documents', 'Check audit trail', 'Print or export record'],
+                'columns' => ['Field', 'Value', 'Source', 'Owner', 'Status'],
+                'rows' => [
+                    ['Reference', 'REC-2026-0001', 'Module table', 'Accounting', 'Current'],
+                    ['Shipment Job ID', 'JOB-SEA-2026-0423', 'Document', 'Operations', 'Traceable'],
+                    ['Posting Status', 'Posted', 'GL', 'Accounting', 'Locked'],
+                ],
+            ],
+            'edit-record' => [
+                'title' => 'Edit Record',
+                'subtitle' => 'Controlled edit screen for draft records with approval and audit protection.',
+                'primary' => ['label' => 'Audit Logs', 'route' => route('erp.action', 'audit-logs'), 'icon' => 'bi-clock-history'],
+                'cards' => [['Editable Fields', '8'], ['Requires Approval', 'Yes'], ['Draft Mode', 'Enabled'], ['Audit Log', 'Required']],
+                'steps' => ['Validate record is not locked', 'Update allowed fields', 'Submit for approval if required', 'Write activity log'],
+                'columns' => ['Field', 'Current Value', 'New Value', 'Approval', 'Status'],
+                'rows' => [
+                    ['Due Date', '2026-06-24', '2026-07-24', 'Finance', 'Pending'],
+                    ['Payment Terms', '30 Days', '60 Days', 'Finance', 'Pending'],
+                    ['Remarks', 'Original note', 'Updated note', 'Not required', 'Draft'],
+                ],
+            ],
+            'journal-entry' => [
+                'title' => 'Journal Entry Quick Action',
+                'subtitle' => 'Quick access to shipment-linked journal entry creation and GL posting controls.',
+                'primary' => ['label' => 'Journal Entries', 'route' => route('erp.accounting.journals'), 'icon' => 'bi-journal-plus'],
+                'cards' => [['Draft Journals', '4'], ['For Posting', '3'], ['Posted Today', '11'], ['Posting Lock', 'Open']],
+                'steps' => ['Enter Journal No. and date', 'Attach Shipment Job ID', 'Balance debit and credit lines', 'Post to GL or save as draft'],
+                'columns' => ['Journal No.', 'Shipment Job ID', 'Reference', 'Amount', 'Status'],
+                'rows' => [
+                    ['JV-2026-00218', 'JOB-SEA-2026-0423', 'BI-2026-01043', '98,500.00', 'Draft'],
+                    ['JV-2026-00217', 'JOB-SEA-2026-0422', 'BI-2026-01042', '87,946.43', 'Posted'],
+                    ['JV-2026-00216', 'JOB-SEA-2026-0398', 'SOAA-2026-00211', '106,720.00', 'Posted'],
+                ],
+            ],
+            'new-journal-entry' => [
+                'title' => 'New Journal Entry',
+                'subtitle' => 'Create a manual journal entry with required Shipment Job ID traceability.',
+                'primary' => ['label' => 'Journal Entries', 'route' => route('erp.accounting.journals'), 'icon' => 'bi-journal-plus'],
+                'cards' => [['Draft Journals', '4'], ['Balanced', '3'], ['Unbalanced', '1'], ['Audit Trail', 'Enabled']],
+                'steps' => ['Enter reference and Shipment Job ID', 'Select debit account', 'Select credit account', 'Verify balance before posting'],
+                'columns' => ['Journal No.', 'Debit', 'Credit', 'Amount', 'Status'],
+                'rows' => [
+                    ['JV-2026-00219', 'Accounts Receivable', 'Service Revenue', '45,000.00', 'Draft'],
+                    ['JV-2026-00218', 'Bank - Operating', 'Accounts Receivable', '43,200.00', 'Posted'],
+                    ['JV-2026-00217', 'AP Trade', 'Bank - Operating', '127,900.00', 'For Approval'],
+                ],
+            ],
+            'bank-transfer' => [
+                'title' => 'Bank Transfer',
+                'subtitle' => 'Quick bank transfer workspace for fund movement between cash and bank accounts.',
+                'primary' => ['label' => 'Record Bank Transaction', 'route' => route('erp.banking.transactions.create'), 'icon' => 'bi-arrow-left-right'],
+                'cards' => [['Draft Transfers', '2'], ['Released Today', '3'], ['For Reconciliation', '2'], ['FX Transfers', '1']],
+                'steps' => ['Select source bank account', 'Select receiving bank account', 'Enter reference and amount', 'Post to cashbook'],
+                'columns' => ['Transfer No.', 'Source', 'Destination', 'Amount', 'Status'],
+                'rows' => [
+                    ['BT-2026-00021', 'BPI Operating - PHP', 'BDO Payroll - PHP', '200,000.00', 'Released'],
+                    ['BT-2026-00020', 'Metrobank USD Collections', 'BPI Operating - PHP', '5,000.00 USD', 'FX Posted'],
+                    ['BT-2026-00019', 'Cash on Hand', 'BPI Operating - PHP', '25,000.00', 'Matched'],
+                ],
+            ],
+            'approve-ap-payment' => [
+                'title' => 'Approve AP Payment',
+                'subtitle' => 'Review supplier payment details before voucher release, check printing, or bank transfer.',
+                'primary' => ['label' => 'Payment Approvals', 'route' => route('erp.payables.approvals'), 'icon' => 'bi-check2-square'],
+                'cards' => [['For Approval', '3'], ['Approved', '8'], ['Returned', '1'], ['Released', '6']],
+                'steps' => ['Review supplier and bill reference', 'Check Shipment Job ID and WHT', 'Confirm bank or cheque details', 'Approve or return with notes'],
+                'columns' => ['Payment No.', 'Supplier', 'Shipment Job ID', 'Amount', 'Status'],
+                'rows' => [
+                    ['PV-2026-00312', 'Metro Industrial Supply', 'JOB-SEA-2026-0423', '127,900.00', 'For Approval'],
+                    ['PV-2026-00311', 'Pacific Fuel Services', 'JOB-SEA-2026-0398', '1,325.00 USD', 'Approved'],
+                    ['PV-2026-00310', 'Harbor Office Center', 'JOB-SEA-2026-0365', '18,000.00', 'Returned'],
+                ],
+            ],
+            'record-supplier-bill' => [
+                'title' => 'Record Supplier Bill',
+                'subtitle' => 'Create a shipment-linked supplier bill with client tagging, VAT, WHT, and currency.',
+                'primary' => ['label' => 'Vendor Bill Entry', 'route' => route('erp.payables.vendor-bills.create'), 'icon' => 'bi-receipt'],
+                'cards' => [['Draft Bills', '5'], ['For Approval', '3'], ['USD Bills', '1'], ['WHT Required', '4']],
+                'steps' => ['Select supplier', 'Tag client and Shipment Job ID', 'Compute VAT and withholding tax', 'Submit bill for approval'],
+                'columns' => ['Bill No.', 'Supplier', 'Shipment Job ID', 'Currency', 'Status'],
+                'rows' => [
+                    ['BILL-4902', 'Metro Industrial Supply', 'JOB-SEA-2026-0423', 'PHP', 'For Approval'],
+                    ['BILL-7710', 'Pacific Fuel Services', 'JOB-SEA-2026-0398', 'USD', 'For Payment'],
+                    ['BILL-2420', 'Harbor Office Center', 'JOB-SEA-2026-0365', 'PHP', 'Approved'],
+                ],
+            ],
+            'email-official-receipt' => [
+                'title' => 'Email Official Receipt',
+                'subtitle' => 'Prepare Official Receipt email with PDF attachment and delivery audit trail.',
+                'primary' => ['label' => 'Official Receipt', 'route' => route('erp.official-receipt.preview'), 'icon' => 'bi-receipt'],
+                'cards' => [['Queued Emails', '2'], ['Sent Today', '9'], ['PDF Attached', 'Yes'], ['Audit Trail', 'Enabled']],
+                'steps' => ['Review customer email', 'Attach Official Receipt PDF', 'Add email message', 'Send and log delivery status'],
+                'columns' => ['Receipt No.', 'Customer', 'Email', 'Amount', 'Status'],
+                'rows' => [
+                    ['OR-2026-00618', 'North Harbor Trading', 'billing@northharbor.test', '43,200.00', 'Ready'],
+                    ['OR-2026-00617', 'Blue Anchor Logistics', 'billing@blueanchor.test', '1,840.00 USD', 'Sent'],
+                    ['OR-2026-00616', 'Island Prime Foods', 'ap@islandprime.test', '12,800.00', 'Queued'],
+                ],
+            ],
+            'email-soa' => [
+                'title' => 'Email Statement of Account',
+                'subtitle' => 'Prepare SOA email with outstanding invoice list and aging summary.',
+                'primary' => ['label' => 'Statement Preview', 'route' => route('erp.soa.preview'), 'icon' => 'bi-envelope'],
+                'cards' => [['SOA Ready', '6'], ['Sent Today', '4'], ['Outstanding', '238,700.00'], ['Aging Attached', 'Yes']],
+                'steps' => ['Review SOA date range', 'Confirm outstanding balances', 'Attach SOA PDF', 'Send and log activity'],
+                'columns' => ['SOA No.', 'Customer', 'Date Range', 'Balance', 'Status'],
+                'rows' => [
+                    ['SOA-2026-0052', 'North Harbor Trading', 'May 2026', '98,500.00', 'Ready'],
+                    ['SOA-2026-0051', 'Island Prime Foods', 'May 2026', '48,900.00', 'Sent'],
+                    ['SOA-2026-0050', 'Blue Anchor Logistics', 'May 2026', '1,840.00 USD', 'Queued'],
+                ],
+            ],
+            'email-soa-a' => [
+                'title' => 'Email SOA A',
+                'subtitle' => 'Prepare non-pre-printed SOA A email for customer collection follow-up.',
+                'primary' => ['label' => 'SOA A Preview', 'route' => route('erp.soa-a.preview'), 'icon' => 'bi-envelope'],
+                'cards' => [['SOA A Ready', '3'], ['USD Documents', '2'], ['Sent Today', '2'], ['No Pre-print', 'Yes']],
+                'steps' => ['Review SOA A details', 'Confirm USD/PHP currency', 'Attach PDF', 'Send and update customer ledger'],
+                'columns' => ['SOA A No.', 'Customer', 'Shipment Job ID', 'Currency', 'Status'],
+                'rows' => [
+                    ['SOAA-2026-00211', 'Blue Anchor Logistics', 'JOB-SEA-2026-0398', 'USD', 'Ready'],
+                    ['SOAA-2026-00210', 'North Harbor Trading', 'JOB-SEA-2026-0422', 'PHP', 'Sent'],
+                    ['SOAA-2026-00209', 'Island Prime Foods', 'JOB-SEA-2026-0365', 'PHP', 'Queued'],
+                ],
+            ],
+        ];
+
+        return array_replace_recursive($defaults, isset($actions[$slug]) ? $actions[$slug] : []);
+    }
+
+    public function customers()
+    {
+        return view('erp.customers.index', ['customers' => $this->customers]);
+    }
+
+    public function customerCreate()
+    {
+        return view('erp.customers.create');
+    }
+
+    public function suppliers()
+    {
+        return view('erp.suppliers.index', ['suppliers' => $this->suppliers]);
+    }
+
+    public function supplierCreate()
+    {
+        return view('erp.suppliers.create');
+    }
+
+    public function usersIndex()
+    {
+        return view('erp.users.index', ['users' => $this->users]);
+    }
+
+    public function userCreate()
+    {
+        return view('erp.users.create');
+    }
+
+    public function userEdit($user)
+    {
+        return view('erp.users.edit', [
+            'userId' => $user,
+            'users' => $this->users,
+        ]);
+    }
+
+    public function userDelete($user)
+    {
+        return view('erp.users.delete', ['userId' => $user]);
+    }
+
+    public function userDeleteReview()
+    {
+        return view('erp.users.delete-review', [
+            'delete' => request()->only(['user_id', 'name', 'delete_action', 'reason']),
+        ]);
+    }
+
+    public function userReview()
+    {
+        return view('erp.users.review', [
+            'user' => request()->only([
+                'user_id',
+                'name',
+                'email',
+                'role',
+                'department',
+                'branch',
+                'status',
+                'access_scope',
+            ]),
+        ]);
+    }
+
+    public function userStatus()
+    {
+        return view('erp.users.status', ['users' => $this->users]);
+    }
+
+    public function userStatusReview()
+    {
+        return view('erp.users.status-review', [
+            'status' => request()->only([
+                'user_id',
+                'name',
+                'current_status',
+                'new_status',
+                'reason',
+            ]),
+        ]);
+    }
+
+    public function vendorBillCreate()
+    {
+        return view('erp.payables.vendor-bill-create', [
+            'suppliers' => $this->suppliers,
+            'customers' => $this->customers,
+        ]);
+    }
+
+    public function expensesIndex()
+    {
+        $expenses = [
+            ['BILL-2026-00492', 'Metro Industrial Supply', 'JOB-SEA-2026-0423', 'North Harbor Trading', 'PHP', '127,900.00', 'For Approval', '2026-05-24'],
+            ['BILL-7710', 'Pacific Fuel Services', 'JOB-SEA-2026-0398', 'Blue Anchor Logistics', 'USD', '1,325.00', 'For Payment', '2026-05-23'],
+            ['EXP-2026-00869', 'Harbor Office Center', 'JOB-SEA-2026-0365', 'Island Prime Foods', 'PHP', '18,000.00', 'Approved', '2026-05-22'],
+            ['RE-2026-00022', 'Harbor Office Center', 'OPER-ADMIN-2026-001', 'Admin', 'PHP', '18,000.00', 'Recurring', '2026-06-01'],
+        ];
+
+        return view('erp.payables.expenses-index', compact('expenses'));
+    }
+
+    public function vendorBillReview()
+    {
+        return view('erp.payables.vendor-bill-review', [
+            'bill' => request()->only([
+                'transaction_type',
+                'ap_account',
+                'bill_received',
+                'supplier_id',
+                'supplier_name',
+                'supplier_address',
+                'client_customer_id',
+                'shipment_job_id',
+                'bill_no',
+                'bill_date',
+                'reference_no',
+                'due_date',
+                'terms',
+                'currency',
+                'exchange_rate',
+                'gross_amount',
+                'php_amount',
+                'withholding_tax_rate',
+                'withholding_tax_amount',
+                'net_amount',
+                'memo',
+                'expense_account',
+                'expense_tax',
+                'expense_amount',
+                'expense_memo',
+                'expense_customer_job',
+                'expense_billable',
+                'expense_class',
+                'description',
+            ]),
+        ]);
+    }
+
+    public function apPaymentCreate()
+    {
+        return view('erp.payables.payment-create', [
+            'suppliers' => $this->suppliers,
+        ]);
+    }
+
+    public function apPaymentReview()
+    {
+        return view('erp.payables.payment-review', [
+            'payment' => request()->only([
+                'payment_no',
+                'supplier_id',
+                'supplier_name',
+                'shipment_job_id',
+                'bill_no',
+                'payment_date',
+                'payment_method',
+                'bank_account',
+                'check_no',
+                'currency',
+                'amount',
+                'approval_status',
+            ]),
+        ]);
+    }
+
+    public function paymentApprovals()
+    {
+        $approvals = [
+            ['PV-2026-00312', 'Metro Industrial Supply', 'JOB-SEA-2026-0423', 'PHP', '127,900.00', 'For Approval'],
+            ['PV-2026-00311', 'Pacific Fuel Services', 'JOB-SEA-2026-0398', 'USD', '1,325.00', 'Approved'],
+            ['PV-2026-00310', 'Harbor Office Center', 'JOB-SEA-2026-0365', 'PHP', '18,000.00', 'Returned'],
+        ];
+
+        return view('erp.payables.approvals', compact('approvals'));
+    }
+
+    public function checkVoucherPreview()
+    {
+        return view('erp.payables.check-voucher');
+    }
+
+    public function checkPrint()
+    {
+        return view('erp.payables.check-print');
+    }
+
+    public function apAging()
+    {
+        $rows = [
+            ['SUP-001', 'Metro Industrial Supply', 'JOB-SEA-2026-0423', 'BILL-4902', 'PHP', 127900, 0, 0, 0],
+            ['SUP-002', 'Pacific Fuel Services', 'JOB-SEA-2026-0398', 'BILL-7710', 'USD', 0, 1325, 0, 0],
+            ['SUP-003', 'Harbor Office Center', 'JOB-SEA-2026-0365', 'BILL-2420', 'PHP', 0, 0, 18000, 0],
+        ];
+
+        return view('erp.payables.aging', compact('rows'));
+    }
+
+    public function cashbook()
+    {
+        $accounts = $this->bankAccounts();
+        $transactions = [
+            ['2026-05-24', 'BPI Operating - PHP', 'Deposit', 'OR-2026-00618', 'PHP', 43200, 0, 1066700, 'Matched'],
+            ['2026-05-24', 'BPI Operating - PHP', 'Withdrawal', 'PV-2026-00313', 'PHP', 0, 121505, 945195, 'For Reconciliation'],
+            ['2026-05-23', 'Metrobank USD Collections - USD', 'Deposit', 'SOAA-2026-00211', 'USD', 1840, 0, 20260, 'Matched'],
+            ['2026-05-23', 'BDO Payroll - PHP', 'Withdrawal', 'PAY-2026-00112', 'PHP', 0, 76000, 200000, 'Cleared'],
+        ];
+
+        return view('erp.banking.cashbook', compact('accounts', 'transactions'));
+    }
+
+    public function bankTransactionCreate()
+    {
+        return view('erp.banking.transaction-create', [
+            'accounts' => $this->bankAccounts(),
+        ]);
+    }
+
+    public function bankTransactionReview()
+    {
+        return view('erp.banking.transaction-review', [
+            'transaction' => request()->only([
+                'transaction_no',
+                'bank_account',
+                'transaction_date',
+                'transaction_type',
+                'reference_no',
+                'shipment_job_id',
+                'currency',
+                'exchange_rate',
+                'foreign_amount',
+                'base_amount',
+                'description',
+            ]),
+        ]);
+    }
+
+    public function bankReconciliation()
+    {
+        $rows = [
+            ['2026-05-24', 'OR-2026-00618', 'Deposit', 'PHP', '43,200.00', 'Books and bank matched'],
+            ['2026-05-24', 'PV-2026-00313', 'Withdrawal', 'PHP', '121,505.00', 'Outstanding check'],
+            ['2026-05-23', 'SOAA-2026-00211', 'Deposit', 'USD', '1,840.00', 'FX deposit matched'],
+        ];
+
+        return view('erp.banking.reconciliation', [
+            'accounts' => $this->bankAccounts(),
+            'rows' => $rows,
+        ]);
+    }
+
+    public function bankReconciliationReview()
+    {
+        return view('erp.banking.reconciliation-review', [
+            'recon' => request()->only([
+                'bank_account',
+                'statement_date',
+                'book_balance',
+                'bank_balance',
+                'outstanding_deposits',
+                'outstanding_withdrawals',
+                'adjusted_balance',
+            ]),
+        ]);
+    }
+
+    public function fxTracking()
+    {
+        $rows = [
+            ['2026-05-23', 'SOAA-2026-00211', 'USD', 1840, 58.000000, 106720, 'Deposit conversion'],
+            ['2026-05-21', 'BILL-7710', 'USD', -1325, 58.250000, -77162.50, 'AP payment conversion'],
+            ['2026-05-20', 'BANK-FX-0007', 'USD', 5000, 58.100000, 290500, 'USD to PHP transfer'],
+        ];
+
+        return view('erp.banking.fx-tracking', compact('rows'));
+    }
+
+    public function multiCurrencyFx()
+    {
+        return view('erp.fx.index', [
+            'rates' => $this->fxRates(),
+            'exposures' => $this->fxExposures(),
+            'gainsLosses' => $this->fxGainLossRows(),
+        ]);
+    }
+
+    public function fxConversionCreate()
+    {
+        return view('erp.fx.conversion');
+    }
+
+    public function fxConversionReview()
+    {
+        $foreignAmount = (float) request('foreign_amount', 0);
+        $documentRate = (float) request('document_rate', 1);
+        $settlementRate = (float) request('settlement_rate', 1);
+        $bookValue = $foreignAmount * $documentRate;
+        $settlementValue = $foreignAmount * $settlementRate;
+
+        return view('erp.fx.conversion-review', [
+            'conversion' => request()->only([
+                'reference_no',
+                'shipment_job_id',
+                'source_currency',
+                'target_currency',
+                'foreign_amount',
+                'document_rate',
+                'settlement_rate',
+                'conversion_date',
+                'conversion_type',
+                'party_name',
+            ]),
+            'bookValue' => $bookValue,
+            'settlementValue' => $settlementValue,
+            'gainLoss' => $settlementValue - $bookValue,
+        ]);
+    }
+
+    public function fxGainsLosses()
+    {
+        return view('erp.fx.gains-losses', [
+            'rows' => $this->fxGainLossRows(),
+            'exposures' => $this->fxExposures(),
+        ]);
+    }
+
+    private function fxRates()
+    {
+        return [
+            ['2026-05-24', 'USD', 'PHP', 58.150000, 'BSP Closing', 'Active'],
+            ['2026-05-23', 'USD', 'PHP', 58.000000, 'Bank Settlement', 'Posted'],
+            ['2026-05-21', 'USD', 'PHP', 58.250000, 'AP Payment', 'Posted'],
+        ];
+    }
+
+    private function fxExposures()
+    {
+        return [
+            ['Accounts Receivable', 'Blue Anchor Logistics', 'SOAA-2026-00211', 'JOB-SEA-2026-0398', 'USD', 1840.00, 58.000000, 58.150000, 276.00],
+            ['Accounts Payable', 'Pacific Fuel Services', 'BILL-7710', 'JOB-SEA-2026-0398', 'USD', -1325.00, 58.250000, 58.150000, 132.50],
+            ['Bank Account', 'Metrobank USD Collections', 'BANK-FX-0007', '-', 'USD', 5000.00, 58.100000, 58.150000, 250.00],
+        ];
+    }
+
+    private function fxGainLossRows()
+    {
+        return [
+            ['2026-05-24', 'Unrealized', 'SOAA-2026-00211', 'JOB-SEA-2026-0398', 'USD', 1840.00, 58.000000, 58.150000, 276.00, 'Gain'],
+            ['2026-05-23', 'Realized', 'OR-2026-00618', 'JOB-SEA-2026-0398', 'USD', 1840.00, 57.900000, 58.000000, 184.00, 'Gain'],
+            ['2026-05-21', 'Realized', 'BILL-7710', 'JOB-SEA-2026-0398', 'USD', -1325.00, 58.250000, 58.150000, 132.50, 'Gain'],
+            ['2026-05-20', 'Unrealized', 'BANK-FX-0007', '-', 'USD', 5000.00, 58.100000, 58.150000, 250.00, 'Gain'],
+        ];
+    }
+
+    public function dailyCashPosition()
+    {
+        $accounts = $this->bankAccounts();
+        $summary = [
+            ['PHP', 'Opening Cash', 1219500],
+            ['PHP', 'Deposits', 43200],
+            ['PHP', 'Withdrawals', -197505],
+            ['USD', 'Opening Cash', 18420],
+            ['USD', 'Deposits', 1840],
+            ['USD', 'Withdrawals', 0],
+        ];
+
+        return view('erp.banking.daily-cash-position', compact('accounts', 'summary'));
+    }
+
+    private function bankAccounts()
+    {
+        return [
+            ['code' => 'BPI-PHP-001', 'name' => 'BPI Operating - PHP', 'bank' => 'BPI', 'account_no' => '0012-3456-78', 'currency' => 'PHP', 'book_balance' => '945,195.00', 'bank_balance' => '1,066,700.00'],
+            ['code' => 'MBTC-USD-001', 'name' => 'Metrobank USD Collections - USD', 'bank' => 'Metrobank', 'account_no' => '9988-1200-45', 'currency' => 'USD', 'book_balance' => '20,260.00', 'bank_balance' => '20,260.00'],
+            ['code' => 'BDO-PHP-002', 'name' => 'BDO Payroll - PHP', 'bank' => 'BDO', 'account_no' => '7755-3001-22', 'currency' => 'PHP', 'book_balance' => '200,000.00', 'bank_balance' => '200,000.00'],
+        ];
+    }
+
+    public function chartOfAccounts()
+    {
+        $accounts = [
+            ['1000', 'Cash on Hand', 'Assets', '-', 'Debit', '245,000.00', 'Active'],
+            ['1010', 'Bank - Operating Account', 'Assets', '-', 'Debit', '1,023,500.00', 'Active'],
+            ['1200', 'Accounts Receivable', 'Assets', '-', 'Debit', '238,700.00', 'Active'],
+            ['1210', 'A/Trade-Billing Invoice', 'Assets', '1200', 'Debit', '98,500.00', 'Active'],
+            ['1220', 'A/R Reimbursable Charges', 'Assets', '1200', 'Debit', '12,800.00', 'Active'],
+            ['1230', 'A/R Trade-SOA A', 'Assets', '1200', 'Debit', '106,720.00', 'Active'],
+            ['1240', 'A/R Trade-Debit Note', 'Assets', '1200', 'Debit', '48,900.00', 'Active'],
+            ['2100', 'Accounts Payable', 'Liabilities', '-', 'Credit', '174,250.00', 'Active'],
+            ['2200', 'Output VAT Payable', 'Liabilities', '-', 'Credit', '41,280.00', 'Active'],
+            ['4000', 'Service Revenue', 'Revenue', '-', 'Credit', '845,230.00', 'Active'],
+            ['5100', 'Operating Expenses', 'Expenses', '-', 'Debit', '142,110.00', 'Active'],
+        ];
+
+        return view('erp.accounting.chart-of-accounts', compact('accounts'));
+    }
+
+    public function journalEntries()
+    {
+        return view('erp.accounting.journal-entries');
+    }
+
+    public function journalEntryReview()
+    {
+        return view('erp.accounting.journal-review', [
+            'journal' => request()->only([
+                'journal_no',
+                'journal_date',
+                'shipment_job_id',
+                'reference_no',
+                'memo',
+                'debit_account',
+                'credit_account',
+                'amount',
+            ]),
+        ]);
+    }
+
+    public function balanceSheet()
+    {
+        return $this->statement('Balance Sheet', [
+            ['Assets', 'Cash and Bank', 1268500],
+            ['Assets', 'Accounts Receivable', 238700],
+            ['Liabilities', 'Accounts Payable', -174250],
+            ['Liabilities', 'Output VAT Payable', -41280],
+            ['Equity', 'Owner Equity', -1291670],
+        ]);
+    }
+
+    public function profitLoss()
+    {
+        return $this->statement('Profit and Loss', [
+            ['Revenue', 'Service Revenue', 845230],
+            ['Cost', 'Cost of Services', -240300],
+            ['Expense', 'Operating Expenses', -142110],
+        ]);
+    }
+
+    public function incomeStatement()
+    {
+        return $this->statement('Income Statement', [
+            ['Revenue', 'Service Revenue', 845230],
+            ['Less', 'Direct Costs', -240300],
+            ['Less', 'Operating Expenses', -142110],
+            ['Net Income', 'Net Income Before Tax', 462820],
+        ]);
+    }
+
+    public function cashFlow()
+    {
+        return $this->statement('Cash Flow Statement', [
+            ['Operating', 'Collections from Customers', 328900],
+            ['Operating', 'Payments to Suppliers', -174250],
+            ['Financing', 'Owner Contributions', 250000],
+            ['Ending Cash', 'Cash and Bank Balance', 1268500],
+        ]);
+    }
+
+    private function statement($title, $rows)
+    {
+        return view('erp.statements.show', compact('title', 'rows'));
+    }
+
+    public function vatSummary()
+    {
+        $sales = $this->salesTaxRows();
+        $purchases = $this->purchaseTaxRows();
+
+        return view('erp.tax.vat-summary', [
+            'sales' => $sales,
+            'purchases' => $purchases,
+            'outputVat' => 41280,
+            'inputVat' => 15348,
+            'vatPayable' => 25932,
+        ]);
+    }
+
+    public function withholdingTax()
+    {
+        $rows = [
+            ['2026-05-24', 'BILL-4902', 'Expanded Withholding Tax', 'Metro Industrial Supply', 'JOB-SEA-2026-0423', 'PHP', 127900, '5%', 6395, 'For Remittance'],
+            ['2026-05-23', 'BI-2026-01042', 'Creditable Withholding Tax', 'North Harbor Trading', 'JOB-SEA-2026-0422', 'PHP', 98500, '2%', 1970, 'Creditable'],
+            ['2026-05-21', 'BILL-7710', 'Expanded Withholding Tax', 'Pacific Fuel Services', 'JOB-SEA-2026-0398', 'USD', 1325, '2%', 26.50, 'For Remittance'],
+        ];
+
+        return view('erp.tax.withholding', compact('rows'));
+    }
+
+    public function taxCalculator()
+    {
+        return view('erp.tax.calculator');
+    }
+
+    public function taxCalculatorReview()
+    {
+        $amount = (float) request('amount', 0);
+        $vatClassification = request('vat_classification', '12% VAT');
+        $withholdingRate = (float) request('withholding_tax_rate', 0);
+        $vatRate = $vatClassification === '12% VAT' ? 0.12 : 0;
+        $vatAmount = $amount * $vatRate;
+        $withholdingAmount = $amount * ($withholdingRate / 100);
+
+        return view('erp.tax.calculator-review', [
+            'tax' => request()->only([
+                'document_type',
+                'reference_no',
+                'shipment_job_id',
+                'party_name',
+                'vat_classification',
+                'withholding_type',
+                'withholding_tax_rate',
+                'currency',
+                'amount',
+            ]),
+            'vatAmount' => $vatAmount,
+            'withholdingAmount' => $withholdingAmount,
+            'netAmount' => $amount + $vatAmount - $withholdingAmount,
+        ]);
+    }
+
+    public function taxSalesPurchases()
+    {
+        return view('erp.tax.sales-purchases', [
+            'sales' => $this->salesTaxRows(),
+            'purchases' => $this->purchaseTaxRows(),
+        ]);
+    }
+
+    public function taxAuditTrail()
+    {
+        $logs = [
+            ['2026-05-24 14:10', 'Maria Santos', 'Computed Output VAT', 'BI-2026-01042', 'JOB-SEA-2026-0422', 'Output VAT changed from 0.00 to 10,553.57'],
+            ['2026-05-24 13:38', 'Ana Reyes', 'Reviewed EWT', 'BILL-4902', 'JOB-SEA-2026-0423', 'EWT 5% marked for remittance'],
+            ['2026-05-23 16:22', 'Maria Santos', 'Tagged Zero-rated Sale', 'SOAA-2026-00211', 'JOB-SEA-2026-0398', 'VAT classification set to zero-rated export service'],
+            ['2026-05-23 10:04', 'John Cruz', 'Updated Tax Code', 'VAT12', '-', 'Output VAT Payable account verified'],
+        ];
+
+        return view('erp.tax.audit-trail', compact('logs'));
+    }
+
+    private function salesTaxRows()
+    {
+        return [
+            ['2026-05-24', 'BI-2026-01042', 'North Harbor Trading', 'JOB-SEA-2026-0422', '12% VAT', 'PHP', 87946.43, 10553.57, 1970.00],
+            ['2026-05-23', 'SOAA-2026-00211', 'Blue Anchor Logistics', 'JOB-SEA-2026-0398', 'Zero-rated export services', 'USD', 1840.00, 0.00, 0.00],
+            ['2026-05-22', 'DN-2026-00042', 'Island Prime Foods', 'JOB-SEA-2026-0365', 'VAT-exempt', 'PHP', 48900.00, 0.00, 0.00],
+        ];
+    }
+
+    private function purchaseTaxRows()
+    {
+        return [
+            ['2026-05-24', 'BILL-4902', 'Metro Industrial Supply', 'JOB-SEA-2026-0423', '12% VAT', 'PHP', 114196.43, 13703.57, 6395.00],
+            ['2026-05-21', 'BILL-7710', 'Pacific Fuel Services', 'JOB-SEA-2026-0398', '12% VAT', 'USD', 1183.04, 141.96, 26.50],
+            ['2026-05-20', 'BILL-2420', 'Harbor Office Center', 'JOB-SEA-2026-0365', 'VAT-exempt', 'PHP', 18000.00, 0.00, 0.00],
+        ];
+    }
+
+    public function invoiceCreate()
+    {
+        return view('erp.invoices.create', ['customers' => $this->customers]);
+    }
+
+    public function billingIndex()
+    {
+        return view('erp.billings.index', ['billings' => $this->billingRows()]);
+    }
+
+    public function billingEdit($invoice)
+    {
+        return view('erp.billings.edit', [
+            'invoiceNo' => $invoice,
+            'customers' => $this->customers,
+        ]);
+    }
+
+    public function billingDelete($invoice)
+    {
+        return view('erp.billings.delete', ['invoiceNo' => $invoice]);
+    }
+
+    public function billingDeleteReview()
+    {
+        return view('erp.billings.delete-review', [
+            'delete' => request()->only(['invoice_no', 'customer', 'shipment_job_id', 'delete_action', 'reason']),
+        ]);
+    }
+
+    public function billingStatus()
+    {
+        return view('erp.billings.status', ['billings' => $this->billingRows()]);
+    }
+
+    public function billingStatusReview()
+    {
+        return view('erp.billings.status-review', [
+            'status' => request()->only([
+                'invoice_no',
+                'customer',
+                'shipment_job_id',
+                'current_status',
+                'new_status',
+                'remarks',
+            ]),
+        ]);
+    }
+
+    public function billingInvoicePrintLayout()
+    {
+        return view('erp.billings.print-layout-invoice', [
+            'positions' => $this->invoicePrintPositions(),
+            'settings' => $this->invoicePrintSettings(),
+            'fieldStyles' => $this->invoicePrintFieldStyles(),
+            'customFields' => $this->invoicePrintCustomFields(),
+        ]);
+    }
+
+    public function saveBillingInvoicePrintLayout()
+    {
+        $payload = $this->invoicePrintLayoutPayload();
+
+        try {
+            if (Schema::hasTable('print_layouts')) {
+                DB::table('print_layouts')->updateOrInsert(
+                    [
+                        'company_id' => null,
+                        'document_type' => 'billing_invoice',
+                        'layout_name' => 'Default',
+                    ],
+                    [
+                        'paper_size' => $payload['settings']['paper_size'],
+                        'paper_width' => $payload['settings']['paper_width'],
+                        'paper_height' => $payload['settings']['paper_height'],
+                        'template_url' => $payload['settings']['template_url'],
+                        'print_template' => $payload['settings']['print_template'],
+                        'positions' => json_encode($payload['positions']),
+                        'field_styles' => json_encode($payload['field_styles']),
+                        'custom_fields' => json_encode($payload['custom_fields']),
+                        'is_default' => true,
+                        'updated_at' => now(),
+                        'created_at' => now(),
+                    ]
+                );
+            }
+        } catch (\Exception $exception) {
+            // Keep layout editing usable even if the web server has stale DB config.
+        }
+
+        Storage::put($this->invoicePrintLayoutStoragePath(), json_encode($payload, JSON_PRETTY_PRINT));
+
+        return redirect()
+            ->route('erp.billings.print-layout.invoice')
+            ->with('status', 'Billing invoice print layout saved for future invoices.');
+    }
+
+    private function invoicePrintLayoutStoragePath()
+    {
+        return 'erp/billing_invoice_print_layout.json';
+    }
+
+    private function savedInvoicePrintLayout()
+    {
+        try {
+            if (Schema::hasTable('print_layouts')) {
+                $layout = DB::table('print_layouts')
+                    ->whereNull('company_id')
+                    ->where('document_type', 'billing_invoice')
+                    ->where('layout_name', 'Default')
+                    ->first();
+
+                if ($layout) {
+                    return [
+                        'settings' => [
+                            'paper_size' => $layout->paper_size,
+                            'paper_width' => (int) $layout->paper_width,
+                            'paper_height' => (int) $layout->paper_height,
+                            'template_url' => $layout->template_url ?: '',
+                            'print_template' => (bool) $layout->print_template,
+                        ],
+                        'positions' => json_decode($layout->positions ?: '[]', true) ?: [],
+                        'field_styles' => json_decode($layout->field_styles ?: '[]', true) ?: [],
+                        'custom_fields' => json_decode($layout->custom_fields ?: '[]', true) ?: [],
+                    ];
+                }
+            }
+        } catch (\Exception $exception) {
+            // Fall back to the local layout file if database config is unavailable.
+        }
+
+        if (!Storage::exists($this->invoicePrintLayoutStoragePath())) {
+            return [];
+        }
+
+        $layout = json_decode(Storage::get($this->invoicePrintLayoutStoragePath()), true);
+
+        return is_array($layout) ? $layout : [];
+    }
+
+    private function invoicePrintLayoutPayload()
+    {
+        return [
+            'settings' => $this->invoicePrintSettings(),
+            'positions' => $this->invoicePrintPositions(),
+            'field_styles' => $this->invoicePrintFieldStyles(),
+            'custom_fields' => $this->invoicePrintCustomFields(),
+        ];
+    }
+
+    private function invoicePrintSettings()
+    {
+        $presets = [
+            'letter' => ['label' => 'Letter', 'width' => 816, 'height' => 1056, 'page_css' => 'Letter'],
+            'legal' => ['label' => 'Legal', 'width' => 816, 'height' => 1344, 'page_css' => 'Legal'],
+            'a4' => ['label' => 'A4', 'width' => 794, 'height' => 1123, 'page_css' => 'A4'],
+            'custom' => ['label' => 'Custom', 'width' => 816, 'height' => 1056, 'page_css' => '816px 1056px'],
+        ];
+
+        $saved = $this->savedInvoicePrintLayout();
+        $savedSettings = $saved['settings'] ?? [];
+
+        $paper = request('paper_size', $savedSettings['paper_size'] ?? 'letter');
+        if (!isset($presets[$paper])) {
+            $paper = 'letter';
+        }
+
+        $width = (int) ($savedSettings['paper_width'] ?? $presets[$paper]['width']);
+        $height = (int) ($savedSettings['paper_height'] ?? $presets[$paper]['height']);
+
+        if (request()->has('paper_width')) {
+            $width = max(400, min(1600, (int) request('paper_width', $width)));
+        }
+
+        if (request()->has('paper_height')) {
+            $height = max(400, min(2200, (int) request('paper_height', $height)));
+        }
+
+        $templateUrl = trim((string) request('template_url', $savedSettings['template_url'] ?? ''));
+        $printTemplate = request()->has('print_template')
+            ? request('print_template') === '1'
+            : (bool) ($savedSettings['print_template'] ?? false);
+
+        return [
+            'paper_size' => $paper,
+            'paper_width' => $width,
+            'paper_height' => $height,
+            'page_css' => $paper === 'custom' ? ($width.'px '.$height.'px') : $presets[$paper]['page_css'],
+            'template_url' => $templateUrl,
+            'print_template' => $printTemplate,
+        ];
+    }
+
+    private function invoicePrintPositions()
+    {
+        $saved = $this->savedInvoicePrintLayout();
+        $savedPositions = $saved['positions'] ?? [];
+        $defaults = [
+            'cash_sales' => [38, 135],
+            'charge_sales' => [122, 135],
+            'customer' => [36, 160],
+            'address' => [36, 184],
+            'tin' => [36, 226],
+            'mawb' => [38, 264],
+            'hawb' => [38, 288],
+            'date_shipped' => [38, 312],
+            'origin_dest' => [480, 264],
+            'commodity' => [480, 288],
+            'invoice_no' => [680, 90],
+            'invoice_date' => [700, 132],
+            'line_description' => [110, 374],
+            'soa_no' => [110, 438],
+            'line_qty' => [515, 374],
+            'line_unit_price' => [610, 374],
+            'line_amount' => [760, 374],
+            'vatable_sales' => [115, 805],
+            'vat' => [115, 832],
+            'zero_rated_sales' => [115, 860],
+            'vat_exempt_sales' => [115, 888],
+            'total_sales' => [775, 805],
+            'less_vat' => [775, 832],
+            'amount_net_vat' => [775, 860],
+            'discount' => [775, 892],
+            'add_vat' => [775, 924],
+            'withholding_tax' => [775, 956],
+            'amount_due' => [787, 1003],
+            'prepared_by' => [560, 1076],
+        ];
+
+        foreach ($defaults as $key => $point) {
+            $savedPoint = $savedPositions[$key] ?? $point;
+
+            $defaults[$key] = [
+                (int) request('x_'.$key, $savedPoint[0] ?? $point[0]),
+                (int) request('y_'.$key, $savedPoint[1] ?? $point[1]),
+            ];
+        }
+
+        return $defaults;
+    }
+
+    private function invoicePrintFieldStyles()
+    {
+        $positions = $this->invoicePrintPositions();
+        $saved = $this->savedInvoicePrintLayout();
+        $savedStyles = $saved['field_styles'] ?? [];
+        $amountFields = [
+            'line_qty', 'line_unit_price', 'line_amount', 'vatable_sales', 'vat',
+            'zero_rated_sales', 'vat_exempt_sales', 'total_sales', 'less_vat',
+            'amount_net_vat', 'discount', 'add_vat', 'withholding_tax', 'amount_due',
+        ];
+
+        $styles = [];
+        foreach ($positions as $key => $point) {
+            $defaultWidth = in_array($key, $amountFields) ? 92 : 160;
+            if ($key === 'line_description') {
+                $defaultWidth = 385;
+            }
+            if ($key === 'address') {
+                $defaultWidth = 260;
+            }
+            $savedStyle = $savedStyles[$key] ?? [];
+
+            $styles[$key] = [
+                'width' => max(20, min(900, (int) request('w_'.$key, $savedStyle['width'] ?? $defaultWidth))),
+                'font_size' => max(6, min(48, (int) request('fs_'.$key, $savedStyle['font_size'] ?? ($key === 'address' ? 10 : 12)))),
+            ];
+        }
+
+        return $styles;
+    }
+
+    private function invoicePrintCustomFields()
+    {
+        $saved = $this->savedInvoicePrintLayout();
+        if (!request()->has('custom_fields_present')) {
+            return $this->sanitizeInvoicePrintCustomFields($saved['custom_fields'] ?? []);
+        }
+
+        $keys = (array) request('custom_key', []);
+        $labels = (array) request('custom_label', []);
+        $texts = (array) request('custom_text', []);
+        $xs = (array) request('custom_x', []);
+        $ys = (array) request('custom_y', []);
+        $widths = (array) request('custom_w', []);
+        $fontSizes = (array) request('custom_fs', []);
+
+        return $this->sanitizeInvoicePrintCustomFields(array_map(function ($key, $index) use ($labels, $texts, $xs, $ys, $widths, $fontSizes) {
+            return [
+                'key' => $key,
+                'label' => $labels[$index] ?? 'Custom Field',
+                'text' => $texts[$index] ?? 'Custom Text',
+                'x' => $xs[$index] ?? 40,
+                'y' => $ys[$index] ?? 40,
+                'width' => $widths[$index] ?? 160,
+                'font_size' => $fontSizes[$index] ?? 12,
+            ];
+        }, $keys, array_keys($keys)));
+    }
+
+    private function sanitizeInvoicePrintCustomFields($rawFields)
+    {
+        $fields = [];
+        if (!is_array($rawFields)) {
+            return $fields;
+        }
+
+        foreach ($rawFields as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $key = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) ($field['key'] ?? ''));
+            if ($key === '') {
+                continue;
+            }
+
+            $fields[] = [
+                'key' => $key,
+                'label' => trim((string) ($field['label'] ?? 'Custom Field')),
+                'text' => trim((string) ($field['text'] ?? 'Custom Text')),
+                'x' => max(0, min(1600, (int) ($field['x'] ?? 40))),
+                'y' => max(0, min(2200, (int) ($field['y'] ?? 40))),
+                'width' => max(20, min(900, (int) ($field['width'] ?? 160))),
+                'font_size' => max(6, min(48, (int) ($field['font_size'] ?? 12))),
+            ];
+        }
+
+        return $fields;
+    }
+
+    private function billingRows()
+    {
+        return [
+            ['BI-2026-01042', 'North Harbor Trading', 'JOB-SEA-2026-0422', 'PHP', '98,500.00', 'Posted', '2026-05-24'],
+            ['SOAA-2026-00211', 'Blue Anchor Logistics', 'JOB-SEA-2026-0398', 'USD', '1,840.00', 'For Collection', '2026-05-23'],
+            ['DN-2026-00042', 'Island Prime Foods', 'JOB-SEA-2026-0365', 'PHP', '48,900.00', 'Draft', '2026-05-22'],
+            ['BI-2026-01043', 'Metro Manila Forwarders', 'JOB-SEA-2026-0423', 'PHP', '127,900.00', 'For Approval', '2026-05-24'],
+        ];
+    }
+
+    private function billingPrintDocuments($vatClassification, array $totals = [])
+    {
+        $query = array_filter([
+            'customer' => request('customer_name'),
+            'invoice_no' => request('invoice_no'),
+            'invoice_date' => request('invoice_date'),
+            'soa_no' => request('soa_no'),
+            'billing_total' => isset($totals['billing_total']) ? number_format($totals['billing_total'], 2, '.', '') : null,
+            'reimbursement_total' => isset($totals['reimbursement_total']) ? number_format($totals['reimbursement_total'], 2, '.', '') : null,
+            'soa_total' => isset($totals['soa_total']) ? number_format($totals['soa_total'], 2, '.', '') : null,
+            'vatable_sales' => isset($totals['vatable_sales']) ? number_format($totals['vatable_sales'], 2, '.', '') : null,
+            'vat_amount' => isset($totals['vat_amount']) ? number_format($totals['vat_amount'], 2, '.', '') : null,
+        ], function ($value) {
+            return $value !== null && $value !== '';
+        });
+
+        return $vatClassification === '12%'
+            ? [
+                ['label' => 'Print SOA B', 'route' => route('erp.billings.print-soa', $query), 'icon' => 'bi-file-earmark-text'],
+                ['label' => 'Print Billing Invoice', 'route' => route('erp.billings.print-invoice', $query), 'icon' => 'bi-printer'],
+            ]
+            : [
+                ['label' => 'Print SOA A', 'route' => route('erp.soa-a.preview', $query), 'icon' => 'bi-file-earmark-text'],
+            ];
+    }
+
+    private function billingTotals(array $data)
+    {
+        $billingSubtotal = 0.0;
+        $reimbursementTotal = 0.0;
+        $vatAmount = 0.0;
+
+        foreach (($data['line_amount'] ?? []) as $index => $amount) {
+            $lineAmount = $this->moneyToFloat($amount);
+            $item = strtolower((string) ($data['item'][$index] ?? ''));
+            $description = strtolower((string) ($data['item_description'][$index] ?? ''));
+            $isReimbursement = strpos($item, 'reimburs') !== false || strpos($description, 'reimburs') !== false;
+
+            if ($isReimbursement) {
+                $reimbursementTotal += $lineAmount;
+                continue;
+            }
+
+            $billingSubtotal += $lineAmount;
+            if (($data['tax_category'][$index] ?? '') === '12%') {
+                $vatAmount += $lineAmount * 0.12;
+            }
+        }
+
+        return [
+            'vatable_sales' => $billingSubtotal,
+            'vat_amount' => $vatAmount,
+            'billing_total' => $billingSubtotal + $vatAmount,
+            'reimbursement_total' => $reimbursementTotal,
+            'soa_total' => $billingSubtotal + $vatAmount + $reimbursementTotal,
+        ];
+    }
+
+    private function moneyToFloat($value)
+    {
+        return (float) str_replace(',', '', (string) $value);
+    }
+
+    private function billingPrintPreviewData()
+    {
+        $billingTotal = $this->moneyToFloat(request('billing_total', '21327.07'));
+        $reimbursementTotal = $this->moneyToFloat(request('reimbursement_total', '753495.10'));
+        $soaTotal = request()->has('soa_total')
+            ? $this->moneyToFloat(request('soa_total'))
+            : $billingTotal + $reimbursementTotal;
+
+        return [
+            'customer' => request('customer', 'PHILUSA CORPORATION'),
+            'invoice_no' => request('invoice_no', '0001031'),
+            'invoice_date' => request('invoice_date', '05/19/2026'),
+            'soa_no' => request('soa_no', '7187'),
+            'vatable_sales' => $this->moneyToFloat(request('vatable_sales', '19388.25')),
+            'vat_amount' => $this->moneyToFloat(request('vat_amount', '2326.59')),
+            'billing_total' => $billingTotal,
+            'reimbursement_total' => $reimbursementTotal,
+            'soa_total' => $soaTotal,
+        ];
+    }
+
+    public function invoiceReview()
+    {
+        $data = request()->only([
+            'customer_id',
+            'customer_name',
+            'job_shipment_id',
+            'invoice_no',
+            'transaction_no',
+            'soa_no',
+            'invoice_date',
+            'due_date',
+            'invoice_to',
+            'invoice_amount',
+            'total_payment',
+            'consignee',
+            'credit_term_days',
+            'tin',
+            'vat_classification',
+            'class_code',
+            'currency',
+            'ar_account',
+            'invoice_template',
+            'customer_message',
+            'memo',
+            'customer_tax_code',
+            'description',
+            'amount',
+            'mawb_no',
+            'hawb_no',
+            'date_shipped',
+            'origin_dest',
+            'commodity',
+            'item',
+            'item_description',
+            'qty',
+            'unit_price',
+            'line_class',
+            'tax_category',
+            'line_amount',
+        ]);
+
+        $invoiceNo = trim((string) ($data['invoice_no'] ?? ''));
+        $transactionNo = trim((string) ($data['transaction_no'] ?? ''));
+        $data['invoice_no'] = $invoiceNo !== '' ? $invoiceNo : $transactionNo;
+        $data['transaction_no'] = $data['invoice_no'];
+
+        $totals = $this->billingTotals($data);
+        $data['invoice_amount'] = number_format($totals['billing_total'], 2);
+        $data['amount'] = number_format($totals['soa_total'], 2);
+        $data['reimbursement_total'] = number_format($totals['reimbursement_total'], 2);
+        $data['soa_total'] = number_format($totals['soa_total'], 2);
+
+        return view('erp.invoices.review', [
+            'invoice' => $data,
+            'printDocuments' => $this->billingPrintDocuments($data['vat_classification'] ?? null, $totals),
+        ]);
+    }
+
+    public function paymentCreate()
+    {
+        $customers = [];
+        $invoices = [];
+        $payments = [];
+
+        if (Schema::hasTable('customers')) {
+            $customers = DB::table('customers')
+                ->select('id', 'code', 'customer_id', 'name', 'currency')
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get()
+                ->map(function ($customer) {
+                    return [
+                        'id' => $customer->id,
+                        'customer_id' => $customer->customer_id ?: $customer->code,
+                        'code' => $customer->code,
+                        'name' => $customer->name,
+                        'currency' => $customer->currency ?: 'PHP',
+                    ];
+                })
+                ->all();
+        }
+
+        if (Schema::hasTable('sales_documents')) {
+            $invoices = DB::table('sales_documents')
+                ->leftJoin('customers', 'customers.id', '=', 'sales_documents.customer_id')
+                ->select(
+                    'sales_documents.id',
+                    'sales_documents.document_no',
+                    'sales_documents.currency',
+                    'sales_documents.grand_total',
+                    'sales_documents.paid_total',
+                    'sales_documents.customer_id',
+                    'customers.name as customer_name'
+                )
+                ->whereIn('sales_documents.document_type', ['invoice', 'billing_invoice', 'soa', 'soa_a', 'debit_note'])
+                ->orderBy('sales_documents.document_date', 'desc')
+                ->limit(100)
+                ->get()
+                ->map(function ($invoice) {
+                    return [
+                        'id' => $invoice->id,
+                        'document_no' => $invoice->document_no,
+                        'currency' => $invoice->currency ?: 'PHP',
+                        'grand_total' => (float) $invoice->grand_total,
+                        'paid_total' => (float) $invoice->paid_total,
+                        'balance' => max(0, (float) $invoice->grand_total - (float) $invoice->paid_total),
+                        'customer_id' => $invoice->customer_id,
+                        'customer_name' => $invoice->customer_name,
+                    ];
+                })
+                ->all();
+        }
+
+        if (Schema::hasTable('receipts')) {
+            $payments = DB::table('receipts')
+                ->leftJoin('customers', 'customers.id', '=', 'receipts.customer_id')
+                ->leftJoin('receipt_applications', 'receipt_applications.receipt_id', '=', 'receipts.id')
+                ->leftJoin('sales_documents', 'sales_documents.id', '=', 'receipt_applications.sales_document_id')
+                ->select(
+                    'receipts.id',
+                    'receipts.status',
+                    'receipts.receipt_no',
+                    'receipts.receipt_date',
+                    'receipts.currency',
+                    'receipts.amount',
+                    'receipts.payment_method',
+                    'receipts.reference_no',
+                    'customers.name as customer_name',
+                    DB::raw('GROUP_CONCAT(sales_documents.document_no ORDER BY sales_documents.document_no SEPARATOR ", ") as invoice_numbers')
+                )
+                ->groupBy(
+                    'receipts.id',
+                    'receipts.status',
+                    'receipts.receipt_no',
+                    'receipts.receipt_date',
+                    'receipts.currency',
+                    'receipts.amount',
+                    'receipts.payment_method',
+                    'receipts.reference_no',
+                    'customers.name'
+                )
+                ->orderBy('receipts.receipt_date', 'desc')
+                ->orderBy('receipts.id', 'desc')
+                ->limit(100)
+                ->get()
+                ->map(function ($payment) {
+                    return [
+                        'id' => $payment->id,
+                        'status' => ucfirst($payment->status ?: 'posted'),
+                        'number' => $payment->receipt_no,
+                        'client' => $payment->customer_name ?: 'Unassigned Customer',
+                        'currency' => $payment->currency ?: 'PHP',
+                        'amount' => number_format((float) $payment->amount, 2),
+                        'invoice_number' => $payment->invoice_numbers ?: '',
+                        'date' => $payment->receipt_date,
+                        'payment_method' => $payment->payment_method,
+                        'reference_no' => $payment->reference_no,
+                    ];
+                })
+                ->all();
+        }
+
+        return view('erp.payments.create', [
+            'customers' => $customers,
+            'invoices' => $invoices,
+            'payments' => $payments,
+        ]);
+    }
+
+    public function paymentReceipt()
+    {
+        $payment = request()->only([
+            'receipt_type',
+            'receipt_no',
+            'customer_id',
+            'customer_name',
+            'job_shipment_id',
+            'invoice_no',
+            'project',
+            'payment_date',
+            'payment_method',
+            'payment_type',
+            'reference_no',
+            'private_notes',
+            'send_email',
+            'convert_currency',
+            'currency',
+            'amount',
+        ]);
+
+        if (Schema::hasTable('receipts') && request('customer_id')) {
+            $customer = DB::table('customers')->where('id', request('customer_id'))->first();
+            $companyId = $customer ? $customer->company_id : DB::table('companies')->value('id');
+            $invoice = null;
+
+            if (Schema::hasTable('sales_documents') && request('invoice_no')) {
+                $invoice = DB::table('sales_documents')
+                    ->where('document_no', request('invoice_no'))
+                    ->when($customer, function ($query) use ($customer) {
+                        return $query->where('customer_id', $customer->id);
+                    })
+                    ->first();
+            }
+
+            $receiptNo = request('receipt_no') ?: $this->nextReceiptNumber($companyId);
+            $amount = (float) str_replace(',', '', request('amount', 0));
+
+            DB::transaction(function () use ($customer, $companyId, $invoice, $receiptNo, $amount) {
+                $receiptId = DB::table('receipts')->insertGetId([
+                    'company_id' => $companyId,
+                    'customer_id' => $customer ? $customer->id : request('customer_id'),
+                    'receipt_no' => $receiptNo,
+                    'receipt_type' => request('receipt_type', 'official_receipt'),
+                    'customer_id_text' => $customer ? ($customer->customer_id ?: $customer->code) : null,
+                    'job_shipment_id' => request('job_shipment_id'),
+                    'class_code' => request('class_code', 'MANILA'),
+                    'currency' => request('currency', 'PHP'),
+                    'receipt_date' => request('payment_date', date('Y-m-d')),
+                    'payment_method' => request('payment_method', 'Check'),
+                    'reference_no' => request('reference_no'),
+                    'amount' => $amount,
+                    'status' => 'posted',
+                    'template_code' => request('template_code'),
+                    'uses_pre_printed_form' => true,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                if ($invoice && Schema::hasTable('receipt_applications')) {
+                    DB::table('receipt_applications')->insert([
+                        'receipt_id' => $receiptId,
+                        'sales_document_id' => $invoice->id,
+                        'amount_applied' => min($amount, max(0, (float) $invoice->grand_total - (float) $invoice->paid_total)),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+
+                    DB::table('sales_documents')->where('id', $invoice->id)->update([
+                        'paid_total' => min((float) $invoice->grand_total, (float) $invoice->paid_total + $amount),
+                        'status' => ((float) $invoice->paid_total + $amount) >= (float) $invoice->grand_total ? 'paid' : 'partial',
+                        'updated_at' => now(),
+                    ]);
+                }
+            });
+
+            $payment['receipt_no'] = $receiptNo;
+            $payment['customer_name'] = $customer ? $customer->name : request('customer_name');
+        }
+
+        return view('erp.payments.receipt', [
+            'payment' => $payment,
+        ]);
+    }
+
+    private function nextReceiptNumber($companyId)
+    {
+        if (!$companyId) {
+            return 'OR-' . date('YmdHis');
+        }
+
+        $lastReceipt = DB::table('receipts')
+            ->where('company_id', $companyId)
+            ->where('receipt_no', 'like', 'OR-%')
+            ->orderBy('id', 'desc')
+            ->value('receipt_no');
+
+        $number = $lastReceipt ? (int) preg_replace('/\D/', '', $lastReceipt) : 0;
+
+        return 'OR-' . str_pad($number + 1, 5, '0', STR_PAD_LEFT);
+    }
+
+    public function soaPreview()
+    {
+        return view('erp.print.soa', ['print' => $this->billingPrintPreviewData()]);
+    }
+
+    public function soaAPreview()
+    {
+        return view('erp.print.soa-a');
+    }
+
+    public function debitNotePreview()
+    {
+        return view('erp.print.debit-note');
+    }
+
+    public function officialReceiptPreview()
+    {
+        return view('erp.print.official-receipt');
+    }
+
+    public function acknowledgementReceiptPreview()
+    {
+        return view('erp.print.acknowledgement-receipt');
+    }
+
+    public function publicInvoice($token)
+    {
+        $invoice = [
+            'token' => $token,
+            'invoice_no' => 'BI-2026-01043',
+            'customer' => 'Philusa Corporation',
+            'status' => 'Sent',
+            'currency' => 'PHP',
+            'amount_due' => '21,327.07',
+            'due_date' => '2026-06-23',
+            'items' => [
+                ['Ocean Freight Service Charge', '1', '19,388.25', '19,388.25'],
+                ['Output VAT', '1', '2,326.59', '2,326.59'],
+                ['Creditable Withholding Tax', '1', '-387.77', '-387.77'],
+            ],
+        ];
+
+        return view('erp.client.public-invoice', compact('invoice'));
+    }
+
+    public function publicCheckout($token)
+    {
+        $checkout = [
+            'token' => $token,
+            'invoice_no' => 'BI-2026-01043',
+            'customer' => 'Philusa Corporation',
+            'amount_due' => '21,327.07',
+            'currency' => 'PHP',
+            'gateway' => config('services.stripe.key') ? 'Stripe ready' : 'Stripe test keys not configured',
+        ];
+
+        return view('erp.client.checkout', compact('checkout'));
+    }
+
+    public function stripeWebhook()
+    {
+        return response()->json([
+            'received' => true,
+            'handler' => 'stripe_webhook_placeholder',
+            'rules' => [
+                'verify_signature',
+                'check_event_id_idempotency',
+                'create_payment_record',
+                'update_invoice_balance',
+                'write_activity_log',
+            ],
+        ]);
+    }
+
+    public function customerBillingTemplates()
+    {
+        $templates = [
+            ['Billing Invoice', 'BI-PREPRINT', 'A4 / Legal', 'Yes', 'A/Trade-Billing Invoice', 'PHP / USD'],
+            ['Statement of Account', 'SOA-PREPRINT', 'A4', 'Yes', 'A/R Trade-SOA', 'PHP / USD'],
+            ['Statement of Account A', 'SOAA-PLAIN', 'A4', 'No', 'A/R Trade-SOA A', 'PHP / USD'],
+            ['Debit Note', 'DN-PREPRINT', 'A4', 'Yes', 'A/R Trade-Debit Note', 'PHP / USD'],
+            ['Official Receipt', 'OR-PREPRINT', 'A4 / Official Form', 'Yes', 'A/Trade-Billing Invoice', 'PHP / USD'],
+            ['Acknowledgement Receipt', 'AR-PREPRINT', 'A4 / Official Form', 'Yes', 'A/R Reimbursable Charges', 'PHP / USD'],
+        ];
+
+        return view('erp.reports.customer-billing-templates', compact('templates'));
+    }
+
+    public function agingReport()
+    {
+        $rows = [
+            ['CUST-001', 'North Harbor Trading', 'JOB-SEA-2026-0422', 'BI-2026-01042', 'PHP', '12%', 'MANILA', 98500, 0, 0, 0],
+            ['CUST-002', 'Blue Anchor Logistics', 'JOB-SEA-2026-0398', 'SOAA-2026-00211', 'USD', 'zero-rated', 'CEBU', 0, 1840, 0, 0],
+            ['CUST-003', 'Island Prime Foods', 'JOB-SEA-2026-0365', 'DN-2026-00042', 'PHP', 'exempt', 'PAMPANGA', 0, 0, 36500, 12400],
+        ];
+
+        return view('erp.reports.aging', compact('rows'));
+    }
+
+    private function modules()
+    {
+        return [
+            'accounting' => [
+                'title' => 'Accounting & General Ledger',
+                'subtitle' => 'Chart of accounts, shipment-linked journal entries, financial statements, and audit trail.',
+                'actions' => ['Chart of Accounts', 'Journal Entries', 'Balance Sheet', 'Profit & Loss'],
+                'features' => ['Chart of Accounts', 'Journal Entries', 'Shipment Job ID Required', 'Balance Sheet', 'Profit and Loss', 'Income Statement', 'Cash Flow Statement', 'Audit Trail'],
+                'columns' => ['Journal No.', 'Shipment Job ID', 'Reference', 'Debit', 'Credit', 'Status'],
+                'rows' => [
+                    ['JV-2026-00218', 'JOB-SEA-2026-0423', 'BI-2026-01043', 'Accounts Receivable', 'Service Revenue', 'Draft'],
+                    ['JV-2026-00217', 'JOB-SEA-2026-0422', 'BI-2026-01042', 'A/Trade-Billing Invoice', 'Service Revenue', 'Posted'],
+                    ['JV-2026-00216', 'JOB-SEA-2026-0398', 'SOAA-2026-00211', 'A/R Trade-SOA A', 'Service Revenue', 'Posted'],
+                ],
+            ],
+            'receivables' => [
+                'title' => 'Accounts Receivable',
+                'subtitle' => 'Customer masterlist, create invoice, enter billing information, receive payment, and monitor aging.',
+                'actions' => ['Customer Masterlist', 'Create Invoice', 'Receive Payment', 'Aging Report'],
+                'features' => ['Customer ID', 'Tax Information', 'Contact Information', 'Job/Shipment ID', 'Invoice No.', 'VAT 12% / Zero-rated / Exempt', 'Class: MANILA / PAMPANGA / CEBU', '30/60/90 Terms', 'PHP / USD'],
+                'columns' => ['Customer ID', 'Customer', 'Terms', 'Currency', 'AR Account', 'Class'],
+                'rows' => [
+                    ['CUST-001', 'North Harbor Trading', '30 Days', 'PHP', 'A/Trade-Billing Invoice', 'MANILA'],
+                    ['CUST-002', 'Blue Anchor Logistics', '60 Days', 'USD', 'A/R Trade-SOA A', 'CEBU'],
+                    ['CUST-003', 'Island Prime Foods', '90 Days', 'PHP', 'A/R Trade-Debit Note', 'PAMPANGA'],
+                ],
+            ],
+            'billing' => [
+                'title' => 'Customer Invoicing',
+                'subtitle' => 'Create invoices first, enter billing and shipment information, then proceed to payment.',
+                'actions' => ['Billing CRUD', 'Create Invoice', 'Invoice Preview', 'Receive Payment', 'Templates'],
+                'features' => ['BI Pre-printed', 'SOA Pre-printed', 'SOA A Plain Form', 'Debit Note Pre-printed', 'Invoice No.', 'Customer ID', 'Job/Shipment ID', 'VAT Classification'],
+                'columns' => ['Doc Type', 'Doc No.', 'Customer ID', 'Job/Shipment ID', 'VAT', 'Class'],
+                'rows' => [
+                    ['Billing Invoice', 'BI-2026-01042', 'CUST-001', 'JOB-SEA-2026-0422', '12%', 'MANILA'],
+                    ['Statement A', 'SOAA-2026-00211', 'CUST-002', 'JOB-SEA-2026-0398', 'zero-rated', 'CEBU'],
+                    ['Debit Note', 'DN-2026-00042', 'CUST-003', 'JOB-SEA-2026-0365', 'exempt', 'PAMPANGA'],
+                ],
+            ],
+            'collections' => [
+                'title' => 'Collections / Receive Payment',
+                'subtitle' => 'Official Receipts, Acknowledgement Receipts, SOA A collections, and payment allocation.',
+                'actions' => ['Official Receipt', 'Acknowledgement Receipt', 'SOA A Collection', 'Deposit Collection'],
+                'features' => ['OR Pre-printed', 'AR Pre-printed', 'SOA A No Pre-printed Form', 'Cash', 'Check', 'Bank Transfer', 'Partial Payment', 'Multiple Invoice Payment'],
+                'columns' => ['Receipt Type', 'Receipt No.', 'Customer ID', 'Job/Shipment ID', 'Currency', 'Amount'],
+                'rows' => [
+                    ['Official Receipt', 'OR-2026-00618', 'CUST-001', 'JOB-SEA-2026-0422', 'PHP', '43,200.00'],
+                    ['Acknowledgement Receipt', 'AR-2026-00109', 'CUST-003', 'JOB-SEA-2026-0365', 'PHP', '12,800.00'],
+                    ['SOA A Collection', 'COLA-2026-00031', 'CUST-002', 'JOB-SEA-2026-0398', 'USD', '1,840.00'],
+                ],
+            ],
+            'payables' => [
+                'title' => 'Accounts Payable',
+                'subtitle' => 'Vendor bill entry, shipment-linked expenses, approvals, payments, vouchers, checks, WHT, and aging.',
+                'actions' => ['Vendor Bill Entry', 'Payment Processing', 'Payment Approvals', 'AP Aging'],
+                'features' => ['Vendor Bill Entry', 'Shipment-linked Expenses', 'Client Tagging', 'Check Voucher Printing', 'Payment Approval', 'Bank / Cheque / Online Transfer', 'Check Printing', 'Withholding Tax', 'USD / PHP'],
+                'columns' => ['Supplier', 'Bill No.', 'Shipment Job ID', 'Currency', 'WHT', 'Status'],
+                'rows' => [
+                    ['Pacific Fuel Services', 'BILL-7710', 'JOB-SEA-2026-0398', 'USD', '2%', 'For Payment'],
+                    ['Metro Industrial Supply', 'BILL-4902', 'JOB-SEA-2026-0423', 'PHP', '5%', 'For Approval'],
+                    ['Harbor Office Center', 'BILL-2420', 'JOB-SEA-2026-0365', 'PHP', '0%', 'Approved'],
+                ],
+            ],
+            'purchasing' => [
+                'title' => 'Purchasing',
+                'subtitle' => 'Purchase requests, purchase orders, service/goods receiving, supplier bills, and approval workflows.',
+                'actions' => ['Create PR', 'Create PO', 'Receive Goods / Services', 'Supplier Performance'],
+                'features' => ['Purchase Request', 'RFQ', 'Purchase Order', 'Receiving', 'Three-way Match', 'Approval Workflow', 'Supplier Terms', 'Attachments'],
+                'columns' => ['PO No.', 'Supplier', 'Branch', 'Expected Date', 'Amount', 'Status'],
+                'rows' => [
+                    ['PO-2026-00491', 'Metro Industrial Supply', 'Main', '2026-05-29', '127,900.00', 'Approved'],
+                    ['PO-2026-00490', 'Pacific Fuel Services', 'South', '2026-05-28', '76,880.00', 'Receiving'],
+                    ['PO-2026-00489', 'Harbor Office Center', 'Main', '2026-05-27', '18,000.00', 'Closed'],
+                ],
+            ],
+            'banking' => [
+                'title' => 'Banking',
+                'subtitle' => 'Cashbook, multi-bank accounts, deposits, withdrawals, FX tracking, reconciliation, and daily cash position.',
+                'actions' => ['Cashbook', 'Record Bank Transaction', 'Bank Reconciliation', 'Daily Cash Position'],
+                'features' => ['Bank Reconciliation', 'Cashbook Management', 'Deposit Tracking', 'Withdrawal Tracking', 'Multi-bank Support', 'FX Conversion Tracking', 'Daily Cash Position Report'],
+                'columns' => ['Account', 'Bank', 'Currency', 'Book Balance', 'Bank Balance', 'Status'],
+                'rows' => [
+                    ['BPI Operating - PHP', 'BPI', 'PHP', '945,195.00', '1,066,700.00', 'Reconciling'],
+                    ['BDO Payroll - PHP', 'BDO', 'PHP', '200,000.00', '200,000.00', 'Reconciled'],
+                    ['Metrobank USD Collections - USD', 'Metrobank', 'USD', '20,260.00', '20,260.00', 'Reconciled'],
+                ],
+            ],
+            'fx' => [
+                'title' => 'Multi-Currency & FX',
+                'subtitle' => 'USD and PHP conversion, realized FX gains/losses, unrealized revaluation, and accounting traceability.',
+                'actions' => ['Currency Conversion', 'FX Gains / Losses', 'Bank FX Tracking', 'Journal Entries'],
+                'features' => ['USD / PHP', 'Currency Conversion', 'Realized FX Gain/Loss', 'Unrealized FX Gain/Loss', 'Document Rate', 'Settlement Rate', 'Month-end Revaluation', 'Shipment Job ID Traceability'],
+                'columns' => ['Date', 'Type', 'Reference', 'Currency', 'Foreign Amount', 'Gain/Loss'],
+                'rows' => [
+                    ['2026-05-24', 'Unrealized', 'SOAA-2026-00211', 'USD', '1,840.00', '276.00 Gain'],
+                    ['2026-05-23', 'Realized', 'OR-2026-00618', 'USD', '1,840.00', '184.00 Gain'],
+                    ['2026-05-21', 'Realized', 'BILL-7710', 'USD', '-1,325.00', '132.50 Gain'],
+                ],
+            ],
+            'reports' => [
+                'title' => 'Financial Reports',
+                'subtitle' => 'Balance sheet, profit and loss, cash flow, tax reports, KPI analytics, PDF, and Excel.',
+                'actions' => ['Profit & Loss', 'Balance Sheet', 'Cash Flow', 'Export Excel'],
+                'features' => ['Balance Sheet', 'Profit & Loss', 'Income Statement', 'Cash Flow Statement', 'Shipment Job ID Drilldown', 'Revenue Summary', 'Expense Summary', 'Tax Reports'],
+                'columns' => ['Report', 'Period', 'Branch', 'Currency', 'Format', 'Last Run'],
+                'rows' => [
+                    ['Profit & Loss', 'May 2026', 'All', 'PHP', 'PDF/Excel', '2026-05-24'],
+                    ['Balance Sheet', 'May 2026', 'All', 'PHP', 'PDF/Excel', '2026-05-24'],
+                    ['VAT Summary', 'Q2 2026', 'Main', 'PHP', 'Excel', '2026-05-23'],
+                ],
+            ],
+            'tax' => [
+                'title' => 'Tax Management',
+                'subtitle' => 'VAT computation, zero-rated export services, VAT-exempt transactions, withholding tax, summary lists, and audit trail.',
+                'actions' => ['VAT Summary', 'Tax Calculator', 'Withholding Tax', 'Sales & Purchases'],
+                'features' => ['12% VAT', 'Zero-rated Export Services', 'VAT-exempt', 'Expanded Withholding Tax', 'Creditable Withholding Tax', 'Sales Summary List', 'Purchase Summary List', 'Audit Trail'],
+                'columns' => ['Tax Code', 'Description', 'Rate', 'Tax Type', 'GL Account', 'Status'],
+                'rows' => [
+                    ['VAT12', 'Output VAT / Input VAT 12%', '12%', 'VAT', 'Output VAT Payable / Input VAT', 'Active'],
+                    ['VATZERO', 'Zero-rated Export Services', '0%', 'VAT', 'Zero-rated Sales', 'Active'],
+                    ['VATEXEMPT', 'VAT-exempt Transactions', '0%', 'VAT', 'Exempt Sales/Purchases', 'Active'],
+                    ['EWT2', 'Expanded Withholding Tax', '2%', 'Withholding', 'EWT Payable', 'Active'],
+                    ['CWT2', 'Creditable Withholding Tax', '2%', 'Withholding', 'CWT Receivable', 'Active'],
+                ],
+            ],
+            'recurring-invoices' => [
+                'title' => 'Recurring Invoices',
+                'subtitle' => 'Scheduled customer billings for repeat service contracts and monthly retainers.',
+                'actions' => ['Create Schedule', 'Generate Due Invoices', 'Email Queue', 'Open Checkout'],
+                'features' => ['Recurring Template', 'Frequency', 'Start Date', 'Remaining Cycles', 'Due Date Rule', 'Auto Email', 'Optional Auto Billing', 'No Duplicate Generation'],
+                'columns' => ['Schedule No.', 'Customer', 'Cycle', 'Next Run', 'Auto Bill', 'Status'],
+                'rows' => [
+                    ['RI-2026-00014', 'North Harbor Trading', 'Monthly', '2026-06-01', 'Manual', 'Active'],
+                    ['RI-2026-00013', 'Blue Anchor Logistics', 'Quarterly', '2026-07-01', 'Gateway Token', 'For Review'],
+                    ['RI-2026-00012', 'Island Prime Foods', 'Monthly', '2026-06-05', 'None', 'Paused'],
+                ],
+            ],
+            'online-checkout' => [
+                'title' => 'Online Checkout',
+                'subtitle' => 'Hosted payment links, Stripe-ready checkout flow, tokenized payment methods, webhook handling, and invoice balance updates.',
+                'actions' => ['Open Public Invoice', 'Open Checkout', 'Stripe Setup', 'Webhook Monitor'],
+                'features' => ['Secure Payment Link', 'Stripe Checkout / Payment Element', 'No Raw Card Storage', 'Gateway Transaction ID', 'Partial Payment', 'Refund Handling', 'Failed Payment Handling', 'Webhook Idempotency'],
+                'columns' => ['Payment Link', 'Invoice', 'Gateway', 'Amount Due', 'Token Mode', 'Status'],
+                'rows' => [
+                    ['demo-invoice-token', 'BI-2026-01043', 'Stripe', 'PHP 21,327.07', 'Hosted Checkout', 'Ready'],
+                    ['soa-payment-token', 'SOA-2026-07187', 'Stripe', 'PHP 98,500.00', 'Customer Token', 'Ready'],
+                    ['usd-payment-token', 'SOAA-2026-00211', 'Stripe', 'USD 1,840.00', 'Hosted Checkout', 'Requires FX Rate'],
+                ],
+            ],
+            'client-portal' => [
+                'title' => 'Client Portal',
+                'subtitle' => 'Secure customer-facing pages for invoice viewing, quote approval, payment history, documents, and payment methods.',
+                'actions' => ['Portal Preview', 'Open Checkout', 'Magic Link Settings', 'Email Queue'],
+                'features' => ['Magic Link Access', 'Invoice List', 'Quote Approval', 'Payment History', 'PDF Download', 'Documents', 'Payment Method Update', 'Client Activity Tracking'],
+                'columns' => ['Portal User', 'Client', 'Access Type', 'Last Activity', 'Open Balance', 'Status'],
+                'rows' => [
+                    ['Angela Reyes', 'North Harbor Trading', 'Magic Link', 'Viewed BI-2026-01042', 'PHP 55,300.00', 'Active'],
+                    ['Mark Lim', 'Blue Anchor Logistics', 'Login', 'Paid SOAA-2026-00211', 'USD 0.00', 'Active'],
+                    ['Grace Tan', 'Island Prime Foods', 'Magic Link', 'Downloaded SOA', 'PHP 12,400.00', 'Pending'],
+                ],
+            ],
+            'quotes' => [
+                'title' => 'Quotes',
+                'subtitle' => 'Customer estimates with approval tracking and controlled quote-to-invoice conversion.',
+                'actions' => ['View Quote Register', 'Export Quotes', 'Attach Approval', 'Create Invoice'],
+                'features' => ['Quote No.', 'Customer', 'Shipment Job ID', 'Validity Date', 'Currency', 'Client Approval', 'Signature Capture', 'Quote-to-Invoice'],
+                'columns' => ['Quote No.', 'Customer', 'Shipment Job ID', 'Amount', 'Valid Until', 'Status'],
+                'rows' => [
+                    ['QT-2026-0042', 'North Harbor Trading', 'JOB-SEA-2026-0422', '98,500.00', '2026-06-15', 'Accepted'],
+                    ['QT-2026-0041', 'Blue Anchor Logistics', 'JOB-SEA-2026-0398', '1,840.00 USD', '2026-06-10', 'For Review'],
+                    ['QT-2026-0040', 'Island Prime Foods', 'JOB-SEA-2026-0365', '48,900.00', '2026-06-01', 'Expired'],
+                ],
+            ],
+            'credits' => [
+                'title' => 'Credits',
+                'subtitle' => 'Customer credit memos, invoice adjustments, overpayment credits, and application tracking.',
+                'actions' => ['Create Credit Memo', 'Apply to Invoice', 'Review Credit Balance', 'Export Credits'],
+                'features' => ['Credit Memo No.', 'Customer', 'Invoice Reference', 'Shipment Job ID', 'VAT Reversal', 'Approval Workflow', 'Audit Trail'],
+                'columns' => ['Credit No.', 'Customer', 'Invoice', 'Shipment Job ID', 'Amount', 'Status'],
+                'rows' => [
+                    ['CM-2026-00031', 'North Harbor Trading', 'BI-2026-01042', 'JOB-SEA-2026-0422', '2,500.00', 'Applied'],
+                    ['CM-2026-00030', 'Island Prime Foods', 'DN-2026-00042', 'JOB-SEA-2026-0365', '1,200.00', 'For Approval'],
+                    ['CM-2026-00029', 'Blue Anchor Logistics', 'SOAA-2026-00211', 'JOB-SEA-2026-0398', '80.00 USD', 'Open'],
+                ],
+            ],
+            'projects' => [
+                'title' => 'Projects',
+                'subtitle' => 'Shipment jobs and client projects with billing, cost, collection, and document tracking.',
+                'actions' => ['Open Shipment Job', 'Review Billing', 'Track Expenses', 'Attach Documents'],
+                'features' => ['Shipment Job ID', 'Customer', 'Origin/Destination', 'Class', 'Branch', 'Revenue', 'Expense', 'Profitability'],
+                'columns' => ['Shipment Job ID', 'Customer', 'Origin/Destination', 'Revenue', 'Expense', 'Margin'],
+                'rows' => [
+                    ['JOB-SEA-2026-0423', 'Metro Manila Forwarders', 'ROTTERDAM / MANILA', '127,900.00', '76,880.00', '51,020.00'],
+                    ['JOB-SEA-2026-0422', 'North Harbor Trading', 'SINGAPORE / MANILA', '98,500.00', '43,200.00', '55,300.00'],
+                    ['JOB-SEA-2026-0398', 'Blue Anchor Logistics', 'CEBU / TOKYO', '1,840.00 USD', '1,325.00 USD', '515.00 USD'],
+                ],
+            ],
+            'tasks' => [
+                'title' => 'Tasks',
+                'subtitle' => 'Operational, accounting, collection, approval, and document follow-up tasks.',
+                'actions' => ['Create Task', 'Assign Owner', 'Update Due Date', 'Mark Complete'],
+                'features' => ['Task Owner', 'Due Date', 'Shipment Job ID', 'Priority', 'Module Link', 'Comment Thread', 'Activity Timeline'],
+                'columns' => ['Task', 'Owner', 'Module', 'Due Date', 'Priority', 'Status'],
+                'rows' => [
+                    ['Review BI print alignment', 'Maria Santos', 'Invoices', '2026-05-24', 'High', 'Open'],
+                    ['Follow up SOA payment', 'Ana Reyes', 'Payments', '2026-05-25', 'Medium', 'In Progress'],
+                    ['Attach supplier bill docs', 'Leo Garcia', 'Expenses', '2026-05-26', 'Medium', 'Open'],
+                ],
+            ],
+            'expenses' => [
+                'title' => 'Expenses',
+                'subtitle' => 'Shipment-linked expenses, vendor bills, tax computation, payment approval, and AP aging.',
+                'actions' => ['Vendor Bill Entry', 'Payment Processing', 'Check Voucher', 'AP Aging'],
+                'features' => ['Expense Category', 'Supplier', 'Shipment Job ID', 'Client Tagging', 'Input VAT', 'Withholding Tax', 'USD / PHP', 'Payment Approval'],
+                'columns' => ['Expense No.', 'Supplier', 'Shipment Job ID', 'Currency', 'Amount', 'Status'],
+                'rows' => [
+                    ['EXP-2026-00871', 'Pacific Fuel Services', 'JOB-SEA-2026-0398', 'USD', '1,325.00', 'For Payment'],
+                    ['EXP-2026-00870', 'Metro Industrial Supply', 'JOB-SEA-2026-0423', 'PHP', '127,900.00', 'For Approval'],
+                    ['EXP-2026-00869', 'Harbor Office Center', 'JOB-SEA-2026-0365', 'PHP', '18,000.00', 'Approved'],
+                ],
+            ],
+            'recurring-expenses' => [
+                'title' => 'Recurring Expenses',
+                'subtitle' => 'Scheduled vendor bills and repeat operating expenses with approval and tax rules.',
+                'actions' => ['Create Expense Schedule', 'Generate Bills', 'Review Taxes', 'Pause Schedule'],
+                'features' => ['Vendor', 'Cycle', 'Next Run Date', 'Default Expense Account', 'VAT / WHT Setup', 'Approval Required', 'Auto Voucher Draft'],
+                'columns' => ['Schedule No.', 'Vendor', 'Cycle', 'Next Run', 'Amount', 'Status'],
+                'rows' => [
+                    ['RE-2026-00022', 'Harbor Office Center', 'Monthly', '2026-06-01', '18,000.00', 'Active'],
+                    ['RE-2026-00021', 'Cloud Mail Services', 'Monthly', '2026-06-03', '4,500.00', 'Active'],
+                    ['RE-2026-00020', 'Warehouse Lease', 'Quarterly', '2026-07-01', '150,000.00', 'For Review'],
+                ],
+            ],
+            'email-reminders' => [
+                'title' => 'Email & Reminders',
+                'subtitle' => 'Original invoice emails, quote emails, payment receipts, overdue reminders, and delivery/activity tracking.',
+                'actions' => ['Reminder Rules', 'Email Queue', 'Portal Preview', 'Audit Logs'],
+                'features' => ['Invoice Sent Email', 'Quote Sent Email', 'Payment Received Email', 'Before Due Reminder', 'After Due Reminder', 'Custom Subject', 'BCC Rules', 'Activity Log'],
+                'columns' => ['Template / Rule', 'Trigger', 'Audience', 'Last Run', 'Delivery State', 'Status'],
+                'rows' => [
+                    ['Invoice Sent', 'On send invoice', 'Client contacts', '2026-05-24 13:20', 'Queued 4 / Sent 4', 'Active'],
+                    ['Payment Received', 'On successful payment', 'Client + Finance', '2026-05-24 14:02', 'Sent', 'Active'],
+                    ['Overdue Reminder 1', '3 days after due date', 'Primary contact', '2026-05-24 08:00', 'No due invoices', 'Active'],
+                ],
+            ],
+            'transactions' => [
+                'title' => 'Transactions',
+                'subtitle' => 'Unified ledger of invoices, payments, expenses, bank movements, FX entries, and journal postings.',
+                'actions' => ['View Cashbook', 'Journal Entries', 'Bank Reconciliation', 'Export Transactions'],
+                'features' => ['Transaction Date', 'Reference No.', 'Module Source', 'Shipment Job ID', 'Debit/Credit', 'Currency', 'Audit Trail', 'Posting Status'],
+                'columns' => ['Date', 'Reference', 'Module', 'Shipment Job ID', 'Amount', 'Status'],
+                'rows' => [
+                    ['2026-05-24', 'BI-2026-01043', 'Invoices', 'JOB-SEA-2026-0423', '127,900.00', 'Draft'],
+                    ['2026-05-24', 'OR-2026-00618', 'Payments', 'JOB-SEA-2026-0422', '43,200.00', 'Posted'],
+                    ['2026-05-23', 'BILL-7710', 'Expenses', 'JOB-SEA-2026-0398', '1,325.00 USD', 'For Payment'],
+                ],
+            ],
+            'documents' => [
+                'title' => 'Documents',
+                'subtitle' => 'Central document cabinet for invoice PDFs, SOA, receipts, shipment files, vouchers, and approvals.',
+                'actions' => ['Upload Document', 'Attach to Shipment', 'Print Forms', 'Export Register'],
+                'features' => ['Attachment Upload', 'Document Type', 'Reference No.', 'Shipment Job ID', 'Versioning', 'Commenting', 'Access Control', 'Audit Trail'],
+                'columns' => ['Document', 'Type', 'Reference', 'Shipment Job ID', 'Uploaded By', 'Status'],
+                'rows' => [
+                    ['BI-2026-01042.pdf', 'Billing Invoice', 'BI-2026-01042', 'JOB-SEA-2026-0422', 'Maria Santos', 'Approved'],
+                    ['SOA-2026-07187.pdf', 'Statement of Account', 'SOA-2026-07187', 'JOB-SEA-2026-0423', 'Ana Reyes', 'Ready'],
+                    ['CV-2026-00418.pdf', 'Check Voucher', 'BILL-7710', 'JOB-SEA-2026-0398', 'Leo Garcia', 'For Signature'],
+                ],
+            ],
+            'api-webhooks' => [
+                'title' => 'API & Webhooks',
+                'subtitle' => 'API-first integration surface for clients, invoices, quotes, payments, expenses, reports, and outgoing events.',
+                'actions' => ['API Tokens', 'Outgoing Webhooks', 'Webhook Monitor', 'Security Checklist'],
+                'features' => ['API Tokens', 'HTTPS Required', 'Tenant-scoped Access', 'Invoice Created Event', 'Invoice Paid Event', 'Quote Approved Event', 'Payment Webhooks', 'Retry Log'],
+                'columns' => ['Integration', 'Scope / Event', 'Endpoint', 'Last Delivery', 'Retries', 'Status'],
+                'rows' => [
+                    ['Operations API Token', 'clients invoices payments', '/api/v1/*', '2026-05-24 12:44', '0', 'Active'],
+                    ['Finance Webhook', 'invoice.paid', 'https://example.test/hooks/finance', '2026-05-24 13:18', '0', 'Active'],
+                    ['Stripe Incoming', 'payment_intent.succeeded', '/webhooks/stripe', '2026-05-24 14:02', '0', 'Signature Required'],
+                ],
+            ],
+            'security' => [
+                'title' => 'Security & Tenant Controls',
+                'subtitle' => 'Controls for tenant isolation, signed client links, payment tokenization, audit logs, backups, and rate limiting.',
+                'actions' => ['Security Checklist', 'Audit Logs', 'Approval Matrix', 'API Tokens'],
+                'features' => ['Tenant Isolation', 'Role-based Access', 'Signed Public Links', 'Payment Tokenization', 'Webhook Signature Verification', 'Audit Logs', 'Input Validation', 'Backups'],
+                'columns' => ['Control', 'Implementation', 'Risk Reduced', 'Owner', 'Review Date', 'Status'],
+                'rows' => [
+                    ['Tenant Isolation', 'company_id scoped records and memberships', 'Cross-company data access', 'Admin', '2026-05-24', 'Required'],
+                    ['Webhook Verification', 'gateway signature + event id idempotency', 'Fake or duplicate payments', 'Finance', '2026-05-24', 'Required'],
+                    ['Signed Client Links', 'tokenized public invoice access', 'Unauthorized invoice views', 'IT', '2026-05-24', 'Required'],
+                ],
+            ],
+            'settings' => [
+                'title' => 'Settings',
+                'subtitle' => 'Company setup, users, roles, approval matrix, numbering, branches, currencies, payment gateways, email, and audit configuration.',
+                'actions' => ['Users CRUD', 'Approval Matrix', 'Number Series', 'Security Checklist'],
+                'features' => ['Role-based Access', 'Multi-company', 'Multi-branch', 'Currency Setup', 'Tax Defaults', 'Document Numbering', 'Email Settings', 'Stripe Settings', 'Activity Logs'],
+                'columns' => ['Setting Area', 'Description', 'Owner', 'Last Updated', 'Status', 'Action'],
+                'rows' => [
+                    ['Users & Roles', 'Admin, Accounting, Finance, Sales, Purchasing, Viewer', 'Admin', '2026-05-24', 'Active', 'Review'],
+                    ['Approval Matrix', 'Payment, credit, FX, and posting approvals', 'Finance', '2026-05-24', 'Active', 'Review'],
+                    ['Number Series', 'BI, SOA, OR, AP, CV, JV numbering', 'Accounting', '2026-05-23', 'Active', 'Review'],
+                ],
+            ],
+            'users' => [
+                'title' => 'Users & Role-Based Access',
+                'subtitle' => 'Roles, permissions, departments, approval workflows, login logs, and audit trails.',
+                'actions' => ['Invite User', 'Create Role', 'Approval Matrix', 'Audit Logs'],
+                'features' => ['Admin', 'Accounting', 'Finance', 'Sales', 'Purchasing', 'Operations', 'Viewer', 'Department Access'],
+                'columns' => ['User', 'Role', 'Department', 'Branch', 'Last Login', 'Status'],
+                'rows' => [
+                    ['Maria Santos', 'Admin', 'Accounting', 'Main', '2026-05-24 09:15', 'Active'],
+                    ['John Cruz', 'Operations', 'Operations', 'North Branch', '2026-05-24 08:55', 'Active'],
+                    ['Ana Reyes', 'Viewer', 'Management', 'All', '2026-05-23 17:20', 'Active'],
+                ],
+            ],
+        ];
+    }
+}
