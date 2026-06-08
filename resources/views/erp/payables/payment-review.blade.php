@@ -10,8 +10,8 @@
             <p class="text-muted mb-0">Payment details captured for approval, voucher printing, and check processing.</p>
         </div>
         <div class="d-flex gap-2">
-            <a href="{{ route('erp.payables.check-voucher') }}" class="btn btn-outline-secondary"><i class="bi bi-printer me-1"></i> Check Voucher</a>
-            <a href="{{ route('erp.payables.check-print') }}" class="btn btn-primary"><i class="bi bi-bank me-1"></i> Print Check</a>
+            <a href="{{ route('erp.payables.check-voucher', $payment['id'] ?? null) }}" class="btn btn-outline-secondary"><i class="bi bi-printer me-1"></i> Check Voucher</a>
+            <a href="{{ route('erp.payables.check-print', $payment['id'] ?? null) }}" class="btn btn-primary"><i class="bi bi-bank me-1"></i> Print Check</a>
         </div>
     </div>
     <div class="erp-card p-4">
@@ -23,5 +23,14 @@
                 </div>
             @endforeach
         </div>
+        @if(isset($attachments) && count($attachments))
+            <hr>
+            <h2 class="h6 fw-bold">Attached Documents</h2>
+            <div class="d-flex flex-wrap gap-2">
+                @foreach($attachments as $attachment)
+                    <span class="badge badge-soft py-2 px-3"><i class="bi bi-paperclip me-1"></i>{{ $attachment->original_name }}</span>
+                @endforeach
+            </div>
+        @endif
     </div>
 @endsection

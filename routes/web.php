@@ -50,8 +50,8 @@ Route::middleware(['auth', 'user.access:administrator,admin,accounting,finance']
     Route::get('/erp/payables/payments/create', 'Erp\ModuleController@apPaymentCreate')->name('erp.payables.payments.create');
     Route::post('/erp/payables/payments/review', 'Erp\ModuleController@apPaymentReview')->name('erp.payables.payments.review');
     Route::get('/erp/payables/payment-approvals', 'Erp\ModuleController@paymentApprovals')->name('erp.payables.approvals');
-    Route::get('/erp/payables/check-voucher/preview', 'Erp\ModuleController@checkVoucherPreview')->name('erp.payables.check-voucher');
-    Route::get('/erp/payables/check/print', 'Erp\ModuleController@checkPrint')->name('erp.payables.check-print');
+    Route::get('/erp/payables/check-voucher/preview/{payment?}', 'Erp\ModuleController@checkVoucherPreview')->name('erp.payables.check-voucher');
+    Route::get('/erp/payables/check/print/{payment?}', 'Erp\ModuleController@checkPrint')->name('erp.payables.check-print');
     Route::get('/erp/payables/aging', 'Erp\ModuleController@apAging')->name('erp.payables.aging');
 
     Route::get('/erp/banking/cashbook', 'Erp\ModuleController@cashbook')->name('erp.banking.cashbook');

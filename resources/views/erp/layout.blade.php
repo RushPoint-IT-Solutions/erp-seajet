@@ -299,11 +299,6 @@
                 <small class="text-muted">Multi-company | Multi-branch | Multi-currency ready</small>
             </div>
             <div class="d-flex align-items-center gap-2">
-                <select class="form-select form-select-sm erp-select" style="width: 170px">
-                    <option>SeaJet Holdings</option>
-                    <option>SeaJet Logistics</option>
-                    <option>SeaJet Trading</option>
-                </select>
                 <a href="{{ route('erp.notifications') }}" class="btn btn-outline-secondary btn-sm" title="Notifications"><i class="bi bi-bell"></i></a>
                 <a href="{{ route('erp.invoices.create') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i> Quick Entry</a>
                 <div class="dropdown">

@@ -80,7 +80,8 @@
 
 @section('content')
     <div class="bill-workspace">
-        <form method="post" action="{{ route('erp.payables.vendor-bills.review') }}" id="billForm">
+        @php($bill = $bill ?? [])
+        <form method="post" action="{{ route('erp.payables.vendor-bills.review') }}" id="billForm" enctype="multipart/form-data">
             {{ csrf_field() }}
 
             <div class="bill-toolbar d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 no-print">
@@ -90,7 +91,7 @@
                     <button class="btn btn-sm btn-success" type="submit"><i class="bi bi-save me-1"></i>Save</button>
                     <a href="{{ route('erp.expenses.index') }}" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg me-1"></i>Delete</a>
                     <button class="btn btn-sm btn-outline-secondary" type="button" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
-                    <a href="{{ route('erp.action', 'upload-document') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-paperclip me-1"></i>Attach File</a>
+                    <label class="btn btn-sm btn-outline-secondary mb-0"><i class="bi bi-paperclip me-1"></i>Attach File<input type="file" name="attachments[]" multiple class="d-none"></label>
                     <a href="{{ route('erp.suppliers.index') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-building me-1"></i>Select Vendor</a>
                     <button class="btn btn-sm btn-outline-secondary" type="button" id="recalculateBill"><i class="bi bi-calculator me-1"></i>Recalculate</button>
                     <a href="{{ route('erp.payables.payments.create') }}" class="btn btn-sm btn-primary"><i class="bi bi-cash-stack me-1"></i>Pay Bill</a>
@@ -112,7 +113,7 @@
                         <option>Operating Expense Payable</option>
                     </select>
                 </div>
-                <label class="form-check-label ms-auto"><input class="form-check-input me-1" type="checkbox" name="bill_received" value="Yes"> Bill Received</label>
+                    <label class="form-check-label ms-auto"><input class="form-check-input me-1" type="checkbox" name="bill_received" value="Yes" {{ ($bill['bill_received'] ?? '') === 'Yes' ? 'checked' : '' }}> Bill Received</label>
             </div>
 
             <div class="bill-shell p-3">
@@ -130,30 +131,31 @@
                                                 data-address="{{ $supplier['address'] }}"
                                                 data-terms="{{ $supplier['terms'] }}"
                                                 data-currency="{{ $supplier['currency'] }}"
-                                                data-wht="{{ $supplier['withholding_tax'] }}">
+                                                data-wht="{{ $supplier['withholding_tax'] }}"
+                                                {{ ($bill['supplier_id'] ?? '') === $supplier['supplier_id'] ? 'selected' : '' }}>
                                             {{ $supplier['supplier_id'] }} - {{ $supplier['name'] }}
                                         </option>
                                     @endforeach
                                 </select>
-                                <input type="hidden" name="supplier_name" id="supplierName" value="">
+                                <input type="hidden" name="supplier_name" id="supplierName" value="{{ $bill['supplier_name'] ?? '' }}">
                             </div>
                             <div class="mb-2">
                                 <label class="form-label small text-muted">Address</label>
-                                <textarea name="supplier_address" id="supplierAddress" class="form-control bill-field" rows="4"></textarea>
+                                <textarea name="supplier_address" id="supplierAddress" class="form-control bill-field" rows="4">{{ $bill['supplier_address'] ?? '' }}</textarea>
                             </div>
                             <div class="row g-2">
                                 <div class="col-5">
                                     <label class="form-label small text-muted">Terms</label>
                                     <select name="terms" id="termsSelect" class="form-select bill-field">
                                         <option value=""></option>
-                                        <option>30 Days</option>
-                                        <option>60 Days</option>
-                                        <option>90 Days</option>
+                                        @foreach(['30 Days', '60 Days', '90 Days'] as $term)
+                                            <option {{ ($bill['terms'] ?? '') === $term ? 'selected' : '' }}>{{ $term }}</option>
+                                        @endforeach
                                     </select>
                                 </div>
                                 <div class="col-7">
                                     <label class="form-label small text-muted">Bill No</label>
-                                    <input name="bill_no" class="form-control bill-field" value="">
+                                    <input name="bill_no" class="form-control bill-field" value="{{ $bill['bill_no'] ?? $nextBillNo }}">
                                 </div>
                             </div>
                         </div>
@@ -162,34 +164,47 @@
                             <div class="row g-2">
                                 <div class="col-md-6">
                                     <label class="form-label small text-muted">Date</label>
-                                    <input name="bill_date" type="date" class="form-control bill-field" value="" required>
+                                    <input name="bill_date" type="date" class="form-control bill-field" value="{{ $bill['bill_date'] ?? date('Y-m-d') }}" required>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small text-muted">Ref. No</label>
-                                    <input name="reference_no" class="form-control bill-field" value="">
+                                    <input name="reference_no" class="form-control bill-field" value="{{ $bill['reference_no'] ?? '' }}">
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small text-muted">Currency</label>
                                     <select name="currency" id="currencySelect" class="form-select bill-field">
-                                        <option>USD</option>
-                                        <option>PHP</option>
+                                        <option {{ ($bill['currency'] ?? 'PHP') === 'USD' ? 'selected' : '' }}>USD</option>
+                                        <option {{ ($bill['currency'] ?? 'PHP') === 'PHP' ? 'selected' : '' }}>PHP</option>
                                     </select>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small text-muted">Amount Due</label>
-                                    <input name="gross_amount" id="grossAmount" class="form-control bill-field text-end" value="">
+                                    <input name="gross_amount" id="grossAmount" class="form-control bill-field text-end" value="{{ $bill['gross_amount'] ?? '' }}">
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small text-muted">PHP Amount</label>
-                                    <input name="php_amount" id="phpAmount" class="form-control bill-field text-end" value="" readonly>
+                                    <input name="php_amount" id="phpAmount" class="form-control bill-field text-end" value="{{ $bill['php_amount'] ?? '' }}" readonly>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small text-muted">Bill Due</label>
-                                    <input name="due_date" type="date" class="form-control bill-field" value="">
+                                    <input name="due_date" type="date" class="form-control bill-field" value="{{ $bill['due_date'] ?? '' }}">
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label small text-muted">Memo</label>
-                                    <input name="memo" class="form-control bill-field" value="">
+                                    <input name="memo" class="form-control bill-field" value="{{ $bill['memo'] ?? '' }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small text-muted">Shipment Job ID</label>
+                                    <input name="shipment_job_id" class="form-control bill-field" value="{{ $bill['shipment_job_id'] ?? '' }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small text-muted">Client Tag</label>
+                                    <select name="client_customer_id" class="form-select bill-field erp-select">
+                                        <option value=""></option>
+                                        @foreach($customers as $customer)
+                                            <option value="{{ $customer['customer_id'] }}" {{ ($bill['client_customer_id'] ?? '') === $customer['customer_id'] ? 'selected' : '' }}>{{ $customer['customer_id'] }} - {{ $customer['name'] }}</option>
+                                        @endforeach
+                                    </select>
                                 </div>
                             </div>
                         </div>
@@ -202,18 +217,17 @@
                                     <div class="col-6">
                                         <label class="form-label small text-muted">WHT %</label>
                                         <select name="withholding_tax_rate" id="whtRate" class="form-select form-select-sm bill-field">
-                                            <option value="0">0%</option>
-                                            <option value="2">2%</option>
-                                            <option value="5">5%</option>
-                                            <option value="10">10%</option>
+                                            @foreach([0, 2, 5, 10] as $rate)
+                                                <option value="{{ $rate }}" {{ (float)($bill['withholding_tax_rate'] ?? 0) === (float)$rate ? 'selected' : '' }}>{{ $rate }}%</option>
+                                            @endforeach
                                         </select>
                                     </div>
                                     <div class="col-6">
                                         <label class="form-label small text-muted">WHT Amt</label>
-                                        <input name="withholding_tax_amount" id="whtAmount" class="form-control form-control-sm bill-field text-end" value="" readonly>
+                                        <input name="withholding_tax_amount" id="whtAmount" class="form-control form-control-sm bill-field text-end" value="{{ $bill['withholding_tax_amount'] ?? '' }}" readonly>
                                     </div>
                                 </div>
-                                <input type="hidden" name="net_amount" id="netAmount" value="">
+                                <input type="hidden" name="net_amount" id="netAmount" value="{{ $bill['net_amount'] ?? '' }}">
                             </div>
                         </div>
                     </div>
@@ -286,7 +300,7 @@
                 <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mt-4">
                     <div class="d-flex align-items-center gap-2">
                         <label class="form-label mb-0 small text-muted">Exchange Rate 1 USD =</label>
-                        <input name="exchange_rate" id="exchangeRate" class="form-control form-control-sm bill-field text-end" style="width: 110px" value="61.393">
+                        <input name="exchange_rate" id="exchangeRate" class="form-control form-control-sm bill-field text-end" style="width: 110px" value="{{ $bill['exchange_rate'] ?? '61.393' }}">
                         <span class="badge text-bg-light">PHP</span>
                     </div>
                     <div class="d-flex gap-2 no-print">

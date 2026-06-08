@@ -2,6 +2,8 @@
 
 use Illuminate\Database\Seeder;
 
+require_once __DIR__.'/SeaJetSampleDataSeeder.php';
+
 class DatabaseSeeder extends Seeder
 {
     /**
@@ -12,5 +14,6 @@ class DatabaseSeeder extends Seeder
     public function run()
     {
         $this->call(ErpDemoSeeder::class);
+        $this->call(SeaJetSampleDataSeeder::class);
     }
 }

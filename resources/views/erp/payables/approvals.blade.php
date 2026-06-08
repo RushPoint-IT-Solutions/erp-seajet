@@ -17,12 +17,16 @@
             <tbody>
             @foreach($approvals as $row)
                 <tr>
-                    @foreach($row as $index => $cell)
-                        <td class="{{ $index === 4 ? 'text-end' : '' }}">{{ $cell }}</td>
-                    @endforeach
+                    <td>{{ $row['payment_no'] }}</td>
+                    <td>{{ $row['supplier'] }}</td>
+                    <td>{{ $row['shipment_job_id'] }}</td>
+                    <td>{{ $row['currency'] }}</td>
+                    <td class="text-end">{{ $row['amount'] }}</td>
+                    <td>{{ $row['status'] }}</td>
                     <td class="text-end">
                         <a href="{{ route('erp.action', 'approve-ap-payment') }}" class="btn btn-sm btn-outline-secondary">Approve</a>
-                        <a href="{{ route('erp.payables.check-voucher') }}" class="btn btn-sm btn-outline-secondary">Voucher</a>
+                        <a href="{{ route('erp.payables.check-voucher', $row['id']) }}" class="btn btn-sm btn-outline-secondary">Voucher</a>
+                        <a href="{{ route('erp.payables.check-print', $row['id']) }}" class="btn btn-sm btn-primary">Check</a>
                     </td>
                 </tr>
             @endforeach

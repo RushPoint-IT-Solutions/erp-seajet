@@ -945,25 +945,31 @@ class ModuleController extends Controller
 
     public function vendorBillCreate()
     {
+        $bill = request('bill') && Schema::hasTable('purchase_documents')
+            ? $this->apBillByNumber(request('bill'))
+            : null;
+
         return view('erp.payables.vendor-bill-create', [
             'suppliers' => $this->vendorRows(),
             'customers' => $this->customerSelectOptions(),
+            'bill' => $bill,
+            'nextBillNo' => $this->nextDocumentNumber('vendor_bill', 'BILL-', 5, false),
         ]);
     }
 
     public function expensesIndex()
     {
-        $expenses = [
-            ['BILL-2026-00492', 'Metro Industrial Supply', 'JOB-SEA-2026-0423', 'North Harbor Trading', 'PHP', '127,900.00', 'For Approval', '2026-05-24'],
-            ['BILL-7710', 'Pacific Fuel Services', 'JOB-SEA-2026-0398', 'Blue Anchor Logistics', 'USD', '1,325.00', 'For Payment', '2026-05-23'],
-            ['EXP-2026-00869', 'Harbor Office Center', 'JOB-SEA-2026-0365', 'Island Prime Foods', 'PHP', '18,000.00', 'Approved', '2026-05-22'],
-            ['RE-2026-00022', 'Harbor Office Center', 'OPER-ADMIN-2026-001', 'Admin', 'PHP', '18,000.00', 'Recurring', '2026-06-01'],
-        ];
+        $expenses = $this->apRegisterRows();
+        $phpPayables = $this->openApTotalByCurrency('PHP');
+        $usdPayables = $this->openApTotalByCurrency('USD');
+        $forApproval = Schema::hasTable('purchase_documents')
+            ? DB::table('purchase_documents')->where('approval_status', 'For Approval')->count()
+            : 0;
 
         $apStats = [
-            ['label' => 'PHP Payables', 'value' => 'PHP 267,210.00', 'icon' => 'bi-cash-stack', 'tone' => 'primary'],
-            ['label' => 'USD Payables', 'value' => 'USD 1,325.00', 'icon' => 'bi-currency-dollar', 'tone' => 'success'],
-            ['label' => 'For Approval', 'value' => '2', 'icon' => 'bi-check2-square', 'tone' => 'warning'],
+            ['label' => 'PHP Payables', 'value' => 'PHP '.number_format($phpPayables, 2), 'icon' => 'bi-cash-stack', 'tone' => 'primary'],
+            ['label' => 'USD Payables', 'value' => 'USD '.number_format($usdPayables, 2), 'icon' => 'bi-currency-dollar', 'tone' => 'success'],
+            ['label' => 'For Approval', 'value' => $forApproval, 'icon' => 'bi-check2-square', 'tone' => 'warning'],
             ['label' => 'WHT Computation', 'value' => 'Enabled', 'icon' => 'bi-percent', 'tone' => 'danger'],
         ];
 
@@ -994,98 +1000,789 @@ class ModuleController extends Controller
 
     public function vendorBillReview()
     {
+        $data = request()->validate([
+            'transaction_type' => 'required|string|max:50',
+            'ap_account' => 'nullable|string|max:255',
+            'bill_received' => 'nullable|string|max:10',
+            'supplier_id' => 'required|string|max:100',
+            'supplier_name' => 'nullable|string|max:255',
+            'supplier_address' => 'nullable|string',
+            'client_customer_id' => 'nullable|string|max:100',
+            'shipment_job_id' => 'nullable|string|max:100',
+            'bill_no' => 'nullable|string|max:100',
+            'bill_date' => 'required|date',
+            'reference_no' => 'nullable|string|max:100',
+            'due_date' => 'nullable|date',
+            'terms' => 'nullable|string|max:100',
+            'currency' => 'required|string|max:3',
+            'exchange_rate' => 'nullable',
+            'gross_amount' => 'nullable',
+            'php_amount' => 'nullable',
+            'withholding_tax_rate' => 'nullable',
+            'withholding_tax_amount' => 'nullable',
+            'net_amount' => 'nullable',
+            'memo' => 'nullable|string',
+            'expense_account' => 'nullable|array',
+            'expense_tax' => 'nullable|array',
+            'expense_amount' => 'nullable|array',
+            'expense_memo' => 'nullable|array',
+            'expense_customer_job' => 'nullable|array',
+            'expense_billable' => 'nullable|array',
+            'expense_class' => 'nullable|array',
+            'attachments.*' => 'file|max:10240',
+        ]);
+
+        $bill = $this->saveApBill($data);
+
         return view('erp.payables.vendor-bill-review', [
-            'bill' => request()->only([
-                'transaction_type',
-                'ap_account',
-                'bill_received',
-                'supplier_id',
-                'supplier_name',
-                'supplier_address',
-                'client_customer_id',
-                'shipment_job_id',
-                'bill_no',
-                'bill_date',
-                'reference_no',
-                'due_date',
-                'terms',
-                'currency',
-                'exchange_rate',
-                'gross_amount',
-                'php_amount',
-                'withholding_tax_rate',
-                'withholding_tax_amount',
-                'net_amount',
-                'memo',
-                'expense_account',
-                'expense_tax',
-                'expense_amount',
-                'expense_memo',
-                'expense_customer_job',
-                'expense_billable',
-                'expense_class',
-                'description',
-            ]),
+            'bill' => $bill,
+            'lines' => $this->apBillLines($bill['id']),
+            'attachments' => $this->documentAttachments('purchase_document', $bill['id']),
         ]);
     }
 
     public function apPaymentCreate()
     {
+        $selectedBill = request('bill') ? $this->apBillByNumber(request('bill')) : null;
+
         return view('erp.payables.payment-create', [
             'suppliers' => $this->vendorRows(),
+            'openBills' => $this->openApBills(),
+            'selectedBill' => $selectedBill,
+            'nextPaymentNo' => $this->nextDocumentNumber('payment_voucher', 'PV-', 5, false),
         ]);
     }
 
     public function apPaymentReview()
     {
+        $data = request()->validate([
+            'payment_no' => 'nullable|string|max:100',
+            'payment_date' => 'required|date',
+            'bill_no' => 'required|string|max:100',
+            'shipment_job_id' => 'nullable|string|max:100',
+            'supplier_id' => 'required|string|max:100',
+            'supplier_name' => 'nullable|string|max:255',
+            'payment_method' => 'required|string|max:100',
+            'bank_account' => 'nullable|string|max:255',
+            'check_no' => 'nullable|string|max:100',
+            'currency' => 'required|string|max:3',
+            'amount' => 'required',
+            'approval_status' => 'required|string|max:100',
+            'attachments.*' => 'file|max:10240',
+        ]);
+
+        $payment = $this->saveApPayment($data);
+
         return view('erp.payables.payment-review', [
-            'payment' => request()->only([
-                'payment_no',
-                'supplier_id',
-                'supplier_name',
-                'shipment_job_id',
-                'bill_no',
-                'payment_date',
-                'payment_method',
-                'bank_account',
-                'check_no',
-                'currency',
-                'amount',
-                'approval_status',
-            ]),
+            'payment' => $payment,
+            'attachments' => $this->documentAttachments('payment', $payment['id']),
         ]);
     }
 
     public function paymentApprovals()
     {
-        $approvals = [
-            ['PV-2026-00312', 'Metro Industrial Supply', 'JOB-SEA-2026-0423', 'PHP', '127,900.00', 'For Approval'],
-            ['PV-2026-00311', 'Pacific Fuel Services', 'JOB-SEA-2026-0398', 'USD', '1,325.00', 'Approved'],
-            ['PV-2026-00310', 'Harbor Office Center', 'JOB-SEA-2026-0365', 'PHP', '18,000.00', 'Returned'],
-        ];
+        $approvals = $this->apPaymentRows();
 
         return view('erp.payables.approvals', compact('approvals'));
     }
 
-    public function checkVoucherPreview()
+    public function checkVoucherPreview($payment = null)
     {
-        return view('erp.payables.check-voucher');
+        return view('erp.payables.check-voucher', [
+            'voucher' => $this->paymentPrintData($payment),
+        ]);
     }
 
-    public function checkPrint()
+    public function checkPrint($payment = null)
     {
-        return view('erp.payables.check-print');
+        return view('erp.payables.check-print', [
+            'voucher' => $this->paymentPrintData($payment),
+        ]);
     }
 
     public function apAging()
     {
-        $rows = [
-            ['SUP-001', 'Metro Industrial Supply', 'JOB-SEA-2026-0423', 'BILL-4902', 'PHP', 127900, 0, 0, 0],
-            ['SUP-002', 'Pacific Fuel Services', 'JOB-SEA-2026-0398', 'BILL-7710', 'USD', 0, 1325, 0, 0],
-            ['SUP-003', 'Harbor Office Center', 'JOB-SEA-2026-0365', 'BILL-2420', 'PHP', 0, 0, 18000, 0],
-        ];
+        $rows = $this->apAgingRows();
 
         return view('erp.payables.aging', compact('rows'));
+    }
+
+    private function apRegisterRows()
+    {
+        if (!Schema::hasTable('purchase_documents')) {
+            return [];
+        }
+
+        return DB::table('purchase_documents')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_documents.supplier_id')
+            ->select(
+                'purchase_documents.id',
+                'purchase_documents.document_no',
+                'purchase_documents.shipment_job_id',
+                'purchase_documents.client_customer_id',
+                'purchase_documents.currency',
+                'purchase_documents.grand_total',
+                'purchase_documents.paid_total',
+                'purchase_documents.status',
+                'purchase_documents.approval_status',
+                'purchase_documents.document_date',
+                'suppliers.name as supplier_name'
+            )
+            ->orderBy('purchase_documents.document_date', 'desc')
+            ->orderBy('purchase_documents.id', 'desc')
+            ->get()
+            ->map(function ($bill) {
+                $balance = max(0, (float) $bill->grand_total - (float) $bill->paid_total);
+
+                return [
+                    $bill->document_no,
+                    $bill->supplier_name ?: '-',
+                    $bill->shipment_job_id ?: '-',
+                    $bill->client_customer_id ?: '-',
+                    $bill->currency ?: 'PHP',
+                    number_format($balance ?: (float) $bill->grand_total, 2),
+                    $bill->approval_status ?: ucwords(str_replace('_', ' ', $bill->status)),
+                    $bill->document_date,
+                    'id' => $bill->id,
+                ];
+            })
+            ->all();
+    }
+
+    private function openApTotalByCurrency($currency)
+    {
+        if (!Schema::hasTable('purchase_documents')) {
+            return 0.0;
+        }
+
+        return (float) DB::table('purchase_documents')
+            ->where('currency', $currency)
+            ->whereNotIn('status', ['paid', 'cancelled', 'voided'])
+            ->select(DB::raw('COALESCE(SUM(grand_total - paid_total), 0) as balance'))
+            ->value('balance');
+    }
+
+    private function saveApBill(array $data)
+    {
+        return DB::transaction(function () use ($data) {
+            $companyId = $this->defaultCompanyId();
+            $supplierId = $this->supplierIdForAp($companyId, $data);
+            $documentNo = trim((string) ($data['bill_no'] ?? ''));
+            if ($documentNo === '') {
+                $documentNo = $this->nextDocumentNumber('vendor_bill', 'BILL-', 5);
+            }
+
+            $lineTotal = 0.0;
+            foreach ((array) ($data['expense_amount'] ?? []) as $amount) {
+                $lineTotal += $this->moneyToFloat($amount);
+            }
+
+            $grossAmount = $lineTotal > 0 ? $lineTotal : $this->moneyToFloat($data['gross_amount'] ?? 0);
+            $whtRate = $this->moneyToFloat($data['withholding_tax_rate'] ?? 0);
+            $whtAmount = $this->moneyToFloat($data['withholding_tax_amount'] ?? 0);
+            if ($whtAmount <= 0 && $whtRate > 0) {
+                $whtAmount = $grossAmount * ($whtRate / 100);
+            }
+            $netAmount = max(0, $grossAmount - $whtAmount);
+            $usdToPhpRate = $this->moneyToFloat($data['exchange_rate'] ?? 1) ?: 1;
+            $exchangeRate = strtoupper($data['currency']) === 'USD' ? $usdToPhpRate : 1;
+            $phpAmount = strtoupper($data['currency']) === 'USD' ? $grossAmount * $usdToPhpRate : $grossAmount;
+
+            $payload = $this->tablePayload('purchase_documents', [
+                'company_id' => $companyId,
+                'branch_id' => DB::table('branches')->where('company_id', $companyId)->orderBy('id')->value('id'),
+                'supplier_id' => $supplierId,
+                'document_type' => 'vendor_bill',
+                'transaction_type' => $data['transaction_type'],
+                'ap_account' => $data['ap_account'] ?? null,
+                'bill_received' => isset($data['bill_received']),
+                'supplier_address' => $data['supplier_address'] ?? null,
+                'client_customer_id' => $data['client_customer_id'] ?? null,
+                'shipment_job_id' => $data['shipment_job_id'] ?? null,
+                'document_no' => $documentNo,
+                'reference_no' => $data['reference_no'] ?? null,
+                'document_date' => $data['bill_date'],
+                'due_date' => $data['due_date'] ?? null,
+                'terms' => $data['terms'] ?? null,
+                'currency' => strtoupper($data['currency']),
+                'exchange_rate' => $exchangeRate,
+                'usd_to_php_rate' => $usdToPhpRate,
+                'gross_amount' => $grossAmount,
+                'php_amount' => $phpAmount,
+                'subtotal' => $grossAmount,
+                'tax_total' => 0,
+                'withholding_tax_rate' => $whtRate,
+                'withholding_tax_amount' => $whtAmount,
+                'grand_total' => $netAmount,
+                'net_amount' => $netAmount,
+                'paid_total' => 0,
+                'status' => 'for_payment',
+                'approval_status' => 'For Approval',
+                'remarks' => $data['memo'] ?? null,
+                'memo' => $data['memo'] ?? null,
+                'updated_at' => now(),
+            ]);
+
+            $existingId = DB::table('purchase_documents')
+                ->where('company_id', $companyId)
+                ->where('document_no', $documentNo)
+                ->value('id');
+
+            if ($existingId) {
+                DB::table('purchase_documents')->where('id', $existingId)->update($payload);
+                $billId = $existingId;
+            } else {
+                $payload['created_at'] = now();
+                $billId = DB::table('purchase_documents')->insertGetId($payload);
+            }
+
+            $this->replaceApBillLines($billId, $data);
+            $this->storeDocumentAttachments('purchase_document', $billId, request()->file('attachments', []));
+
+            return $this->apBillById($billId);
+        });
+    }
+
+    private function replaceApBillLines($billId, array $data)
+    {
+        $table = Schema::hasTable('vendor_bill_lines') ? 'vendor_bill_lines' : 'purchase_document_lines';
+        if (!Schema::hasTable($table)) {
+            return;
+        }
+
+        DB::table($table)->where('purchase_document_id', $billId)->delete();
+
+        $accounts = (array) ($data['expense_account'] ?? []);
+        $taxes = (array) ($data['expense_tax'] ?? []);
+        $amounts = (array) ($data['expense_amount'] ?? []);
+        $memos = (array) ($data['expense_memo'] ?? []);
+        $jobs = (array) ($data['expense_customer_job'] ?? []);
+        $billable = (array) ($data['expense_billable'] ?? []);
+        $classes = (array) ($data['expense_class'] ?? []);
+
+        foreach ($accounts as $index => $account) {
+            $amount = $this->moneyToFloat($amounts[$index] ?? 0);
+            if (trim((string) $account) === '' && $amount <= 0) {
+                continue;
+            }
+
+            DB::table($table)->insert($this->tablePayload($table, [
+                'purchase_document_id' => $billId,
+                'account_name' => $account,
+                'tax_category' => $taxes[$index] ?? null,
+                'amount' => $amount,
+                'description' => $memos[$index] ?? ($account ?: 'Vendor bill expense'),
+                'quantity' => 1,
+                'unit_cost' => $amount,
+                'line_total' => $amount,
+                'memo' => $memos[$index] ?? null,
+                'customer_job_id' => $jobs[$index] ?? null,
+                'is_billable' => isset($billable[$index]) && $billable[$index] === 'Yes',
+                'class_code' => $classes[$index] ?? null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]));
+        }
+    }
+
+    private function supplierIdForAp($companyId, array $data)
+    {
+        $supplierCode = trim((string) ($data['supplier_id'] ?? ''));
+        $supplierName = trim((string) ($data['supplier_name'] ?? ''));
+
+        $supplier = DB::table('suppliers')
+            ->where('company_id', $companyId)
+            ->where(function ($query) use ($supplierCode, $supplierName) {
+                $query->where('code', $supplierCode);
+                if ($supplierName !== '') {
+                    $query->orWhere('name', $supplierName);
+                }
+            })
+            ->first();
+
+        if ($supplier) {
+            return $supplier->id;
+        }
+
+        return DB::table('suppliers')->insertGetId($this->tablePayload('suppliers', [
+            'company_id' => $companyId,
+            'code' => $supplierCode ?: 'SUP-'.date('YmdHis'),
+            'name' => $supplierName ?: $supplierCode,
+            'address' => $data['supplier_address'] ?? null,
+            'payment_terms' => $data['terms'] ?? 'COD',
+            'payment_term_days' => $this->paymentTermDays($data['terms'] ?? 'COD'),
+            'currency' => strtoupper($data['currency'] ?? 'PHP'),
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]));
+    }
+
+    private function openApBills()
+    {
+        if (!Schema::hasTable('purchase_documents')) {
+            return [];
+        }
+
+        return DB::table('purchase_documents')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_documents.supplier_id')
+            ->select(
+                'purchase_documents.id',
+                'purchase_documents.document_no',
+                'purchase_documents.shipment_job_id',
+                'purchase_documents.currency',
+                'purchase_documents.grand_total',
+                'purchase_documents.paid_total',
+                'suppliers.code as supplier_code',
+                'suppliers.name as supplier_name'
+            )
+            ->whereNotIn('purchase_documents.status', ['paid', 'cancelled', 'voided'])
+            ->orderBy('purchase_documents.document_date', 'desc')
+            ->get()
+            ->map(function ($bill) {
+                $balance = max(0, (float) $bill->grand_total - (float) $bill->paid_total);
+
+                return [
+                    'id' => $bill->id,
+                    'bill_no' => $bill->document_no,
+                    'supplier_id' => $bill->supplier_code,
+                    'supplier_name' => $bill->supplier_name,
+                    'shipment_job_id' => $bill->shipment_job_id,
+                    'currency' => $bill->currency,
+                    'balance' => $balance,
+                    'balance_display' => ($bill->currency ?: 'PHP').' '.number_format($balance, 2),
+                ];
+            })
+            ->all();
+    }
+
+    private function saveApPayment(array $data)
+    {
+        return DB::transaction(function () use ($data) {
+            $companyId = $this->defaultCompanyId();
+            $bill = $this->apBillRecordByNumber($data['bill_no']);
+            $supplierId = $bill ? $bill->supplier_id : $this->supplierIdForAp($companyId, $data);
+            $amount = $this->moneyToFloat($data['amount']);
+            $paymentNo = trim((string) ($data['payment_no'] ?? ''));
+            if ($paymentNo === '') {
+                $paymentNo = $this->nextDocumentNumber('payment_voucher', 'PV-', 5);
+            }
+            $voucherNo = $this->nextDocumentNumber('check_voucher', 'CV-', 5);
+
+            $paymentId = DB::table('payments')->insertGetId($this->tablePayload('payments', [
+                'company_id' => $companyId,
+                'supplier_id' => $supplierId,
+                'shipment_job_id' => $data['shipment_job_id'] ?? ($bill->shipment_job_id ?? null),
+                'bill_no' => $data['bill_no'],
+                'payment_no' => $paymentNo,
+                'voucher_no' => $voucherNo,
+                'payment_date' => $data['payment_date'],
+                'payment_method' => $data['payment_method'],
+                'bank_account' => $data['bank_account'] ?? null,
+                'check_no' => $data['check_no'] ?? null,
+                'currency' => strtoupper($data['currency']),
+                'exchange_rate' => 1,
+                'amount' => $amount,
+                'status' => strtolower(str_replace(' ', '_', $data['approval_status'])),
+                'approval_status' => $data['approval_status'],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]));
+
+            $isReleasedPayment = in_array($data['approval_status'], ['Approved', 'Released']);
+
+            if ($bill && Schema::hasTable('payment_applications')) {
+                DB::table('payment_applications')->insert($this->tablePayload('payment_applications', [
+                    'payment_id' => $paymentId,
+                    'purchase_document_id' => $bill->id,
+                    'amount_applied' => $amount,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]));
+            }
+
+            if ($bill && $isReleasedPayment) {
+                $paidTotal = min((float) $bill->grand_total, (float) $bill->paid_total + $amount);
+                DB::table('purchase_documents')->where('id', $bill->id)->update([
+                    'paid_total' => $paidTotal,
+                    'status' => $paidTotal >= (float) $bill->grand_total ? 'paid' : 'partially_paid',
+                    'approval_status' => $data['approval_status'],
+                    'updated_at' => now(),
+                ]);
+            }
+
+            $this->storeDocumentAttachments('payment', $paymentId, request()->file('attachments', []));
+
+            return $this->paymentArrayById($paymentId);
+        });
+    }
+
+    private function apPaymentRows()
+    {
+        if (!Schema::hasTable('payments')) {
+            return [];
+        }
+
+        return DB::table('payments')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'payments.supplier_id')
+            ->select('payments.*', 'suppliers.name as supplier_name')
+            ->orderBy('payments.payment_date', 'desc')
+            ->orderBy('payments.id', 'desc')
+            ->get()
+            ->map(function ($payment) {
+                return [
+                    'id' => $payment->id,
+                    'payment_no' => $payment->payment_no,
+                    'supplier' => $payment->supplier_name ?: '-',
+                    'shipment_job_id' => $payment->shipment_job_id ?: '-',
+                    'currency' => $payment->currency ?: 'PHP',
+                    'amount' => number_format((float) $payment->amount, 2),
+                    'status' => $payment->approval_status ?: ucwords(str_replace('_', ' ', $payment->status)),
+                ];
+            })
+            ->all();
+    }
+
+    private function apAgingRows()
+    {
+        if (!Schema::hasTable('purchase_documents')) {
+            return [];
+        }
+
+        return DB::table('purchase_documents')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_documents.supplier_id')
+            ->select(
+                'purchase_documents.*',
+                'suppliers.code as supplier_code',
+                'suppliers.name as supplier_name'
+            )
+            ->whereNotIn('purchase_documents.status', ['paid', 'cancelled', 'voided'])
+            ->orderBy('purchase_documents.due_date')
+            ->get()
+            ->map(function ($bill) {
+                $balance = max(0, (float) $bill->grand_total - (float) $bill->paid_total);
+                $daysPastDue = $bill->due_date ? now()->diffInDays(\Carbon\Carbon::parse($bill->due_date), false) * -1 : 0;
+                $buckets = [0, 0, 0, 0];
+                if ($daysPastDue <= 0) {
+                    $buckets[0] = $balance;
+                } elseif ($daysPastDue <= 30) {
+                    $buckets[1] = $balance;
+                } elseif ($daysPastDue <= 60) {
+                    $buckets[2] = $balance;
+                } else {
+                    $buckets[3] = $balance;
+                }
+
+                return array_merge([
+                    $bill->supplier_code ?: '-',
+                    $bill->supplier_name ?: '-',
+                    $bill->shipment_job_id ?: '-',
+                    $bill->document_no,
+                    $bill->currency ?: 'PHP',
+                ], $buckets);
+            })
+            ->all();
+    }
+
+    private function paymentPrintData($paymentId = null)
+    {
+        if (!Schema::hasTable('payments')) {
+            return $this->emptyPaymentPrintData();
+        }
+
+        $query = DB::table('payments')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'payments.supplier_id')
+            ->select('payments.*', 'suppliers.name as supplier_name');
+
+        $payment = $paymentId
+            ? $query->where('payments.id', $paymentId)->first()
+            : $query->orderBy('payments.id', 'desc')->first();
+
+        if (!$payment) {
+            return $this->emptyPaymentPrintData();
+        }
+
+        $bill = $this->apBillRecordByNumber($payment->bill_no);
+        $gross = $bill ? (float) $bill->gross_amount : (float) $payment->amount;
+        $wht = $bill ? (float) $bill->withholding_tax_amount : 0;
+        $net = (float) $payment->amount;
+
+        return [
+            'id' => $payment->id,
+            'voucher_no' => $payment->voucher_no ?: 'CV-'.$payment->id,
+            'payment_no' => $payment->payment_no,
+            'company' => DB::table('companies')->where('id', $payment->company_id)->value('name') ?: 'SeaJet Holdings Inc.',
+            'supplier' => $payment->supplier_name ?: '-',
+            'shipment_job_id' => $payment->shipment_job_id ?: '-',
+            'payment_method' => $payment->payment_method,
+            'bank_account' => $payment->bank_account ?: '-',
+            'check_no' => $payment->check_no ?: '-',
+            'bill_no' => $payment->bill_no,
+            'description' => $bill && $bill->memo ? $bill->memo : 'Shipment-linked vendor expense',
+            'currency' => $payment->currency ?: 'PHP',
+            'gross' => $gross,
+            'withholding' => $wht,
+            'net' => $net,
+            'amount_words' => $this->amountToWords($net, $payment->currency ?: 'PHP'),
+        ];
+    }
+
+    private function emptyPaymentPrintData()
+    {
+        return [
+            'id' => null,
+            'voucher_no' => 'No saved payment',
+            'payment_no' => '-',
+            'company' => 'SeaJet Holdings Inc.',
+            'supplier' => '-',
+            'shipment_job_id' => '-',
+            'payment_method' => '-',
+            'bank_account' => '-',
+            'check_no' => '-',
+            'bill_no' => '-',
+            'description' => 'No AP payment has been saved yet.',
+            'currency' => 'PHP',
+            'gross' => 0,
+            'withholding' => 0,
+            'net' => 0,
+            'amount_words' => 'Zero Pesos Only',
+        ];
+    }
+
+    private function apBillByNumber($documentNo)
+    {
+        $bill = $this->apBillRecordByNumber($documentNo);
+        return $bill ? $this->apBillArray($bill) : null;
+    }
+
+    private function apBillById($id)
+    {
+        $bill = DB::table('purchase_documents')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_documents.supplier_id')
+            ->select('purchase_documents.*', 'suppliers.code as supplier_code', 'suppliers.name as supplier_name')
+            ->where('purchase_documents.id', $id)
+            ->first();
+
+        return $bill ? $this->apBillArray($bill) : [];
+    }
+
+    private function apBillRecordByNumber($documentNo)
+    {
+        if (!Schema::hasTable('purchase_documents')) {
+            return null;
+        }
+
+        return DB::table('purchase_documents')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_documents.supplier_id')
+            ->select('purchase_documents.*', 'suppliers.code as supplier_code', 'suppliers.name as supplier_name')
+            ->where('purchase_documents.document_no', $documentNo)
+            ->first();
+    }
+
+    private function apBillArray($bill)
+    {
+        return [
+            'id' => $bill->id,
+            'transaction_type' => $bill->transaction_type ?? $bill->document_type,
+            'ap_account' => $bill->ap_account ?? null,
+            'bill_received' => !empty($bill->bill_received) ? 'Yes' : 'No',
+            'supplier_id' => $bill->supplier_code ?? $bill->supplier_id,
+            'supplier_name' => $bill->supplier_name ?? null,
+            'supplier_address' => $bill->supplier_address ?? null,
+            'client_customer_id' => $bill->client_customer_id ?? null,
+            'shipment_job_id' => $bill->shipment_job_id ?? null,
+            'bill_no' => $bill->document_no,
+            'bill_date' => $bill->document_date,
+            'reference_no' => $bill->reference_no ?? null,
+            'due_date' => $bill->due_date,
+            'terms' => $bill->terms ?? null,
+            'currency' => $bill->currency,
+            'exchange_rate' => $bill->usd_to_php_rate ?? $bill->exchange_rate ?? 1,
+            'usd_to_php_rate' => $bill->usd_to_php_rate ?? $bill->exchange_rate ?? 1,
+            'gross_amount' => number_format((float) ($bill->gross_amount ?? $bill->subtotal), 2),
+            'php_amount' => number_format((float) ($bill->php_amount ?? 0), 2),
+            'withholding_tax_rate' => $bill->withholding_tax_rate ?? 0,
+            'withholding_tax_amount' => number_format((float) ($bill->withholding_tax_amount ?? 0), 2),
+            'net_amount' => number_format((float) ($bill->net_amount ?? $bill->grand_total), 2),
+            'memo' => $bill->memo ?? $bill->remarks,
+            'approval_status' => $bill->approval_status ?? $bill->status,
+        ];
+    }
+
+    private function apBillLines($billId)
+    {
+        $table = Schema::hasTable('vendor_bill_lines') ? 'vendor_bill_lines' : 'purchase_document_lines';
+        if (!Schema::hasTable($table)) {
+            return [];
+        }
+
+        return DB::table($table)->where('purchase_document_id', $billId)->get();
+    }
+
+    private function paymentArrayById($id)
+    {
+        $payment = DB::table('payments')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'payments.supplier_id')
+            ->select('payments.*', 'suppliers.code as supplier_code', 'suppliers.name as supplier_name')
+            ->where('payments.id', $id)
+            ->first();
+
+        return [
+            'id' => $payment->id,
+            'payment_no' => $payment->payment_no,
+            'voucher_no' => $payment->voucher_no ?? null,
+            'supplier_id' => $payment->supplier_code ?? $payment->supplier_id,
+            'supplier_name' => $payment->supplier_name,
+            'shipment_job_id' => $payment->shipment_job_id,
+            'bill_no' => $payment->bill_no,
+            'payment_date' => $payment->payment_date,
+            'payment_method' => $payment->payment_method,
+            'bank_account' => $payment->bank_account,
+            'check_no' => $payment->check_no,
+            'currency' => $payment->currency,
+            'amount' => number_format((float) $payment->amount, 2),
+            'approval_status' => $payment->approval_status ?? $payment->status,
+        ];
+    }
+
+    private function storeDocumentAttachments($documentType, $documentId, $files)
+    {
+        if (!Schema::hasTable('document_attachments') || empty($files)) {
+            return;
+        }
+
+        foreach ((array) $files as $file) {
+            if (!$file || !$file->isValid()) {
+                continue;
+            }
+
+            $path = $file->store('ap-attachments');
+            DB::table('document_attachments')->insert([
+                'document_type' => $documentType,
+                'document_id' => $documentId,
+                'disk' => 'local',
+                'path' => $path,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getClientMimeType(),
+                'size' => $file->getSize(),
+                'uploaded_by' => auth()->id(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    private function documentAttachments($documentType, $documentId)
+    {
+        if (!Schema::hasTable('document_attachments')) {
+            return collect();
+        }
+
+        return DB::table('document_attachments')
+            ->where('document_type', $documentType)
+            ->where('document_id', $documentId)
+            ->orderBy('id')
+            ->get();
+    }
+
+    private function nextDocumentNumber($documentType, $prefix, $padding = 5, $increment = true)
+    {
+        $companyId = $this->defaultCompanyId();
+
+        if (!Schema::hasTable('number_series')) {
+            return $prefix.date('YmdHis');
+        }
+
+        $series = DB::table('number_series')
+            ->where('company_id', $companyId)
+            ->where('document_type', $documentType)
+            ->lockForUpdate()
+            ->first();
+
+        if (!$series) {
+            DB::table('number_series')->insert([
+                'company_id' => $companyId,
+                'document_type' => $documentType,
+                'prefix' => $prefix,
+                'current_number' => 0,
+                'padding' => $padding,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $series = DB::table('number_series')
+                ->where('company_id', $companyId)
+                ->where('document_type', $documentType)
+                ->first();
+        }
+
+        $next = ((int) $series->current_number) + 1;
+        if ($increment) {
+            DB::table('number_series')->where('id', $series->id)->update([
+                'current_number' => $next,
+                'updated_at' => now(),
+            ]);
+        }
+
+        return ($series->prefix ?: $prefix).str_pad($next, (int) ($series->padding ?: $padding), '0', STR_PAD_LEFT);
+    }
+
+    private function tablePayload($table, array $payload)
+    {
+        return array_filter($payload, function ($value, $column) use ($table) {
+            return Schema::hasColumn($table, $column);
+        }, ARRAY_FILTER_USE_BOTH);
+    }
+
+    private function amountToWords($amount, $currency)
+    {
+        $whole = (int) floor((float) $amount);
+        $cents = (int) round(((float) $amount - $whole) * 100);
+        $major = strtoupper($currency) === 'USD' ? 'Dollars' : 'Pesos';
+        $words = $this->numberToWords($whole).' '.$major;
+
+        if ($cents > 0) {
+            $words .= ' and '.$this->numberToWords($cents).'/100';
+        }
+
+        return $words.' Only';
+    }
+
+    private function numberToWords($number)
+    {
+        $number = (int) $number;
+        if ($number === 0) {
+            return 'Zero';
+        }
+
+        $ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+        $tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+        $scales = ['', 'Thousand', 'Million', 'Billion'];
+        $parts = [];
+        $scale = 0;
+
+        while ($number > 0) {
+            $chunk = $number % 1000;
+            if ($chunk) {
+                $chunkWords = [];
+                if ($chunk >= 100) {
+                    $chunkWords[] = $ones[(int) floor($chunk / 100)].' Hundred';
+                    $chunk %= 100;
+                }
+                if ($chunk >= 20) {
+                    $chunkWords[] = $tens[(int) floor($chunk / 10)];
+                    $chunk %= 10;
+                }
+                if ($chunk > 0) {
+                    $chunkWords[] = $ones[$chunk];
+                }
+                $parts[] = trim(implode(' ', $chunkWords).' '.$scales[$scale]);
+            }
+            $number = (int) floor($number / 1000);
+            $scale++;
+        }
+
+        return implode(' ', array_reverse($parts));
     }
 
     public function cashbook()

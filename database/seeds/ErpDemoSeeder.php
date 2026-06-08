@@ -8,31 +8,33 @@ class ErpDemoSeeder extends Seeder
 {
     public function run()
     {
-        $companyId = DB::table('companies')->insertGetId([
+        DB::table('companies')->updateOrInsert(['code' => 'SJ'], [
             'code' => 'SJ',
             'name' => 'SeaJet Holdings Inc.',
             'tin' => '000-123-456-000',
             'address' => 'Harbor Business Center, Manila, Philippines',
             'base_currency' => 'PHP',
-            'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $companyId = DB::table('companies')->where('code', 'SJ')->value('id');
 
-        $branchId = DB::table('branches')->insertGetId([
+        DB::table('branches')->updateOrInsert(['company_id' => $companyId, 'code' => 'MAIN'], [
             'company_id' => $companyId,
             'code' => 'MAIN',
             'name' => 'Main Branch',
             'address' => 'Manila',
-            'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $branchId = DB::table('branches')->where('company_id', $companyId)->where('code', 'MAIN')->value('id');
 
-        DB::table('currencies')->insert([
-            ['code' => 'PHP', 'name' => 'Philippine Peso', 'exchange_rate' => 1, 'is_base' => true, 'created_at' => now(), 'updated_at' => now()],
-            ['code' => 'USD', 'name' => 'US Dollar', 'exchange_rate' => 58, 'is_base' => false, 'created_at' => now(), 'updated_at' => now()],
-        ]);
+        foreach ([
+            ['code' => 'PHP', 'name' => 'Philippine Peso', 'exchange_rate' => 1, 'is_base' => true],
+            ['code' => 'USD', 'name' => 'US Dollar', 'exchange_rate' => 58, 'is_base' => false],
+        ] as $currency) {
+            DB::table('currencies')->updateOrInsert(['code' => $currency['code']], $currency + ['updated_at' => now()]);
+        }
 
-        DB::table('users')->insert([
+        DB::table('users')->updateOrInsert(['email' => 'admin@seajet.test'], [
             'company_id' => $companyId,
             'branch_id' => $branchId,
             'name' => 'ERP Admin',
@@ -40,7 +42,6 @@ class ErpDemoSeeder extends Seeder
             'password' => Hash::make('password'),
             'role' => 'admin',
             'department' => 'Accounting',
-            'created_at' => now(),
             'updated_at' => now(),
         ]);
 
@@ -53,7 +54,7 @@ class ErpDemoSeeder extends Seeder
         ];
         $categoryIds = [];
         foreach ($categories as $key => $category) {
-            $categoryIds[$key] = DB::table('account_categories')->insertGetId(array_merge($category, ['created_at' => now(), 'updated_at' => now()]));
+            $categoryIds[$key] = $this->firstOrInsertId('account_categories', ['name' => $category['name']], $category);
         }
 
         $accounts = [
@@ -73,26 +74,28 @@ class ErpDemoSeeder extends Seeder
             ['Expenses', '5100', 'Operating Expenses', 'Expense', 142110],
         ];
         foreach ($accounts as $account) {
-            DB::table('accounts')->insert([
+            DB::table('accounts')->updateOrInsert(['company_id' => $companyId, 'code' => $account[1]], [
                 'company_id' => $companyId,
                 'account_category_id' => $categoryIds[$account[0]],
                 'code' => $account[1],
                 'name' => $account[2],
                 'type' => $account[3],
                 'opening_balance' => $account[4],
-                'created_at' => now(),
                 'updated_at' => now(),
             ]);
         }
 
-        $vatTaxCodeId = DB::table('tax_codes')->insertGetId(['company_id' => $companyId, 'code' => 'VAT12', 'name' => 'Output VAT 12%', 'rate' => 12, 'tax_type' => 'output_vat', 'created_at' => now(), 'updated_at' => now()]);
-        DB::table('tax_codes')->insert([
-            ['company_id' => $companyId, 'code' => 'INPUT12', 'name' => 'Input VAT 12%', 'rate' => 12, 'tax_type' => 'input_vat', 'created_at' => now(), 'updated_at' => now()],
-            ['company_id' => $companyId, 'code' => 'ZERO', 'name' => 'Zero Rated', 'rate' => 0, 'tax_type' => 'zero_rated', 'created_at' => now(), 'updated_at' => now()],
-            ['company_id' => $companyId, 'code' => 'EXEMPT', 'name' => 'VAT Exempt', 'rate' => 0, 'tax_type' => 'vat_exempt', 'created_at' => now(), 'updated_at' => now()],
-        ]);
+        foreach ([
+            ['code' => 'VAT12', 'name' => 'Output VAT 12%', 'rate' => 12, 'tax_type' => 'output_vat'],
+            ['code' => 'INPUT12', 'name' => 'Input VAT 12%', 'rate' => 12, 'tax_type' => 'input_vat'],
+            ['code' => 'ZERO', 'name' => 'Zero Rated', 'rate' => 0, 'tax_type' => 'zero_rated'],
+            ['code' => 'EXEMPT', 'name' => 'VAT Exempt', 'rate' => 0, 'tax_type' => 'vat_exempt'],
+        ] as $taxCode) {
+            DB::table('tax_codes')->updateOrInsert(['company_id' => $companyId, 'code' => $taxCode['code']], $taxCode + ['company_id' => $companyId, 'updated_at' => now()]);
+        }
+        $vatTaxCodeId = DB::table('tax_codes')->where('company_id', $companyId)->where('code', 'VAT12')->value('id');
 
-        $customerId = DB::table('customers')->insertGetId([
+        DB::table('customers')->updateOrInsert(['company_id' => $companyId, 'code' => 'CUST-001'], [
             'company_id' => $companyId,
             'code' => 'CUST-001',
             'customer_id' => 'CUST-001',
@@ -103,11 +106,11 @@ class ErpDemoSeeder extends Seeder
             'credit_term_days' => 30,
             'default_class_code' => 'MANILA',
             'default_ar_account_code' => 'AR_TRADE_BI',
-            'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $customerId = DB::table('customers')->where('company_id', $companyId)->where('code', 'CUST-001')->value('id');
 
-        DB::table('customers')->insert([
+        foreach ([
             [
                 'company_id' => $companyId,
                 'code' => 'CUST-002',
@@ -120,7 +123,6 @@ class ErpDemoSeeder extends Seeder
                 'currency' => 'USD',
                 'default_class_code' => 'CEBU',
                 'default_ar_account_code' => 'AR_TRADE_SOAA',
-                'created_at' => now(),
                 'updated_at' => now(),
             ],
             [
@@ -135,31 +137,32 @@ class ErpDemoSeeder extends Seeder
                 'currency' => 'PHP',
                 'default_class_code' => 'PAMPANGA',
                 'default_ar_account_code' => 'AR_TRADE_DN',
-                'created_at' => now(),
                 'updated_at' => now(),
             ],
-        ]);
+        ] as $customer) {
+            DB::table('customers')->updateOrInsert(['company_id' => $companyId, 'code' => $customer['code']], $customer);
+        }
 
-        $supplierId = DB::table('suppliers')->insertGetId([
+        DB::table('suppliers')->updateOrInsert(['company_id' => $companyId, 'code' => 'SUP-001'], [
             'company_id' => $companyId,
             'code' => 'SUP-001',
             'name' => 'Metro Industrial Supply',
             'email' => 'ap@metroindustrial.test',
             'payment_terms' => '30 Days',
-            'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $supplierId = DB::table('suppliers')->where('company_id', $companyId)->where('code', 'SUP-001')->value('id');
 
-        $warehouseId = DB::table('warehouses')->insertGetId([
+        DB::table('warehouses')->updateOrInsert(['company_id' => $companyId, 'code' => 'MAIN-WH'], [
             'company_id' => $companyId,
             'branch_id' => $branchId,
             'code' => 'MAIN-WH',
             'name' => 'Main Warehouse',
-            'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $warehouseId = DB::table('warehouses')->where('company_id', $companyId)->where('code', 'MAIN-WH')->value('id');
 
-        $itemId = DB::table('items')->insertGetId([
+        DB::table('items')->updateOrInsert(['company_id' => $companyId, 'sku' => 'INV-FLT-001'], [
             'company_id' => $companyId,
             'sku' => 'INV-FLT-001',
             'barcode' => '480000000001',
@@ -169,20 +172,19 @@ class ErpDemoSeeder extends Seeder
             'standard_cost' => 3200,
             'selling_price' => 4000,
             'reorder_level' => 20,
-            'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $itemId = DB::table('items')->where('company_id', $companyId)->where('sku', 'INV-FLT-001')->value('id');
 
-        DB::table('inventory_balances')->insert([
+        DB::table('inventory_balances')->updateOrInsert(['item_id' => $itemId, 'warehouse_id' => $warehouseId], [
             'item_id' => $itemId,
             'warehouse_id' => $warehouseId,
             'quantity_on_hand' => 42,
             'average_cost' => 3200,
-            'created_at' => now(),
             'updated_at' => now(),
         ]);
 
-        $invoiceId = DB::table('sales_documents')->insertGetId([
+        DB::table('sales_documents')->updateOrInsert(['company_id' => $companyId, 'document_no' => 'BI-2026-01042'], [
             'company_id' => $companyId,
             'branch_id' => $branchId,
             'customer_id' => $customerId,
@@ -204,11 +206,11 @@ class ErpDemoSeeder extends Seeder
             'tax_total' => 10553.57,
             'grand_total' => 98500,
             'status' => 'posted',
-            'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $invoiceId = DB::table('sales_documents')->where('company_id', $companyId)->where('document_no', 'BI-2026-01042')->value('id');
 
-        DB::table('ar_account_mappings')->insert([
+        foreach ([
             ['company_id' => $companyId, 'code' => 'AR_TRADE_BI', 'name' => 'A/Trade-Billing Invoice', 'currency' => 'PHP', 'document_type' => 'billing_invoice', 'created_at' => now(), 'updated_at' => now()],
             ['company_id' => $companyId, 'code' => 'AR_TRADE_BI', 'name' => 'A/Trade-Billing Invoice', 'currency' => 'USD', 'document_type' => 'billing_invoice', 'created_at' => now(), 'updated_at' => now()],
             ['company_id' => $companyId, 'code' => 'AR_REIMBURSABLE', 'name' => 'A/R Reimbursable Charges', 'currency' => 'PHP', 'document_type' => 'acknowledgement_receipt', 'created_at' => now(), 'updated_at' => now()],
@@ -217,17 +219,29 @@ class ErpDemoSeeder extends Seeder
             ['company_id' => $companyId, 'code' => 'AR_TRADE_SOAA', 'name' => 'A/R Trade-SOA A', 'currency' => 'USD', 'document_type' => 'statement_of_account_a', 'created_at' => now(), 'updated_at' => now()],
             ['company_id' => $companyId, 'code' => 'AR_TRADE_DN', 'name' => 'A/R Trade-Debit Note', 'currency' => 'PHP', 'document_type' => 'debit_note', 'created_at' => now(), 'updated_at' => now()],
             ['company_id' => $companyId, 'code' => 'AR_TRADE_DN', 'name' => 'A/R Trade-Debit Note', 'currency' => 'USD', 'document_type' => 'debit_note', 'created_at' => now(), 'updated_at' => now()],
-        ]);
+        ] as $mapping) {
+            DB::table('ar_account_mappings')->updateOrInsert([
+                'company_id' => $companyId,
+                'code' => $mapping['code'],
+                'currency' => $mapping['currency'],
+            ], $mapping);
+        }
 
-        DB::table('document_templates')->insert([
+        foreach ([
             ['company_id' => $companyId, 'code' => 'BI-PREPRINT', 'name' => 'Billing Invoice Pre-printed Form', 'document_type' => 'billing_invoice', 'uses_pre_printed_form' => true, 'paper_size' => 'A4/Legal', 'created_at' => now(), 'updated_at' => now()],
             ['company_id' => $companyId, 'code' => 'SOA-PREPRINT', 'name' => 'Statement of Account Pre-printed Form', 'document_type' => 'statement_of_account', 'uses_pre_printed_form' => true, 'paper_size' => 'A4', 'created_at' => now(), 'updated_at' => now()],
             ['company_id' => $companyId, 'code' => 'SOAA-PLAIN', 'name' => 'Statement of Account A Plain Form', 'document_type' => 'statement_of_account_a', 'uses_pre_printed_form' => false, 'paper_size' => 'A4', 'created_at' => now(), 'updated_at' => now()],
             ['company_id' => $companyId, 'code' => 'DN-PREPRINT', 'name' => 'Debit Note Pre-printed Form', 'document_type' => 'debit_note', 'uses_pre_printed_form' => true, 'paper_size' => 'A4', 'created_at' => now(), 'updated_at' => now()],
             ['company_id' => $companyId, 'code' => 'OR-PREPRINT', 'name' => 'Official Receipt Pre-printed Form', 'document_type' => 'official_receipt', 'uses_pre_printed_form' => true, 'paper_size' => 'Official Form', 'created_at' => now(), 'updated_at' => now()],
             ['company_id' => $companyId, 'code' => 'AR-PREPRINT', 'name' => 'Acknowledgement Receipt Pre-printed Form', 'document_type' => 'acknowledgement_receipt', 'uses_pre_printed_form' => true, 'paper_size' => 'Official Form', 'created_at' => now(), 'updated_at' => now()],
-        ]);
+        ] as $template) {
+            DB::table('document_templates')->updateOrInsert([
+                'company_id' => $companyId,
+                'code' => $template['code'],
+            ], $template);
+        }
 
+        DB::table('sales_document_lines')->where('sales_document_id', $invoiceId)->delete();
         DB::table('sales_document_lines')->insert([
             'sales_document_id' => $invoiceId,
             'description' => 'Freight handling and delivery service',
@@ -239,7 +253,7 @@ class ErpDemoSeeder extends Seeder
             'updated_at' => now(),
         ]);
 
-        $splitInvoiceId = DB::table('sales_documents')->insertGetId([
+        DB::table('sales_documents')->updateOrInsert(['company_id' => $companyId, 'document_no' => 'BI-2026-REIMB'], [
             'company_id' => $companyId,
             'branch_id' => $branchId,
             'customer_id' => $customerId,
@@ -262,10 +276,11 @@ class ErpDemoSeeder extends Seeder
             'grand_total' => 162,
             'status' => 'posted',
             'remarks' => 'Sample SOA B includes PHP 50.00 reimbursement; Billing Invoice prints PHP 112.00 only.',
-            'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $splitInvoiceId = DB::table('sales_documents')->where('company_id', $companyId)->where('document_no', 'BI-2026-REIMB')->value('id');
 
+        DB::table('sales_document_lines')->where('sales_document_id', $splitInvoiceId)->delete();
         DB::table('sales_document_lines')->insert([
             [
                 'sales_document_id' => $splitInvoiceId,
@@ -289,7 +304,7 @@ class ErpDemoSeeder extends Seeder
             ],
         ]);
 
-        DB::table('purchase_documents')->insert([
+        DB::table('purchase_documents')->updateOrInsert(['company_id' => $companyId, 'document_no' => 'PO-2026-00491'], [
             'company_id' => $companyId,
             'branch_id' => $branchId,
             'supplier_id' => $supplierId,
@@ -301,8 +316,19 @@ class ErpDemoSeeder extends Seeder
             'tax_total' => 13703.57,
             'grand_total' => 127900,
             'status' => 'approved',
-            'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function firstOrInsertId($table, array $keys, array $values)
+    {
+        $id = DB::table($table)->where($keys)->value('id');
+
+        if ($id) {
+            DB::table($table)->where('id', $id)->update($values + ['updated_at' => now()]);
+            return $id;
+        }
+
+        return DB::table($table)->insertGetId($keys + $values + ['created_at' => now(), 'updated_at' => now()]);
     }
 }

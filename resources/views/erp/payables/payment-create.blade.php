@@ -12,38 +12,52 @@
         <a href="{{ route('erp.payables.approvals') }}" class="btn btn-outline-secondary"><i class="bi bi-check2-square me-1"></i> Approvals</a>
     </div>
 
-    <form class="erp-card p-4" method="post" action="{{ route('erp.payables.payments.review') }}">
+    @php($selectedBill = $selectedBill ?? null)
+    <form class="erp-card p-4" method="post" action="{{ route('erp.payables.payments.review') }}" enctype="multipart/form-data">
         {{ csrf_field() }}
         <div class="row g-3">
             <div class="col-md-3">
                 <label class="form-label">Payment No</label>
-                <input name="payment_no" class="form-control" value="PV-2026-00313" required>
+                <input name="payment_no" class="form-control" value="{{ $nextPaymentNo }}" required>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Payment Date</label>
-                <input name="payment_date" type="date" class="form-control" value="2026-05-24" required>
+                <input name="payment_date" type="date" class="form-control" value="{{ date('Y-m-d') }}" required>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Bill No</label>
-                <input name="bill_no" class="form-control" value="BILL-2026-00492" required>
+                <select name="bill_no" id="billSelect" class="form-select erp-select" required>
+                    <option value="">Select bill...</option>
+                    @foreach($openBills as $bill)
+                        <option value="{{ $bill['bill_no'] }}"
+                                data-supplier-id="{{ $bill['supplier_id'] }}"
+                                data-supplier-name="{{ $bill['supplier_name'] }}"
+                                data-job="{{ $bill['shipment_job_id'] }}"
+                                data-currency="{{ $bill['currency'] }}"
+                                data-amount="{{ number_format($bill['balance'], 2, '.', '') }}"
+                                {{ $selectedBill && $selectedBill['bill_no'] === $bill['bill_no'] ? 'selected' : '' }}>
+                            {{ $bill['bill_no'] }} - {{ $bill['supplier_name'] }} - {{ $bill['balance_display'] }}
+                        </option>
+                    @endforeach
+                </select>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Shipment Job ID</label>
-                <input name="shipment_job_id" class="form-control" value="JOB-SEA-2026-0423" required>
+                <input name="shipment_job_id" id="shipmentJobId" class="form-control" value="{{ $selectedBill['shipment_job_id'] ?? '' }}">
             </div>
             <div class="col-md-3">
                 <label class="form-label">Supplier ID</label>
-                <select name="supplier_id" class="form-select erp-select">
+                <select name="supplier_id" id="supplierId" class="form-select erp-select">
                     @foreach($suppliers as $supplier)
-                        <option value="{{ $supplier['supplier_id'] }}">{{ $supplier['supplier_id'] }}</option>
+                        <option value="{{ $supplier['supplier_id'] }}" {{ $selectedBill && $selectedBill['supplier_id'] === $supplier['supplier_id'] ? 'selected' : '' }}>{{ $supplier['supplier_id'] }}</option>
                     @endforeach
                 </select>
             </div>
             <div class="col-md-5">
                 <label class="form-label">Supplier Name</label>
-                <select name="supplier_name" class="form-select erp-select">
+                <select name="supplier_name" id="supplierName" class="form-select erp-select">
                     @foreach($suppliers as $supplier)
-                        <option>{{ $supplier['name'] }}</option>
+                        <option {{ $selectedBill && $selectedBill['supplier_name'] === $supplier['name'] ? 'selected' : '' }}>{{ $supplier['name'] }}</option>
                     @endforeach
                 </select>
             </div>
@@ -57,19 +71,23 @@
             </div>
             <div class="col-md-3">
                 <label class="form-label">Check No</label>
-                <input name="check_no" class="form-control" value="CHK-883121">
+                <input name="check_no" class="form-control" value="">
             </div>
             <div class="col-md-3">
                 <label class="form-label">Currency</label>
-                <select name="currency" class="form-select erp-select"><option>PHP</option><option>USD</option></select>
+                <select name="currency" id="currencySelect" class="form-select erp-select"><option>PHP</option><option>USD</option></select>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Amount</label>
-                <input name="amount" class="form-control" value="121505.00" required>
+                <input name="amount" id="amountInput" class="form-control" value="{{ $selectedBill ? str_replace(',', '', $selectedBill['net_amount']) : '' }}" required>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Approval Status</label>
                 <select name="approval_status" class="form-select erp-select"><option>For Approval</option><option>Approved</option><option>Released</option></select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Attach Documents</label>
+                <input type="file" name="attachments[]" class="form-control" multiple>
             </div>
         </div>
         <div class="d-flex justify-content-end gap-2 mt-4">
@@ -78,3 +96,25 @@
         </div>
     </form>
 @endsection
+
+@push('scripts')
+<script>
+    $(function () {
+        function syncBill() {
+            var option = $('#billSelect option:selected');
+            if (!option.val()) {
+                return;
+            }
+
+            $('#shipmentJobId').val(option.data('job') || '');
+            $('#supplierId').val(option.data('supplier-id') || '');
+            $('#supplierName').val(option.data('supplier-name') || '');
+            $('#currencySelect').val(option.data('currency') || 'PHP');
+            $('#amountInput').val(option.data('amount') || '');
+        }
+
+        $('#billSelect').on('change', syncBill);
+        syncBill();
+    });
+</script>
+@endpush
