@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="816" height="1056" viewBox="0 0 816 1056">
+  <rect width="816" height="1056" fill="#ffffff"/>
+  <g fill="#111111" font-family="Arial, Helvetica, sans-serif">
+    <g transform="translate(72 32)">
+      <path d="M3 46h51l11-12H14zM22 28h51l11-12H33zM60 2h42L56 52H14z" fill="#202020"/>
+      <path d="M74 0h42L70 50H28z" fill="#202020" opacity=".92"/>
+    </g>
+    <text x="408" y="38" text-anchor="middle" font-size="18" font-weight="700">SEA-JET INTERNATIONAL FORWARDERS, INC.</text>
+    <text x="408" y="54" text-anchor="middle" font-size="10.5">RM 2 A &amp; B BTDT BLDG. A C CORTES AVE 6014 MANDAUE CITY CEBU, PHILIPPINES</text>
+    <text x="408" y="68" text-anchor="middle" font-size="10.5">TEL. NO.: 032 4259882</text>
+    <text x="408" y="82" text-anchor="middle" font-size="10.5">VAT REG. TIN: 000-143-896-00002</text>
+
+    <text x="620" y="110" font-size="21" font-weight="700" letter-spacing=".7">BILLING INVOICE</text>
+    <text x="637" y="147" font-size="15" fill="#a21d1d" font-weight="700">No</text>
+    <text x="678" y="147" font-size="18" fill="#a21d1d" font-family="Courier New, monospace">0000170</text>
+    <text x="642" y="186" font-size="13" font-weight="700">DATE:</text>
+    <rect x="696" y="168" width="88" height="35" fill="none" stroke="#111" stroke-width="1"/>
+
+    <rect x="56" y="119" width="14" height="14" fill="none" stroke="#111" stroke-width="1"/>
+    <text x="76" y="130" font-size="11">CASH SALES</text>
+    <rect x="166" y="119" width="14" height="14" fill="none" stroke="#111" stroke-width="1"/>
+    <text x="186" y="130" font-size="11">CHARGE SALES</text>
+
+    <text x="56" y="158" font-size="12">CUSTOMER</text>
+    <text x="56" y="185" font-size="12">ADDRESS</text>
+    <text x="56" y="212" font-size="12">TIN</text>
+    <line x1="55" y1="224" x2="768" y2="224" stroke="#111" stroke-width="1"/>
+
+    <rect x="48" y="232" width="720" height="694" fill="none" stroke="#111" stroke-width="1"/>
+    <line x1="48" y1="322" x2="768" y2="322" stroke="#111" stroke-width="1"/>
+    <line x1="48" y1="346" x2="768" y2="346" stroke="#111" stroke-width="1"/>
+    <line x1="430" y1="322" x2="430" y2="926" stroke="#111" stroke-width="1"/>
+    <line x1="540" y1="322" x2="540" y2="926" stroke="#111" stroke-width="1"/>
+    <line x1="660" y1="322" x2="660" y2="926" stroke="#111" stroke-width="1"/>
+
+    <text x="58" y="252" font-size="12">MAWB B/L NO.:</text>
+    <text x="58" y="274" font-size="12">HAWB B/L NO.:</text>
+    <text x="58" y="296" font-size="12">DATE SHIPPED:</text>
+    <text x="352" y="252" font-size="12">ORIGIN/DES&apos;N:</text>
+    <text x="352" y="274" font-size="12">COMMODITY:</text>
+
+    <text x="66" y="339" font-size="14" font-weight="700">ITEM DESCRIPTION/ NATURE OF SERVICE</text>
+    <text x="446" y="339" font-size="13" font-weight="700">QUANTITY</text>
+    <text x="566" y="339" font-size="13" font-weight="700">UNIT PRICE</text>
+    <text x="705" y="339" font-size="13" font-weight="700">AMOUNT</text>
+
+    <text x="62" y="792" font-size="10">VATable Sales</text>
+    <text x="62" y="814" font-size="10">VAT</text>
+    <text x="62" y="836" font-size="10">Zero-Rated Sales</text>
+    <text x="62" y="858" font-size="10">VAT-Exempt Sales</text>
+
+    <text x="452" y="792" font-size="10">Total Sales (VAT Inclusive)</text>
+    <text x="452" y="814" font-size="10">Less VAT</text>
+    <text x="452" y="836" font-size="10">Amount Net of VAT</text>
+    <text x="452" y="858" font-size="10">Less: Discount</text>
+    <text x="452" y="880" font-size="8">SCPWD/NAC/MOV/SP</text>
+    <text x="452" y="902" font-size="10">Add: VAT</text>
+    <text x="452" y="924" font-size="10">Less Withholding Tax</text>
+
+    <text x="62" y="894" font-size="7">SCPWD/NAC/MOV</text>
+    <text x="62" y="904" font-size="7">Solo Parent ID No.</text>
+    <line x1="140" y1="902" x2="185" y2="902" stroke="#111" stroke-width="1"/>
+    <text x="196" y="904" font-size="8">Signature</text>
+    <line x1="242" y1="902" x2="286" y2="902" stroke="#111" stroke-width="1"/>
+    <text x="62" y="924" font-size="9">Received the amount of</text>
+    <line x1="180" y1="922" x2="380" y2="922" stroke="#111" stroke-width="1"/>
+
+    <line x1="48" y1="940" x2="768" y2="940" stroke="#111" stroke-width="1"/>
+    <text x="470" y="958" font-size="16" font-weight="700">PLEASE PAY THIS AMOUNT</text>
+    <rect x="660" y="940" width="108" height="28" fill="none" stroke="#111" stroke-width="1"/>
+    <text x="56" y="956" font-size="8">Please issue check payable to Sea-Jet International Forwarders, Inc.</text>
+    <text x="56" y="976" font-size="7">Interest at 2.5% per month shall be charged on all overdue accounts,</text>
+    <text x="56" y="986" font-size="7">and in the event of judicial proceedings to enforce collection, customer</text>
+    <text x="56" y="996" font-size="7">shall pay the company amount equivalent to not less than 25% of the</text>
+    <text x="56" y="1006" font-size="7">amount due as attorney&apos;s fees.</text>
+    <text x="470" y="998" font-size="13" font-weight="700">SEA-JET INTERNATIONAL FORWARDERS, INC.</text>
+    <line x1="470" y1="1028" x2="768" y2="1028" stroke="#111" stroke-width="1"/>
+
+    <g font-size="6.2">
+      <text x="58" y="1018">15 PAB 1.50XB3     0000001 - 0000750</text>
+      <text x="58" y="1027">BIR ATP No.: 3JCN8U1A2024000014345</text>
+      <text x="58" y="1036">Date Issued: 09/23/2024</text>
+      <text x="220" y="1018">PrintWave Solutions Co.</text>
+      <text x="220" y="1027">TIN 410-789-000-000</text>
+      <text x="220" y="1036">Valid until used</text>
+    </g>
+  </g>
+</svg>

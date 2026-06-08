@@ -264,6 +264,7 @@
                 <div class="payment-entry-toolbar">
                     <h1 class="h5 mb-0">Enter Payment</h1>
                     <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-light" type="button" id="samplePaymentButton"><i class="bi bi-magic me-1"></i>Sample Payment</button>
                         <a href="{{ route('erp.modules.show', 'collections') }}" class="btn btn-sm btn-outline-light"><i class="bi bi-x-circle me-1"></i>Cancel</a>
                         <button class="btn btn-sm btn-success" type="submit"><i class="bi bi-cloud-arrow-up-fill me-1"></i>Save</button>
                     </div>
@@ -428,6 +429,62 @@
             $('#currencySelect').val(row.data('currency'));
             $('input[name="payment_date"]').val(row.data('date'));
             $('input[name="reference_no"]').val('PAY-' + row.data('number'));
+        });
+
+        $('#samplePaymentButton').on('click', function () {
+            var sampleDate = new Date().toISOString().slice(0, 10);
+            var invoiceOption = $('#invoiceSelect option').filter(function () {
+                return $(this).val() && $(this).data('balance');
+            }).first();
+            var customerId = invoiceOption.data('customer-id') || '';
+            var customerOption = customerId
+                ? $('#customerSelect option[value="' + customerId + '"]')
+                : $('#customerSelect option').filter(function () { return $(this).val(); }).first();
+
+            if (!customerOption.length) {
+                $('#customerSelect').append(
+                    $('<option>', {
+                        value: 'sample',
+                        text: 'CUST-SAMPLE - Philusa Corporation'
+                    }).attr({
+                        'data-code': 'CUST-SAMPLE',
+                        'data-name': 'Philusa Corporation',
+                        'data-currency': 'PHP'
+                    })
+                );
+                customerOption = $('#customerSelect option[value="sample"]');
+            }
+
+            customerOption.prop('selected', true);
+            $('#customerSelect').trigger('change');
+
+            if (invoiceOption.length) {
+                invoiceOption.prop('selected', true);
+                $('#invoiceSelect').trigger('change');
+            } else {
+                $('#invoiceSelect').append(
+                    $('<option>', {
+                        value: 'BI-2026-01042',
+                        text: 'BI-2026-01042 - Philusa Corporation - PHP 98,500.00'
+                    }).attr({
+                        'data-customer-id': customerOption.val(),
+                        'data-currency': 'PHP',
+                        'data-balance': '98500.00'
+                    })
+                );
+                $('#invoiceSelect').val('BI-2026-01042').trigger('change');
+            }
+
+            $('input[name="payment_date"]').val(sampleDate);
+            $('select[name="payment_method"]').val('Bank Transfer');
+            $('input[name="reference_no"]').val('BPI-FT-' + sampleDate.replace(/-/g, '') + '-1042');
+            $('input[name="project"]').val('Ocean Freight Collection');
+            $('input[name="job_shipment_id"]').val('JOB-SEA-2026-0422');
+            $('#currencySelect').val($('#invoiceSelect option:selected').data('currency') || 'PHP');
+            $('input[name="amount"]').val($('#invoiceSelect option:selected').data('balance') || '98500.00');
+            $('textarea[name="private_notes"]').val('Sample customer payment applied to billing invoice. Verify bank reference before posting.');
+            $('input[name="receipt_type"]').val('Official Receipt');
+            $('input[name="receipt_no"]').val('OR-SAMPLE-0001');
         });
 
         function filterPayments() {

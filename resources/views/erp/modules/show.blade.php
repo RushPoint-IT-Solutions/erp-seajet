@@ -16,7 +16,7 @@
                         'Billing Invoice' => route('erp.invoice.preview'),
                         'Customer Masterlist' => route('erp.customers.index'),
                         'Create Invoice' => route('erp.invoices.create'),
-                        'Billing CRUD' => route('erp.billings.index'),
+                        'Billing CRUD' => route('erp.invoices.index'),
                         'Receive Payment' => route('erp.payments.create'),
                         'Open Public Invoice' => route('erp.public.invoice', 'demo-invoice-token'),
                         'Open Checkout' => route('erp.public.checkout', 'demo-invoice-token'),

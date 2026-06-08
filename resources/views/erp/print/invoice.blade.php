@@ -9,8 +9,9 @@
         position: relative;
         width: {{ $settings['paper_width'] }}px;
         height: {{ $settings['paper_height'] }}px;
+        box-sizing: border-box;
         margin: 0 auto;
-        background: #fbf7cf;
+        background: #fff;
         @if($settings['template_url'])
         background-image: url('{{ $settings['template_url'] }}');
         background-size: 100% 100%;
@@ -23,33 +24,36 @@
         color: #1f2937;
         overflow: hidden;
     }
-    .bi-template-guide {
+    .bi-template-guide,
+    .bi-guide-line,
+    .bi-guide-vline,
+    .bi-guide-box {
         position: absolute;
-        inset: 28px 24px 46px;
-        border: 1px solid rgba(0,0,0,.5);
         pointer-events: none;
+        border-color: #111;
     }
-    .bi-guide-line {
-        position: absolute;
-        left: 24px;
-        right: 24px;
-        height: 1px;
-        background: rgba(0,0,0,.45);
-    }
-    .bi-guide-vline {
-        position: absolute;
-        top: 330px;
-        bottom: 210px;
-        width: 1px;
-        background: rgba(0,0,0,.35);
-    }
+    .bi-template-guide { left: 48px; top: 214px; width: 720px; height: 710px; border: 1px solid #111; }
+    .bi-guide-line { left: 48px; width: 720px; height: 1px; background: #111; }
+    .bi-guide-vline { top: 282px; height: 642px; width: 1px; background: #111; }
+    .bi-guide-box { border: 1px solid #111; }
     .bi-field {
         position: absolute;
-        line-height: 1.28;
+        box-sizing: border-box;
+        padding: 0;
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+        line-height: .92;
         white-space: pre-line;
     }
+    @foreach($hiddenFields as $hiddenField)
+    .print-field-{{ $hiddenField }} {
+        display: none !important;
+    }
+    @endforeach
     .bi-field.amount {
         text-align: right;
+        justify-content: flex-end;
         font-weight: 600;
     }
     .bi-field.header-value {
@@ -66,8 +70,8 @@
     .bi-company-preview {
         position: absolute;
         top: 28px;
-        left: 180px;
-        right: 180px;
+        left: 190px;
+        right: 190px;
         text-align: center;
         font-weight: 700;
         font-size: 15px;
@@ -76,19 +80,31 @@
     .bi-logo-preview {
         position: absolute;
         top: 26px;
-        left: 92px;
-        width: 72px;
-        height: 48px;
+        left: 70px;
+        width: 92px;
+        height: 64px;
         object-fit: contain;
     }
     .bi-title-preview {
         position: absolute;
-        top: 82px;
-        right: 88px;
+        top: 91px;
+        right: 60px;
         font-size: 20px;
         font-weight: 800;
         letter-spacing: .04em;
     }
+    @if($settings['template_url'])
+    .bi-template-guide,
+    .bi-guide-line,
+    .bi-guide-vline,
+    .bi-guide-box,
+    .bi-label-preview,
+    .bi-company-preview,
+    .bi-logo-preview,
+    .bi-title-preview {
+        display: none !important;
+    }
+    @endif
     @media print {
         @page {
             size: {{ $settings['page_css'] }};
@@ -134,76 +150,94 @@
         $fieldStyle = function ($field) use ($s) {
             return 'width: '.$s[$field]['width'].'px; font-size: '.$s[$field]['font_size'].'px';
         };
-        $money = function ($amount) {
-            return 'PHP '.number_format((float) $amount, 2);
+        $currency = $print['currency'] ?? 'PHP';
+        $money = function ($amount) use ($currency) {
+            return trim($currency.' '.number_format((float) $amount, 2));
         };
-        $lineDescription = "OCEAN FREIGHT (5% OF FREIGHT CHARGES)\n(2,100 x 3 CNTRS = \$6,300 x 61.55 = 387,765 x 5%)\n\nSHIPPER: LEMOINE HOLLAND B.V.\nCONTR NO.\nLETU5131406/TCNU5442735/FSCU8916299";
+        $plainAmount = function ($amount) {
+            return number_format((float) $amount, 2);
+        };
+        $lineDescription = $print['line_description'] ?? '';
     @endphp
 
     <div class="bi-print-sheet">
         <img src="{{ asset('images/image.png') }}" class="bi-logo-preview" alt="SeaJet logo">
         <div class="bi-company-preview">
             SEA-JET INTERNATIONAL FORWARDERS, INC.<br>
-            <span style="font-size: 10px; font-weight: 600">UNIT 18 & 19 BLDG. B, CARGO VILLAGE COMPLEX, PARANAQUE CITY</span>
+            <span style="font-size: 10px; font-weight: 600">UNIT 1 ESSEL PARK BLDG. MC ARTHUR HI-WAY TELABASTAGAN<br>CITY OF SAN FERNANDO, PAMPANGA, PHILIPPINES 2000<br>TEL NO. 045 6522632<br>VAT REG. TIN: 000-143-896-00001</span>
         </div>
         <div class="bi-title-preview">BILLING INVOICE</div>
+        <div class="bi-label-preview" style="left: 625px; top: 130px; color: #9c1c1c; font-size: 18px; font-weight: 700; text-transform: none">No</div>
         <div class="bi-template-guide"></div>
+        <div class="bi-guide-box" style="left: 660px; top: 165px; width: 108px; height: 34px"></div>
         <div class="bi-guide-line" style="top: 242px"></div>
-        <div class="bi-guide-line" style="top: 330px"></div>
-        <div class="bi-guide-line" style="top: 350px"></div>
-        <div class="bi-guide-line" style="top: 798px"></div>
-        <div class="bi-guide-line" style="top: 988px"></div>
-        <div class="bi-guide-vline" style="left: 470px"></div>
-        <div class="bi-guide-vline" style="left: 590px"></div>
-        <div class="bi-guide-vline" style="left: 705px"></div>
+        <div class="bi-guide-line" style="top: 282px"></div>
+        <div class="bi-guide-line" style="top: 306px"></div>
+        <div class="bi-guide-line" style="top: 924px"></div>
+        <div class="bi-guide-vline" style="left: 430px"></div>
+        <div class="bi-guide-vline" style="left: 540px"></div>
+        <div class="bi-guide-vline" style="left: 660px"></div>
 
-        <div class="bi-label-preview" style="left: 34px; top: 135px">Cash Sales</div>
-        <div class="bi-label-preview" style="left: 118px; top: 135px">Charge Sales</div>
-        <div class="bi-label-preview" style="left: 34px; top: 158px">Customer</div>
-        <div class="bi-label-preview" style="left: 34px; top: 183px">Address</div>
-        <div class="bi-label-preview" style="left: 34px; top: 225px">TIN</div>
-        <div class="bi-label-preview" style="left: 34px; top: 263px">MAWB B/L No.</div>
-        <div class="bi-label-preview" style="left: 34px; top: 287px">HAWB B/L No.</div>
-        <div class="bi-label-preview" style="left: 34px; top: 311px">Date Shipped</div>
-        <div class="bi-label-preview" style="left: 478px; top: 263px">Origin/Dest'n</div>
-        <div class="bi-label-preview" style="left: 478px; top: 287px">Commodity</div>
-        <div class="bi-label-preview" style="left: 52px; top: 351px">Item Description/Nature of Service</div>
-        <div class="bi-label-preview" style="left: 504px; top: 351px">Quantity</div>
-        <div class="bi-label-preview" style="left: 600px; top: 351px">Unit Price</div>
-        <div class="bi-label-preview" style="left: 752px; top: 351px">Amount</div>
+        <div class="bi-label-preview" style="left: 55px; top: 118px">Cash Sales</div>
+        <div class="bi-label-preview" style="left: 165px; top: 118px">Charge Sales</div>
+        <div class="bi-label-preview" style="left: 55px; top: 148px">Customer</div>
+        <div class="bi-label-preview" style="left: 55px; top: 175px">Address</div>
+        <div class="bi-label-preview" style="left: 55px; top: 202px">TIN</div>
+        <div class="bi-label-preview" style="left: 55px; top: 244px">MAWB B/L No.:</div>
+        <div class="bi-label-preview" style="left: 55px; top: 270px">HAWB B/L No.:</div>
+        <div class="bi-label-preview" style="left: 55px; top: 296px">Date Shipped:</div>
+        <div class="bi-label-preview" style="left: 350px; top: 244px">Origin/Dest'n:</div>
+        <div class="bi-label-preview" style="left: 350px; top: 270px">Commodity:</div>
+        <div class="bi-label-preview" style="left: 60px; top: 288px; font-weight: 800">Item Description/ Nature of Service</div>
+        <div class="bi-label-preview" style="left: 445px; top: 288px; font-weight: 800">Quantity</div>
+        <div class="bi-label-preview" style="left: 565px; top: 288px; font-weight: 800">Unit Price</div>
+        <div class="bi-label-preview" style="left: 705px; top: 288px; font-weight: 800">Amount</div>
+        <div class="bi-label-preview" style="left: 620px; top: 170px">Date:</div>
+        <div class="bi-label-preview" style="left: 65px; top: 790px; text-transform: none">VATable Sales</div>
+        <div class="bi-label-preview" style="left: 65px; top: 815px; text-transform: none">VAT</div>
+        <div class="bi-label-preview" style="left: 65px; top: 840px; text-transform: none">Zero-Rated Sales</div>
+        <div class="bi-label-preview" style="left: 65px; top: 865px; text-transform: none">VAT-Exempt Sales</div>
+        <div class="bi-label-preview" style="left: 455px; top: 790px; text-transform: none">Total Sales (VAT Inclusive)</div>
+        <div class="bi-label-preview" style="left: 455px; top: 815px; text-transform: none">Less VAT</div>
+        <div class="bi-label-preview" style="left: 455px; top: 840px; text-transform: none">Amount Net of VAT</div>
+        <div class="bi-label-preview" style="left: 455px; top: 865px; text-transform: none">Less: Discount</div>
+        <div class="bi-label-preview" style="left: 455px; top: 890px; text-transform: none">Add: VAT</div>
+        <div class="bi-label-preview" style="left: 455px; top: 915px; text-transform: none">Less Withholding Tax</div>
+        <div class="bi-label-preview" style="left: 455px; top: 948px; font-size: 16px; font-weight: 800">PLEASE PAY THIS AMOUNT</div>
+        <div class="bi-label-preview" style="left: 455px; top: 995px; font-size: 13px; font-weight: 800">SEA-JET INTERNATIONAL FORWARDERS, INC.</div>
 
-        <div class="bi-field" style="left: {{ $p['cash_sales'][0] }}px; top: {{ $p['cash_sales'][1] }}px; {{ $fieldStyle('cash_sales') }}">[ ]</div>
-        <div class="bi-field" style="left: {{ $p['charge_sales'][0] }}px; top: {{ $p['charge_sales'][1] }}px; {{ $fieldStyle('charge_sales') }}">[x]</div>
-        <div class="bi-field" style="left: {{ $p['customer'][0] }}px; top: {{ $p['customer'][1] }}px; {{ $fieldStyle('customer') }}">{{ $print['customer'] }}</div>
-        <div class="bi-field" style="left: {{ $p['address'][0] }}px; top: {{ $p['address'][1] }}px; {{ $fieldStyle('address') }}">28 SHAW BLVD, KAPITOLYO 1603<br>CITY OF PASIG</div>
-        <div class="bi-field" style="left: {{ $p['tin'][0] }}px; top: {{ $p['tin'][1] }}px; {{ $fieldStyle('tin') }}">000-281-014-00000</div>
-        <div class="bi-field" style="left: {{ $p['mawb'][0] }}px; top: {{ $p['mawb'][1] }}px; {{ $fieldStyle('mawb') }}">OOLU32322350120</div>
-        <div class="bi-field" style="left: {{ $p['hawb'][0] }}px; top: {{ $p['hawb'][1] }}px; {{ $fieldStyle('hawb') }}">2GJXM412-G1</div>
-        <div class="bi-field" style="left: {{ $p['date_shipped'][0] }}px; top: {{ $p['date_shipped'][1] }}px; {{ $fieldStyle('date_shipped') }}">05/19/2026</div>
-        <div class="bi-field header-value" style="left: {{ $p['invoice_no'][0] }}px; top: {{ $p['invoice_no'][1] }}px; {{ $fieldStyle('invoice_no') }}">{{ $print['invoice_no'] }}</div>
-        <div class="bi-field" style="left: {{ $p['invoice_date'][0] }}px; top: {{ $p['invoice_date'][1] }}px; {{ $fieldStyle('invoice_date') }}">{{ $print['invoice_date'] }}</div>
-        <div class="bi-field" style="left: {{ $p['origin_dest'][0] }}px; top: {{ $p['origin_dest'][1] }}px; {{ $fieldStyle('origin_dest') }}">ROTTERDAM/MNL</div>
-        <div class="bi-field" style="left: {{ $p['commodity'][0] }}px; top: {{ $p['commodity'][1] }}px; {{ $fieldStyle('commodity') }}">3 X 40'HC</div>
+        <div class="bi-field print-field-cash_sales" style="left: {{ $p['cash_sales'][0] }}px; top: {{ $p['cash_sales'][1] }}px; {{ $fieldStyle('cash_sales') }}">[ ]</div>
+        <div class="bi-field print-field-charge_sales" style="left: {{ $p['charge_sales'][0] }}px; top: {{ $p['charge_sales'][1] }}px; {{ $fieldStyle('charge_sales') }}">[x]</div>
+        <div class="bi-field print-field-customer" style="left: {{ $p['customer'][0] }}px; top: {{ $p['customer'][1] }}px; {{ $fieldStyle('customer') }}">{{ $print['customer'] }}</div>
+        <div class="bi-field print-field-address" style="left: {{ $p['address'][0] }}px; top: {{ $p['address'][1] }}px; {{ $fieldStyle('address') }}">{{ $print['address'] }}</div>
+        <div class="bi-field print-field-tin" style="left: {{ $p['tin'][0] }}px; top: {{ $p['tin'][1] }}px; {{ $fieldStyle('tin') }}">{{ $print['tin'] }}</div>
+        <div class="bi-field print-field-mawb" style="left: {{ $p['mawb'][0] }}px; top: {{ $p['mawb'][1] }}px; {{ $fieldStyle('mawb') }}">{{ $print['mawb'] }}</div>
+        <div class="bi-field print-field-hawb" style="left: {{ $p['hawb'][0] }}px; top: {{ $p['hawb'][1] }}px; {{ $fieldStyle('hawb') }}">{{ $print['hawb'] }}</div>
+        <div class="bi-field print-field-date_shipped" style="left: {{ $p['date_shipped'][0] }}px; top: {{ $p['date_shipped'][1] }}px; {{ $fieldStyle('date_shipped') }}">{{ $print['date_shipped'] }}</div>
+        <div class="bi-field header-value print-field-invoice_no" style="left: {{ $p['invoice_no'][0] }}px; top: {{ $p['invoice_no'][1] }}px; {{ $fieldStyle('invoice_no') }}">{{ $print['invoice_no'] }}</div>
+        <div class="bi-field print-field-invoice_date" style="left: {{ $p['invoice_date'][0] }}px; top: {{ $p['invoice_date'][1] }}px; {{ $fieldStyle('invoice_date') }}">{{ $print['invoice_date'] }}</div>
+        <div class="bi-field print-field-origin_dest" style="left: {{ $p['origin_dest'][0] }}px; top: {{ $p['origin_dest'][1] }}px; {{ $fieldStyle('origin_dest') }}">{{ $print['origin_dest'] }}</div>
+        <div class="bi-field print-field-commodity" style="left: {{ $p['commodity'][0] }}px; top: {{ $p['commodity'][1] }}px; {{ $fieldStyle('commodity') }}">{{ $print['commodity'] }}</div>
 
-        <div class="bi-field" style="left: {{ $p['line_description'][0] }}px; top: {{ $p['line_description'][1] }}px; {{ $fieldStyle('line_description') }}">{{ $lineDescription }}</div>
-        <div class="bi-field" style="left: {{ $p['soa_no'][0] }}px; top: {{ $p['soa_no'][1] }}px; {{ $fieldStyle('soa_no') }}">SOA# {{ $print['soa_no'] }}</div>
-        <div class="bi-field amount" style="left: {{ $p['line_qty'][0] }}px; top: {{ $p['line_qty'][1] }}px; {{ $fieldStyle('line_qty') }}">1</div>
-        <div class="bi-field amount" style="left: {{ $p['line_unit_price'][0] }}px; top: {{ $p['line_unit_price'][1] }}px; {{ $fieldStyle('line_unit_price') }}">19,388.25</div>
-        <div class="bi-field amount" style="left: {{ $p['line_amount'][0] }}px; top: {{ $p['line_amount'][1] }}px; {{ $fieldStyle('line_amount') }}">19,388.25</div>
+        <div class="bi-field print-field-line_description" style="left: {{ $p['line_description'][0] }}px; top: {{ $p['line_description'][1] }}px; {{ $fieldStyle('line_description') }}">{{ $lineDescription }}</div>
+        <div class="bi-field print-field-soa_no" style="left: {{ $p['soa_no'][0] }}px; top: {{ $p['soa_no'][1] }}px; {{ $fieldStyle('soa_no') }}">SOA# {{ $print['soa_no'] }}</div>
+        <div class="bi-field amount print-field-line_qty" style="left: {{ $p['line_qty'][0] }}px; top: {{ $p['line_qty'][1] }}px; {{ $fieldStyle('line_qty') }}">{{ $print['line_qty'] }}</div>
+        <div class="bi-field amount print-field-line_unit_price" style="left: {{ $p['line_unit_price'][0] }}px; top: {{ $p['line_unit_price'][1] }}px; {{ $fieldStyle('line_unit_price') }}">{{ $plainAmount($print['line_unit_price']) }}</div>
+        <div class="bi-field amount print-field-line_amount" style="left: {{ $p['line_amount'][0] }}px; top: {{ $p['line_amount'][1] }}px; {{ $fieldStyle('line_amount') }}">{{ $plainAmount($print['line_amount']) }}</div>
 
-        <div class="bi-field amount" style="left: {{ $p['vatable_sales'][0] }}px; top: {{ $p['vatable_sales'][1] }}px; {{ $fieldStyle('vatable_sales') }}">{{ $money($print['vatable_sales']) }}</div>
-        <div class="bi-field amount" style="left: {{ $p['vat'][0] }}px; top: {{ $p['vat'][1] }}px; {{ $fieldStyle('vat') }}">{{ $money($print['vat_amount']) }}</div>
-        <div class="bi-field amount" style="left: {{ $p['zero_rated_sales'][0] }}px; top: {{ $p['zero_rated_sales'][1] }}px; {{ $fieldStyle('zero_rated_sales') }}">0.00</div>
-        <div class="bi-field amount" style="left: {{ $p['vat_exempt_sales'][0] }}px; top: {{ $p['vat_exempt_sales'][1] }}px; {{ $fieldStyle('vat_exempt_sales') }}">0.00</div>
+        <div class="bi-field amount print-field-vatable_sales" style="left: {{ $p['vatable_sales'][0] }}px; top: {{ $p['vatable_sales'][1] }}px; {{ $fieldStyle('vatable_sales') }}">{{ $money($print['vatable_sales']) }}</div>
+        <div class="bi-field amount print-field-vat" style="left: {{ $p['vat'][0] }}px; top: {{ $p['vat'][1] }}px; {{ $fieldStyle('vat') }}">{{ $money($print['vat_amount']) }}</div>
+        <div class="bi-field amount print-field-zero_rated_sales" style="left: {{ $p['zero_rated_sales'][0] }}px; top: {{ $p['zero_rated_sales'][1] }}px; {{ $fieldStyle('zero_rated_sales') }}">{{ $plainAmount($print['zero_rated_sales']) }}</div>
+        <div class="bi-field amount print-field-vat_exempt_sales" style="left: {{ $p['vat_exempt_sales'][0] }}px; top: {{ $p['vat_exempt_sales'][1] }}px; {{ $fieldStyle('vat_exempt_sales') }}">{{ $plainAmount($print['vat_exempt_sales']) }}</div>
 
-        <div class="bi-field amount" style="left: {{ $p['total_sales'][0] }}px; top: {{ $p['total_sales'][1] }}px; {{ $fieldStyle('total_sales') }}">{{ $money($print['billing_total']) }}</div>
-        <div class="bi-field amount" style="left: {{ $p['less_vat'][0] }}px; top: {{ $p['less_vat'][1] }}px; {{ $fieldStyle('less_vat') }}">{{ $money($print['vat_amount']) }}</div>
-        <div class="bi-field amount" style="left: {{ $p['amount_net_vat'][0] }}px; top: {{ $p['amount_net_vat'][1] }}px; {{ $fieldStyle('amount_net_vat') }}">{{ $money($print['vatable_sales']) }}</div>
-        <div class="bi-field amount" style="left: {{ $p['discount'][0] }}px; top: {{ $p['discount'][1] }}px; {{ $fieldStyle('discount') }}">0.00</div>
-        <div class="bi-field amount" style="left: {{ $p['add_vat'][0] }}px; top: {{ $p['add_vat'][1] }}px; {{ $fieldStyle('add_vat') }}">{{ $money($print['vat_amount']) }}</div>
-        <div class="bi-field amount" style="left: {{ $p['withholding_tax'][0] }}px; top: {{ $p['withholding_tax'][1] }}px; {{ $fieldStyle('withholding_tax') }}">PHP -387.77</div>
-        <div class="bi-field amount header-value" style="left: {{ $p['amount_due'][0] }}px; top: {{ $p['amount_due'][1] }}px; {{ $fieldStyle('amount_due') }}">{{ $money($print['billing_total']) }}</div>
-        <div class="bi-field" style="left: {{ $p['prepared_by'][0] }}px; top: {{ $p['prepared_by'][1] }}px; {{ $fieldStyle('prepared_by') }}">MABEL PLATA</div>
+        <div class="bi-field amount print-field-total_sales" style="left: {{ $p['total_sales'][0] }}px; top: {{ $p['total_sales'][1] }}px; {{ $fieldStyle('total_sales') }}">{{ $money($print['billing_total']) }}</div>
+        <div class="bi-field amount print-field-less_vat" style="left: {{ $p['less_vat'][0] }}px; top: {{ $p['less_vat'][1] }}px; {{ $fieldStyle('less_vat') }}">{{ $money($print['vat_amount']) }}</div>
+        <div class="bi-field amount print-field-amount_net_vat" style="left: {{ $p['amount_net_vat'][0] }}px; top: {{ $p['amount_net_vat'][1] }}px; {{ $fieldStyle('amount_net_vat') }}">{{ $money($print['vatable_sales']) }}</div>
+        <div class="bi-field amount print-field-discount" style="left: {{ $p['discount'][0] }}px; top: {{ $p['discount'][1] }}px; {{ $fieldStyle('discount') }}">{{ $plainAmount($print['discount']) }}</div>
+        <div class="bi-field amount print-field-add_vat" style="left: {{ $p['add_vat'][0] }}px; top: {{ $p['add_vat'][1] }}px; {{ $fieldStyle('add_vat') }}">{{ $money($print['vat_amount']) }}</div>
+        <div class="bi-field amount print-field-withholding_tax" style="left: {{ $p['withholding_tax'][0] }}px; top: {{ $p['withholding_tax'][1] }}px; {{ $fieldStyle('withholding_tax') }}">{{ $money($print['withholding_tax']) }}</div>
+        <div class="bi-field amount header-value print-field-amount_due" style="left: {{ $p['amount_due'][0] }}px; top: {{ $p['amount_due'][1] }}px; {{ $fieldStyle('amount_due') }}">{{ $money($print['billing_total']) }}</div>
+        <div class="bi-field print-field-prepared_by" style="left: {{ $p['prepared_by'][0] }}px; top: {{ $p['prepared_by'][1] }}px; {{ $fieldStyle('prepared_by') }}">{{ $print['prepared_by'] }}</div>
 
         @foreach($customFields as $custom)
             <div class="bi-field" style="left: {{ $custom['x'] }}px; top: {{ $custom['y'] }}px; width: {{ $custom['width'] }}px; font-size: {{ $custom['font_size'] }}px">{{ $custom['text'] }}</div>

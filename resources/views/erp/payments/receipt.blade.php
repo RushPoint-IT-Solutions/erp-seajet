@@ -9,7 +9,13 @@
             <h1 class="h3 fw-bold mb-1">Payment Recorded</h1>
             <p class="text-muted mb-0">Receipt details are ready for printing or customer email.</p>
         </div>
-        <a href="{{ route('erp.official-receipt.preview') }}" class="btn btn-primary"><i class="bi bi-printer me-1"></i> Print Receipt</a>
+        <div class="d-flex flex-wrap gap-2">
+            @foreach($receiptDocuments as $document)
+                <a href="{{ $document['route'] }}" class="btn {{ $loop->first ? 'btn-primary' : 'btn-outline-primary' }}">
+                    <i class="bi {{ $document['icon'] }} me-1"></i>{{ $document['label'] }}
+                </a>
+            @endforeach
+        </div>
     </div>
     <div class="erp-card p-4">
         <div class="row g-3">

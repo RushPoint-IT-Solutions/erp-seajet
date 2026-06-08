@@ -136,6 +136,7 @@ class ModuleController extends Controller
             'settings' => $this->invoicePrintSettings(),
             'fieldStyles' => $this->invoicePrintFieldStyles(),
             'customFields' => $this->invoicePrintCustomFields(),
+            'hiddenFields' => $this->invoicePrintHiddenFields(),
             'print' => $this->billingPrintPreviewData(),
         ]);
     }
@@ -484,7 +485,37 @@ class ModuleController extends Controller
 
     public function customers()
     {
-        return view('erp.customers.index', ['customers' => $this->customers]);
+        $totalCreditLimit = 0.0;
+        $watchlistCount = 0;
+        $vatableCount = 0;
+
+        foreach ($this->customers as $customer) {
+            $totalCreditLimit += $this->moneyToFloat($customer['credit_limit']);
+
+            if (strtolower($customer['credit_status']) === 'watchlist') {
+                $watchlistCount++;
+            }
+
+            if ($customer['vat_classification'] === '12%') {
+                $vatableCount++;
+            }
+        }
+
+        return view('erp.customers.index', [
+            'customers' => $this->customers,
+            'stats' => [
+                ['label' => 'Active Clients', 'value' => count($this->customers), 'icon' => 'bi-people-fill', 'tone' => 'primary'],
+                ['label' => 'Credit Limit', 'value' => 'PHP '.number_format($totalCreditLimit, 2), 'icon' => 'bi-bank', 'tone' => 'success'],
+                ['label' => 'Watchlist', 'value' => $watchlistCount, 'icon' => 'bi-exclamation-triangle', 'tone' => 'warning'],
+                ['label' => 'VATable Clients', 'value' => $vatableCount, 'icon' => 'bi-percent', 'tone' => 'danger'],
+            ],
+            'workflows' => [
+                ['label' => 'Create client', 'route' => route('erp.customers.create'), 'icon' => 'bi-person-plus'],
+                ['label' => 'Create invoice', 'route' => route('erp.invoices.create'), 'icon' => 'bi-file-earmark-plus'],
+                ['label' => 'Receive payment', 'route' => route('erp.payments.create'), 'icon' => 'bi-credit-card'],
+                ['label' => 'AR aging', 'route' => route('erp.customer-billing.aging'), 'icon' => 'bi-bar-chart-line'],
+            ],
+        ]);
     }
 
     public function customerCreate()
@@ -504,7 +535,11 @@ class ModuleController extends Controller
 
     public function usersIndex()
     {
-        return view('erp.users.index', ['users' => $this->users]);
+        return view('erp.users.index', [
+            'users' => $this->users,
+            'roles' => $this->rolePermissionRoles(),
+            'permissionGroups' => $this->rolePermissionGroups(),
+        ]);
     }
 
     public function userCreate()
@@ -583,7 +618,36 @@ class ModuleController extends Controller
             ['RE-2026-00022', 'Harbor Office Center', 'OPER-ADMIN-2026-001', 'Admin', 'PHP', '18,000.00', 'Recurring', '2026-06-01'],
         ];
 
-        return view('erp.payables.expenses-index', compact('expenses'));
+        $apStats = [
+            ['label' => 'PHP Payables', 'value' => 'PHP 267,210.00', 'icon' => 'bi-cash-stack', 'tone' => 'primary'],
+            ['label' => 'USD Payables', 'value' => 'USD 1,325.00', 'icon' => 'bi-currency-dollar', 'tone' => 'success'],
+            ['label' => 'For Approval', 'value' => '2', 'icon' => 'bi-check2-square', 'tone' => 'warning'],
+            ['label' => 'WHT Computation', 'value' => 'Enabled', 'icon' => 'bi-percent', 'tone' => 'danger'],
+        ];
+
+        $apFeatures = [
+            ['label' => 'Vendor bill entry', 'icon' => 'bi-receipt'],
+            ['label' => 'Shipment-linked expenses', 'icon' => 'bi-tags'],
+            ['label' => 'Client tagging', 'icon' => 'bi-person-lines-fill'],
+            ['label' => 'Check vouchers', 'icon' => 'bi-printer'],
+            ['label' => 'Payment approvals', 'icon' => 'bi-check2-square'],
+            ['label' => 'Bank / cheque / online transfer', 'icon' => 'bi-bank'],
+            ['label' => 'Check printing', 'icon' => 'bi-file-earmark-check'],
+            ['label' => 'Withholding tax computation', 'icon' => 'bi-percent'],
+            ['label' => 'AP aging reports', 'icon' => 'bi-clock-history'],
+            ['label' => 'Multi-currency: USD & PHP', 'icon' => 'bi-currency-exchange'],
+        ];
+
+        $apWorkflows = [
+            ['label' => 'Vendor bill entry', 'route' => route('erp.payables.vendor-bills.create'), 'icon' => 'bi-plus-lg'],
+            ['label' => 'Payment approvals', 'route' => route('erp.payables.approvals'), 'icon' => 'bi-check2-square'],
+            ['label' => 'Payment processing', 'route' => route('erp.payables.payments.create'), 'icon' => 'bi-credit-card'],
+            ['label' => 'Print check voucher', 'route' => route('erp.payables.check-voucher'), 'icon' => 'bi-printer'],
+            ['label' => 'Print checks', 'route' => route('erp.payables.check-print'), 'icon' => 'bi-file-earmark-check'],
+            ['label' => 'AP aging report', 'route' => route('erp.payables.aging'), 'icon' => 'bi-clock-history'],
+        ];
+
+        return view('erp.payables.expenses-index', compact('expenses', 'apStats', 'apFeatures', 'apWorkflows'));
     }
 
     public function vendorBillReview()
@@ -1044,7 +1108,55 @@ class ModuleController extends Controller
 
     public function invoiceCreate()
     {
-        return view('erp.invoices.create', ['customers' => $this->customers]);
+        return view('erp.invoices.create', [
+            'customers' => $this->customers,
+            'invoiceTemplates' => $this->invoiceTemplates(),
+        ]);
+    }
+
+    public function invoiceIndex()
+    {
+        $invoices = $this->billingRows();
+        $totalAmount = 0.0;
+        $postedAmount = 0.0;
+        $postedCount = 0;
+
+        foreach ($invoices as $invoice) {
+            $amount = $this->moneyToFloat($invoice[4]);
+            $status = strtolower($invoice[5]);
+
+            $totalAmount += $amount;
+
+            if ($status === 'posted') {
+                $postedCount++;
+                $postedAmount += $amount;
+            }
+        }
+
+        return view('erp.invoices.index', [
+            'invoices' => $invoices,
+            'stats' => [
+                ['label' => 'Invoices', 'value' => count($invoices), 'icon' => 'bi-receipt', 'tone' => 'primary'],
+                ['label' => 'Total Billed', 'value' => 'PHP '.number_format($totalAmount, 2), 'icon' => 'bi-cash-stack', 'tone' => 'success'],
+                ['label' => 'Posted Amount', 'value' => 'PHP '.number_format($postedAmount, 2), 'icon' => 'bi-check2-square', 'tone' => 'warning'],
+                ['label' => 'Posted', 'value' => $postedCount, 'icon' => 'bi-check2-circle', 'tone' => 'success'],
+            ],
+            'workflows' => [
+                ['label' => 'Create invoice', 'route' => route('erp.invoices.create'), 'icon' => 'bi-plus-lg'],
+                ['label' => 'Receive payment', 'route' => route('erp.payments.create'), 'icon' => 'bi-credit-card'],
+            ],
+            'agingBuckets' => [
+                ['label' => 'Current', 'value' => 'PHP 98,500.00', 'icon' => 'bi-calendar-check', 'tone' => 'success'],
+                ['label' => '30 Days', 'value' => 'USD 1,840.00', 'icon' => 'bi-calendar2-week', 'tone' => 'primary'],
+                ['label' => '60 Days', 'value' => 'PHP 36,500.00', 'icon' => 'bi-calendar2-minus', 'tone' => 'warning'],
+                ['label' => '90+ Days', 'value' => 'PHP 12,400.00', 'icon' => 'bi-calendar2-x', 'tone' => 'danger'],
+            ],
+            'agingRows' => [
+                ['North Harbor Trading', 'BI-2026-01042', 'PHP', '98,500.00', '0.00', '0.00', '0.00'],
+                ['Blue Anchor Logistics', 'SOAA-2026-00211', 'USD', '0.00', '1,840.00', '0.00', '0.00'],
+                ['Island Prime Foods', 'DN-2026-00042', 'PHP', '0.00', '0.00', '36,500.00', '12,400.00'],
+            ],
+        ]);
     }
 
     public function billingIndex()
@@ -1054,9 +1166,11 @@ class ModuleController extends Controller
 
     public function billingEdit($invoice)
     {
-        return view('erp.billings.edit', [
-            'invoiceNo' => $invoice,
+        return view('erp.invoices.create', [
+            'isEdit' => true,
+            'editingInvoice' => $this->billingPrintInvoiceDataFromReference($invoice),
             'customers' => $this->customers,
+            'invoiceTemplates' => $this->invoiceTemplates(),
         ]);
     }
 
@@ -1098,34 +1212,49 @@ class ModuleController extends Controller
             'settings' => $this->invoicePrintSettings(),
             'fieldStyles' => $this->invoicePrintFieldStyles(),
             'customFields' => $this->invoicePrintCustomFields(),
+            'hiddenFields' => $this->invoicePrintHiddenFields(),
         ]);
     }
 
     public function saveBillingInvoicePrintLayout()
     {
+        if (request()->hasFile('template_file') && request()->file('template_file')->isValid()) {
+            $path = request()->file('template_file')->store('erp/templates', 'public');
+            request()->merge([
+                'template_url' => asset('storage/'.$path),
+                'print_template' => '1',
+            ]);
+        }
+
         $payload = $this->invoicePrintLayoutPayload();
 
         try {
             if (Schema::hasTable('print_layouts')) {
+                $updates = [
+                    'paper_size' => $payload['settings']['paper_size'],
+                    'paper_width' => $payload['settings']['paper_width'],
+                    'paper_height' => $payload['settings']['paper_height'],
+                    'template_url' => $payload['settings']['template_url'],
+                    'print_template' => $payload['settings']['print_template'],
+                    'positions' => json_encode($payload['positions']),
+                    'field_styles' => json_encode($payload['field_styles']),
+                    'custom_fields' => json_encode($payload['custom_fields']),
+                    'is_default' => true,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ];
+
+                if (Schema::hasColumn('print_layouts', 'hidden_fields')) {
+                    $updates['hidden_fields'] = json_encode($payload['hidden_fields']);
+                }
+
                 DB::table('print_layouts')->updateOrInsert(
                     [
                         'company_id' => null,
-                        'document_type' => 'billing_invoice',
+                        'document_type' => 'billing_invoice_cebu_recreated',
                         'layout_name' => 'Default',
                     ],
-                    [
-                        'paper_size' => $payload['settings']['paper_size'],
-                        'paper_width' => $payload['settings']['paper_width'],
-                        'paper_height' => $payload['settings']['paper_height'],
-                        'template_url' => $payload['settings']['template_url'],
-                        'print_template' => $payload['settings']['print_template'],
-                        'positions' => json_encode($payload['positions']),
-                        'field_styles' => json_encode($payload['field_styles']),
-                        'custom_fields' => json_encode($payload['custom_fields']),
-                        'is_default' => true,
-                        'updated_at' => now(),
-                        'created_at' => now(),
-                    ]
+                    $updates
                 );
             }
         } catch (\Exception $exception) {
@@ -1139,18 +1268,109 @@ class ModuleController extends Controller
             ->with('status', 'Billing invoice print layout saved for future invoices.');
     }
 
-    private function invoicePrintLayoutStoragePath()
+    public function soaBPrintLayout()
     {
-        return 'erp/billing_invoice_print_layout.json';
+        return view('erp.billings.print-layout-soa', $this->soaPrintLayoutViewData('soa_b'));
     }
 
-    private function savedInvoicePrintLayout()
+    public function saveSoaBPrintLayout()
+    {
+        $this->saveSoaPrintLayoutPayload('soa_b');
+
+        return redirect()
+            ->route('erp.billings.print-layout.soa-b')
+            ->with('status', 'SOA B print layout saved.');
+    }
+
+    public function soaAPrintLayout()
+    {
+        return view('erp.billings.print-layout-soa', $this->soaPrintLayoutViewData('soa_a'));
+    }
+
+    public function saveSoaAPrintLayout()
+    {
+        $this->saveSoaPrintLayoutPayload('soa_a');
+
+        return redirect()
+            ->route('erp.billings.print-layout.soa-a')
+            ->with('status', 'SOA A print layout saved.');
+    }
+
+    private function soaPrintLayoutViewData($type)
+    {
+        return [
+            'type' => $type,
+            'title' => $type === 'soa_a' ? 'SOA A' : 'SOA B',
+            'previewRoute' => $type === 'soa_a' ? route('erp.soa-a.preview') : route('erp.billings.print-soa'),
+            'saveRoute' => $type === 'soa_a' ? route('erp.billings.print-layout.soa-a.save') : route('erp.billings.print-layout.soa-b.save'),
+            'resetRoute' => $type === 'soa_a' ? route('erp.billings.print-layout.soa-a') : route('erp.billings.print-layout.soa-b'),
+            'settings' => $this->soaPrintSettings($type),
+            'positions' => $this->soaPrintPositions($type),
+            'fieldStyles' => $this->soaPrintFieldStyles($type),
+            'customFields' => $this->soaPrintCustomFields($type),
+            'hiddenFields' => $this->soaPrintHiddenFields($type),
+            'samples' => $this->soaPrintSamples($type),
+        ];
+    }
+
+    private function saveSoaPrintLayoutPayload($type)
+    {
+        $payload = [
+            'settings' => $this->soaPrintSettings($type),
+            'positions' => $this->soaPrintPositions($type),
+            'field_styles' => $this->soaPrintFieldStyles($type),
+            'custom_fields' => $this->soaPrintCustomFields($type),
+            'hidden_fields' => $this->soaPrintHiddenFields($type),
+        ];
+
+        try {
+            if (Schema::hasTable('print_layouts')) {
+                $updates = [
+                    'paper_size' => $payload['settings']['paper_size'],
+                    'paper_width' => $payload['settings']['paper_width'],
+                    'paper_height' => $payload['settings']['paper_height'],
+                    'template_url' => $payload['settings']['template_url'],
+                    'print_template' => $payload['settings']['print_template'],
+                    'positions' => json_encode($payload['positions']),
+                    'field_styles' => json_encode($payload['field_styles']),
+                    'custom_fields' => json_encode($payload['custom_fields']),
+                    'is_default' => true,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ];
+
+                if (Schema::hasColumn('print_layouts', 'hidden_fields')) {
+                    $updates['hidden_fields'] = json_encode($payload['hidden_fields']);
+                }
+
+                DB::table('print_layouts')->updateOrInsert(
+                    [
+                        'company_id' => null,
+                        'document_type' => $type,
+                        'layout_name' => 'Default',
+                    ],
+                    $updates
+                );
+            }
+        } catch (\Exception $exception) {
+            // Keep layout editing usable even if the database is unavailable.
+        }
+
+        Storage::put($this->soaPrintLayoutStoragePath($type), json_encode($payload, JSON_PRETTY_PRINT));
+    }
+
+    private function soaPrintLayoutStoragePath($type)
+    {
+        return 'erp/'.$type.'_print_layout.json';
+    }
+
+    private function savedSoaPrintLayout($type)
     {
         try {
             if (Schema::hasTable('print_layouts')) {
                 $layout = DB::table('print_layouts')
                     ->whereNull('company_id')
-                    ->where('document_type', 'billing_invoice')
+                    ->where('document_type', $type)
                     ->where('layout_name', 'Default')
                     ->first();
 
@@ -1166,6 +1386,217 @@ class ModuleController extends Controller
                         'positions' => json_decode($layout->positions ?: '[]', true) ?: [],
                         'field_styles' => json_decode($layout->field_styles ?: '[]', true) ?: [],
                         'custom_fields' => json_decode($layout->custom_fields ?: '[]', true) ?: [],
+                        'hidden_fields' => Schema::hasColumn('print_layouts', 'hidden_fields') ? (json_decode($layout->hidden_fields ?: '[]', true) ?: []) : [],
+                    ];
+                }
+            }
+        } catch (\Exception $exception) {
+            // Fall back to local storage.
+        }
+
+        if (!Storage::exists($this->soaPrintLayoutStoragePath($type))) {
+            return [];
+        }
+
+        $layout = json_decode(Storage::get($this->soaPrintLayoutStoragePath($type)), true);
+
+        return is_array($layout) ? $layout : [];
+    }
+
+    private function soaPrintSettings($type)
+    {
+        $presets = [
+            'letter' => ['width' => 816, 'height' => 1056, 'page_css' => 'Letter'],
+            'legal' => ['width' => 816, 'height' => 1344, 'page_css' => 'Legal'],
+            'a4' => ['width' => 794, 'height' => 1123, 'page_css' => 'A4'],
+            'custom' => ['width' => 816, 'height' => 1056, 'page_css' => '816px 1056px'],
+        ];
+        $saved = $this->savedSoaPrintLayout($type);
+        $savedSettings = $saved['settings'] ?? [];
+        $paper = request('paper_size', $savedSettings['paper_size'] ?? 'letter');
+        $paper = isset($presets[$paper]) ? $paper : 'letter';
+        $width = (int) ($savedSettings['paper_width'] ?? $presets[$paper]['width']);
+        $height = (int) ($savedSettings['paper_height'] ?? $presets[$paper]['height']);
+
+        if (request()->has('paper_width')) {
+            $width = max(400, min(1600, (int) request('paper_width', $width)));
+        }
+        if (request()->has('paper_height')) {
+            $height = max(400, min(2200, (int) request('paper_height', $height)));
+        }
+
+        return [
+            'paper_size' => $paper,
+            'paper_width' => $width,
+            'paper_height' => $height,
+            'page_css' => $paper === 'custom' ? ($width.'px '.$height.'px') : $presets[$paper]['page_css'],
+            'template_url' => trim((string) request('template_url', $savedSettings['template_url'] ?? '')),
+            'print_template' => request()->has('print_template') ? request('print_template') === '1' : (bool) ($savedSettings['print_template'] ?? false),
+        ];
+    }
+
+    private function soaPrintDefaults($type)
+    {
+        if ($type === 'soa_a') {
+            return [
+                'serial' => [690, 134],
+                'particulars' => [112, 250],
+                'amounts' => [637, 250],
+                'total_reimbursement' => [637, 797],
+            ];
+        }
+
+        return [
+            'serial' => [692, 134],
+            'customer' => [152, 190],
+            'address' => [148, 220],
+            'date' => [618, 235],
+            'particulars' => [115, 370],
+            'amounts' => [640, 370],
+            'payment_note' => [60, 735],
+            'total_reimbursement' => [640, 899],
+            'prepared_by' => [545, 1005],
+        ];
+    }
+
+    private function soaPrintPositions($type)
+    {
+        $saved = $this->savedSoaPrintLayout($type);
+        $positions = $this->soaPrintDefaults($type);
+
+        foreach ($positions as $key => $point) {
+            $savedPoint = $saved['positions'][$key] ?? $point;
+            $positions[$key] = [
+                (int) request('x_'.$key, $savedPoint[0] ?? $point[0]),
+                (int) request('y_'.$key, $savedPoint[1] ?? $point[1]),
+            ];
+        }
+
+        return $positions;
+    }
+
+    private function soaPrintFieldStyles($type)
+    {
+        $saved = $this->savedSoaPrintLayout($type);
+        $styles = [];
+
+        foreach ($this->soaPrintPositions($type) as $key => $point) {
+            $savedStyle = $saved['field_styles'][$key] ?? [];
+            $defaultWidth = in_array($key, ['amounts', 'total_reimbursement']) ? 115 : 180;
+            if (in_array($key, ['particulars', 'payment_note'])) {
+                $defaultWidth = $key === 'payment_note' ? 510 : 455;
+            }
+
+            $styles[$key] = [
+                'width' => max(20, min(900, (int) request('w_'.$key, $savedStyle['width'] ?? $defaultWidth))),
+                'font_size' => max(6, min(48, (int) request('fs_'.$key, $savedStyle['font_size'] ?? ($key === 'serial' ? 18 : 12)))),
+            ];
+        }
+
+        return $styles;
+    }
+
+    private function soaPrintCustomFields($type)
+    {
+        $saved = $this->savedSoaPrintLayout($type);
+        if (!request()->has('custom_fields_present')) {
+            return $this->sanitizeInvoicePrintCustomFields($saved['custom_fields'] ?? []);
+        }
+
+        $keys = (array) request('custom_key', []);
+        $labels = (array) request('custom_label', []);
+        $texts = (array) request('custom_text', []);
+        $xs = (array) request('custom_x', []);
+        $ys = (array) request('custom_y', []);
+        $widths = (array) request('custom_w', []);
+        $fontSizes = (array) request('custom_fs', []);
+
+        return $this->sanitizeInvoicePrintCustomFields(array_map(function ($key, $index) use ($labels, $texts, $xs, $ys, $widths, $fontSizes) {
+            return [
+                'key' => $key,
+                'label' => $labels[$index] ?? 'Custom Field',
+                'text' => $texts[$index] ?? 'Custom Text',
+                'x' => $xs[$index] ?? 40,
+                'y' => $ys[$index] ?? 40,
+                'width' => $widths[$index] ?? 160,
+                'font_size' => $fontSizes[$index] ?? 12,
+            ];
+        }, $keys, array_keys($keys)));
+    }
+
+    private function soaPrintHiddenFields($type)
+    {
+        $saved = $this->savedSoaPrintLayout($type);
+        $hidden = request()->has('hidden_fields_present') ? (array) request('hidden_field', []) : ($saved['hidden_fields'] ?? []);
+
+        return array_values(array_unique(array_filter(array_map(function ($field) {
+            return preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) $field);
+        }, is_array($hidden) ? $hidden : []))));
+    }
+
+    private function soaPrintSamples($type)
+    {
+        if ($type === 'soa_a') {
+            return [
+                'serial' => ['label' => 'A Number', 'value' => '0907', 'class' => 'serial'],
+                'particulars' => ['label' => 'Particulars', 'value' => "OCEAN FREIGHT\nBUNKER SURCHARGE\nSOLAS ADMIN\n5% COLLECT FEE\n\nSHIPPER: LEMOINE HOLLAND B.V.", 'class' => ''],
+                'amounts' => ['label' => 'Amounts', 'value' => "368,376.75\n120,022.50\n20,311.50\n9,232.50", 'class' => 'amount'],
+                'total_reimbursement' => ['label' => 'Total Reimbursement', 'value' => '518,943.25', 'class' => 'amount'],
+            ];
+        }
+
+        return [
+            'serial' => ['label' => 'B Number', 'value' => '007187', 'class' => 'serial'],
+            'customer' => ['label' => 'Customer', 'value' => 'PHILUSA CORPORATION', 'class' => ''],
+            'address' => ['label' => 'Address', 'value' => "28 SHAW BLVD, KAPITOLYO 1603\nCITY OF PASIG", 'class' => 'small'],
+            'date' => ['label' => 'Date', 'value' => '05/19/2026', 'class' => ''],
+            'particulars' => ['label' => 'Particulars', 'value' => "OCEAN FREIGHT (95% OF FREIGHT CHARGES)\nBUNKER SURCHARGE\nSOLAS ADMIN\n5% COLLECT FEE", 'class' => ''],
+            'amounts' => ['label' => 'Amounts', 'value' => "368,376.75\n120,022.50\n20,311.50\n9,232.50\n19,388.25", 'class' => 'amount'],
+            'payment_note' => ['label' => 'Payment Note', 'value' => "PLEASE PAY THIS REIMBURSEMENT CHARGES TOGETHER WITH INVOICE NUMBER 0001031\nREIMBURSEMENT CHARGES PHP 753,495.10", 'class' => ''],
+            'total_reimbursement' => ['label' => 'Total Amount Due', 'value' => '774,822.17', 'class' => 'amount'],
+            'prepared_by' => ['label' => 'Prepared By', 'value' => 'MABEL PLATA', 'class' => ''],
+        ];
+    }
+
+    private function invoicePrintLayoutStoragePath()
+    {
+        return 'erp/billing_invoice_cebu_recreated_print_layout.json';
+    }
+
+    private function savedInvoicePrintLayout()
+    {
+        try {
+            if (Schema::hasTable('print_layouts')) {
+                $layout = DB::table('print_layouts')
+                    ->whereNull('company_id')
+                    ->where('document_type', 'billing_invoice_cebu_recreated')
+                    ->where('layout_name', 'Default')
+                    ->first();
+
+                if ($layout) {
+                    $storageLayout = [];
+                    if (Storage::exists($this->invoicePrintLayoutStoragePath())) {
+                        $stored = json_decode(Storage::get($this->invoicePrintLayoutStoragePath()), true);
+                        $storageLayout = is_array($stored) ? $stored : [];
+                    }
+
+                    $hiddenFields = $storageLayout['hidden_fields'] ?? [];
+                    if (Schema::hasColumn('print_layouts', 'hidden_fields')) {
+                        $hiddenFields = json_decode($layout->hidden_fields ?: '[]', true) ?: $hiddenFields;
+                    }
+
+                    return [
+                        'settings' => [
+                            'paper_size' => $layout->paper_size,
+                            'paper_width' => (int) $layout->paper_width,
+                            'paper_height' => (int) $layout->paper_height,
+                            'template_url' => $layout->template_url ?: '',
+                            'print_template' => (bool) $layout->print_template,
+                        ],
+                        'positions' => json_decode($layout->positions ?: '[]', true) ?: [],
+                        'field_styles' => json_decode($layout->field_styles ?: '[]', true) ?: [],
+                        'custom_fields' => json_decode($layout->custom_fields ?: '[]', true) ?: [],
+                        'hidden_fields' => $hiddenFields,
                     ];
                 }
             }
@@ -1189,6 +1620,7 @@ class ModuleController extends Controller
             'positions' => $this->invoicePrintPositions(),
             'field_styles' => $this->invoicePrintFieldStyles(),
             'custom_fields' => $this->invoicePrintCustomFields(),
+            'hidden_fields' => $this->invoicePrintHiddenFields(),
         ];
     }
 
@@ -1203,6 +1635,7 @@ class ModuleController extends Controller
 
         $saved = $this->savedInvoicePrintLayout();
         $savedSettings = $saved['settings'] ?? [];
+        $defaultTemplateUrl = asset('images/billing-invoice-template.svg');
 
         $paper = request('paper_size', $savedSettings['paper_size'] ?? 'letter');
         if (!isset($presets[$paper])) {
@@ -1220,10 +1653,11 @@ class ModuleController extends Controller
             $height = max(400, min(2200, (int) request('paper_height', $height)));
         }
 
-        $templateUrl = trim((string) request('template_url', $savedSettings['template_url'] ?? ''));
+        $savedTemplateUrl = trim((string) ($savedSettings['template_url'] ?? ''));
+        $templateUrl = trim((string) request('template_url', $savedTemplateUrl !== '' ? $savedTemplateUrl : $defaultTemplateUrl));
         $printTemplate = request()->has('print_template')
             ? request('print_template') === '1'
-            : (bool) ($savedSettings['print_template'] ?? false);
+            : (array_key_exists('print_template', $savedSettings) ? (bool) $savedSettings['print_template'] : true);
 
         return [
             'paper_size' => $paper,
@@ -1240,35 +1674,35 @@ class ModuleController extends Controller
         $saved = $this->savedInvoicePrintLayout();
         $savedPositions = $saved['positions'] ?? [];
         $defaults = [
-            'cash_sales' => [38, 135],
-            'charge_sales' => [122, 135],
-            'customer' => [36, 160],
-            'address' => [36, 184],
-            'tin' => [36, 226],
-            'mawb' => [38, 264],
-            'hawb' => [38, 288],
-            'date_shipped' => [38, 312],
-            'origin_dest' => [480, 264],
-            'commodity' => [480, 288],
-            'invoice_no' => [680, 90],
-            'invoice_date' => [700, 132],
-            'line_description' => [110, 374],
-            'soa_no' => [110, 438],
-            'line_qty' => [515, 374],
-            'line_unit_price' => [610, 374],
-            'line_amount' => [760, 374],
-            'vatable_sales' => [115, 805],
-            'vat' => [115, 832],
-            'zero_rated_sales' => [115, 860],
-            'vat_exempt_sales' => [115, 888],
-            'total_sales' => [775, 805],
-            'less_vat' => [775, 832],
-            'amount_net_vat' => [775, 860],
-            'discount' => [775, 892],
-            'add_vat' => [775, 924],
-            'withholding_tax' => [775, 956],
-            'amount_due' => [787, 1003],
-            'prepared_by' => [560, 1076],
+            'cash_sales' => [56, 118],
+            'charge_sales' => [165, 118],
+            'customer' => [96, 148],
+            'address' => [96, 175],
+            'tin' => [96, 202],
+            'mawb' => [122, 244],
+            'hawb' => [122, 270],
+            'date_shipped' => [122, 296],
+            'origin_dest' => [455, 244],
+            'commodity' => [455, 270],
+            'invoice_no' => [662, 123],
+            'invoice_date' => [682, 170],
+            'line_description' => [65, 384],
+            'soa_no' => [65, 450],
+            'line_qty' => [450, 384],
+            'line_unit_price' => [565, 384],
+            'line_amount' => [705, 384],
+            'vatable_sales' => [126, 790],
+            'vat' => [126, 815],
+            'zero_rated_sales' => [126, 840],
+            'vat_exempt_sales' => [126, 865],
+            'total_sales' => [660, 790],
+            'less_vat' => [660, 815],
+            'amount_net_vat' => [660, 840],
+            'discount' => [660, 865],
+            'add_vat' => [660, 890],
+            'withholding_tax' => [660, 915],
+            'amount_due' => [690, 948],
+            'prepared_by' => [490, 1003],
         ];
 
         foreach ($defaults as $key => $point) {
@@ -1298,10 +1732,19 @@ class ModuleController extends Controller
         foreach ($positions as $key => $point) {
             $defaultWidth = in_array($key, $amountFields) ? 92 : 160;
             if ($key === 'line_description') {
-                $defaultWidth = 385;
+                $defaultWidth = 350;
             }
             if ($key === 'address') {
-                $defaultWidth = 260;
+                $defaultWidth = 270;
+            }
+            if (in_array($key, ['origin_dest', 'commodity'])) {
+                $defaultWidth = 230;
+            }
+            if ($key === 'prepared_by') {
+                $defaultWidth = 250;
+            }
+            if ($key === 'invoice_no') {
+                $defaultWidth = 125;
             }
             $savedStyle = $savedStyles[$key] ?? [];
 
@@ -1342,6 +1785,18 @@ class ModuleController extends Controller
         }, $keys, array_keys($keys)));
     }
 
+    private function invoicePrintHiddenFields()
+    {
+        $saved = $this->savedInvoicePrintLayout();
+        $hidden = request()->has('hidden_fields_present')
+            ? (array) request('hidden_field', [])
+            : ($saved['hidden_fields'] ?? []);
+
+        return array_values(array_unique(array_filter(array_map(function ($field) {
+            return preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) $field);
+        }, is_array($hidden) ? $hidden : []))));
+    }
+
     private function sanitizeInvoicePrintCustomFields($rawFields)
     {
         $fields = [];
@@ -1377,36 +1832,381 @@ class ModuleController extends Controller
     {
         return [
             ['BI-2026-01042', 'North Harbor Trading', 'JOB-SEA-2026-0422', 'PHP', '98,500.00', 'Posted', '2026-05-24'],
-            ['SOAA-2026-00211', 'Blue Anchor Logistics', 'JOB-SEA-2026-0398', 'USD', '1,840.00', 'For Collection', '2026-05-23'],
-            ['DN-2026-00042', 'Island Prime Foods', 'JOB-SEA-2026-0365', 'PHP', '48,900.00', 'Draft', '2026-05-22'],
-            ['BI-2026-01043', 'Metro Manila Forwarders', 'JOB-SEA-2026-0423', 'PHP', '127,900.00', 'For Approval', '2026-05-24'],
+            ['SOAA-2026-00211', 'Blue Anchor Logistics', 'JOB-SEA-2026-0398', 'USD', '1,840.00', 'Posted', '2026-05-23'],
+            ['DN-2026-00042', 'Island Prime Foods', 'JOB-SEA-2026-0365', 'PHP', '48,900.00', 'Posted', '2026-05-22'],
+            ['BI-2026-01043', 'Metro Manila Forwarders', 'JOB-SEA-2026-0423', 'PHP', '127,900.00', 'Posted', '2026-05-24'],
         ];
     }
 
-    private function billingPrintDocuments($vatClassification, array $totals = [])
+    private function billingPrintInvoiceFallbacks()
     {
+        return [
+            'BI-2026-01042' => [
+                'customer' => 'North Harbor Trading',
+                'customer_id' => 'CUST-001',
+                'invoice_no' => 'BI-2026-01042',
+                'invoice_date' => '2026-05-24',
+                'due_date' => '2026-06-23',
+                'soa_no' => '01042',
+                'invoice_to' => "North Harbor Trading\nNorth Harbor Center, Manila",
+                'tin' => '000-345-111-000',
+                'credit_term_days' => '30',
+                'vat_classification' => '12%',
+                'class_code' => 'MANILA',
+                'ar_account' => 'A/Trade-Billing Invoice',
+                'invoice_template' => ['SOA_B', 'Billing Invoice'],
+                'currency' => 'PHP',
+                'mawb_no' => 'MAWB-SEA-0422',
+                'hawb_no' => 'HAWB-0422-A',
+                'date_shipped' => '2026-05-24',
+                'origin_dest' => 'ROTTERDAM / MANILA',
+                'commodity' => 'Freight handling and delivery service',
+                'description' => 'Freight handling and delivery service',
+                'item' => ['Freight handling', 'Reimbursable Charges'],
+                'item_description' => ['Freight handling and delivery service', "OCEAN FREIGHT (95% OF FREIGHT CHARGES)\nBUNKER SURCHARGE\nSOLAS ADMIN\n5% COLLECT FEE\nDESTINATION CHARGES"],
+                'qty' => ['1', '1'],
+                'unit_price' => ['87946.43', '753495.10'],
+                'tax_category' => ['12%', 'exempt'],
+                'line_amount' => ['87946.43', '753495.10'],
+                'vatable_sales' => '87946.43',
+                'vat_amount' => '10553.57',
+                'billing_total' => '98500.00',
+                'reimbursement_total' => '753495.10',
+                'soa_total' => '851995.10',
+            ],
+            'BI-2026-01043' => [
+                'customer' => 'Metro Manila Forwarders',
+                'invoice_no' => 'BI-2026-01043',
+                'invoice_date' => '2026-05-24',
+                'due_date' => '2026-06-23',
+                'soa_no' => '01043',
+                'invoice_to' => "Metro Manila Forwarders\nMetro Manila",
+                'credit_term_days' => '30',
+                'vat_classification' => '12%',
+                'class_code' => 'MANILA',
+                'ar_account' => 'A/Trade-Billing Invoice',
+                'invoice_template' => ['SOA_B', 'Billing Invoice'],
+                'currency' => 'PHP',
+                'mawb_no' => 'MAWB-SEA-0423',
+                'hawb_no' => 'HAWB-0423-A',
+                'date_shipped' => '2026-05-24',
+                'origin_dest' => 'SINGAPORE / MANILA',
+                'commodity' => 'Shipment-linked forwarding service',
+                'description' => 'Shipment-linked forwarding service',
+                'item' => ['Forwarding service'],
+                'item_description' => ['Shipment-linked forwarding service'],
+                'qty' => ['1'],
+                'unit_price' => ['114196.43'],
+                'tax_category' => ['12%'],
+                'line_amount' => ['114196.43'],
+                'vatable_sales' => '114196.43',
+                'vat_amount' => '13703.57',
+                'billing_total' => '127900.00',
+                'reimbursement_total' => '0.00',
+                'soa_total' => '127900.00',
+            ],
+            'SOAA-2026-00211' => [
+                'customer' => 'Blue Anchor Logistics',
+                'invoice_no' => 'SOAA-2026-00211',
+                'invoice_date' => '2026-05-23',
+                'due_date' => '2026-06-22',
+                'soa_no' => '00211',
+                'invoice_to' => "Blue Anchor Logistics\nCebu",
+                'credit_term_days' => '30',
+                'vat_classification' => 'zero-rated',
+                'class_code' => 'CEBU',
+                'ar_account' => 'A/R Trade-SOA A',
+                'invoice_template' => ['SOA_A'],
+                'currency' => 'USD',
+                'mawb_no' => 'MAWB-SEA-0398',
+                'hawb_no' => 'HAWB-0398-A',
+                'date_shipped' => '2026-05-23',
+                'origin_dest' => 'CEBU / HONG KONG',
+                'commodity' => 'Export logistics service',
+                'description' => 'Export logistics service',
+                'item' => ['Export logistics'],
+                'item_description' => ['Export logistics service'],
+                'qty' => ['1'],
+                'unit_price' => ['1840.00'],
+                'tax_category' => ['Zero-rated'],
+                'line_amount' => ['1840.00'],
+                'vatable_sales' => '0.00',
+                'vat_amount' => '0.00',
+                'zero_rated_sales' => '1840.00',
+                'billing_total' => '1840.00',
+                'reimbursement_total' => '0.00',
+                'soa_total' => '1840.00',
+            ],
+        ];
+    }
+
+    private function billingPrintInvoiceDataFromReference($reference = null)
+    {
+        $reference = trim((string) ($reference ?: request('invoice') ?: request('invoice_no') ?: request('document_no')));
+        $customerReference = trim((string) request('customer'));
+        if ($reference === '' && $customerReference === '') {
+            return [];
+        }
+
+        $fallback = $reference !== '' && isset($this->billingPrintInvoiceFallbacks()[$reference]) ? $this->billingPrintInvoiceFallbacks()[$reference] : [
+            'invoice_no' => $reference,
+        ];
+        $data = [];
+
+        try {
+            if (Schema::hasTable('sales_documents')) {
+                $query = DB::table('sales_documents');
+                if (Schema::hasTable('customers')) {
+                    $query->leftJoin('customers', 'customers.id', '=', 'sales_documents.customer_id')
+                        ->select(
+                            'sales_documents.*',
+                            'customers.name as customer_name',
+                            'customers.tin as customer_tin',
+                            'customers.billing_address as customer_billing_address',
+                            'customers.address as customer_address'
+                        );
+                } else {
+                    $query->select('sales_documents.*');
+                }
+
+                if ($reference !== '') {
+                    $query->where('sales_documents.document_no', $reference);
+                } elseif ($customerReference !== '' && Schema::hasTable('customers')) {
+                    $query->where(function ($customerQuery) use ($customerReference) {
+                        $customerQuery->where('customers.name', $customerReference)
+                            ->orWhere('customers.customer_id', $customerReference)
+                            ->orWhere('customers.code', $customerReference);
+                    })->orderBy('sales_documents.document_date', 'desc')
+                        ->orderBy('sales_documents.id', 'desc');
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
+
+                $invoice = $query->first();
+
+                if ($invoice) {
+                    $column = function ($key, $default = null) use ($invoice) {
+                        return property_exists($invoice, $key) ? $invoice->$key : $default;
+                    };
+                    $subtotal = (float) ($invoice->subtotal ?? 0);
+                    $taxTotal = (float) ($invoice->tax_total ?? 0);
+                    $grandTotal = (float) ($invoice->grand_total ?? 0);
+                    $reimbursementTotal = (float) ($invoice->freight_total ?? 0);
+
+                    $data = [
+                        'customer' => $column('customer_name', $fallback['customer'] ?? ''),
+                        'customer_id' => $column('customer_id_text', $fallback['customer_id'] ?? ''),
+                        'invoice_no' => $invoice->document_no,
+                        'transaction_no' => $column('transaction_no', $invoice->document_no),
+                        'invoice_date' => $invoice->document_date,
+                        'due_date' => $column('due_date', $fallback['due_date'] ?? ''),
+                        'soa_no' => $column('soa_no', $fallback['soa_no'] ?? ''),
+                        'invoice_to' => $column('invoice_to', $column('customer_billing_address', $column('customer_address', $fallback['invoice_to'] ?? ''))),
+                        'consignee' => $column('consignee', ''),
+                        'tin' => $column('customer_tin', $fallback['tin'] ?? ''),
+                        'credit_term_days' => $column('credit_term_days', $fallback['credit_term_days'] ?? ''),
+                        'vat_classification' => $column('vat_classification', $fallback['vat_classification'] ?? ''),
+                        'class_code' => $column('class_code', $fallback['class_code'] ?? ''),
+                        'ar_account' => $fallback['ar_account'] ?? 'A/Trade-Billing Invoice',
+                        'invoice_template' => $fallback['invoice_template'] ?? [],
+                        'currency' => $invoice->currency ?? $fallback['currency'] ?? 'PHP',
+                        'mawb_no' => $column('mawb_no', $fallback['mawb_no'] ?? ''),
+                        'hawb_no' => $column('hawb_no', $fallback['hawb_no'] ?? ''),
+                        'date_shipped' => $column('date_shipped', $invoice->document_date ?? $fallback['date_shipped'] ?? ''),
+                        'origin_dest' => $column('origin_dest', $fallback['origin_dest'] ?? ''),
+                        'commodity' => $column('commodity', $fallback['commodity'] ?? ''),
+                        'description' => $invoice->remarks ?? $fallback['description'] ?? '',
+                        'customer_message' => $column('customer_message', $fallback['customer_message'] ?? ''),
+                        'memo' => $column('memo', $fallback['memo'] ?? ''),
+                        'job_shipment_id' => $column('job_shipment_id', $column('shipment_job_id', $fallback['job_shipment_id'] ?? '')),
+                        'vatable_sales' => number_format($subtotal, 2, '.', ''),
+                        'vat_amount' => number_format($taxTotal, 2, '.', ''),
+                        'billing_total' => number_format($grandTotal - $reimbursementTotal, 2, '.', ''),
+                        'reimbursement_total' => number_format($reimbursementTotal, 2, '.', ''),
+                        'soa_total' => number_format($grandTotal, 2, '.', ''),
+                    ];
+
+                    if (Schema::hasTable('sales_document_lines')) {
+                        $lines = DB::table('sales_document_lines')
+                            ->where('sales_document_id', $invoice->id)
+                            ->orderBy('id')
+                            ->get();
+
+                        if ($lines->count() > 0) {
+                            $data['item'] = $lines->map(function ($line) {
+                                return (property_exists($line, 'item_name') && $line->item_name) ? $line->item_name : 'Service';
+                            })->all();
+                            $data['item_description'] = $lines->pluck('description')->all();
+                            $data['qty'] = $lines->pluck('quantity')->map(function ($qty) {
+                                return rtrim(rtrim(number_format((float) $qty, 4, '.', ''), '0'), '.');
+                            })->all();
+                            $data['unit_price'] = $lines->pluck('unit_price')->map(function ($amount) {
+                                return number_format((float) $amount, 2, '.', '');
+                            })->all();
+                            $data['line_amount'] = $lines->pluck('line_total')->map(function ($amount) {
+                                return number_format((float) $amount, 2, '.', '');
+                            })->all();
+                            $data['tax_category'] = $lines->map(function ($line) use ($invoice) {
+                                return (property_exists($line, 'tax_category') && $line->tax_category) ? $line->tax_category : ($invoice->vat_classification ?? '12%');
+                            })->all();
+
+                            $hasReimbursementLine = false;
+                            foreach ($data['item_description'] as $index => $description) {
+                                $item = strtolower((string) ($data['item'][$index] ?? ''));
+                                $description = strtolower((string) $description);
+                                if (strpos($item, 'reimburs') !== false || strpos($description, 'reimburs') !== false) {
+                                    $hasReimbursementLine = true;
+                                    break;
+                                }
+                            }
+
+                            if (!$hasReimbursementLine && !empty($fallback['item_description'])) {
+                                foreach ($fallback['item_description'] as $index => $description) {
+                                    $item = strtolower((string) ($fallback['item'][$index] ?? ''));
+                                    $descriptionCheck = strtolower((string) $description);
+                                    if (strpos($item, 'reimburs') === false && strpos($descriptionCheck, 'reimburs') === false) {
+                                        continue;
+                                    }
+
+                                    $data['item'][] = $fallback['item'][$index] ?? 'Reimbursable Charges';
+                                    $data['item_description'][] = $description;
+                                    $data['qty'][] = $fallback['qty'][$index] ?? '1';
+                                    $data['unit_price'][] = $fallback['unit_price'][$index] ?? '0.00';
+                                    $data['line_amount'][] = $fallback['line_amount'][$index] ?? '0.00';
+                                    $data['tax_category'][] = $fallback['tax_category'][$index] ?? 'exempt';
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $exception) {
+            $data = [];
+        }
+
+        $resolved = array_replace($fallback, array_filter($data, function ($value) {
+            if (is_array($value)) {
+                return count($value) > 0;
+            }
+
+            return $value !== null && $value !== '';
+        }));
+
+        $totals = $this->billingTotals($resolved);
+        $resolved['vatable_sales'] = number_format($totals['vatable_sales'], 2, '.', '');
+        $resolved['vat_amount'] = number_format($totals['vat_amount'], 2, '.', '');
+        $resolved['billing_total'] = number_format($totals['billing_total'], 2, '.', '');
+        $resolved['reimbursement_total'] = number_format($totals['reimbursement_total'], 2, '.', '');
+        $resolved['soa_total'] = number_format($totals['soa_total'], 2, '.', '');
+
+        return $resolved;
+    }
+
+    private function invoiceTemplates()
+    {
+        return [
+            ['key' => 'SOA_B', 'label' => 'SOA B', 'account' => 'A/Trade-Billing Invoice'],
+            ['key' => 'Billing Invoice', 'label' => 'Billing Invoice', 'account' => 'A/Trade-Billing Invoice'],
+            ['key' => 'SOA_A', 'label' => 'SOA A', 'account' => 'A/R Trade-SOA A'],
+            ['key' => 'Debit Note', 'label' => 'Debit Note', 'account' => 'A/R Trade-Debit Note'],
+        ];
+    }
+
+    private function rolePermissionRoles()
+    {
+        return [
+            ['key' => 'administrator', 'label' => 'Administrator', 'color' => '#f15b45', 'locked' => true, 'note' => 'Full ERP access'],
+            ['key' => 'accounting', 'label' => 'Accounting Staff', 'color' => '#2f5597', 'locked' => false, 'note' => 'Billing, payments, reports'],
+            ['key' => 'finance', 'label' => 'Finance Staff', 'color' => '#00a99d', 'locked' => false, 'note' => 'Collections and cash controls'],
+        ];
+    }
+
+    private function rolePermissionGroups()
+    {
+        return [
+            'Core Modules' => [
+                ['key' => 'dashboard', 'label' => 'Dashboard', 'permissions' => ['view']],
+                ['key' => 'clients', 'label' => 'Clients', 'permissions' => ['view', 'create', 'edit', 'delete']],
+                ['key' => 'invoices', 'label' => 'Invoices', 'permissions' => ['view', 'create', 'edit', 'delete']],
+                ['key' => 'payments', 'label' => 'Payments', 'permissions' => ['view', 'create', 'edit', 'delete']],
+            ],
+            'Finance & Operations' => [
+                ['key' => 'vendors', 'label' => 'Vendors', 'permissions' => ['view', 'create', 'edit', 'delete']],
+                ['key' => 'expenses', 'label' => 'Accounts Payable (AP)', 'permissions' => ['view', 'create', 'edit', 'delete']],
+                ['key' => 'reports', 'label' => 'Reports', 'permissions' => ['view', 'create', 'edit', 'delete']],
+            ],
+            'Administration' => [
+                ['key' => 'user_access_control', 'label' => 'User Access Control', 'permissions' => ['view', 'create', 'edit', 'delete']],
+                ['key' => 'finance_settings', 'label' => 'Finance Settings', 'permissions' => ['view', 'create', 'edit', 'delete']],
+            ],
+        ];
+    }
+
+    private function billingPrintDocuments($vatClassification, array $totals = [], array $selectedTemplates = [], array $invoiceData = [])
+    {
+        $value = function ($key, $default = null) use ($invoiceData) {
+            return $invoiceData[$key] ?? request($key, $default);
+        };
+
         $query = array_filter([
-            'customer' => request('customer_name'),
-            'invoice_no' => request('invoice_no'),
-            'invoice_date' => request('invoice_date'),
-            'soa_no' => request('soa_no'),
+            'customer' => $value('customer_name', $value('customer')),
+            'invoice_no' => $value('invoice_no'),
+            'invoice_date' => $value('invoice_date'),
+            'soa_no' => $value('soa_no'),
+            'invoice_to' => $value('invoice_to'),
+            'consignee' => $value('consignee'),
+            'tin' => $value('tin'),
+            'currency' => $value('currency'),
+            'mawb_no' => $value('mawb_no'),
+            'hawb_no' => $value('hawb_no'),
+            'date_shipped' => $value('date_shipped'),
+            'origin_dest' => $value('origin_dest'),
+            'commodity' => $value('commodity'),
+            'description' => $value('description'),
+            'customer_message' => $value('customer_message'),
+            'memo' => $value('memo'),
+            'item' => (array) $value('item', []),
+            'item_description' => (array) $value('item_description', []),
+            'qty' => (array) $value('qty', []),
+            'unit_price' => (array) $value('unit_price', []),
+            'tax_category' => (array) $value('tax_category', []),
+            'line_amount' => (array) $value('line_amount', []),
             'billing_total' => isset($totals['billing_total']) ? number_format($totals['billing_total'], 2, '.', '') : null,
             'reimbursement_total' => isset($totals['reimbursement_total']) ? number_format($totals['reimbursement_total'], 2, '.', '') : null,
             'soa_total' => isset($totals['soa_total']) ? number_format($totals['soa_total'], 2, '.', '') : null,
             'vatable_sales' => isset($totals['vatable_sales']) ? number_format($totals['vatable_sales'], 2, '.', '') : null,
             'vat_amount' => isset($totals['vat_amount']) ? number_format($totals['vat_amount'], 2, '.', '') : null,
         ], function ($value) {
+            if (is_array($value)) {
+                return count(array_filter($value, function ($item) {
+                    return $item !== null && $item !== '';
+                })) > 0;
+            }
+
             return $value !== null && $value !== '';
         });
 
-        return $vatClassification === '12%'
-            ? [
-                ['label' => 'Print SOA B', 'route' => route('erp.billings.print-soa', $query), 'icon' => 'bi-file-earmark-text'],
-                ['label' => 'Print Billing Invoice', 'route' => route('erp.billings.print-invoice', $query), 'icon' => 'bi-printer'],
-            ]
-            : [
-                ['label' => 'Print SOA A', 'route' => route('erp.soa-a.preview', $query), 'icon' => 'bi-file-earmark-text'],
-            ];
+        $templateRoutes = [
+            'SOA_B' => ['label' => 'Print SOA B', 'route' => route('erp.billings.print-soa', $query), 'icon' => 'bi-file-earmark-text'],
+            'Billing Invoice' => ['label' => 'Print Billing Invoice', 'route' => route('erp.billings.print-invoice', $query), 'icon' => 'bi-printer'],
+            'SOA_A' => ['label' => 'Print SOA A', 'route' => route('erp.soa-a.preview', $query), 'icon' => 'bi-file-earmark-text'],
+            'Debit Note' => ['label' => 'Print Debit Note', 'route' => route('erp.debit-note.preview', $query), 'icon' => 'bi-file-earmark-minus'],
+        ];
+
+        if (empty($selectedTemplates)) {
+            $selectedTemplates = $vatClassification === '12%' ? ['SOA_B', 'Billing Invoice'] : ['SOA_A'];
+        }
+
+        $documents = [];
+        foreach ($selectedTemplates as $template) {
+            if (isset($templateRoutes[$template])) {
+                $documents[$template] = $templateRoutes[$template];
+            } else {
+                $documents[$template] = ['label' => 'Template: '.$template, 'route' => route('erp.billings.print-invoice', $query), 'icon' => 'bi-file-earmark-text'];
+            }
+        }
+
+        return array_values($documents);
     }
 
     private function billingTotals(array $data)
@@ -1446,24 +2246,168 @@ class ModuleController extends Controller
         return (float) str_replace(',', '', (string) $value);
     }
 
+    private function firstPrintLineValue($key, $default = '')
+    {
+        $value = request($key, $default);
+
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                if ($item !== null && $item !== '') {
+                    return $item;
+                }
+            }
+
+            return $default;
+        }
+
+        return $value;
+    }
+
+    private function displayPrintDate($date, $default)
+    {
+        $date = trim((string) $date);
+        if ($date === '') {
+            return $default;
+        }
+
+        $timestamp = strtotime($date);
+        return $timestamp ? date('m/d/Y', $timestamp) : $date;
+    }
+
     private function billingPrintPreviewData()
     {
-        $billingTotal = $this->moneyToFloat(request('billing_total', '21327.07'));
-        $reimbursementTotal = $this->moneyToFloat(request('reimbursement_total', '753495.10'));
-        $soaTotal = request()->has('soa_total')
-            ? $this->moneyToFloat(request('soa_total'))
+        $invoiceData = $this->billingPrintInvoiceDataFromReference();
+        $read = function ($key, $default = null) use ($invoiceData) {
+            return request()->has($key) ? request($key) : ($invoiceData[$key] ?? $default);
+        };
+        $firstLineValue = function ($key, $default = '') use ($read) {
+            $value = $read($key, $default);
+
+            if (is_array($value)) {
+                foreach ($value as $item) {
+                    if ($item !== null && $item !== '') {
+                        return $item;
+                    }
+                }
+
+                return $default;
+            }
+
+            return $value;
+        };
+        $lineValue = function ($values, $index, $default = '') {
+            return is_array($values) ? ($values[$index] ?? $default) : $default;
+        };
+
+        $billingTotal = $this->moneyToFloat($read('billing_total', '21327.07'));
+        $reimbursementTotal = $this->moneyToFloat($read('reimbursement_total', '753495.10'));
+        $soaTotal = request()->has('soa_total') || array_key_exists('soa_total', $invoiceData)
+            ? $this->moneyToFloat($read('soa_total'))
             : $billingTotal + $reimbursementTotal;
+        $items = (array) $read('item', []);
+        $descriptions = (array) $read('item_description', []);
+        $quantities = (array) $read('qty', []);
+        $unitPrices = (array) $read('unit_price', []);
+        $lineAmounts = (array) $read('line_amount', []);
+        $taxCategories = (array) $read('tax_category', []);
+        $lineCount = max(count($items), count($descriptions), count($quantities), count($unitPrices), count($lineAmounts), 1);
+        $billingLineIndexes = [];
+        $reimbursementLineIndexes = [];
+        $zeroRatedSales = 0.0;
+        $vatExemptSales = 0.0;
+
+        for ($index = 0; $index < $lineCount; $index++) {
+            $item = strtolower((string) $lineValue($items, $index));
+            $description = strtolower((string) $lineValue($descriptions, $index));
+            $isReimbursement = strpos($item, 'reimburs') !== false || strpos($description, 'reimburs') !== false;
+            $taxCategory = strtolower((string) ($taxCategories[$index] ?? ''));
+            $amount = $lineValue($lineAmounts, $index);
+
+            if ($isReimbursement) {
+                $reimbursementLineIndexes[] = $index;
+            } elseif (trim((string) $lineValue($descriptions, $index)) !== '' || $amount !== '') {
+                $billingLineIndexes[] = $index;
+            }
+
+            if (strpos($taxCategory, 'zero') !== false) {
+                $zeroRatedSales += $this->moneyToFloat($amount);
+            }
+            if (strpos($taxCategory, 'exempt') !== false) {
+                $vatExemptSales += $this->moneyToFloat($amount);
+            }
+        }
+
+        if (empty($billingLineIndexes)) {
+            $billingLineIndexes[] = 0;
+        }
+
+        $billingLineIndex = $billingLineIndexes[0];
+        $billingDescriptions = [];
+        $billingAmounts = [];
+        foreach ($billingLineIndexes as $index) {
+            $description = trim((string) $lineValue($descriptions, $index));
+            $amount = $this->moneyToFloat($lineValue($lineAmounts, $index));
+            if ($description !== '') {
+                $billingDescriptions[] = $description;
+            }
+            if ($amount !== 0.0) {
+                $billingAmounts[] = number_format($amount, 2);
+            }
+        }
+
+        $lineDescription = trim(implode("\n", $billingDescriptions));
+        if ($lineDescription === '') {
+            $lineDescription = trim((string) $read('description'));
+        }
+
+        $soaParticulars = [];
+        $soaAmounts = [];
+        foreach ($reimbursementLineIndexes as $index) {
+            $description = trim((string) $lineValue($descriptions, $index));
+            $amount = $this->moneyToFloat($lineValue($lineAmounts, $index));
+
+            if ($description !== '') {
+                $soaParticulars[] = $description;
+            }
+            if ($amount !== 0.0) {
+                $soaAmounts[] = number_format($amount, 2);
+            }
+        }
 
         return [
-            'customer' => request('customer', 'PHILUSA CORPORATION'),
-            'invoice_no' => request('invoice_no', '0001031'),
-            'invoice_date' => request('invoice_date', '05/19/2026'),
-            'soa_no' => request('soa_no', '7187'),
-            'vatable_sales' => $this->moneyToFloat(request('vatable_sales', '19388.25')),
-            'vat_amount' => $this->moneyToFloat(request('vat_amount', '2326.59')),
+            'customer' => $read('customer', 'PHILUSA CORPORATION'),
+            'invoice_no' => $read('invoice_no', $read('invoice', '0001031')),
+            'invoice_date' => $this->displayPrintDate($read('invoice_date'), '05/19/2026'),
+            'soa_no' => $read('soa_no', '7187'),
+            'address' => $read('invoice_to', "28 SHAW BLVD, KAPITOLYO 1603\nCITY OF PASIG"),
+            'tin' => $read('tin', '000-281-014-00000'),
+            'currency' => $read('currency', 'PHP'),
+            'mawb' => $read('mawb_no', 'OOLU32322350120'),
+            'hawb' => $read('hawb_no', '2GJXM412-G1'),
+            'date_shipped' => $this->displayPrintDate($read('date_shipped'), '05/19/2026'),
+            'origin_dest' => $read('origin_dest', 'ROTTERDAM/MNL'),
+            'commodity' => $read('commodity', "3 X 40'HC"),
+            'line_description' => $lineDescription !== '' ? $lineDescription : "OCEAN FREIGHT (5% OF FREIGHT CHARGES)\n(2,100 x 3 CNTRS = \$6,300 x 61.55 = 387,765 x 5%)\n\nSHIPPER: LEMOINE HOLLAND B.V.",
+            'line_qty' => $lineValue($quantities, $billingLineIndex, $firstLineValue('qty', '1')),
+            'line_unit_price' => $this->moneyToFloat($lineValue($unitPrices, $billingLineIndex, $firstLineValue('unit_price', '19388.25'))),
+            'line_amount' => $this->moneyToFloat($lineValue($lineAmounts, $billingLineIndex, $firstLineValue('line_amount', '19388.25'))),
+            'billing_amounts' => implode("\n", $billingAmounts),
+            'soa_particulars' => implode("\n", $soaParticulars),
+            'soa_amounts' => implode("\n", $soaAmounts),
+            'vatable_sales' => $this->moneyToFloat($read('vatable_sales', '19388.25')),
+            'vat_amount' => $this->moneyToFloat($read('vat_amount', '2326.59')),
+            'zero_rated_sales' => request()->has('zero_rated_sales') || array_key_exists('zero_rated_sales', $invoiceData) ? $this->moneyToFloat($read('zero_rated_sales')) : $zeroRatedSales,
+            'vat_exempt_sales' => request()->has('vat_exempt_sales') || array_key_exists('vat_exempt_sales', $invoiceData) ? $this->moneyToFloat($read('vat_exempt_sales')) : $vatExemptSales,
+            'discount' => $this->moneyToFloat($read('discount', '0')),
+            'withholding_tax' => $this->moneyToFloat($read('withholding_tax', '0')),
+            'prepared_by' => $read('prepared_by', ''),
             'billing_total' => $billingTotal,
             'reimbursement_total' => $reimbursementTotal,
             'soa_total' => $soaTotal,
+            'memo' => $read('memo', ''),
+            'customer_message' => $read('customer_message', ''),
+            'description' => $read('description', ''),
+            'job_shipment_id' => $read('job_shipment_id', $read('shipment_job_id', '')),
         ];
     }
 
@@ -1518,10 +2462,13 @@ class ModuleController extends Controller
         $data['amount'] = number_format($totals['soa_total'], 2);
         $data['reimbursement_total'] = number_format($totals['reimbursement_total'], 2);
         $data['soa_total'] = number_format($totals['soa_total'], 2);
+        $selectedTemplates = array_values(array_filter(array_map('trim', (array) ($data['invoice_template'] ?? []))));
+        $data['invoice_template'] = $selectedTemplates;
+        $data['invoice_templates_display'] = implode(', ', $selectedTemplates);
 
         return view('erp.invoices.review', [
             'invoice' => $data,
-            'printDocuments' => $this->billingPrintDocuments($data['vat_classification'] ?? null, $totals),
+            'printDocuments' => $this->billingPrintDocuments($data['vat_classification'] ?? null, $totals, $selectedTemplates, $data),
         ]);
     }
 
@@ -1657,7 +2604,7 @@ class ModuleController extends Controller
             'amount',
         ]);
 
-        if (Schema::hasTable('receipts') && request('customer_id')) {
+        if (Schema::hasTable('receipts') && ctype_digit((string) request('customer_id'))) {
             $customer = DB::table('customers')->where('id', request('customer_id'))->first();
             $companyId = $customer ? $customer->company_id : DB::table('companies')->value('id');
             $invoice = null;
@@ -1716,8 +2663,25 @@ class ModuleController extends Controller
             $payment['customer_name'] = $customer ? $customer->name : request('customer_name');
         }
 
+        $receiptQuery = array_filter([
+            'receipt_no' => $payment['receipt_no'] ?? null,
+            'customer' => $payment['customer_name'] ?? null,
+            'invoice_no' => $payment['invoice_no'] ?? null,
+            'payment_date' => $payment['payment_date'] ?? null,
+            'payment_method' => $payment['payment_method'] ?? null,
+            'reference_no' => $payment['reference_no'] ?? null,
+            'currency' => $payment['currency'] ?? null,
+            'amount' => $payment['amount'] ?? null,
+        ], function ($value) {
+            return $value !== null && $value !== '';
+        });
+
         return view('erp.payments.receipt', [
             'payment' => $payment,
+            'receiptDocuments' => [
+                ['label' => 'Print Official Receipt', 'route' => route('erp.official-receipt.preview', $receiptQuery), 'icon' => 'bi-receipt'],
+                ['label' => 'Print Acknowledgement Receipt', 'route' => route('erp.acknowledgement-receipt.preview', $receiptQuery), 'icon' => 'bi-receipt-cutoff'],
+            ],
         ]);
     }
 
@@ -1740,17 +2704,33 @@ class ModuleController extends Controller
 
     public function soaPreview()
     {
-        return view('erp.print.soa', ['print' => $this->billingPrintPreviewData()]);
+        return view('erp.print.soa', [
+            'print' => $this->billingPrintPreviewData(),
+            'settings' => $this->soaPrintSettings('soa_b'),
+            'positions' => $this->soaPrintPositions('soa_b'),
+            'fieldStyles' => $this->soaPrintFieldStyles('soa_b'),
+            'customFields' => $this->soaPrintCustomFields('soa_b'),
+            'hiddenFields' => $this->soaPrintHiddenFields('soa_b'),
+        ]);
     }
 
     public function soaAPreview()
     {
-        return view('erp.print.soa-a');
+        return view('erp.print.soa-a', [
+            'print' => $this->billingPrintPreviewData(),
+            'settings' => $this->soaPrintSettings('soa_a'),
+            'positions' => $this->soaPrintPositions('soa_a'),
+            'fieldStyles' => $this->soaPrintFieldStyles('soa_a'),
+            'customFields' => $this->soaPrintCustomFields('soa_a'),
+            'hiddenFields' => $this->soaPrintHiddenFields('soa_a'),
+        ]);
     }
 
     public function debitNotePreview()
     {
-        return view('erp.print.debit-note');
+        return view('erp.print.debit-note', [
+            'print' => $this->billingPrintPreviewData(),
+        ]);
     }
 
     public function officialReceiptPreview()
@@ -1824,6 +2804,193 @@ class ModuleController extends Controller
         ];
 
         return view('erp.reports.customer-billing-templates', compact('templates'));
+    }
+
+    public function reportsIndex()
+    {
+        $reportStats = [
+            ['label' => 'Open AR', 'value' => 'PHP 238,700.00', 'icon' => 'bi-hourglass-split', 'tone' => 'primary'],
+            ['label' => 'Revenue MTD', 'value' => 'PHP 845,230.00', 'icon' => 'bi-graph-up-arrow', 'tone' => 'success'],
+            ['label' => 'VAT Payable', 'value' => 'PHP 25,932.00', 'icon' => 'bi-percent', 'tone' => 'warning'],
+            ['label' => 'AP Exposure', 'value' => 'PHP 174,250.00', 'icon' => 'bi-credit-card-2-front', 'tone' => 'danger'],
+        ];
+
+        $reportGroups = [
+            'Accounts Receivable' => [
+                ['name' => 'AR Aging', 'description' => 'Current, 30, 60, and 90+ balances by client, job, currency, VAT, and branch class.', 'route' => route('erp.customer-billing.aging'), 'icon' => 'bi-bar-chart-steps', 'frequency' => 'Daily', 'owner' => 'Accounting'],
+                ['name' => 'Customer Statement', 'description' => 'Client billing summary with open invoices, payments, credits, and SOA-ready totals.', 'route' => route('erp.customer-billing.templates'), 'icon' => 'bi-file-earmark-text', 'frequency' => 'Weekly', 'owner' => 'Collections'],
+                ['name' => 'Collection Forecast', 'description' => 'Expected receipts by due date, client terms, and payment status.', 'route' => route('erp.export', 'collection-forecast'), 'icon' => 'bi-calendar2-check', 'frequency' => 'Weekly', 'owner' => 'Finance'],
+            ],
+            'Financial Statements' => [
+                ['name' => 'Financial Statement Pack', 'description' => 'Complete finance report center for statements, ledgers, AR, AP, cash, tax, and management reports.', 'route' => route('erp.reports.financial-statements'), 'icon' => 'bi-folder-check', 'frequency' => 'Monthly', 'owner' => 'Finance'],
+                ['name' => 'Profit & Loss', 'description' => 'Revenue, cost of services, operating expenses, and net income by period.', 'route' => route('erp.statements.profit-loss'), 'icon' => 'bi-graph-up', 'frequency' => 'Monthly', 'owner' => 'Finance'],
+                ['name' => 'Balance Sheet', 'description' => 'Assets, liabilities, equity, cash, AR, AP, and VAT balances.', 'route' => route('erp.statements.balance-sheet'), 'icon' => 'bi-layout-text-window-reverse', 'frequency' => 'Monthly', 'owner' => 'Accounting'],
+                ['name' => 'Cash Flow', 'description' => 'Operating collections, supplier payments, financing movement, and ending cash.', 'route' => route('erp.statements.cash-flow'), 'icon' => 'bi-cash-stack', 'frequency' => 'Monthly', 'owner' => 'Finance'],
+                ['name' => 'Income Statement', 'description' => 'Income presentation for service revenue, direct costs, and operating expenses.', 'route' => route('erp.statements.income-statement'), 'icon' => 'bi-clipboard-data', 'frequency' => 'Monthly', 'owner' => 'Management'],
+            ],
+            'Tax & Compliance' => [
+                ['name' => 'VAT Summary', 'description' => 'Output VAT, input VAT, payable amount, and supporting sales/purchases.', 'route' => route('erp.tax.vat-summary'), 'icon' => 'bi-receipt-cutoff', 'frequency' => 'Monthly', 'owner' => 'Tax'],
+                ['name' => 'Withholding Tax', 'description' => 'Expanded and creditable withholding tax by document and supplier/client.', 'route' => route('erp.tax.withholding'), 'icon' => 'bi-percent', 'frequency' => 'Monthly', 'owner' => 'Tax'],
+                ['name' => 'Sales & Purchases', 'description' => 'Sales and purchase tax list for VAT filing and audit support.', 'route' => route('erp.tax.sales-purchases'), 'icon' => 'bi-table', 'frequency' => 'Monthly', 'owner' => 'Accounting'],
+                ['name' => 'Tax Audit Trail', 'description' => 'Traceable tax entries, adjustments, reviews, and filing controls.', 'route' => route('erp.tax.audit-trail'), 'icon' => 'bi-clock-history', 'frequency' => 'As needed', 'owner' => 'Admin'],
+            ],
+            'Operations' => [
+                ['name' => 'AP Aging', 'description' => 'Supplier payables by aging bucket, due date, currency, and payment status.', 'route' => route('erp.payables.aging'), 'icon' => 'bi-building-exclamation', 'frequency' => 'Weekly', 'owner' => 'Payables'],
+                ['name' => 'Cashbook', 'description' => 'Cash and bank movement with deposits, transfers, checks, and reconciliation state.', 'route' => route('erp.banking.cashbook'), 'icon' => 'bi-journal-text', 'frequency' => 'Daily', 'owner' => 'Finance'],
+                ['name' => 'Journal Entries', 'description' => 'Posted and draft journal entries linked to shipment jobs and documents.', 'route' => route('erp.accounting.journals'), 'icon' => 'bi-journal-check', 'frequency' => 'Daily', 'owner' => 'Accounting'],
+            ],
+        ];
+
+        return view('erp.reports.index', compact('reportStats', 'reportGroups'));
+    }
+
+    public function financialStatementsReport()
+    {
+        $period = request('period', 'May 2026');
+        $currency = request('currency', 'PHP');
+
+        $summaryCards = [
+            ['label' => 'Revenue MTD', 'value' => 'PHP 845,230.00', 'icon' => 'bi-graph-up-arrow', 'tone' => 'success'],
+            ['label' => 'Net Income', 'value' => 'PHP 462,820.00', 'icon' => 'bi-piggy-bank', 'tone' => 'primary'],
+            ['label' => 'Cash Balance', 'value' => 'PHP 1,268,500.00', 'icon' => 'bi-bank', 'tone' => 'info'],
+            ['label' => 'Working Capital', 'value' => 'PHP 64,450.00', 'icon' => 'bi-arrow-left-right', 'tone' => 'warning'],
+        ];
+
+        $statementSections = [
+            'Income Statement' => [
+                ['Service Revenue', 845230, 'Revenue from billing invoices, SOA, debit notes, and service charges.'],
+                ['Cost of Services', -240300, 'Shipment-linked vendor bills, handling, brokerage, trucking, and direct costs.'],
+                ['Gross Profit', 604930, 'Revenue less direct shipment costs.'],
+                ['Operating Expenses', -142110, 'Salaries, rent, bank charges, utilities, and admin expenses.'],
+                ['Net Income Before Tax', 462820, 'Operating result before income tax provision.'],
+            ],
+            'Balance Sheet' => [
+                ['Cash and Bank', 1268500, 'PHP and USD bank balances converted to reporting currency.'],
+                ['Accounts Receivable', 238700, 'Open customer invoices and SOA balances.'],
+                ['Accounts Payable', -174250, 'Open vendor bills and approved unpaid payables.'],
+                ['VAT Payable', -25932, 'Output VAT less input VAT.'],
+                ['Owner Equity and Retained Earnings', -1307018, 'Capital accounts and retained earnings.'],
+            ],
+            'Cash Flow Statement' => [
+                ['Collections from Customers', 328900, 'Official receipts, acknowledgement receipts, bank deposits, and online transfers.'],
+                ['Payments to Suppliers', -174250, 'Checks, bank transfers, online payments, and AP payment runs.'],
+                ['Tax Payments', -25932, 'VAT and withholding remittances.'],
+                ['Owner Contributions', 250000, 'Financing cash movements.'],
+                ['Ending Cash Balance', 1268500, 'Cash and bank ending balance.'],
+            ],
+        ];
+
+        $reportCatalog = [
+            'Core Financial Statements' => [
+                ['name' => 'Balance Sheet', 'purpose' => 'Assets, liabilities, equity, AR, AP, bank, VAT, and retained earnings.', 'route' => route('erp.statements.balance-sheet'), 'frequency' => 'Monthly'],
+                ['name' => 'Income Statement', 'purpose' => 'Revenue, direct costs, gross profit, operating expenses, and net income.', 'route' => route('erp.statements.income-statement'), 'frequency' => 'Monthly'],
+                ['name' => 'Profit and Loss', 'purpose' => 'Management P&L with branch, client, shipment, and cost center filters.', 'route' => route('erp.statements.profit-loss'), 'frequency' => 'Monthly'],
+                ['name' => 'Cash Flow Statement', 'purpose' => 'Operating, investing, financing, and ending cash movement.', 'route' => route('erp.statements.cash-flow'), 'frequency' => 'Monthly'],
+                ['name' => 'Statement of Changes in Equity', 'purpose' => 'Capital movements, drawings, dividends, and retained earnings.', 'route' => route('erp.export', 'equity-statement'), 'frequency' => 'Monthly'],
+            ],
+            'General Ledger and Audit' => [
+                ['name' => 'Trial Balance', 'purpose' => 'Debit and credit balances before generating financial statements.', 'route' => route('erp.export', 'trial-balance'), 'frequency' => 'Monthly'],
+                ['name' => 'General Ledger', 'purpose' => 'Account-level ledger with source document, job ID, and posting reference.', 'route' => route('erp.export', 'general-ledger'), 'frequency' => 'Daily'],
+                ['name' => 'Journal Entry Register', 'purpose' => 'Posted and draft journal entries with shipment job ID and approval status.', 'route' => route('erp.accounting.journals'), 'frequency' => 'Daily'],
+                ['name' => 'Audit Trail', 'purpose' => 'Changes to finance records, layouts, approvals, exports, and posting entries.', 'route' => route('erp.action', 'audit-logs'), 'frequency' => 'As needed'],
+            ],
+            'Receivables and Billing' => [
+                ['name' => 'AR Aging', 'purpose' => 'Current, 30, 60, 90+ balances by client, invoice, job, and currency.', 'route' => route('erp.customer-billing.aging'), 'frequency' => 'Daily'],
+                ['name' => 'Customer Statement', 'purpose' => 'Open invoices, SOA, payments, reimbursables, and customer balances.', 'route' => route('erp.customer-billing.templates'), 'frequency' => 'Weekly'],
+                ['name' => 'Sales Register', 'purpose' => 'Billing invoices, SOA A/B, debit notes, VAT class, and customer/job details.', 'route' => route('erp.export', 'sales-register'), 'frequency' => 'Monthly'],
+                ['name' => 'Collection Report', 'purpose' => 'OR/AR receipts, payment applications, bank deposit, and withholding deductions.', 'route' => route('erp.export', 'collection-report'), 'frequency' => 'Daily'],
+            ],
+            'Payables and Cash' => [
+                ['name' => 'AP Aging', 'purpose' => 'Vendor bills by due date, bucket, currency, approval, and payment status.', 'route' => route('erp.payables.aging'), 'frequency' => 'Weekly'],
+                ['name' => 'Disbursement Report', 'purpose' => 'Checks, vouchers, bank transfers, online payments, and payment approvals.', 'route' => route('erp.export', 'disbursement-report'), 'frequency' => 'Daily'],
+                ['name' => 'Cashbook', 'purpose' => 'Cash and bank deposits, withdrawals, transfers, and reconciliation status.', 'route' => route('erp.banking.cashbook'), 'frequency' => 'Daily'],
+                ['name' => 'Bank Reconciliation', 'purpose' => 'Book balance versus bank balance with outstanding checks and deposits.', 'route' => route('erp.banking.reconciliation'), 'frequency' => 'Monthly'],
+            ],
+            'Tax and Compliance' => [
+                ['name' => 'VAT Summary', 'purpose' => 'Output VAT, input VAT, VAT payable, zero-rated, and exempt sales.', 'route' => route('erp.tax.vat-summary'), 'frequency' => 'Monthly'],
+                ['name' => 'Withholding Tax Report', 'purpose' => 'EWT/CWT computation by document, vendor, client, and tax rate.', 'route' => route('erp.tax.withholding'), 'frequency' => 'Monthly'],
+                ['name' => 'Sales and Purchases Schedule', 'purpose' => 'VAT filing support for taxable, exempt, and zero-rated transactions.', 'route' => route('erp.tax.sales-purchases'), 'frequency' => 'Monthly'],
+                ['name' => 'BIR Compliance Audit Trail', 'purpose' => 'Tax source documents, adjustments, approvals, and filing history.', 'route' => route('erp.tax.audit-trail'), 'frequency' => 'As needed'],
+            ],
+            'Management Reports' => [
+                ['name' => 'Shipment Profitability', 'purpose' => 'Revenue, direct costs, reimbursables, margin, and profit by job.', 'route' => route('erp.export', 'shipment-profitability'), 'frequency' => 'Weekly'],
+                ['name' => 'Client Profitability', 'purpose' => 'Revenue and margin by customer, branch, route, and service item.', 'route' => route('erp.export', 'client-profitability'), 'frequency' => 'Monthly'],
+                ['name' => 'Cost Center Report', 'purpose' => 'Income and expenses by branch, department, and operation cost center.', 'route' => route('erp.settings.index').'#cost-centers', 'frequency' => 'Monthly'],
+                ['name' => 'FX Gain/Loss Report', 'purpose' => 'USD/PHP realized and unrealized gains and losses.', 'route' => route('erp.fx.gains-losses'), 'frequency' => 'Monthly'],
+            ],
+        ];
+
+        return view('erp.reports.financial-statements', compact('period', 'currency', 'summaryCards', 'statementSections', 'reportCatalog'));
+    }
+
+    public function financeSettings()
+    {
+        $settingStats = [
+            ['label' => 'Cost Centers', 'value' => '4', 'icon' => 'bi-diagram-3', 'tone' => 'primary'],
+            ['label' => 'Item List', 'value' => '8', 'icon' => 'bi-box-seam', 'tone' => 'success'],
+            ['label' => 'Currencies', 'value' => 'PHP / USD', 'icon' => 'bi-currency-exchange', 'tone' => 'warning'],
+            ['label' => 'Tax Codes', 'value' => 'VAT / WHT', 'icon' => 'bi-percent', 'tone' => 'danger'],
+        ];
+
+        $settingGroups = [
+            'Accounting Setup' => [
+                ['name' => 'Chart of Accounts', 'description' => 'GL accounts for AR, AP, revenue, expenses, VAT, WHT, bank, cash, and equity.', 'route' => route('erp.accounting.coa'), 'icon' => 'bi-journal-text', 'status' => 'Active'],
+                ['name' => 'Cost Centers', 'description' => 'Department, branch, and operation-level cost tracking for management reporting.', 'route' => route('erp.settings.index').'#cost-centers', 'icon' => 'bi-diagram-3', 'status' => 'Required'],
+                ['name' => 'Number Series', 'description' => 'Document numbering for BI, SOA, OR, AP bills, check vouchers, payments, and journal entries.', 'route' => route('erp.action', 'number-series'), 'icon' => 'bi-123', 'status' => 'Active'],
+            ],
+            'Billing & Item Setup' => [
+                ['name' => 'Item List', 'description' => 'Service, freight, documentation, terminal handling, reimbursable, and tax treatment defaults.', 'route' => route('erp.settings.index').'#item-list', 'icon' => 'bi-box-seam', 'status' => 'Required'],
+                ['name' => 'Invoice Templates', 'description' => 'Billing Invoice, SOA B, SOA A, Debit Note, Official Receipt, and custom templates.', 'route' => route('erp.customer-billing.templates'), 'icon' => 'bi-file-earmark-text', 'status' => 'Active'],
+                ['name' => 'Print Layouts', 'description' => 'Pre-printed form alignment, paper size, field positions, and custom printable fields.', 'route' => route('erp.billings.print-layout.invoice'), 'icon' => 'bi-sliders', 'status' => 'Active'],
+            ],
+            'Tax, Currency & Banking' => [
+                ['name' => 'Tax Codes', 'description' => '12% VAT, zero-rated, exempt, EWT, CWT, and withholding defaults for AR/AP.', 'route' => route('erp.tax.calculator'), 'icon' => 'bi-percent', 'status' => 'Active'],
+                ['name' => 'Currency Rates', 'description' => 'USD/PHP exchange rates for invoice, AP, payment, bank, and FX revaluation.', 'route' => route('erp.fx.index'), 'icon' => 'bi-currency-dollar', 'status' => 'Required'],
+                ['name' => 'Bank Accounts', 'description' => 'PHP and USD bank accounts for receipts, payments, check printing, and reconciliation.', 'route' => route('erp.banking.cashbook'), 'icon' => 'bi-bank', 'status' => 'Active'],
+            ],
+            'Controls' => [
+                ['name' => 'Approval Matrix', 'description' => 'Approval limits for billing, AP payments, credit overrides, FX, tax, and user access.', 'route' => route('erp.approval-matrix'), 'icon' => 'bi-check2-square', 'status' => 'Active'],
+                ['name' => 'User Access Control', 'description' => 'Role permissions by module for view, create, edit, and delete access.', 'route' => route('erp.users.index'), 'icon' => 'bi-person-lock', 'status' => 'Active'],
+                ['name' => 'Audit Trail', 'description' => 'Activity logs for finance settings, documents, approvals, print, export, and posting.', 'route' => route('erp.action', 'audit-logs'), 'icon' => 'bi-clock-history', 'status' => 'Enabled'],
+            ],
+        ];
+
+        $costCenters = [
+            ['CC-MNL-OPS', 'Manila Operations', 'Operations', 'MANILA', 'SeaJet Logistics', 'Active'],
+            ['CC-CEB-OPS', 'Cebu Operations', 'Operations', 'CEBU', 'SeaJet Logistics', 'Active'],
+            ['CC-PAM-OPS', 'Pampanga Operations', 'Operations', 'PAMPANGA', 'SeaJet Logistics', 'Active'],
+            ['CC-HQ-FIN', 'Head Office Finance', 'Finance', 'Main', 'SeaJet Holdings', 'Active'],
+        ];
+
+        $items = [
+            ['SVC-FREIGHT', 'Ocean Freight', 'Service Revenue', 'Zero-rated', 'USD / PHP', 'Billable'],
+            ['SVC-THC', 'Terminal Handling', 'Service Revenue', '12% VAT', 'PHP', 'Billable'],
+            ['SVC-DOC', 'Documentation Fee', 'Service Revenue', '12% VAT', 'PHP', 'Billable'],
+            ['REIMB-PORT', 'Port Advances / Reimbursable', 'A/R Reimbursable Charges', 'Exempt', 'USD / PHP', 'Reimbursable'],
+            ['AP-FUEL', 'Fuel / Trucking Expense', 'Cost of Services', '12% VAT + EWT', 'PHP', 'AP Expense'],
+            ['AP-BROKER', 'Brokerage Expense', 'Cost of Services', '12% VAT + EWT', 'PHP', 'AP Expense'],
+            ['BANK-FEE', 'Bank Charges', 'Bank Fees', 'Exempt', 'USD / PHP', 'Expense'],
+            ['FX-ADJ', 'FX Gain / Loss Adjustment', 'FX Gain/Loss', 'N/A', 'USD / PHP', 'Journal'],
+        ];
+
+        $numberSeries = [
+            ['Billing Invoice', 'BI-', '000001', '6 digits', 'Active'],
+            ['Statement of Account', 'SOA-', '000001', '6 digits', 'Active'],
+            ['Official Receipt', 'OR-', '000001', '6 digits', 'Active'],
+            ['AP Bill', 'BILL-', '000001', '6 digits', 'Active'],
+            ['Check Voucher', 'CV-', '000001', '6 digits', 'Active'],
+            ['Journal Voucher', 'JV-', '000001', '6 digits', 'Active'],
+        ];
+
+        $taxCodes = [
+            ['VAT12', 'Output/Input VAT 12%', '12%', 'VAT', 'Sales and purchases'],
+            ['ZERO', 'Zero-rated', '0%', 'VAT', 'Export services'],
+            ['EXEMPT', 'VAT Exempt', '0%', 'VAT', 'Reimbursements and exempt items'],
+            ['EWT2', 'Expanded Withholding Tax', '2%', 'Withholding', 'Supplier services'],
+            ['CWT2', 'Creditable Withholding Tax', '2%', 'Withholding', 'Customer collections'],
+        ];
+
+        return view('erp.settings.index', compact('settingStats', 'settingGroups', 'costCenters', 'items', 'numberSeries', 'taxCodes'));
     }
 
     public function agingReport()

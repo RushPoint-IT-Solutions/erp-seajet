@@ -7,14 +7,15 @@
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
         <div>
             <h1 class="h3 fw-bold mb-1">Billing CRUD</h1>
-            <p class="text-muted mb-0">Create, view, edit, update status, and print Billing Invoice or Statement of Account.</p>
+            <p class="text-muted mb-0">Create, view, edit, and print posted Billing Invoice or Statement of Account documents.</p>
         </div>
         <div class="d-flex flex-wrap gap-2 no-print">
             <a href="{{ route('erp.invoices.create') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Create Billing</a>
-            <a href="{{ route('erp.billings.status') }}" class="btn btn-outline-secondary"><i class="bi bi-toggle-on me-1"></i>Update Status</a>
             <a href="{{ route('erp.billings.print-invoice') }}" class="btn btn-outline-secondary"><i class="bi bi-printer me-1"></i>Print BI</a>
             <a href="{{ route('erp.billings.print-soa') }}" class="btn btn-outline-secondary"><i class="bi bi-printer me-1"></i>Print SOA</a>
             <a href="{{ route('erp.billings.print-layout.invoice') }}" class="btn btn-outline-secondary"><i class="bi bi-sliders me-1"></i>BI Layout</a>
+            <a href="{{ route('erp.billings.print-layout.soa-b') }}" class="btn btn-outline-secondary"><i class="bi bi-sliders me-1"></i>SOA B Layout</a>
+            <a href="{{ route('erp.billings.print-layout.soa-a') }}" class="btn btn-outline-secondary"><i class="bi bi-sliders me-1"></i>SOA A Layout</a>
         </div>
     </div>
 
@@ -38,7 +39,6 @@
                         <td>{{ $billing[6] }}</td>
                         <td class="text-end">
                             <a href="{{ route('erp.billings.edit', $billing[0]) }}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
-                            <a href="{{ route('erp.billings.status', ['invoice' => $billing[0]]) }}" class="btn btn-sm btn-outline-secondary" title="Status"><i class="bi bi-toggle-on"></i></a>
                             <a href="{{ route('erp.billings.print-invoice', ['invoice' => $billing[0]]) }}" class="btn btn-sm btn-outline-secondary" title="Print BI"><i class="bi bi-printer"></i></a>
                             <a href="{{ route('erp.billings.print-soa', ['customer' => $billing[1]]) }}" class="btn btn-sm btn-outline-secondary" title="Print SOA"><i class="bi bi-file-earmark-text"></i></a>
                             <a href="{{ route('erp.billings.delete', $billing[0]) }}" class="btn btn-sm btn-outline-danger" title="Void"><i class="bi bi-trash"></i></a>

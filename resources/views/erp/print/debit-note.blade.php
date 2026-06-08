@@ -45,6 +45,24 @@
 @endpush
 
 @section('content')
+    @php
+        $currency = $print['currency'] ?? 'PHP';
+        $money = function ($amount) use ($currency) {
+            return $currency.' '.number_format((float) $amount, 2);
+        };
+        $memoText = trim($print['memo'] ?? '') !== ''
+            ? $print['memo']
+            : (trim($print['description'] ?? '') !== '' ? $print['description'] : ($print['line_description'] ?? ''));
+        $particulars = trim($memoText) !== '' ? $memoText : 'Debit memo adjustment';
+        if (!empty($print['invoice_no'])) {
+            $particulars .= "\nInvoice ".$print['invoice_no'];
+        }
+        if (!empty($print['job_shipment_id'])) {
+            $particulars .= "\nShipment ".$print['job_shipment_id'];
+        }
+        $memoAmount = (float) ($print['soa_total'] ?? $print['billing_total'] ?? $print['line_amount'] ?? 0);
+    @endphp
+
     <div class="d-flex justify-content-end gap-2 mb-3 no-print">
         <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print Content Only</button>
         <a href="{{ route('erp.export', 'debit-note-pdf') }}" class="btn btn-primary"><i class="bi bi-filetype-pdf me-1"></i> PDF</a>
@@ -57,7 +75,7 @@
             <span style="font-size: 10px; font-weight: 600">Unit 18 & 19 Bldg. B, Cargo Village Complex<br>Sto. Nino, Paranaque City 1704, Philippines</span>
         </div>
         <div class="dn-label" style="left: 612px; top: 116px">Debit Note No.</div>
-        <div class="dn-field" style="left: 728px; top: 112px; color: #991b1b; font-size: 18px; font-weight: 800">017741</div>
+        <div class="dn-field" style="left: 700px; top: 112px; width: 105px; color: #991b1b; font-size: 16px; font-weight: 800; text-align: right">{{ $print['invoice_no'] ?? '' }}</div>
         <div class="dn-label" style="left: 615px; top: 165px">Date:</div>
         <div class="dn-box" style="left: 655px; top: 155px; width: 132px; height: 28px"></div>
 
@@ -75,16 +93,13 @@
         <div class="dn-box" style="left: 700px; top: 928px; width: 120px; height: 34px"></div>
         <div class="dn-label" style="left: 525px; top: 990px; font-size: 16px">Sea-Jet International Fwdrs., Inc.</div>
 
-        <div class="dn-field" style="left: 100px; top: 158px; width: 330px">PHILUSA CORPORATION<br>28 SHAW BLVD, KAPITOLYO 1603<br>CITY OF PASIG</div>
-        <div class="dn-field" style="left: 662px; top: 162px">05/19/2026</div>
-        <div class="dn-field" style="left: 112px; top: 390px; width: 520px">
-            Reimbursement charges adjustment
-            Additional destination charges
-            Shipment JOB-SEA-2026-0423
-        </div>
+        <div class="dn-field" style="left: 100px; top: 158px; width: 330px">{{ $print['customer'] ?? '' }}<br>{{ $print['address'] ?? '' }}</div>
+        <div class="dn-field" style="left: 662px; top: 162px">{{ $print['invoice_date'] ?? '' }}</div>
+        <div class="dn-field" style="left: 112px; top: 390px; width: 520px">{{ $particulars }}</div>
         <div class="dn-field amount" style="left: 700px; top: 390px; width: 80px">
-            48,900.00
+            {{ number_format($memoAmount, 2) }}
         </div>
-        <div class="dn-field amount" style="left: 704px; top: 893px; width: 105px">48,900.00</div>
+        <div class="dn-field amount" style="left: 704px; top: 893px; width: 105px">{{ $money($memoAmount) }}</div>
+        <div class="dn-field amount" style="left: 704px; top: 936px; width: 105px">{{ $money($memoAmount) }}</div>
     </div>
 @endsection

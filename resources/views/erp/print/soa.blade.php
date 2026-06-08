@@ -7,10 +7,16 @@
 <style>
     .form-sheet {
         position: relative;
-        width: 816px;
-        height: 1056px;
+        width: {{ $settings['paper_width'] }}px;
+        height: {{ $settings['paper_height'] }}px;
         margin: 0 auto;
         background: #f7f4df;
+        @if($settings['template_url'])
+        background-image: url('{{ $settings['template_url'] }}');
+        background-size: 100% 100%;
+        background-repeat: no-repeat;
+        background-position: center;
+        @endif
         border: 1px solid #2f3542;
         box-shadow: 0 10px 30px rgba(15, 23, 42, .14);
         font-family: Arial, sans-serif;
@@ -67,6 +73,11 @@
         line-height: 1.35;
         white-space: pre-line;
     }
+    @foreach($hiddenFields as $hiddenField)
+    .print-field-{{ $hiddenField }} {
+        display: none !important;
+    }
+    @endforeach
     .print-field.amount {
         text-align: right;
         font-weight: 600;
@@ -78,13 +89,17 @@
         font-size: 18px;
     }
     @media print {
-        @page { size: Letter; margin: 0; }
+        @page { size: {{ $settings['page_css'] }}; margin: 0; }
         body { background: #fff !important; }
         .form-sheet {
             border: 0;
             box-shadow: none;
             margin: 0;
+            width: {{ $settings['paper_width'] }}px;
+            height: {{ $settings['paper_height'] }}px;
+            @if(!$settings['print_template'])
             background: transparent !important;
+            @endif
         }
         .template-line,
         .template-box,
@@ -101,14 +116,31 @@
 
 @section('content')
     @php
-        $money = function ($amount) {
-            return 'PHP '.number_format((float) $amount, 2);
+        $p = $positions;
+        $s = $fieldStyles;
+        $fieldStyle = function ($field) use ($s) {
+            return 'width: '.$s[$field]['width'].'px; font-size: '.$s[$field]['font_size'].'px';
         };
+        $currency = $print['currency'] ?? 'PHP';
+        $money = function ($amount) use ($currency) {
+            return $currency.' '.number_format((float) $amount, 2);
+        };
+        $soaParticulars = trim($print['soa_particulars'] ?? '') !== ''
+            ? $print['soa_particulars']
+            : "REIMBURSABLE CHARGES";
+        $soaAmounts = trim($print['soa_amounts'] ?? '') !== ''
+            ? $print['soa_amounts']
+            : number_format((float) ($print['reimbursement_total'] ?? 0), 2);
+        $paymentNote = "PLEASE PAY THIS REIMBURSEMENT CHARGES TOGETHER WITH INVOICE NUMBER ".($print['invoice_no'] ?? '')."\n"
+            ."REIMBURSEMENT CHARGES     ".$money($print['reimbursement_total'] ?? 0)."\n"
+            ."INVOICE AMOUNT            ".$money($print['billing_total'] ?? 0)."\n"
+            ."PLEASE PAY THIS AMOUNT    ".$money($print['soa_total'] ?? 0);
     @endphp
 
     <div class="d-flex justify-content-end gap-2 mb-3 no-print">
         <a href="{{ route('erp.billings.index') }}" class="btn btn-outline-secondary"><i class="bi bi-table me-1"></i> Billing CRUD</a>
         <a href="{{ route('erp.billings.status') }}" class="btn btn-outline-secondary"><i class="bi bi-toggle-on me-1"></i> Update Status</a>
+        <a href="{{ route('erp.billings.print-layout.soa-b', request()->query()) }}" class="btn btn-outline-secondary"><i class="bi bi-sliders me-1"></i> Adjust Layout</a>
         <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print Content Only</button>
         <a href="{{ route('erp.action', 'email-soa') }}" class="btn btn-primary"><i class="bi bi-envelope me-1"></i> Email SOA</a>
     </div>
@@ -121,7 +153,7 @@
         </div>
         <div class="template-title">STATEMENT OF ACCOUNT</div>
         <div class="template-label serial-label" style="left: 640px; top: 137px">B No.</div>
-        <div class="print-field serial" style="left: 692px; top: 134px">007187</div>
+        <div class="print-field serial print-field-serial" style="left: {{ $p['serial'][0] }}px; top: {{ $p['serial'][1] }}px; {{ $fieldStyle('serial') }}">{{ $print['soa_no'] ?? '007187' }}</div>
 
         <div class="template-box" style="left: 70px; top: 180px; width: 330px; height: 78px"></div>
         <div class="template-label" style="left: 82px; top: 190px; letter-spacing: 0">CUSTOMER:</div>
@@ -136,37 +168,21 @@
         <div class="template-label" style="left: 675px; top: 302px; letter-spacing: 0">Amount</div>
 
         <div class="template-label" style="left: 54px; top: 857px; font-size: 12px; font-style: italic; letter-spacing: 0">"THIS DOCUMENT IS NOT VALID FOR CLAIMING INPUT TAXES"</div>
-        <div class="template-label" style="left: 275px; top: 905px; font-size: 16px; letter-spacing: 0">TOTAL REIMBURSEMENT CHARGES</div>
+        <div class="template-label" style="left: 330px; top: 905px; font-size: 16px; letter-spacing: 0">PLEASE PAY THIS AMOUNT</div>
         <div class="template-box" style="left: 640px; top: 892px; width: 124px; height: 36px"></div>
         <div class="template-label" style="left: 480px; top: 985px; font-size: 15px; letter-spacing: 0">SEA-JET INTERNATIONAL FORWARDERS, INC.</div>
         <div class="template-line" style="left: 505px; top: 1028px; width: 300px"></div>
 
-        <div class="print-field" style="left: 152px; top: 190px; width: 230px">{{ $print['customer'] }}</div>
-        <div class="print-field" style="left: 148px; top: 220px; width: 240px">28 SHAW BLVD, KAPITOLYO 1603<br>CITY OF PASIG</div>
-        <div class="print-field" style="left: 618px; top: 235px; width: 155px">{{ $print['invoice_date'] }}</div>
-        <div class="print-field" style="left: 115px; top: 370px; width: 455px">
-            OCEAN FREIGHT (95% OF FREIGHT CHARGES)
-            BUNKER SURCHARGE
-            SOLAS ADMIN
-            5% COLLECT FEE
-
-            SHIPPER: LEMOINE HOLLAND B.V.
-            CONT'R NO. LETU5131406/TCNU5442735/FSCU8916299
-        </div>
-        <div class="print-field amount" style="left: 640px; top: 370px; width: 100px">
-            368,376.75
-            120,022.50
-            20,311.50
-            9,232.50
-            19,388.25
-        </div>
-        <div class="print-field" style="left: 60px; top: 735px; width: 510px">
-            PLEASE PAY THIS REIMBURSEMENT CHARGES TOGETHER WITH INVOICE NUMBER {{ $print['invoice_no'] }}
-            REIMBURSEMENT CHARGES     {{ $money($print['reimbursement_total']) }}
-            INVOICE AMOUNT            {{ $money($print['billing_total']) }}
-            PLEASE PAY THIS AMOUNT    {{ $money($print['soa_total']) }}
-        </div>
-        <div class="print-field amount" style="left: 640px; top: 899px; width: 115px">{{ number_format((float) $print['soa_total'], 2) }}</div>
-        <div class="print-field" style="left: 545px; top: 1005px; width: 180px; text-align: center">MABEL PLATA</div>
+        <div class="print-field print-field-customer" style="left: {{ $p['customer'][0] }}px; top: {{ $p['customer'][1] }}px; {{ $fieldStyle('customer') }}">{{ $print['customer'] }}</div>
+        <div class="print-field print-field-address" style="left: {{ $p['address'][0] }}px; top: {{ $p['address'][1] }}px; {{ $fieldStyle('address') }}">{{ $print['address'] }}</div>
+        <div class="print-field print-field-date" style="left: {{ $p['date'][0] }}px; top: {{ $p['date'][1] }}px; {{ $fieldStyle('date') }}">{{ $print['invoice_date'] }}</div>
+        <div class="print-field print-field-particulars" style="left: {{ $p['particulars'][0] }}px; top: {{ $p['particulars'][1] }}px; {{ $fieldStyle('particulars') }}">{{ $soaParticulars }}</div>
+        <div class="print-field amount print-field-amounts" style="left: {{ $p['amounts'][0] }}px; top: {{ $p['amounts'][1] }}px; {{ $fieldStyle('amounts') }}">{{ $soaAmounts }}</div>
+        <div class="print-field print-field-payment_note" style="left: {{ $p['payment_note'][0] }}px; top: {{ $p['payment_note'][1] }}px; {{ $fieldStyle('payment_note') }}">{{ $paymentNote }}</div>
+        <div class="print-field amount print-field-total_reimbursement" style="left: {{ $p['total_reimbursement'][0] }}px; top: {{ $p['total_reimbursement'][1] }}px; {{ $fieldStyle('total_reimbursement') }}">{{ number_format((float) $print['soa_total'], 2) }}</div>
+        <div class="print-field print-field-prepared_by" style="left: {{ $p['prepared_by'][0] }}px; top: {{ $p['prepared_by'][1] }}px; {{ $fieldStyle('prepared_by') }}; text-align: center">{{ $print['prepared_by'] ?: 'MABEL PLATA' }}</div>
+        @foreach($customFields as $custom)
+            <div class="print-field" style="left: {{ $custom['x'] }}px; top: {{ $custom['y'] }}px; width: {{ $custom['width'] }}px; font-size: {{ $custom['font_size'] }}px">{{ $custom['text'] }}</div>
+        @endforeach
     </div>
 @endsection

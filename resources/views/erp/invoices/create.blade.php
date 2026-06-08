@@ -1,7 +1,12 @@
 @extends('erp.layout')
 
-@section('title', 'Create Invoice')
-@section('page-title', 'Create Invoice')
+@php
+    $isEdit = $isEdit ?? false;
+    $editingInvoice = $editingInvoice ?? [];
+@endphp
+
+@section('title', $isEdit ? 'Edit Invoice' : 'Create Invoice')
+@section('page-title', $isEdit ? 'Edit Invoice' : 'Create Invoice')
 
 @push('styles')
 <style>
@@ -126,15 +131,20 @@
 
             <div class="invoice-toolbar d-flex flex-wrap align-items-center justify-content-between gap-2">
                 <div class="d-flex align-items-center gap-3">
-                    <h1 class="h5 mb-0">New Invoice</h1>
+                    <h1 class="h5 mb-0">{{ $isEdit ? 'Edit Invoice' : 'New Invoice' }}</h1>
                     <a href="{{ route('erp.billings.index') }}" class="btn btn-sm btn-outline-light"><i class="bi bi-x-circle me-1"></i>Back</a>
-                    <button class="btn btn-sm btn-success" type="submit"><i class="bi bi-cloud-arrow-up-fill me-1"></i>Save</button>
+                    @unless($isEdit)
+                        <button class="btn btn-sm btn-outline-light" type="button" id="sampleInvoiceButton"><i class="bi bi-magic me-1"></i>Sample Invoice</button>
+                    @endunless
+                    <button class="btn btn-sm btn-success" type="submit"><i class="bi bi-cloud-arrow-up-fill me-1"></i>{{ $isEdit ? 'Update' : 'Save' }}</button>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
-                    <a href="{{ route('erp.billings.print-invoice') }}" class="btn btn-sm btn-outline-light vatable-print-action"><i class="bi bi-filetype-pdf me-1"></i>Billing Invoice</a>
-                    <a href="{{ route('erp.billings.print-soa') }}" class="btn btn-sm btn-outline-light vatable-print-action"><i class="bi bi-file-earmark-text me-1"></i>SOA B</a>
-                    <a href="{{ route('erp.soa-a.preview') }}" class="btn btn-sm btn-outline-light non-tax-print-action d-none"><i class="bi bi-file-earmark-text me-1"></i>SOA A</a>
-                    <a href="{{ route('erp.billings.print-layout.invoice') }}" class="btn btn-sm btn-outline-light"><i class="bi bi-sliders me-1"></i>Print Layout</a>
+                    <a href="{{ route('erp.billings.print-invoice', $isEdit && !empty($editingInvoice['invoice_no']) ? ['invoice' => $editingInvoice['invoice_no']] : []) }}" class="btn btn-sm btn-outline-light vatable-print-action invoice-linked-action" data-base-url="{{ route('erp.billings.print-invoice') }}"><i class="bi bi-filetype-pdf me-1"></i>Billing Invoice</a>
+                    <a href="{{ route('erp.billings.print-soa', $isEdit && !empty($editingInvoice['invoice_no']) ? ['invoice' => $editingInvoice['invoice_no']] : []) }}" class="btn btn-sm btn-outline-light vatable-print-action invoice-linked-action" data-base-url="{{ route('erp.billings.print-soa') }}"><i class="bi bi-file-earmark-text me-1"></i>SOA B</a>
+                    <a href="{{ route('erp.soa-a.preview', $isEdit && !empty($editingInvoice['invoice_no']) ? ['invoice' => $editingInvoice['invoice_no']] : []) }}" class="btn btn-sm btn-outline-light non-tax-print-action d-none invoice-linked-action" data-base-url="{{ route('erp.soa-a.preview') }}"><i class="bi bi-file-earmark-text me-1"></i>SOA A</a>
+                    <a href="{{ route('erp.billings.print-layout.invoice', $isEdit && !empty($editingInvoice['invoice_no']) ? ['invoice' => $editingInvoice['invoice_no']] : []) }}" class="btn btn-sm btn-outline-light invoice-linked-action" data-base-url="{{ route('erp.billings.print-layout.invoice') }}"><i class="bi bi-sliders me-1"></i>BI Layout</a>
+                    <a href="{{ route('erp.billings.print-layout.soa-b', $isEdit && !empty($editingInvoice['invoice_no']) ? ['invoice' => $editingInvoice['invoice_no']] : []) }}" class="btn btn-sm btn-outline-light vatable-print-action invoice-linked-action" data-base-url="{{ route('erp.billings.print-layout.soa-b') }}"><i class="bi bi-sliders me-1"></i>SOA B Layout</a>
+                    <a href="{{ route('erp.billings.print-layout.soa-a', $isEdit && !empty($editingInvoice['invoice_no']) ? ['invoice' => $editingInvoice['invoice_no']] : []) }}" class="btn btn-sm btn-outline-light non-tax-print-action d-none invoice-linked-action" data-base-url="{{ route('erp.billings.print-layout.soa-a') }}"><i class="bi bi-sliders me-1"></i>SOA A Layout</a>
                     <button class="btn btn-sm btn-outline-light" type="button" onclick="window.print()"><i class="bi bi-printer-fill me-1"></i>Print</button>
                 </div>
             </div>
@@ -189,13 +199,17 @@
                     </div>
                     <div class="col-lg-3">
                         <label class="form-label">Template</label>
-                        <select name="invoice_template" id="invoiceTemplate" class="form-select">
-                            <option value=""></option>
-                            <option>SOA_B</option>
-                            <option>Billing Invoice</option>
-                            <option>SOA_A</option>
-                            <option>Debit Note</option>
+                        <select name="invoice_template[]" id="invoiceTemplate" class="form-select erp-select" multiple>
+                            @foreach($invoiceTemplates as $template)
+                                <option value="{{ $template['key'] }}" data-account="{{ $template['account'] }}">{{ $template['label'] }}</option>
+                            @endforeach
                         </select>
+                        <div class="input-group input-group-sm mt-2">
+                            <input type="text" id="customTemplateName" class="form-control" placeholder="Add custom template">
+                            <button type="button" class="btn btn-outline-secondary" id="addInvoiceTemplate" title="Add template">
+                                <i class="bi bi-plus-lg"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -443,6 +457,9 @@
 @push('scripts')
 <script>
     $(function () {
+        var isEdit = @json($isEdit);
+        var editInvoice = @json($editingInvoice);
+
         function numberValue(value) {
             var parsed = parseFloat(String(value || '').replace(/,/g, ''));
             return isNaN(parsed) ? 0 : parsed;
@@ -463,10 +480,30 @@
 
             if (source === 'transaction') {
                 invoiceNo.val(value);
+                syncInvoiceActionLinks();
                 return;
             }
 
             transactionNo.val(value);
+            syncInvoiceActionLinks();
+        }
+
+        function syncInvoiceActionLinks() {
+            var invoiceNo = ($('#invoiceNo').val() || $('#transactionNo').val() || '').trim();
+
+            $('.invoice-linked-action').each(function () {
+                var baseUrl = $(this).data('base-url');
+                if (!baseUrl) {
+                    return;
+                }
+
+                if (!invoiceNo) {
+                    $(this).attr('href', baseUrl);
+                    return;
+                }
+
+                $(this).attr('href', baseUrl + '?invoice=' + encodeURIComponent(invoiceNo));
+            });
         }
 
         function syncCustomer() {
@@ -475,7 +512,7 @@
                 $('#customerName').val('');
                 $('#clientSummary').text('No customer selected');
                 $('#arAccount').val('');
-                $('#invoiceTemplate').val('');
+                $('#invoiceTemplate').val(null).trigger('change.select2');
                 $('.vatable-print-action').removeClass('d-none');
                 $('.non-tax-print-action').addClass('d-none');
                 return;
@@ -493,11 +530,34 @@
             $('#creditTerms').val(terms.replace(/[^0-9]/g, ''));
             $('#customerTaxCode').val(isVatable ? 'VAT12' : (taxClass === 'zero-rated' ? 'ZERO' : 'EXEMPT'));
             $('#arAccount').val(isVatable ? 'A/Trade-Billing Invoice' : 'A/R Trade-SOA A');
-            $('#invoiceTemplate').val(isVatable ? 'SOA_B' : 'SOA_A');
+            $('#invoiceTemplate').val(isVatable ? ['SOA_B', 'Billing Invoice'] : ['SOA_A']).trigger('change.select2');
             $('.vatable-print-action').toggleClass('d-none', !isVatable);
             $('.non-tax-print-action').toggleClass('d-none', isVatable);
             $('#clientSummary').text((option.data('terms') || '-') + ' | ' + (option.data('currency') || '-') + ' | ' + (taxClass || '-') + ' | ' + (isVatable ? 'Print SOA B + Billing Invoice' : 'Print SOA A'));
         }
+
+        $('#addInvoiceTemplate').on('click', function () {
+            var input = $('#customTemplateName');
+            var value = input.val().trim();
+            var select = $('#invoiceTemplate');
+            var selected = select.val() || [];
+
+            if (!value) {
+                input.focus();
+                return;
+            }
+
+            if (!select.find('option').filter(function () { return this.value === value; }).length) {
+                select.append(new Option(value, value, true, true));
+            }
+
+            if (selected.indexOf(value) === -1) {
+                selected.push(value);
+            }
+
+            select.val(selected).trigger('change.select2');
+            input.val('').focus();
+        });
 
         function syncItem(row) {
             var option = row.find('.item-select option:selected');
@@ -550,6 +610,149 @@
             $('#invoiceAmountInput').val(billingTotal ? money(billingTotal) : '');
         }
 
+        function setLine(index, item, description, rate, qty, lineClass, taxCategory) {
+            while ($('#invoiceLines tbody tr').length <= index) {
+                $('#addLine').trigger('click');
+            }
+
+            var row = $('#invoiceLines tbody tr').eq(index);
+            row.find('.item-select').val(item);
+            row.find('textarea[name="item_description[]"]').val(description);
+            row.find('.line-unit').val(rate);
+            row.find('.line-qty').val(qty);
+            row.find('select[name="line_class[]"]').val(lineClass);
+            row.find('.line-tax').val(taxCategory);
+        }
+
+        function fillSampleInvoice() {
+            $('#customerSelect').val('CUST-001').trigger('change').trigger('change.select2');
+
+            $('input[name="job_shipment_id"]').val('JOB-SEA-2026-0501');
+            $('input[name="soa_no"]').val('SOA-2026-0501');
+            $('input[name="mawb_no"]').val('MAWB-7842-SEA');
+            $('input[name="hawb_no"]').val('HAWB-501-A');
+            $('input[name="origin_dest"]').val('SINGAPORE / MANILA');
+            $('input[name="date_shipped"]').val('2026-06-07');
+            $('input[name="commodity"]').val('Consolidated sea freight cargo');
+            $('select[name="customer_message"]').val('Payment is due based on agreed credit terms.');
+            $('input[name="memo"]').val('Sample invoice generated for testing');
+            $('input[name="invoice_date"]').val('2026-06-07');
+            $('input[name="due_date"]').val('2026-07-07');
+            $('#invoiceNo').val('BI-2026-0501');
+            $('#transactionNo').val('BI-2026-0501');
+            syncInvoiceActionLinks();
+            $('textarea[name="invoice_to"]').val('North Harbor Trading\nNorth Harbor Center, Manila\nTIN: 000-345-111-000');
+            $('textarea[name="consignee"]').val('North Harbor Trading\nManila Port Warehouse');
+            $('input[name="total_payment"]').val('0.00');
+            $('textarea[name="description"]').val('Sample billing for shipment-linked services. Includes VATable service charges and reimbursable charges.');
+            $('#invoiceTemplate').val(['SOA_B', 'Billing Invoice']).trigger('change.select2');
+
+            $('#invoiceLines tbody tr:gt(0)').remove();
+            setLine(0, 'Terminal Handling', 'TERMINAL HANDLING CHARGES', '321714.25', '1', 'MANILA', '12%');
+            setLine(1, 'Documentation VAT', 'DOC / IDENTIFICATION FEE', '4280.60', '1', 'MANILA', '12%');
+            setLine(2, 'Reimbursable Charges', 'REIMBURSABLE CHARGES - PORT ADVANCES', '753495.10', '1', 'MANILA', 'exempt');
+
+            recalc();
+        }
+
+        function dateValue(value) {
+            if (!value) {
+                return '';
+            }
+
+            return String(value).substring(0, 10);
+        }
+
+        function setTemplateValues(values) {
+            var select = $('#invoiceTemplate');
+            values = values || [];
+
+            values.forEach(function (value) {
+                if (value && !select.find('option').filter(function () { return this.value === value; }).length) {
+                    select.append(new Option(value, value, true, true));
+                }
+            });
+
+            select.val(values).trigger('change.select2');
+        }
+
+        function fillEditInvoice() {
+            if (!editInvoice || !editInvoice.invoice_no) {
+                return false;
+            }
+
+            var customerId = editInvoice.customer_id || '';
+            if (!customerId && editInvoice.customer) {
+                $('#customerSelect option').each(function () {
+                    if ($(this).data('name') === editInvoice.customer) {
+                        customerId = this.value;
+                    }
+                });
+            }
+
+            if (customerId) {
+                $('#customerSelect').val(customerId).trigger('change').trigger('change.select2');
+            }
+
+            $('#customerName').val(editInvoice.customer || '');
+            $('#clientSummary').text([
+                editInvoice.customer || 'Selected invoice',
+                editInvoice.currency || '',
+                editInvoice.invoice_no || ''
+            ].filter(Boolean).join(' | '));
+            $('#classCode').val(editInvoice.class_code || $('#classCode').val() || '');
+            $('#arAccount').val(editInvoice.ar_account || 'A/Trade-Billing Invoice');
+            $('#currencySelect').val(editInvoice.currency || 'PHP').trigger('change.select2');
+            $('#vatClassification').val(editInvoice.vat_classification || '');
+            $('#customerTaxCode').val(editInvoice.customer_tax_code || (editInvoice.vat_classification === '12%' ? 'VAT12' : ''));
+            $('#customerTin').val(editInvoice.tin || '');
+
+            $('input[name="job_shipment_id"]').val(editInvoice.job_shipment_id || '');
+            $('input[name="soa_no"]').val(editInvoice.soa_no || '');
+            $('input[name="mawb_no"]').val(editInvoice.mawb_no || '');
+            $('input[name="hawb_no"]').val(editInvoice.hawb_no || '');
+            $('input[name="origin_dest"]').val(editInvoice.origin_dest || '');
+            $('input[name="date_shipped"]').val(dateValue(editInvoice.date_shipped));
+            $('input[name="commodity"]').val(editInvoice.commodity || '');
+            $('select[name="customer_message"]').val(editInvoice.customer_message || '');
+            $('input[name="memo"]').val(editInvoice.memo || '');
+            $('input[name="invoice_date"]').val(dateValue(editInvoice.invoice_date));
+            $('input[name="due_date"]').val(dateValue(editInvoice.due_date));
+            $('#invoiceNo').val(editInvoice.invoice_no || '');
+            $('#transactionNo').val(editInvoice.transaction_no || editInvoice.invoice_no || '');
+            syncInvoiceActionLinks();
+            $('textarea[name="invoice_to"]').val(editInvoice.invoice_to || '');
+            $('textarea[name="consignee"]').val(editInvoice.consignee || '');
+            $('input[name="total_payment"]').val(editInvoice.total_payment || '');
+            $('textarea[name="description"]').val(editInvoice.description || '');
+            $('#creditTerms').val(String(editInvoice.credit_term_days || '').replace(/[^0-9]/g, ''));
+            setTemplateValues(editInvoice.invoice_template || (editInvoice.vat_classification === '12%' ? ['SOA_B', 'Billing Invoice'] : ['SOA_A']));
+
+            $('#invoiceLines tbody tr:gt(0)').remove();
+            var items = editInvoice.item || [];
+            var descriptions = editInvoice.item_description || [];
+            var rates = editInvoice.unit_price || [];
+            var quantities = editInvoice.qty || [];
+            var classes = editInvoice.line_class || [];
+            var taxes = editInvoice.tax_category || [];
+            var count = Math.max(items.length, descriptions.length, rates.length, quantities.length, 1);
+
+            for (var i = 0; i < count; i++) {
+                setLine(
+                    i,
+                    items[i] || '',
+                    descriptions[i] || '',
+                    rates[i] || '',
+                    quantities[i] || '1',
+                    classes[i] || editInvoice.class_code || '',
+                    taxes[i] || editInvoice.vat_classification || ''
+                );
+            }
+
+            recalc();
+            return true;
+        }
+
         $('#customerSelect').on('change', function () {
             syncCustomer();
             recalc();
@@ -588,8 +791,13 @@
             }
         });
 
-        syncCustomer();
+        $('#sampleInvoiceButton').on('click', fillSampleInvoice);
+
+        if (!fillEditInvoice()) {
+            syncCustomer();
+        }
         recalc();
+        syncInvoiceActionLinks();
     });
 </script>
 @endpush

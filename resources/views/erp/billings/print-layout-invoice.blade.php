@@ -13,7 +13,7 @@
     }
     .layout-sheet-wrap {
         overflow: auto;
-        padding: 18px;
+        padding: 0 18px 18px;
         background: #e9edf2;
         border-radius: 8px;
         border: 1px solid #d8dde6;
@@ -22,8 +22,9 @@
         position: relative;
         width: {{ $settings['paper_width'] }}px;
         height: {{ $settings['paper_height'] }}px;
+        box-sizing: border-box;
         margin: 0 auto;
-        background: #fbf7cf;
+        background: #fff;
         @if($settings['template_url'])
         background-image: url('{{ $settings['template_url'] }}');
         background-size: 100% 100%;
@@ -39,24 +40,27 @@
     }
     .layout-template-guide {
         position: absolute;
-        inset: 28px 24px 46px;
-        border: 1px solid rgba(0, 0, 0, .5);
+        left: 48px;
+        top: 214px;
+        width: 720px;
+        height: 710px;
+        border: 1px solid #111;
         pointer-events: none;
     }
     .layout-guide-line {
         position: absolute;
-        left: 24px;
-        right: 24px;
+        left: 48px;
+        width: 720px;
         height: 1px;
-        background: rgba(0, 0, 0, .45);
+        background: #111;
         pointer-events: none;
     }
     .layout-guide-vline {
         position: absolute;
-        top: 330px;
-        bottom: 210px;
+        top: 282px;
+        height: 642px;
         width: 1px;
-        background: rgba(0, 0, 0, .35);
+        background: #111;
         pointer-events: none;
     }
     .layout-label-preview {
@@ -70,8 +74,8 @@
     .layout-company-preview {
         position: absolute;
         top: 28px;
-        left: 180px;
-        right: 180px;
+        left: 190px;
+        right: 190px;
         text-align: center;
         font-weight: 700;
         font-size: 15px;
@@ -81,16 +85,16 @@
     .layout-logo-preview {
         position: absolute;
         top: 26px;
-        left: 92px;
-        width: 72px;
-        height: 48px;
+        left: 70px;
+        width: 92px;
+        height: 64px;
         object-fit: contain;
         pointer-events: none;
     }
     .layout-title-preview {
         position: absolute;
-        top: 82px;
-        right: 88px;
+        top: 91px;
+        right: 60px;
         font-size: 20px;
         font-weight: 800;
         letter-spacing: .04em;
@@ -99,21 +103,26 @@
     .drag-field {
         position: absolute;
         z-index: 5;
+        box-sizing: border-box;
         min-width: 34px;
         max-width: 390px;
-        padding: 3px 6px;
+        padding: 0;
         border: 1px dashed #fe790d;
         border-radius: 4px;
         background: rgba(255, 255, 255, .72);
         color: #1f2937;
         cursor: move;
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
         font-size: 12px;
-        line-height: 1.25;
+        line-height: .92;
         white-space: pre-line;
         touch-action: none;
     }
     .drag-field.amount {
         text-align: right;
+        justify-content: flex-end;
         min-width: 92px;
         font-weight: 600;
     }
@@ -159,9 +168,32 @@
         box-shadow: 0 2px 8px rgba(15, 23, 42, .24);
         z-index: 12;
     }
+    .field-resize-handle {
+        position: absolute;
+        right: -6px;
+        bottom: -6px;
+        width: 12px;
+        height: 12px;
+        border: 2px solid #fff;
+        border-radius: 3px;
+        display: none;
+        background: #fe790d;
+        cursor: nwse-resize;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, .24);
+        z-index: 12;
+    }
     .custom-drag-field:hover .field-remove-inside,
+    .drag-field:hover .field-remove-inside,
+    .drag-field.active .field-remove-inside,
     .custom-drag-field.active .field-remove-inside {
         display: inline-flex;
+    }
+    .drag-field:hover .field-resize-handle,
+    .drag-field.active .field-resize-handle {
+        display: block;
+    }
+    .standard-hidden-field {
+        display: none !important;
     }
     .template-muted .layout-logo-preview,
     .template-muted .layout-company-preview,
@@ -172,6 +204,17 @@
     .template-muted .layout-label-preview {
         opacity: .35;
     }
+    @if($settings['template_url'])
+    .layout-logo-preview,
+    .layout-company-preview,
+    .layout-title-preview,
+    .layout-template-guide,
+    .layout-guide-line,
+    .layout-guide-vline,
+    .layout-label-preview {
+        display: none !important;
+    }
+    @endif
     @media (max-width: 1199.98px) {
         .layout-editor-shell {
             grid-template-columns: 1fr;
@@ -249,7 +292,7 @@
         </div>
     @endif
 
-    <form method="get" action="{{ route('erp.billings.print-invoice') }}" id="layoutForm">
+    <form method="get" action="{{ route('erp.billings.print-invoice') }}" id="layoutForm" enctype="multipart/form-data">
         <input type="hidden" name="_token" id="layoutCsrfToken" value="{{ csrf_token() }}" disabled>
         <input type="hidden" name="paper_size" id="paper_size_hidden" value="{{ $settings['paper_size'] }}">
         <input type="hidden" name="paper_width" id="paper_width_hidden" value="{{ $settings['paper_width'] }}">
@@ -257,6 +300,12 @@
         <input type="hidden" name="template_url" id="template_url_hidden" value="{{ $settings['template_url'] }}">
         <input type="hidden" name="print_template" id="print_template_hidden" value="{{ $settings['print_template'] ? '1' : '0' }}">
         <input type="hidden" name="custom_fields_present" value="1">
+        <input type="hidden" name="hidden_fields_present" value="1">
+        <div id="hiddenStandardFields">
+            @foreach($hiddenFields as $hiddenField)
+                <input type="hidden" name="hidden_field[]" id="hidden_field_{{ $hiddenField }}" value="{{ $hiddenField }}">
+            @endforeach
+        </div>
         @foreach($positions as $field => $point)
             <input type="hidden" name="x_{{ $field }}" id="x_{{ $field }}" value="{{ $point[0] }}">
             <input type="hidden" name="y_{{ $field }}" id="y_{{ $field }}" value="{{ $point[1] }}">
@@ -281,42 +330,58 @@
                     <img src="{{ asset('images/image.png') }}" class="layout-logo-preview" alt="SeaJet logo">
                     <div class="layout-company-preview">
                         SEA-JET INTERNATIONAL FORWARDERS, INC.<br>
-                        <span style="font-size: 10px; font-weight: 600">UNIT 18 & 19 BLDG. B, CARGO VILLAGE COMPLEX, PARANAQUE CITY</span>
+                        <span style="font-size: 10px; font-weight: 600">UNIT 1 ESSEL PARK BLDG. MC ARTHUR HI-WAY TELABASTAGAN<br>CITY OF SAN FERNANDO, PAMPANGA, PHILIPPINES 2000<br>TEL NO. 045 6522632<br>VAT REG. TIN: 000-143-896-00001</span>
                     </div>
                     <div class="layout-title-preview">BILLING INVOICE</div>
                     <div class="layout-template-guide"></div>
+                    <div class="layout-label-preview" style="left: 625px; top: 130px; color: #9c1c1c; font-size: 18px; font-weight: 700; text-transform: none">No</div>
+                    <div class="layout-template-guide" style="left: 660px; top: 165px; width: 108px; height: 34px"></div>
                     <div class="layout-guide-line" style="top: 242px"></div>
-                    <div class="layout-guide-line" style="top: 330px"></div>
-                    <div class="layout-guide-line" style="top: 350px"></div>
-                    <div class="layout-guide-line" style="top: 798px"></div>
-                    <div class="layout-guide-line" style="top: 988px"></div>
-                    <div class="layout-guide-vline" style="left: 470px"></div>
-                    <div class="layout-guide-vline" style="left: 590px"></div>
-                    <div class="layout-guide-vline" style="left: 705px"></div>
+                    <div class="layout-guide-line" style="top: 282px"></div>
+                    <div class="layout-guide-line" style="top: 306px"></div>
+                    <div class="layout-guide-line" style="top: 924px"></div>
+                    <div class="layout-guide-vline" style="left: 430px"></div>
+                    <div class="layout-guide-vline" style="left: 540px"></div>
+                    <div class="layout-guide-vline" style="left: 660px"></div>
 
-                    <div class="layout-label-preview" style="left: 34px; top: 135px">Cash Sales</div>
-                    <div class="layout-label-preview" style="left: 118px; top: 135px">Charge Sales</div>
-                    <div class="layout-label-preview" style="left: 34px; top: 158px">Customer</div>
-                    <div class="layout-label-preview" style="left: 34px; top: 183px">Address</div>
-                    <div class="layout-label-preview" style="left: 34px; top: 225px">TIN</div>
-                    <div class="layout-label-preview" style="left: 34px; top: 263px">MAWB B/L No.</div>
-                    <div class="layout-label-preview" style="left: 34px; top: 287px">HAWB B/L No.</div>
-                    <div class="layout-label-preview" style="left: 34px; top: 311px">Date Shipped</div>
-                    <div class="layout-label-preview" style="left: 478px; top: 263px">Origin/Dest'n</div>
-                    <div class="layout-label-preview" style="left: 478px; top: 287px">Commodity</div>
-                    <div class="layout-label-preview" style="left: 52px; top: 351px">Item Description/Nature of Service</div>
-                    <div class="layout-label-preview" style="left: 504px; top: 351px">Quantity</div>
-                    <div class="layout-label-preview" style="left: 600px; top: 351px">Unit Price</div>
-                    <div class="layout-label-preview" style="left: 752px; top: 351px">Amount</div>
+                    <div class="layout-label-preview" style="left: 55px; top: 118px">Cash Sales</div>
+                    <div class="layout-label-preview" style="left: 165px; top: 118px">Charge Sales</div>
+                    <div class="layout-label-preview" style="left: 55px; top: 148px">Customer</div>
+                    <div class="layout-label-preview" style="left: 55px; top: 175px">Address</div>
+                    <div class="layout-label-preview" style="left: 55px; top: 202px">TIN</div>
+                    <div class="layout-label-preview" style="left: 55px; top: 244px">MAWB B/L No.:</div>
+                    <div class="layout-label-preview" style="left: 55px; top: 270px">HAWB B/L No.:</div>
+                    <div class="layout-label-preview" style="left: 55px; top: 296px">Date Shipped:</div>
+                    <div class="layout-label-preview" style="left: 350px; top: 244px">Origin/Dest'n:</div>
+                    <div class="layout-label-preview" style="left: 350px; top: 270px">Commodity:</div>
+                    <div class="layout-label-preview" style="left: 60px; top: 288px; font-weight: 800">Item Description/ Nature of Service</div>
+                    <div class="layout-label-preview" style="left: 445px; top: 288px; font-weight: 800">Quantity</div>
+                    <div class="layout-label-preview" style="left: 565px; top: 288px; font-weight: 800">Unit Price</div>
+                    <div class="layout-label-preview" style="left: 705px; top: 288px; font-weight: 800">Amount</div>
+                    <div class="layout-label-preview" style="left: 620px; top: 170px">Date:</div>
+                    <div class="layout-label-preview" style="left: 65px; top: 790px; text-transform: none">VATable Sales</div>
+                    <div class="layout-label-preview" style="left: 65px; top: 815px; text-transform: none">VAT</div>
+                    <div class="layout-label-preview" style="left: 65px; top: 840px; text-transform: none">Zero-Rated Sales</div>
+                    <div class="layout-label-preview" style="left: 65px; top: 865px; text-transform: none">VAT-Exempt Sales</div>
+                    <div class="layout-label-preview" style="left: 455px; top: 790px; text-transform: none">Total Sales (VAT Inclusive)</div>
+                    <div class="layout-label-preview" style="left: 455px; top: 815px; text-transform: none">Less VAT</div>
+                    <div class="layout-label-preview" style="left: 455px; top: 840px; text-transform: none">Amount Net of VAT</div>
+                    <div class="layout-label-preview" style="left: 455px; top: 865px; text-transform: none">Less: Discount</div>
+                    <div class="layout-label-preview" style="left: 455px; top: 890px; text-transform: none">Add: VAT</div>
+                    <div class="layout-label-preview" style="left: 455px; top: 915px; text-transform: none">Less Withholding Tax</div>
+                    <div class="layout-label-preview" style="left: 455px; top: 948px; font-size: 16px; font-weight: 800">PLEASE PAY THIS AMOUNT</div>
+                    <div class="layout-label-preview" style="left: 455px; top: 995px; font-size: 13px; font-weight: 800">SEA-JET INTERNATIONAL FORWARDERS, INC.</div>
 
                     @foreach($positions as $field => $point)
                         @php $sample = $samples[$field]; @endphp
-                        <div class="drag-field {{ $sample['class'] }}"
+                        <div class="drag-field {{ $sample['class'] }} {{ in_array($field, $hiddenFields) ? 'standard-hidden-field' : '' }}"
                              data-kind="standard"
                              data-field="{{ $field }}"
                              data-label="{{ $sample['label'] }}"
                              style="left: {{ $point[0] }}px; top: {{ $point[1] }}px; width: {{ $fieldStyles[$field]['width'] }}px; font-size: {{ $fieldStyles[$field]['font_size'] }}px"
                              title="{{ $sample['label'] }}">
+                            <button type="button" class="field-remove-inside" data-field="{{ $field }}" title="Remove field"><i class="bi bi-x"></i></button>
+                            <span class="field-resize-handle" data-field="{{ $field }}" title="Resize field"></span>
                             {{ $sample['value'] }}
                         </div>
                     @endforeach
@@ -328,6 +393,7 @@
                              style="left: {{ $custom['x'] }}px; top: {{ $custom['y'] }}px; width: {{ $custom['width'] }}px; font-size: {{ $custom['font_size'] }}px"
                              title="{{ $custom['label'] }}">
                             <button type="button" class="field-remove-inside" data-field="{{ $custom['key'] }}" title="Remove field"><i class="bi bi-x"></i></button>
+                            <span class="field-resize-handle" data-field="{{ $custom['key'] }}" title="Resize field"></span>
                             {{ $custom['text'] }}
                         </div>
                     @endforeach
@@ -362,7 +428,13 @@
                 <div class="mb-3">
                     <label class="form-label small text-muted">Background Template Image URL</label>
                     <input type="url" class="form-control form-control-sm" id="templateUrlControl" value="{{ $settings['template_url'] }}" placeholder="https://example.com/billing-template.jpg">
-                    <div class="form-text">Use a public image URL of the scanned pre-printed form.</div>
+                    <div class="form-text">Use a public image URL or upload a scanned pre-printed form below.</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small text-muted">Upload Background Template</label>
+                    <input type="file" class="form-control form-control-sm" id="templateFileControl" name="template_file" accept="image/png,image/jpeg,image/webp">
+                    <div class="form-text">Choose JPG, PNG, or WEBP. Save Layout to keep it for future invoices.</div>
                 </div>
 
                 <div class="form-check form-switch mb-3">
@@ -376,7 +448,7 @@
 
                 <hr>
                 <h2 class="h6 fw-bold mb-1">Selected Field Size</h2>
-                <p class="text-muted small mb-3">Select a field, then adjust its printed column width and text size.</p>
+                <p class="text-muted small mb-3">Select a field, drag the orange corner to resize, or adjust exact width and text size here.</p>
                 <div class="mb-2">
                     <label class="form-label small text-muted">Selected Field</label>
                     <div class="input-group input-group-sm">
@@ -394,6 +466,28 @@
                         <label class="form-label small text-muted">Font px</label>
                         <input type="number" class="form-control form-control-sm" id="fieldFontControl" min="6" max="48" value="12">
                     </div>
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label class="form-label small text-muted">X px</label>
+                        <input type="number" class="form-control form-control-sm" id="fieldXControl" min="0" max="1600" value="0">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small text-muted">Y px</label>
+                        <input type="number" class="form-control form-control-sm" id="fieldYControl" min="0" max="2200" value="0">
+                    </div>
+                </div>
+                <div class="btn-group btn-group-sm w-100 mb-2" role="group" aria-label="Quick width">
+                    <button type="button" class="btn btn-outline-secondary quick-width" data-width="80">80</button>
+                    <button type="button" class="btn btn-outline-secondary quick-width" data-width="120">120</button>
+                    <button type="button" class="btn btn-outline-secondary quick-width" data-width="180">180</button>
+                    <button type="button" class="btn btn-outline-secondary quick-width" data-width="260">260</button>
+                </div>
+                <div class="btn-group btn-group-sm w-100 mb-3" role="group" aria-label="Nudge field">
+                    <button type="button" class="btn btn-outline-secondary nudge-field" data-dx="-1" data-dy="0"><i class="bi bi-arrow-left"></i></button>
+                    <button type="button" class="btn btn-outline-secondary nudge-field" data-dx="0" data-dy="-1"><i class="bi bi-arrow-up"></i></button>
+                    <button type="button" class="btn btn-outline-secondary nudge-field" data-dx="0" data-dy="1"><i class="bi bi-arrow-down"></i></button>
+                    <button type="button" class="btn btn-outline-secondary nudge-field" data-dx="1" data-dy="0"><i class="bi bi-arrow-right"></i></button>
                 </div>
 
                 <hr>
@@ -458,7 +552,11 @@
                         <button type="button" class="list-group-item list-group-item-action px-0 field-focus" data-kind="standard" data-field="{{ $field }}">
                             <div class="d-flex justify-content-between gap-2">
                                 <span class="fw-semibold">{{ $sample['label'] }}</span>
-                                <span class="badge badge-soft coordinate-pill" id="pos_{{ $field }}">{{ $point[0] }}, {{ $point[1] }}</span>
+                                <span class="d-flex align-items-center gap-1">
+                                    <span class="badge bg-secondary {{ in_array($field, $hiddenFields) ? '' : 'd-none' }}" id="hidden_badge_{{ $field }}">Hidden</span>
+                                    <span class="badge badge-soft coordinate-pill" id="pos_{{ $field }}">{{ $point[0] }}, {{ $point[1] }}</span>
+                                    <span class="btn btn-sm btn-outline-primary restore-standard-field {{ in_array($field, $hiddenFields) ? '' : 'd-none' }}" data-field="{{ $field }}" title="Restore"><i class="bi bi-arrow-counterclockwise"></i></span>
+                                </span>
                             </div>
                         </button>
                     @endforeach
@@ -472,17 +570,24 @@
 <script>
     $(function () {
         var active = null;
+        var resizing = null;
         var offsetX = 0;
         var offsetY = 0;
+        var resizeStartX = 0;
+        var resizeStartY = 0;
+        var resizeStartWidth = 0;
+        var resizeStartFont = 0;
         var sheet = document.getElementById('layoutSheet');
         var selectedField = null;
         var customCounter = {{ count($customFields) + 1 }};
+        var uploadedTemplatePreviewUrl = '';
 
         $('#saveLayout').on('click', function () {
             applyPaperAndTemplate();
             $('#layoutCsrfToken').prop('disabled', false);
             $('#layoutForm')
                 .attr('method', 'post')
+                .attr('enctype', 'multipart/form-data')
                 .attr('action', '{{ route('erp.billings.print-layout.invoice.save') }}')
                 .trigger('submit');
         });
@@ -492,6 +597,7 @@
             $('#layoutCsrfToken').prop('disabled', true);
             $('#layoutForm')
                 .attr('method', 'get')
+                .removeAttr('enctype')
                 .attr('action', '{{ route('erp.billings.print-invoice') }}');
         });
 
@@ -503,6 +609,8 @@
             $('#selectedFieldLabel').val(el.data('label') || field);
             $('#fieldWidthControl').val(parseInt(el[0].style.width, 10) || el.outerWidth());
             $('#fieldFontControl').val(parseInt(el[0].style.fontSize, 10) || 12);
+            $('#fieldXControl').val(parseInt(el[0].style.left, 10) || 0);
+            $('#fieldYControl').val(parseInt(el[0].style.top, 10) || 0);
         }
 
         function setHiddenValue(field, key, value, kind) {
@@ -526,6 +634,10 @@
             setHiddenValue(field, 'x', x, kind);
             setHiddenValue(field, 'y', y, kind);
             $('#pos_' + field).text(x + ', ' + y);
+            if (selectedField === field) {
+                $('#fieldXControl').val(x);
+                $('#fieldYControl').val(y);
+            }
         }
 
         function updateSize(el, width, fontSize) {
@@ -571,8 +683,40 @@
             }
         }
 
+        function hideStandardField(field) {
+            var el = $('[data-field="' + field + '"].drag-field');
+            if (!el.length || el.attr('data-kind') !== 'standard') {
+                return;
+            }
+
+            if (!$('#hidden_field_' + field).length) {
+                $('#hiddenStandardFields').append('<input type="hidden" name="hidden_field[]" id="hidden_field_' + field + '" value="' + field + '">');
+            }
+
+            el.addClass('standard-hidden-field').removeClass('active');
+            $('#hidden_badge_' + field).removeClass('d-none');
+            $('.restore-standard-field[data-field="' + field + '"]').removeClass('d-none');
+
+            if (selectedField === field) {
+                selectedField = null;
+                $('#selectedFieldLabel').val('None selected');
+            }
+        }
+
+        function restoreStandardField(field) {
+            $('#hidden_field_' + field).remove();
+            $('[data-field="' + field + '"].drag-field').removeClass('standard-hidden-field');
+            $('#hidden_badge_' + field).addClass('d-none');
+            $('.restore-standard-field[data-field="' + field + '"]').addClass('d-none');
+            setActive(field);
+        }
+
         function bindDrag(el) {
             $(el).on('pointerdown', function (event) {
+                if ($(event.target).closest('.field-resize-handle, .field-remove-inside').length) {
+                    return;
+                }
+
                 active = this;
                 active.setPointerCapture(event.originalEvent.pointerId);
                 var box = active.getBoundingClientRect();
@@ -598,12 +742,49 @@
             });
         }
 
+        function bindResizeHandle(handle) {
+            $(handle).on('pointerdown', function (event) {
+                var field = $(this).data('field');
+                var el = $('[data-field="' + field + '"].drag-field')[0];
+                if (!el) {
+                    return;
+                }
+
+                resizing = el;
+                this.setPointerCapture(event.originalEvent.pointerId);
+                resizeStartX = event.originalEvent.clientX;
+                resizeStartY = event.originalEvent.clientY;
+                resizeStartWidth = parseInt(el.style.width, 10) || el.offsetWidth;
+                resizeStartFont = parseInt(el.style.fontSize, 10) || 12;
+                setActive(field);
+                event.preventDefault();
+                event.stopPropagation();
+            });
+
+            $(handle).on('pointermove', function (event) {
+                if (!resizing) {
+                    return;
+                }
+
+                var dx = event.originalEvent.clientX - resizeStartX;
+                var dy = event.originalEvent.clientY - resizeStartY;
+                var width = resizeStartWidth + dx;
+                var fontSize = resizeStartFont + Math.round(dy / 8);
+                updateSize(resizing, width, fontSize);
+            });
+
+            $(handle).on('pointerup pointercancel', function () {
+                resizing = null;
+            });
+        }
+
         function applyPaperAndTemplate() {
             var selected = $('#paperSizeControl option:selected');
             var paperSize = $('#paperSizeControl').val();
             var width = parseInt($('#paperWidthControl').val(), 10) || parseInt(selected.data('width'), 10) || 816;
             var height = parseInt($('#paperHeightControl').val(), 10) || parseInt(selected.data('height'), 10) || 1056;
             var templateUrl = $('#templateUrlControl').val();
+            var previewUrl = uploadedTemplatePreviewUrl || templateUrl;
             var printTemplate = $('#printTemplateControl').is(':checked') ? '1' : '0';
 
             width = Math.max(400, Math.min(width, 1600));
@@ -620,8 +801,8 @@
 
             sheet.style.width = width + 'px';
             sheet.style.height = height + 'px';
-            if (templateUrl) {
-                sheet.style.backgroundImage = 'url("' + templateUrl.replace(/"/g, '\\"') + '")';
+            if (previewUrl) {
+                sheet.style.backgroundImage = 'url("' + previewUrl.replace(/"/g, '\\"') + '")';
                 sheet.style.backgroundSize = '100% 100%';
                 sheet.style.backgroundRepeat = 'no-repeat';
                 sheet.style.backgroundPosition = 'center';
@@ -652,9 +833,27 @@
 
         $('#templateUrlControl, #printTemplateControl').on('input change', applyPaperAndTemplate);
         $('#applyTemplateSettings').on('click', applyPaperAndTemplate);
+        $('#templateFileControl').on('change', function () {
+            var file = this.files && this.files[0] ? this.files[0] : null;
+
+            if (uploadedTemplatePreviewUrl) {
+                URL.revokeObjectURL(uploadedTemplatePreviewUrl);
+                uploadedTemplatePreviewUrl = '';
+            }
+
+            if (file) {
+                uploadedTemplatePreviewUrl = URL.createObjectURL(file);
+                $('#printTemplateControl').prop('checked', true);
+            }
+
+            applyPaperAndTemplate();
+        });
 
         $('.drag-field').each(function () {
             bindDrag(this);
+        });
+        $('.field-resize-handle').each(function () {
+            bindResizeHandle(this);
         });
 
         $('#fieldWidthControl, #fieldFontControl').on('input', function () {
@@ -662,6 +861,32 @@
             if (el) {
                 updateSize(el, $('#fieldWidthControl').val(), $('#fieldFontControl').val());
             }
+        });
+
+        $('#fieldXControl, #fieldYControl').on('input', function () {
+            var el = selectedElement();
+            if (el) {
+                updatePosition(el, $('#fieldXControl').val(), $('#fieldYControl').val());
+            }
+        });
+
+        $('.quick-width').on('click', function () {
+            var el = selectedElement();
+            if (el) {
+                $('#fieldWidthControl').val($(this).data('width')).trigger('input');
+            }
+        });
+
+        $('.nudge-field').on('click', function (event) {
+            var el = selectedElement();
+            if (!el) {
+                return;
+            }
+
+            var step = event.shiftKey ? 10 : 1;
+            var x = (parseInt(el.style.left, 10) || 0) + (parseInt($(this).data('dx'), 10) * step);
+            var y = (parseInt(el.style.top, 10) || 0) + (parseInt($(this).data('dy'), 10) * step);
+            updatePosition(el, x, y);
         });
 
         $('#tableFieldControl').on('change', function () {
@@ -714,9 +939,11 @@
             field.attr('title', label);
             field.css({ left: x + 'px', top: y + 'px', width: width + 'px', fontSize: fontSize + 'px' });
             field.append('<button type="button" class="field-remove-inside" data-field="' + key + '" title="Remove field"><i class="bi bi-x"></i></button>');
+            field.append('<span class="field-resize-handle" data-field="' + key + '" title="Resize field"></span>');
             field.append(document.createTextNode(text));
             $('#layoutSheet').append(field);
             bindDrag(field[0]);
+            bindResizeHandle(field.find('.field-resize-handle')[0]);
 
             $('#customFieldList').prepend(
                 '<button type="button" class="list-group-item list-group-item-action px-0 field-focus" data-kind="custom" data-field="' + key + '">' +
@@ -734,7 +961,12 @@
 
         $('#deleteSelectedField').on('click', function () {
             if (selectedField) {
-                removeCustomField(selectedField);
+                var el = $('[data-field="' + selectedField + '"].drag-field');
+                if (el.attr('data-kind') === 'custom') {
+                    removeCustomField(selectedField);
+                } else {
+                    hideStandardField(selectedField);
+                }
             }
         });
 
@@ -747,7 +979,19 @@
         $(document).on('pointerdown click', '.field-remove-inside', function (event) {
             event.preventDefault();
             event.stopPropagation();
-            removeCustomField($(this).data('field'));
+            var field = $(this).data('field');
+            var el = $('[data-field="' + field + '"].drag-field');
+            if (el.attr('data-kind') === 'custom') {
+                removeCustomField(field);
+            } else {
+                hideStandardField(field);
+            }
+        });
+
+        $(document).on('click', '.restore-standard-field', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            restoreStandardField($(this).data('field'));
         });
 
         applyPaperAndTemplate();
