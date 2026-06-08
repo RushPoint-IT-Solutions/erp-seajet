@@ -1,95 +1,365 @@
 @extends('erp.layout')
 
 @section('title', 'Official Receipt Preview')
-@section('page-title', 'Official Receipt Pre-printed Form')
+@section('page-title', 'Official Receipt')
 
 @push('styles')
 <style>
+    .receipt-toolbar {
+        max-width: 210mm;
+        margin: 0 auto 16px;
+    }
     .or-sheet {
-        position: relative;
-        width: 816px;
-        height: 1056px;
+        width: 210mm;
+        height: 148.5mm;
         margin: 0 auto;
-        background: #f8f4dc;
-        border: 1px solid #1f2937;
-        box-shadow: 0 10px 30px rgba(15, 23, 42, .14);
-        font-family: Arial, sans-serif;
-        color: #111827;
+        padding: 10mm 12mm 8mm;
+        background: #f7f7f2;
+        border: 1px solid #222;
+        box-shadow: 0 12px 32px rgba(15, 23, 42, .16);
+        color: #1f2933;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 12px;
+        line-height: 1.2;
+        position: relative;
         overflow: hidden;
     }
-    .or-box,
-    .or-line,
-    .or-label,
-    .or-logo,
-    .or-company {
-        position: absolute;
+    .or-top {
+        display: grid;
+        grid-template-columns: 1fr 64mm;
+        gap: 8mm;
+        align-items: start;
     }
-    .or-box { border: 1px solid #111827; }
-    .or-line { height: 1px; background: #111827; }
-    .or-logo { left: 94px; top: 36px; width: 72px; height: 45px; object-fit: contain; }
-    .or-company { left: 180px; top: 38px; width: 390px; text-align: center; font-weight: 800; font-size: 14px; line-height: 1.15; }
-    .or-label { font-size: 12px; font-weight: 800; text-transform: uppercase; }
-    .or-field { position: absolute; font-size: 12px; line-height: 1.35; white-space: pre-line; }
-    .or-field.amount { text-align: right; font-weight: 700; }
+    .or-brand-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 7mm;
+    }
+    .or-logo {
+        width: 34mm;
+        height: 18mm;
+        object-fit: contain;
+        object-position: left center;
+        filter: grayscale(1) contrast(1.15);
+    }
+    .or-company-name {
+        font-size: 15px;
+        font-weight: 800;
+        letter-spacing: .2px;
+        margin-top: 10mm;
+        text-transform: uppercase;
+    }
+    .or-company-address {
+        font-size: 9px;
+        font-weight: 700;
+        line-height: 1.15;
+        margin-top: 1mm;
+        text-transform: uppercase;
+    }
+    .or-title {
+        font-size: 20px;
+        font-weight: 800;
+        letter-spacing: .8px;
+        text-align: center;
+        text-transform: uppercase;
+    }
+    .or-number {
+        margin: 2mm 0 7mm;
+        text-align: center;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 20px;
+        letter-spacing: 2px;
+    }
+    .or-number span {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 12px;
+        letter-spacing: 0;
+        margin-right: 5mm;
+    }
+    .or-meta {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+    }
+    .or-meta td {
+        border: 1px solid #222;
+        height: 7mm;
+        padding: 1mm 2mm;
+        vertical-align: middle;
+    }
+    .or-meta td:first-child {
+        width: 27mm;
+        font-weight: 700;
+    }
+    .or-section-title {
+        border: 1px solid #222;
+        border-bottom: 0;
+        font-size: 12px;
+        font-weight: 800;
+        padding: 1mm 2mm;
+        text-transform: uppercase;
+    }
+    .or-received {
+        border: 1px solid #222;
+        display: grid;
+        grid-template-columns: 35mm 1fr;
+        min-height: 25mm;
+        padding: 2mm;
+        row-gap: 1mm;
+    }
+    .or-received-label {
+        font-weight: 700;
+    }
+    .or-received-value {
+        color: #4b5563;
+        font-size: 11px;
+        text-transform: uppercase;
+    }
+    .or-transaction {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 0;
+    }
+    .or-transaction th,
+    .or-transaction td {
+        border: 1px solid #222;
+    }
+    .or-transaction th {
+        height: 7mm;
+        padding: 1mm 2mm;
+        text-align: left;
+        font-size: 12px;
+        font-weight: 800;
+    }
+    .or-transaction th:last-child,
+    .or-transaction td:last-child {
+        width: 58mm;
+        text-align: right;
+    }
+    .or-transaction td {
+        height: 30mm;
+        padding: 6mm 6mm 3mm;
+        vertical-align: top;
+        white-space: pre-line;
+    }
+    .or-amount {
+        font-variant-numeric: tabular-nums;
+    }
+    .or-bottom-grid {
+        display: grid;
+        grid-template-columns: 95mm 1fr;
+        gap: 0;
+    }
+    .or-methods {
+        display: flex;
+        align-items: center;
+        gap: 12mm;
+        height: 9mm;
+        font-size: 13px;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+    .or-check {
+        display: inline-block;
+        width: 5mm;
+        height: 5mm;
+        border: 1px solid #222;
+        margin-right: 2mm;
+        position: relative;
+        top: 1mm;
+    }
+    .or-check.checked:after {
+        content: "";
+        position: absolute;
+        left: 1mm;
+        top: 0;
+        width: 2mm;
+        height: 4mm;
+        border: solid #111;
+        border-width: 0 1px 1px 0;
+        transform: rotate(45deg);
+    }
+    .or-total-row {
+        display: grid;
+        grid-template-columns: 1fr 58mm;
+        min-height: 9mm;
+        border: 1px solid #222;
+        border-top: 0;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+    .or-total-row div {
+        padding: 2mm;
+    }
+    .or-total-row div + div {
+        border-left: 1px solid #222;
+        text-align: right;
+        font-weight: 500;
+        text-transform: none;
+    }
+    .or-check-lines {
+        font-size: 10px;
+        line-height: 1.5;
+        padding-top: 1mm;
+    }
+    .or-check-lines span {
+        display: inline-block;
+        min-width: 43mm;
+        border-bottom: 1px solid #222;
+        margin-left: 2mm;
+    }
+    .or-printer {
+        position: absolute;
+        left: 15mm;
+        bottom: 10mm;
+        width: 65mm;
+        font-size: 6px;
+        line-height: 1.15;
+    }
+    .or-tax-note {
+        position: absolute;
+        left: 74mm;
+        bottom: 8mm;
+        font-size: 10px;
+        font-weight: 800;
+        text-align: center;
+        text-transform: uppercase;
+        width: 62mm;
+    }
+    .or-signature {
+        position: absolute;
+        right: 18mm;
+        bottom: 8mm;
+        width: 58mm;
+        text-align: center;
+        font-size: 10px;
+    }
+    .or-signature-line {
+        border-top: 1px solid #222;
+        height: 8mm;
+    }
     @media print {
-        @page { size: Letter; margin: 0; }
+        @page { size: A4 portrait; margin: 0; }
         body { background: #fff !important; }
-        .or-sheet { border: 0; box-shadow: none; margin: 0; background: transparent !important; }
-        .or-box,
-        .or-line,
-        .or-label,
-        .or-logo,
-        .or-company { display: none !important; }
+        .no-print, .receipt-toolbar, .erp-sidebar, .erp-topbar { display: none !important; }
+        .erp-main, .erp-content, main { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+        .or-sheet {
+            width: 210mm;
+            height: 148.5mm;
+            margin: 0;
+            border: 0;
+            box-shadow: none;
+            background: #fff;
+            page-break-after: always;
+        }
     }
 </style>
 @endpush
 
 @section('content')
-    <div class="d-flex justify-content-end gap-2 mb-3 no-print">
-        <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print Content Only</button>
-        <a href="{{ route('erp.action', 'email-official-receipt') }}" class="btn btn-primary"><i class="bi bi-envelope me-1"></i> Email OR</a>
+@php
+    $receipt = $receipt ?? [];
+    $amount = (float) ($receipt['amount'] ?? 0);
+    $currency = $receipt['currency'] ?? 'PHP';
+    $paymentMethod = strtolower($receipt['payment_method'] ?? '');
+    $isCheck = strpos($paymentMethod, 'check') !== false || strpos($paymentMethod, 'cheque') !== false;
+    $isCash = strpos($paymentMethod, 'cash') !== false;
+    $isOnline = strpos($paymentMethod, 'online') !== false || strpos($paymentMethod, 'bank') !== false || strpos($paymentMethod, 'transfer') !== false;
+@endphp
+
+    <div class="receipt-toolbar d-flex justify-content-end gap-2 no-print">
+        <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print Official Receipt</button>
+        <a href="{{ route('erp.payments.create') }}" class="btn btn-primary"><i class="bi bi-arrow-left me-1"></i> Back to Payments</a>
     </div>
 
     <div class="or-sheet">
-        <img src="{{ asset('images/image.png') }}" class="or-logo" alt="SeaJet logo">
-        <div class="or-company">
-            SEA-JET INTERNATIONAL FORWARDERS, INC.<br>
-            <span style="font-size: 10px; font-weight: 600">Unit 18 & 19 Bldg. B, Cargo Village Complex<br>Paranaque City 1704, Philippines</span>
+        <div class="or-top">
+            <div>
+                <div class="or-brand-row">
+                    <img src="{{ asset('images/image.png') }}" class="or-logo" alt="SeaJet logo">
+                    <div>
+                        <div class="or-company-name">SEA-JET INTERNATIONAL FORWARDERS, INC.</div>
+                        <div class="or-company-address">
+                            UNIT 18 &amp; 19 BLDG. B. CARGO VILLAGE COMPLEX<br>
+                            NINOY AQUINO AVE., STO. NINO, PARANAQUE CITY 1704, PHILIPPINES<br>
+                            TEL. NOS.: (632) 8852-9001, 8852-9002 and 8852-9003<br>
+                            VAT REG. TIN: 000-143-896-00000
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div class="or-title">Official Receipt</div>
+                <div class="or-number"><span>No.</span>{{ $receipt['receipt_no'] ?? '0046043' }}</div>
+                <table class="or-meta">
+                    <tr>
+                        <td>Payment Date</td>
+                        <td>{{ $receipt['payment_date'] ?? date('M d, Y') }}</td>
+                    </tr>
+                    <tr>
+                        <td>Account No.</td>
+                        <td>{{ $receipt['account_no'] ?? '' }}</td>
+                    </tr>
+                </table>
+            </div>
         </div>
-        <div class="or-label" style="left: 620px; top: 64px; font-size: 18px">Official Receipt</div>
-        <div class="or-label" style="left: 628px; top: 95px">No.</div>
-        <div class="or-field" style="left: 662px; top: 91px; color: #991b1b; font-size: 18px; font-weight: 800">00618</div>
-        <div class="or-label" style="left: 640px; top: 135px">Date:</div>
-        <div class="or-box" style="left: 685px; top: 125px; width: 100px; height: 28px"></div>
 
-        <div class="or-label" style="left: 70px; top: 146px">Received From</div>
-        <div class="or-line" style="left: 165px; top: 163px; width: 420px"></div>
-        <div class="or-label" style="left: 70px; top: 185px">Business Address</div>
-        <div class="or-line" style="left: 185px; top: 202px; width: 400px"></div>
-        <div class="or-label" style="left: 70px; top: 224px">TIN</div>
-        <div class="or-line" style="left: 110px; top: 241px; width: 230px"></div>
+        <div class="or-section-title mt-2">Received From</div>
+        <div class="or-received">
+            <div class="or-received-label">Registered Name</div>
+            <div class="or-received-value">{{ $receipt['registered_name'] ?? '' }}</div>
+            <div class="or-received-label">TIN</div>
+            <div class="or-received-value">{{ $receipt['tin'] ?? '' }}</div>
+            <div class="or-received-label">Business Address:</div>
+            <div class="or-received-value">{{ $receipt['business_address'] ?? '' }}</div>
+        </div>
 
-        <div class="or-box" style="left: 66px; top: 285px; width: 690px; height: 440px"></div>
-        <div class="or-line" style="left: 66px; top: 315px; width: 690px"></div>
-        <div class="or-line" style="left: 566px; top: 285px; width: 1px; height: 440px"></div>
-        <div class="or-label" style="left: 260px; top: 294px">Description / Nature of Collection</div>
-        <div class="or-label" style="left: 625px; top: 294px">Amount</div>
+        <table class="or-transaction">
+            <thead>
+                <tr>
+                    <th>Description of Transaction / Nature of Service</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>{{ $receipt['description'] ?? '' }}</td>
+                    <td class="or-amount">{{ number_format($amount, 2) }}</td>
+                </tr>
+            </tbody>
+        </table>
 
-        <div class="or-label" style="left: 90px; top: 760px"><span style="font-size: 24px">□</span> Cash</div>
-        <div class="or-label" style="left: 210px; top: 760px"><span style="font-size: 24px">□</span> Check</div>
-        <div class="or-label" style="left: 330px; top: 760px"><span style="font-size: 24px">□</span> Online</div>
-        <div class="or-label" style="left: 500px; top: 760px; font-size: 15px">Total Paid Amount</div>
-        <div class="or-box" style="left: 650px; top: 750px; width: 110px; height: 34px"></div>
-        <div class="or-label" style="left: 76px; top: 825px; font-size: 13px">"This document is not valid for claim of input tax"</div>
-        <div class="or-line" style="left: 500px; top: 948px; width: 250px"></div>
-        <div class="or-label" style="left: 535px; top: 962px; font-size: 12px">Cashier / Authorized Representative</div>
+        <div class="or-bottom-grid">
+            <div>
+                <div class="or-methods">
+                    <span><span class="or-check {{ $isCheck ? 'checked' : '' }}"></span>Check</span>
+                    <span><span class="or-check {{ $isCash ? 'checked' : '' }}"></span>Cash</span>
+                    <span><span class="or-check {{ $isOnline ? 'checked' : '' }}"></span>Online</span>
+                </div>
+                <div class="or-check-lines">
+                    No. <span>{{ $receipt['reference_no'] ?? '' }}</span><br>
+                    Bank: <span>{{ $receipt['bank'] ?? '' }}</span>
+                </div>
+            </div>
+            <div class="or-total-row">
+                <div>Total Paid Amount</div>
+                <div class="or-amount">{{ $currency }} {{ number_format($amount, 2) }}</div>
+            </div>
+        </div>
 
-        <div class="or-field" style="left: 170px; top: 146px; width: 370px">NORTH HARBOR TRADING</div>
-        <div class="or-field" style="left: 190px; top: 185px; width: 360px">North Harbor Center, Manila</div>
-        <div class="or-field" style="left: 115px; top: 224px">000-345-111-000</div>
-        <div class="or-field" style="left: 690px; top: 131px">05/24/2026</div>
-        <div class="or-field" style="left: 105px; top: 355px; width: 420px">Payment for Billing Invoice BI-2026-01042<br>Shipment JOB-SEA-2026-0422</div>
-        <div class="or-field amount" style="left: 585px; top: 355px; width: 140px">43,200.00</div>
-        <div class="or-field amount" style="left: 655px; top: 759px; width: 98px">43,200.00</div>
+        <div class="or-printer">
+            20 PADS (50X3) &nbsp;&nbsp;&nbsp;&nbsp; 0045251 - 0046250<br>
+            BIR ATP NO.: OCN05ZAU20240000010957<br>
+            Date Issued: 09/23/2024<br>
+            Printer's Accreditation No.: 052NP202400000091<br>
+            Accreditation Date: January 22, 2024 Expiry Date: January 21, 2029<br>
+            CB-ThisViewer - Brgy. Pinagbarilan, Baliuag, Bulacan<br>
+            TIN: 200-589-800000
+        </div>
+        <div class="or-tax-note">"This document is not valid for claim of input tax"</div>
+        <div class="or-signature">
+            <div class="or-signature-line"></div>
+            Cashier/Authorized Representative
+        </div>
     </div>
 @endsection

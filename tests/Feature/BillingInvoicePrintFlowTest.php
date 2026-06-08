@@ -2,10 +2,27 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class BillingInvoicePrintFlowTest extends TestCase
 {
+    protected function setUp()
+    {
+        parent::setUp();
+
+        config([
+            'database.default' => 'sqlite',
+            'database.connections.sqlite.database' => ':memory:',
+        ]);
+
+        DB::purge('sqlite');
+        Artisan::call('migrate:fresh', ['--seed' => true]);
+
+        $this->actingAsAdmin();
+    }
+
     public function test_create_billing_invoice_exposes_guest_non_tax_soa_a_path()
     {
         $response = $this->get('/erp/invoices/create');

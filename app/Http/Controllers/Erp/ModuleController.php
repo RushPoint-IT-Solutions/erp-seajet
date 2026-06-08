@@ -4028,6 +4028,10 @@ class ModuleController extends Controller
             $selectedTemplates = $vatClassification === '12%' ? ['SOA_B', 'Billing Invoice'] : ['SOA_A'];
         }
 
+        if ($vatClassification === '12%' && in_array('SOA_B', $selectedTemplates, true) && !in_array('Billing Invoice', $selectedTemplates, true)) {
+            $selectedTemplates[] = 'Billing Invoice';
+        }
+
         $documents = [];
         foreach ($selectedTemplates as $template) {
             if (isset($templateRoutes[$template])) {
@@ -4584,12 +4588,137 @@ class ModuleController extends Controller
 
     public function officialReceiptPreview()
     {
-        return view('erp.print.official-receipt');
+        return view('erp.print.official-receipt', [
+            'receipt' => $this->officialReceiptPrintData(request('receipt_no') ?: request('receipt'), 'or'),
+        ]);
+    }
+
+    private function officialReceiptPrintData($receiptRef = null, $documentKind = 'or')
+    {
+        $isAcknowledgement = $documentKind === 'ar';
+
+        $fallback = [
+            'receipt_no' => $isAcknowledgement ? '0007494' : '0046043',
+            'payment_date' => date('M d, Y'),
+            'account_no' => '',
+            'registered_name' => request('customer', 'ALLEN SPECIALTY PRODUCTS COMPANY'),
+            'tin' => '000-385-400-000',
+            'business_address' => 'U-6A/K 20 LANNSBURGH PLC. # 170 TOMAS MORATO AVE. DISTRICT 4 QUEZON CITY',
+            'description' => ($isAcknowledgement ? 'PAYMENT FOR REIMBURSABLE CHARGES' : 'PAYMENT FOR LOCAL CHARGES') . "\n" . ($isAcknowledgement ? 'SOA#5923' : 'BI# 0000007'),
+            'currency' => request('currency', 'PHP'),
+            'amount' => (float) str_replace(',', '', request('amount', $isAcknowledgement ? 63839.24 : 30680)),
+            'payment_method' => request('payment_method', 'Check'),
+            'reference_no' => request('reference_no', ''),
+            'bank' => '',
+        ];
+
+        if (!Schema::hasTable('receipts')) {
+            return $fallback;
+        }
+
+        $query = DB::table('receipts')
+            ->leftJoin('customers', 'customers.id', '=', 'receipts.customer_id')
+            ->leftJoin('receipt_applications', 'receipt_applications.receipt_id', '=', 'receipts.id')
+            ->leftJoin('sales_documents', 'sales_documents.id', '=', 'receipt_applications.sales_document_id')
+            ->select(
+                'receipts.id',
+                'receipts.receipt_no',
+                'receipts.receipt_date',
+                'receipts.payment_method',
+                'receipts.reference_no',
+                'receipts.amount',
+                'customers.code as customer_code',
+                'customers.name as customer_name',
+                'customers.tin as customer_tin',
+                'customers.billing_address',
+                DB::raw('GROUP_CONCAT(DISTINCT sales_documents.document_no ORDER BY sales_documents.document_no SEPARATOR ", ") as invoice_numbers'),
+                DB::raw('GROUP_CONCAT(DISTINCT sales_documents.remarks ORDER BY sales_documents.document_no SEPARATOR "\n") as invoice_remarks')
+            );
+
+        $receiptColumns = Schema::getColumnListing('receipts');
+
+        if (in_array('currency', $receiptColumns, true)) {
+            $query->addSelect('receipts.currency');
+        }
+
+        if (in_array('customer_id_text', $receiptColumns, true)) {
+            $query->addSelect('receipts.customer_id_text');
+        }
+
+        if (in_array('job_shipment_id', $receiptColumns, true)) {
+            $query->addSelect('receipts.job_shipment_id');
+        }
+
+        if ($receiptRef) {
+            $query->where(function ($where) use ($receiptRef) {
+                $where->where('receipts.receipt_no', $receiptRef);
+
+                if (ctype_digit((string) $receiptRef)) {
+                    $where->orWhere('receipts.id', (int) $receiptRef);
+                }
+            });
+        }
+
+        $dbReceipt = $query
+            ->groupBy(
+                'receipts.id',
+                'receipts.receipt_no',
+                'receipts.receipt_date',
+                'receipts.payment_method',
+                'receipts.reference_no',
+                'receipts.amount',
+                'customers.code',
+                'customers.name',
+                'customers.tin',
+                'customers.billing_address'
+            )
+            ->when(in_array('currency', $receiptColumns, true), function ($grouped) {
+                return $grouped->groupBy('receipts.currency');
+            })
+            ->when(in_array('customer_id_text', $receiptColumns, true), function ($grouped) {
+                return $grouped->groupBy('receipts.customer_id_text');
+            })
+            ->when(in_array('job_shipment_id', $receiptColumns, true), function ($grouped) {
+                return $grouped->groupBy('receipts.job_shipment_id');
+            })
+            ->orderBy('receipts.receipt_date', 'desc')
+            ->orderBy('receipts.id', 'desc')
+            ->first();
+
+        if (!$dbReceipt) {
+            return $fallback;
+        }
+
+        $numericReceiptNo = preg_replace('/\D/', '', $dbReceipt->receipt_no);
+        $defaultDescription = $isAcknowledgement ? 'PAYMENT FOR REIMBURSABLE CHARGES' : 'PAYMENT FOR LOCAL CHARGES';
+        $documentPrefix = $isAcknowledgement ? 'SOA#' : 'BI#';
+        $descriptionParts = array_filter([
+            $dbReceipt->invoice_remarks ? trim($dbReceipt->invoice_remarks) : $defaultDescription,
+            $dbReceipt->invoice_numbers ? $documentPrefix . ' ' . $dbReceipt->invoice_numbers : null,
+            property_exists($dbReceipt, 'job_shipment_id') && $dbReceipt->job_shipment_id ? 'JOB ' . $dbReceipt->job_shipment_id : null,
+        ]);
+
+        return [
+            'receipt_no' => $numericReceiptNo ? str_pad($numericReceiptNo, 7, '0', STR_PAD_LEFT) : $dbReceipt->receipt_no,
+            'payment_date' => $dbReceipt->receipt_date ? date('M d, Y', strtotime($dbReceipt->receipt_date)) : date('M d, Y'),
+            'account_no' => property_exists($dbReceipt, 'customer_id_text') && $dbReceipt->customer_id_text ? $dbReceipt->customer_id_text : $dbReceipt->customer_code,
+            'registered_name' => $dbReceipt->customer_name ?: request('customer', $fallback['registered_name']),
+            'tin' => $dbReceipt->customer_tin ?: '',
+            'business_address' => $dbReceipt->billing_address ?: '',
+            'description' => implode("\n", $descriptionParts),
+            'currency' => property_exists($dbReceipt, 'currency') && $dbReceipt->currency ? $dbReceipt->currency : 'PHP',
+            'amount' => (float) $dbReceipt->amount,
+            'payment_method' => $dbReceipt->payment_method ?: 'Check',
+            'reference_no' => $dbReceipt->reference_no ?: '',
+            'bank' => '',
+        ];
     }
 
     public function acknowledgementReceiptPreview()
     {
-        return view('erp.print.acknowledgement-receipt');
+        return view('erp.print.acknowledgement-receipt', [
+            'receipt' => $this->officialReceiptPrintData(request('receipt_no') ?: request('receipt'), 'ar'),
+        ]);
     }
 
     public function publicInvoice($token)
@@ -5041,8 +5170,51 @@ class ModuleController extends Controller
             return;
         }
 
+        $criteria = $this->financeUniqueCriteria($table, $payload);
+        if (!empty($criteria) && DB::table($table)->where($criteria)->exists()) {
+            DB::table($table)->where($criteria)->update($payload);
+            return;
+        }
+
         $payload['created_at'] = now();
         DB::table($table)->insert($payload);
+    }
+
+    private function financeUniqueCriteria($table, array $payload)
+    {
+        $companyId = $payload['company_id'] ?? null;
+
+        if ($table === 'branches' || $table === 'cost_centers' || $table === 'tax_codes') {
+            return [
+                'company_id' => $companyId,
+                'code' => $payload['code'] ?? null,
+            ];
+        }
+
+        if ($table === 'items') {
+            return [
+                'company_id' => $companyId,
+                'sku' => $payload['sku'] ?? null,
+            ];
+        }
+
+        if ($table === 'number_series') {
+            return [
+                'company_id' => $companyId,
+                'document_type' => $payload['document_type'] ?? null,
+            ];
+        }
+
+        if ($table === 'currency_rates') {
+            return [
+                'company_id' => $companyId,
+                'source_currency' => $payload['source_currency'] ?? null,
+                'target_currency' => $payload['target_currency'] ?? null,
+                'rate_date' => $payload['rate_date'] ?? null,
+            ];
+        }
+
+        return [];
     }
 
     private function financeBranches($companyId)

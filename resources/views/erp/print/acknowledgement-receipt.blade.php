@@ -1,96 +1,366 @@
 @extends('erp.layout')
 
 @section('title', 'Acknowledgement Receipt Preview')
-@section('page-title', 'Acknowledgement Receipt Pre-printed Form')
+@section('page-title', 'Acknowledgement Receipt')
 
 @push('styles')
 <style>
+    .receipt-toolbar {
+        max-width: 210mm;
+        margin: 0 auto 16px;
+    }
     .ar-sheet {
-        position: relative;
-        width: 816px;
-        height: 528px;
+        width: 210mm;
+        height: 148.5mm;
         margin: 0 auto;
-        background: #f7f4dc;
-        border: 1px solid #1f2937;
-        box-shadow: 0 10px 30px rgba(15, 23, 42, .14);
-        font-family: Arial, sans-serif;
-        color: #111827;
+        padding: 10mm 14mm 8mm;
+        background: #f7f7f2;
+        border: 1px solid #222;
+        box-shadow: 0 12px 32px rgba(15, 23, 42, .16);
+        color: #1f2933;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 12px;
+        line-height: 1.2;
+        position: relative;
         overflow: hidden;
     }
-    .ar-box,
-    .ar-line,
-    .ar-label,
-    .ar-logo,
-    .ar-company {
-        position: absolute;
+    .ar-top {
+        display: grid;
+        grid-template-columns: 1fr 62mm;
+        gap: 8mm;
+        align-items: start;
     }
-    .ar-box { border: 1px solid #111827; }
-    .ar-line { height: 1px; background: #111827; }
-    .ar-logo { left: 265px; top: 32px; width: 72px; height: 45px; object-fit: contain; }
-    .ar-company { left: 335px; top: 34px; width: 280px; text-align: left; font-weight: 800; font-size: 13px; line-height: 1.15; }
-    .ar-label { font-size: 12px; font-weight: 800; text-transform: uppercase; }
-    .ar-field { position: absolute; font-size: 12px; line-height: 1.35; white-space: pre-line; }
-    .ar-field.amount { text-align: right; font-weight: 700; }
+    .ar-brand-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 7mm;
+    }
+    .ar-logo {
+        width: 34mm;
+        height: 18mm;
+        object-fit: contain;
+        object-position: left center;
+        filter: grayscale(1) contrast(1.15);
+    }
+    .ar-company-name {
+        font-size: 15px;
+        font-weight: 800;
+        letter-spacing: .2px;
+        margin-top: 10mm;
+        text-transform: uppercase;
+    }
+    .ar-company-address {
+        font-size: 9px;
+        font-weight: 700;
+        line-height: 1.15;
+        margin-top: 1mm;
+        text-transform: uppercase;
+    }
+    .ar-title {
+        font-size: 18px;
+        font-weight: 800;
+        letter-spacing: .2px;
+        text-align: center;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+    .ar-number {
+        margin: 3mm 0 6mm;
+        text-align: center;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 20px;
+        letter-spacing: 2px;
+    }
+    .ar-number span {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 12px;
+        letter-spacing: 0;
+        margin-right: 5mm;
+    }
+    .ar-meta {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+    }
+    .ar-meta td {
+        border: 1px solid #222;
+        height: 7mm;
+        padding: 1mm 2mm;
+        vertical-align: middle;
+    }
+    .ar-meta td:first-child {
+        width: 27mm;
+        font-weight: 700;
+    }
+    .ar-section-title {
+        border: 1px solid #222;
+        border-bottom: 0;
+        font-size: 12px;
+        font-weight: 800;
+        padding: 1mm 2mm;
+        text-transform: uppercase;
+    }
+    .ar-received {
+        border: 1px solid #222;
+        display: grid;
+        grid-template-columns: 35mm 1fr;
+        min-height: 25mm;
+        padding: 2mm;
+        row-gap: 1mm;
+    }
+    .ar-received-label {
+        font-weight: 700;
+    }
+    .ar-received-value {
+        color: #4b5563;
+        font-size: 11px;
+        text-transform: uppercase;
+    }
+    .ar-transaction {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 0;
+    }
+    .ar-transaction th,
+    .ar-transaction td {
+        border: 1px solid #222;
+    }
+    .ar-transaction th {
+        height: 7mm;
+        padding: 1mm 2mm;
+        text-align: left;
+        font-size: 12px;
+        font-weight: 800;
+    }
+    .ar-transaction th:last-child,
+    .ar-transaction td:last-child {
+        width: 58mm;
+        text-align: right;
+    }
+    .ar-transaction td {
+        height: 28mm;
+        padding: 6mm 6mm 3mm;
+        vertical-align: top;
+        white-space: pre-line;
+    }
+    .ar-amount {
+        font-variant-numeric: tabular-nums;
+    }
+    .ar-bottom-grid {
+        display: grid;
+        grid-template-columns: 95mm 1fr;
+        gap: 0;
+    }
+    .ar-methods {
+        display: flex;
+        align-items: center;
+        gap: 12mm;
+        height: 9mm;
+        font-size: 13px;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+    .ar-check {
+        display: inline-block;
+        width: 5mm;
+        height: 5mm;
+        border: 1px solid #222;
+        margin-right: 2mm;
+        position: relative;
+        top: 1mm;
+    }
+    .ar-check.checked:after {
+        content: "";
+        position: absolute;
+        left: 1mm;
+        top: 0;
+        width: 2mm;
+        height: 4mm;
+        border: solid #111;
+        border-width: 0 1px 1px 0;
+        transform: rotate(45deg);
+    }
+    .ar-total-row {
+        display: grid;
+        grid-template-columns: 1fr 58mm;
+        min-height: 9mm;
+        border: 1px solid #222;
+        border-top: 0;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+    .ar-total-row div {
+        padding: 2mm;
+    }
+    .ar-total-row div + div {
+        border-left: 1px solid #222;
+        text-align: right;
+        font-weight: 500;
+        text-transform: none;
+    }
+    .ar-check-lines {
+        font-size: 10px;
+        line-height: 1.5;
+        padding-top: 1mm;
+    }
+    .ar-check-lines span {
+        display: inline-block;
+        min-width: 43mm;
+        border-bottom: 1px solid #222;
+        margin-left: 2mm;
+    }
+    .ar-printer {
+        position: absolute;
+        left: 18mm;
+        bottom: 10mm;
+        width: 63mm;
+        font-size: 6px;
+        line-height: 1.15;
+    }
+    .ar-tax-note {
+        position: absolute;
+        left: 75mm;
+        bottom: 8mm;
+        font-size: 10px;
+        font-weight: 800;
+        text-align: center;
+        text-transform: uppercase;
+        width: 62mm;
+    }
+    .ar-signature {
+        position: absolute;
+        right: 18mm;
+        bottom: 8mm;
+        width: 58mm;
+        text-align: center;
+        font-size: 10px;
+    }
+    .ar-signature-line {
+        border-top: 1px solid #222;
+        height: 8mm;
+    }
     @media print {
-        @page { size: Letter landscape; margin: 0; }
+        @page { size: A4 portrait; margin: 0; }
         body { background: #fff !important; }
-        .ar-sheet { border: 0; box-shadow: none; margin: 0; background: transparent !important; }
-        .ar-box,
-        .ar-line,
-        .ar-label,
-        .ar-logo,
-        .ar-company { display: none !important; }
+        .no-print, .receipt-toolbar, .erp-sidebar, .erp-topbar { display: none !important; }
+        .erp-main, .erp-content, main { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+        .ar-sheet {
+            width: 210mm;
+            height: 148.5mm;
+            margin: 0;
+            border: 0;
+            box-shadow: none;
+            background: #fff;
+            page-break-after: always;
+        }
     }
 </style>
 @endpush
 
 @section('content')
-    <div class="d-flex justify-content-end gap-2 mb-3 no-print">
-        <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print Content Only</button>
-        <a href="{{ route('erp.export', 'acknowledgement-receipt-pdf') }}" class="btn btn-primary"><i class="bi bi-filetype-pdf me-1"></i> PDF</a>
+@php
+    $receipt = $receipt ?? [];
+    $amount = (float) ($receipt['amount'] ?? 0);
+    $currency = $receipt['currency'] ?? 'PHP';
+    $paymentMethod = strtolower($receipt['payment_method'] ?? '');
+    $isCheck = strpos($paymentMethod, 'check') !== false || strpos($paymentMethod, 'cheque') !== false;
+    $isCash = strpos($paymentMethod, 'cash') !== false;
+    $isOnline = strpos($paymentMethod, 'online') !== false || strpos($paymentMethod, 'bank') !== false || strpos($paymentMethod, 'transfer') !== false;
+@endphp
+
+    <div class="receipt-toolbar d-flex justify-content-end gap-2 no-print">
+        <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print Acknowledgement Receipt</button>
+        <a href="{{ route('erp.payments.create') }}" class="btn btn-primary"><i class="bi bi-arrow-left me-1"></i> Back to Payments</a>
     </div>
 
     <div class="ar-sheet">
-        <img src="{{ asset('images/image.png') }}" class="ar-logo" alt="SeaJet logo">
-        <div class="ar-company">
-            SEA-JET INTERNATIONAL FORWARDERS, INC.<br>
-            <span style="font-size: 10px; font-weight: 600">Unit 18 & 19 Bldg. B, Cargo Village Complex<br>Paranaque City 1704, Philippines</span>
+        <div class="ar-top">
+            <div>
+                <div class="ar-brand-row">
+                    <img src="{{ asset('images/image.png') }}" class="ar-logo" alt="SeaJet logo">
+                    <div>
+                        <div class="ar-company-name">SEA-JET INTERNATIONAL FORWARDERS, INC.</div>
+                        <div class="ar-company-address">
+                            UNIT 18 &amp; 19 BLDG. B. CARGO VILLAGE COMPLEX<br>
+                            NINOY AQUINO AVE., STO. NINO, PARANAQUE CITY 1704, PHILIPPINES<br>
+                            TEL. NOS.: (632) 8852-9001, 8852-9002 and 8852-9003<br>
+                            VAT REG. TIN: 000-143-896-00000
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div class="ar-title">Acknowledgement Receipt</div>
+                <div class="ar-number"><span>No.</span>{{ $receipt['receipt_no'] ?? '0007494' }}</div>
+                <table class="ar-meta">
+                    <tr>
+                        <td>Payment Date</td>
+                        <td>{{ $receipt['payment_date'] ?? date('M d, Y') }}</td>
+                    </tr>
+                    <tr>
+                        <td>Account No.</td>
+                        <td>{{ $receipt['account_no'] ?? '' }}</td>
+                    </tr>
+                </table>
+            </div>
         </div>
-        <div class="ar-label" style="left: 650px; top: 95px; writing-mode: vertical-rl; transform: rotate(180deg); font-size: 16px">Acknowledgement Receipt</div>
-        <div class="ar-label" style="left: 690px; top: 140px">No.</div>
-        <div class="ar-field" style="left: 720px; top: 137px; color: #991b1b; font-size: 18px; font-weight: 800">0007496</div>
 
-        <div class="ar-box" style="left: 150px; top: 88px; width: 390px; height: 114px"></div>
-        <div class="ar-label" style="left: 158px; top: 96px">Received From</div>
-        <div class="ar-label" style="left: 158px; top: 125px; font-size: 11px; text-transform: none">Registered Name</div>
-        <div class="ar-label" style="left: 158px; top: 148px; font-size: 11px; text-transform: none">TIN:</div>
-        <div class="ar-label" style="left: 158px; top: 170px; font-size: 11px; text-transform: none">Business Address:</div>
+        <div class="ar-section-title mt-1">Received From</div>
+        <div class="ar-received">
+            <div class="ar-received-label">Registered Name</div>
+            <div class="ar-received-value">{{ $receipt['registered_name'] ?? '' }}</div>
+            <div class="ar-received-label">TIN</div>
+            <div class="ar-received-value">{{ $receipt['tin'] ?? '' }}</div>
+            <div class="ar-received-label">Business Address:</div>
+            <div class="ar-received-value">{{ $receipt['business_address'] ?? '' }}</div>
+        </div>
 
-        <div class="ar-box" style="left: 548px; top: 160px; width: 116px; height: 42px"></div>
-        <div class="ar-label" style="left: 555px; top: 165px; font-size: 11px; text-transform: none">Payment Date</div>
-        <div class="ar-label" style="left: 555px; top: 184px; font-size: 11px; text-transform: none">Account No.</div>
+        <table class="ar-transaction">
+            <thead>
+                <tr>
+                    <th>Description of Transaction / Nature of Service</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>{{ $receipt['description'] ?? '' }}</td>
+                    <td class="ar-amount">{{ number_format($amount, 2) }}</td>
+                </tr>
+            </tbody>
+        </table>
 
-        <div class="ar-box" style="left: 150px; top: 202px; width: 515px; height: 180px"></div>
-        <div class="ar-line" style="left: 150px; top: 232px; width: 515px"></div>
-        <div class="ar-line" style="left: 510px; top: 202px; width: 1px; height: 180px"></div>
-        <div class="ar-label" style="left: 160px; top: 210px">Description of Transaction / Nature of Service</div>
-        <div class="ar-label" style="left: 555px; top: 210px">Amount</div>
+        <div class="ar-bottom-grid">
+            <div>
+                <div class="ar-methods">
+                    <span><span class="ar-check {{ $isCheck ? 'checked' : '' }}"></span>Check</span>
+                    <span><span class="ar-check {{ $isCash ? 'checked' : '' }}"></span>Cash</span>
+                    <span><span class="ar-check {{ $isOnline ? 'checked' : '' }}"></span>Online</span>
+                </div>
+                <div class="ar-check-lines">
+                    No. <span>{{ $receipt['reference_no'] ?? '' }}</span><br>
+                    Bank: <span>{{ $receipt['bank'] ?? '' }}</span>
+                </div>
+            </div>
+            <div class="ar-total-row">
+                <div>Total Paid Amount</div>
+                <div class="ar-amount">{{ $currency }} {{ number_format($amount, 2) }}</div>
+            </div>
+        </div>
 
-        <div class="ar-label" style="left: 95px; top: 405px"><span style="font-size: 24px">□</span> Check</div>
-        <div class="ar-label" style="left: 250px; top: 405px"><span style="font-size: 24px">□</span> Cash</div>
-        <div class="ar-label" style="left: 395px; top: 405px"><span style="font-size: 24px">□</span> Online</div>
-        <div class="ar-box" style="left: 560px; top: 402px; width: 150px; height: 40px"></div>
-        <div class="ar-label" style="left: 575px; top: 412px; font-size: 15px">Total Paid Amount</div>
-        <div class="ar-label" style="left: 56px; top: 470px; font-size: 13px">"This document is not valid for claim of input tax"</div>
-        <div class="ar-line" style="left: 590px; top: 488px; width: 180px"></div>
-        <div class="ar-label" style="left: 608px; top: 498px; font-size: 12px">Cashier/Authorized Representative</div>
-
-        <div class="ar-field" style="left: 255px; top: 123px; width: 240px">PHILUSA CORPORATION</div>
-        <div class="ar-field" style="left: 185px; top: 147px; width: 240px">000-281-014-00000</div>
-        <div class="ar-field" style="left: 255px; top: 168px; width: 260px">28 SHAW BLVD, KAPITOLYO 1603</div>
-        <div class="ar-field" style="left: 556px; top: 162px">05/24/2026</div>
-        <div class="ar-field" style="left: 165px; top: 260px; width: 320px">Collection for reimbursable charges<br>JOB-SEA-2026-0423</div>
-        <div class="ar-field amount" style="left: 525px; top: 260px; width: 120px">12,800.00</div>
-        <div class="ar-field amount" style="left: 590px; top: 421px; width: 100px">12,800.00</div>
+        <div class="ar-printer">
+            20 PADS (50X3) &nbsp;&nbsp;&nbsp;&nbsp; 0007001 - 0008000<br>
+            BIR ATP NO.: OCN05ZAU20240000010957<br>
+            Date Issued: 09/23/2024<br>
+            Printer's Accreditation No.: 052NP202400000091<br>
+            Accreditation Date: January 22, 2024 Expiry Date: January 21, 2029<br>
+            CB-ThisViewer - Brgy. Pinagbarilan, Baliuag, Bulacan<br>
+            TIN: 200-589-800000
+        </div>
+        <div class="ar-tax-note">"This document is not valid for claim of input tax"</div>
+        <div class="ar-signature">
+            <div class="ar-signature-line"></div>
+            Cashier/Authorized Representative
+        </div>
     </div>
 @endsection
