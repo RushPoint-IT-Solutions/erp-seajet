@@ -953,6 +953,8 @@ class ModuleController extends Controller
             'suppliers' => $this->vendorRows(),
             'customers' => $this->customerSelectOptions(),
             'bill' => $bill,
+            'lines' => $bill ? $this->apBillLines($bill['id']) : collect(),
+            'attachments' => $bill ? $this->documentAttachments('purchase_document', $bill['id']) : collect(),
             'nextBillNo' => $this->nextDocumentNumber('vendor_bill', 'BILL-', 5, false),
         ]);
     }
@@ -990,7 +992,6 @@ class ModuleController extends Controller
             ['label' => 'Vendor bill entry', 'route' => route('erp.payables.vendor-bills.create'), 'icon' => 'bi-plus-lg'],
             ['label' => 'Payment approvals', 'route' => route('erp.payables.approvals'), 'icon' => 'bi-check2-square'],
             ['label' => 'Payment processing', 'route' => route('erp.payables.payments.create'), 'icon' => 'bi-credit-card'],
-            ['label' => 'Print check voucher', 'route' => route('erp.payables.check-voucher'), 'icon' => 'bi-printer'],
             ['label' => 'Print checks', 'route' => route('erp.payables.check-print'), 'icon' => 'bi-file-earmark-check'],
             ['label' => 'AP aging report', 'route' => route('erp.payables.aging'), 'icon' => 'bi-clock-history'],
         ];
@@ -1010,6 +1011,7 @@ class ModuleController extends Controller
             'client_customer_id' => 'nullable|string|max:100',
             'shipment_job_id' => 'nullable|string|max:100',
             'bill_no' => 'nullable|string|max:100',
+            'original_bill_no' => 'nullable|string|max:100',
             'bill_date' => 'required|date',
             'reference_no' => 'nullable|string|max:100',
             'due_date' => 'nullable|date',
@@ -1034,11 +1036,59 @@ class ModuleController extends Controller
 
         $bill = $this->saveApBill($data);
 
+        if (request('save_mode') === 'close') {
+            return redirect()
+                ->route('erp.payables.vendor-bills.view', $bill['bill_no'])
+                ->with('status', 'Bill saved.');
+        }
+
+        if (request('save_mode') === 'new') {
+            return redirect()
+                ->route('erp.payables.vendor-bills.create')
+                ->with('status', 'Bill saved. You can encode another bill.');
+        }
+
         return view('erp.payables.vendor-bill-review', [
             'bill' => $bill,
             'lines' => $this->apBillLines($bill['id']),
             'attachments' => $this->documentAttachments('purchase_document', $bill['id']),
         ]);
+    }
+
+    public function vendorBillView($bill)
+    {
+        $record = is_numeric($bill) ? $this->apBillById($bill) : $this->apBillByNumber($bill);
+        abort_unless(!empty($record), 404);
+
+        return view('erp.payables.vendor-bill-review', [
+            'bill' => $record,
+            'lines' => $this->apBillLines($record['id']),
+            'attachments' => $this->documentAttachments('purchase_document', $record['id']),
+        ]);
+    }
+
+    public function uploadVendorBillAttachments($bill)
+    {
+        $record = is_numeric($bill) ? $this->apBillById($bill) : $this->apBillByNumber($bill);
+        abort_unless(!empty($record), 404);
+
+        request()->validate([
+            'attachments.*' => 'required|file|max:10240',
+        ]);
+
+        $this->storeDocumentAttachments('purchase_document', $record['id'], request()->file('attachments', []));
+
+        return redirect()
+            ->route('erp.payables.vendor-bills.view', $record['bill_no'])
+            ->with('status', 'Attachment uploaded.');
+    }
+
+    public function vendorBillPrint($bill)
+    {
+        $record = $this->apBillPrintData($bill);
+        abort_unless(!empty($record['bill']), 404);
+
+        return view('erp.payables.vendor-bill-print', $record);
     }
 
     public function apPaymentCreate()
@@ -1086,11 +1136,78 @@ class ModuleController extends Controller
         return view('erp.payables.approvals', compact('approvals'));
     }
 
+    public function checkVoucherPrintLayout()
+    {
+        return view('erp.payables.check-voucher-layout', [
+            'layout' => $this->checkVoucherPrintLayoutPayload(),
+            'sample' => $this->paymentPrintData(request('payment')),
+            'fields' => $this->checkVoucherPrintFields(),
+        ]);
+    }
+
+    public function saveCheckVoucherPrintLayout()
+    {
+        if (request()->hasFile('template_file') && request()->file('template_file')->isValid()) {
+            $path = request()->file('template_file')->store('erp/templates', 'public');
+            request()->merge([
+                'template_url' => asset('storage/'.$path),
+                'print_template' => '1',
+            ]);
+        }
+
+        $layout = $this->checkVoucherPrintLayoutPayload(true);
+
+        if (Schema::hasTable('print_layouts')) {
+            DB::table('print_layouts')->updateOrInsert(
+                [
+                    'company_id' => null,
+                    'document_type' => 'check_voucher',
+                    'layout_name' => 'Default',
+                ],
+                [
+                    'paper_size' => $layout['settings']['paper_size'],
+                    'paper_width' => $layout['settings']['paper_width'],
+                    'paper_height' => $layout['settings']['paper_height'],
+                    'template_url' => $layout['settings']['template_url'],
+                    'print_template' => $layout['settings']['print_template'],
+                    'positions' => json_encode($layout['positions']),
+                    'field_styles' => json_encode($layout['field_styles']),
+                    'custom_fields' => json_encode($layout['custom_fields']),
+                    'is_default' => true,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
+        }
+
+        Storage::put('erp/check-voucher-print-layout.json', json_encode($layout, JSON_PRETTY_PRINT));
+
+        return redirect()
+            ->route('erp.payables.check-voucher.layout')
+            ->with('status', 'Check voucher print layout saved.');
+    }
+
     public function checkVoucherPreview($payment = null)
     {
         return view('erp.payables.check-voucher', [
             'voucher' => $this->paymentPrintData($payment),
+            'layout' => $this->checkVoucherPrintLayoutPayload(),
+            'fields' => $this->checkVoucherPrintFields(),
         ]);
+    }
+
+    public function checkVoucherForBill($bill)
+    {
+        $billNo = is_numeric($bill) ? DB::table('purchase_documents')->where('id', $bill)->value('document_no') : $bill;
+        $paymentId = $this->latestPaymentIdForBill($billNo);
+
+        if (!$paymentId) {
+            return redirect()
+                ->route('erp.payables.payments.create', ['bill' => $billNo])
+                ->with('status', 'Create or release a payment first before printing the check voucher.');
+        }
+
+        return redirect()->route('erp.payables.check-voucher', $paymentId);
     }
 
     public function checkPrint($payment = null)
@@ -1167,10 +1284,10 @@ class ModuleController extends Controller
         return DB::transaction(function () use ($data) {
             $companyId = $this->defaultCompanyId();
             $supplierId = $this->supplierIdForAp($companyId, $data);
-            $documentNo = trim((string) ($data['bill_no'] ?? ''));
-            if ($documentNo === '') {
-                $documentNo = $this->nextDocumentNumber('vendor_bill', 'BILL-', 5);
-            }
+            $originalDocumentNo = trim((string) ($data['original_bill_no'] ?? ''));
+            $documentNo = $originalDocumentNo !== ''
+                ? $originalDocumentNo
+                : $this->nextDocumentNumber('vendor_bill', 'BILL-', 5);
 
             $lineTotal = 0.0;
             foreach ((array) ($data['expense_amount'] ?? []) as $amount) {
@@ -1187,6 +1304,14 @@ class ModuleController extends Controller
             $usdToPhpRate = $this->moneyToFloat($data['exchange_rate'] ?? 1) ?: 1;
             $exchangeRate = strtoupper($data['currency']) === 'USD' ? $usdToPhpRate : 1;
             $phpAmount = strtoupper($data['currency']) === 'USD' ? $grossAmount * $usdToPhpRate : $grossAmount;
+
+            $existingQuery = DB::table('purchase_documents')->where('company_id', $companyId);
+            if ($originalDocumentNo !== '') {
+                $existingQuery->where('document_no', $originalDocumentNo);
+            } else {
+                $existingQuery->where('document_no', $documentNo);
+            }
+            $existingBill = $existingQuery->first();
 
             $payload = $this->tablePayload('purchase_documents', [
                 'company_id' => $companyId,
@@ -1215,22 +1340,31 @@ class ModuleController extends Controller
                 'withholding_tax_amount' => $whtAmount,
                 'grand_total' => $netAmount,
                 'net_amount' => $netAmount,
-                'paid_total' => 0,
-                'status' => 'for_payment',
-                'approval_status' => 'For Approval',
+                'paid_total' => $existingBill ? (float) $existingBill->paid_total : 0,
+                'status' => $existingBill ? $existingBill->status : 'for_payment',
+                'approval_status' => $existingBill ? ($existingBill->approval_status ?: 'For Approval') : 'For Approval',
                 'remarks' => $data['memo'] ?? null,
                 'memo' => $data['memo'] ?? null,
                 'updated_at' => now(),
             ]);
 
-            $existingId = DB::table('purchase_documents')
+            $duplicateId = DB::table('purchase_documents')
                 ->where('company_id', $companyId)
                 ->where('document_no', $documentNo)
+                ->when($existingBill, function ($query) use ($existingBill) {
+                    $query->where('id', '<>', $existingBill->id);
+                })
                 ->value('id');
 
-            if ($existingId) {
-                DB::table('purchase_documents')->where('id', $existingId)->update($payload);
-                $billId = $existingId;
+            if ($duplicateId) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'bill_no' => 'Bill No. already exists. Please use a different document number.',
+                ]);
+            }
+
+            if ($existingBill) {
+                DB::table('purchase_documents')->where('id', $existingBill->id)->update($payload);
+                $billId = $existingBill->id;
             } else {
                 $payload['created_at'] = now();
                 $billId = DB::table('purchase_documents')->insertGetId($payload);
@@ -1435,6 +1569,7 @@ class ModuleController extends Controller
                     'payment_no' => $payment->payment_no,
                     'supplier' => $payment->supplier_name ?: '-',
                     'shipment_job_id' => $payment->shipment_job_id ?: '-',
+                    'check_no' => $payment->check_no ?: '-',
                     'currency' => $payment->currency ?: 'PHP',
                     'amount' => number_format((float) $payment->amount, 2),
                     'status' => $payment->approval_status ?: ucwords(str_replace('_', ' ', $payment->status)),
@@ -1507,15 +1642,25 @@ class ModuleController extends Controller
         $wht = $bill ? (float) $bill->withholding_tax_amount : 0;
         $net = (float) $payment->amount;
 
+        $documentDate = now()->format('m/d/Y');
+        $accountNo = '-';
+        if (!empty($payment->bank_account) && preg_match('/(?:CA#|SA#|Acct#|Account#)\s*([A-Za-z0-9\-]+)/i', $payment->bank_account, $matches)) {
+            $accountNo = $matches[1];
+        }
+
         return [
             'id' => $payment->id,
             'voucher_no' => $payment->voucher_no ?: 'CV-'.$payment->id,
+            'document_no' => $payment->voucher_no ?: 'CV-'.$payment->id,
+            'document_date' => $documentDate,
             'payment_no' => $payment->payment_no,
             'company' => DB::table('companies')->where('id', $payment->company_id)->value('name') ?: 'SeaJet Holdings Inc.',
             'supplier' => $payment->supplier_name ?: '-',
             'shipment_job_id' => $payment->shipment_job_id ?: '-',
             'payment_method' => $payment->payment_method,
             'bank_account' => $payment->bank_account ?: '-',
+            'account_name' => $payment->supplier_name ?: '-',
+            'account_no' => $accountNo,
             'check_no' => $payment->check_no ?: '-',
             'bill_no' => $payment->bill_no,
             'description' => $bill && $bill->memo ? $bill->memo : 'Shipment-linked vendor expense',
@@ -1523,8 +1668,256 @@ class ModuleController extends Controller
             'gross' => $gross,
             'withholding' => $wht,
             'net' => $net,
+            'debit_account_title' => 'A/P-Trade ('.($payment->bank_account ?: ($payment->currency ?: 'PHP')).')',
+            'credit_account_title' => 'Cash in Bank-'.$payment->bank_account,
             'amount_words' => $this->amountToWords($net, $payment->currency ?: 'PHP'),
         ];
+    }
+
+    private function checkVoucherPrintLayoutPayload($fromRequest = false)
+    {
+        $saved = $this->savedCheckVoucherPrintLayout();
+        $settings = $saved['settings'] ?? [];
+        $defaults = $this->defaultCheckVoucherPrintPositions();
+
+        $paperWidth = (int) request('paper_width', $settings['paper_width'] ?? 816);
+        $paperHeight = (int) request('paper_height', $settings['paper_height'] ?? 1056);
+
+        $layout = [
+            'settings' => [
+                'paper_size' => request('paper_size', $settings['paper_size'] ?? 'letter'),
+                'paper_width' => max(400, min(1800, $paperWidth)),
+                'paper_height' => max(400, min(2400, $paperHeight)),
+                'template_url' => request('template_url', $settings['template_url'] ?? ''),
+                'print_template' => request()->has('print_template') ? request('print_template') === '1' : (bool) ($settings['print_template'] ?? false),
+            ],
+            'positions' => [],
+            'field_styles' => [],
+            'custom_fields' => $this->checkVoucherCustomFields($saved['custom_fields'] ?? [], $fromRequest),
+        ];
+
+        $savedPositions = $saved['positions'] ?? [];
+        $savedStyles = $saved['field_styles'] ?? [];
+
+        foreach ($defaults as $field => $point) {
+            $savedPoint = $savedPositions[$field] ?? $point;
+            $savedStyle = $savedStyles[$field] ?? [];
+            $defaultWidth = $this->checkVoucherDefaultWidth($field);
+            $defaultFontSize = in_array($field, ['company_name', 'form_title']) ? 14 : 11;
+
+            $layout['positions'][$field] = [
+                (int) request('x_'.$field, $savedPoint[0] ?? $point[0]),
+                (int) request('y_'.$field, $savedPoint[1] ?? $point[1]),
+            ];
+            $layout['field_styles'][$field] = [
+                'width' => max(30, min(1000, (int) request('w_'.$field, $savedStyle['width'] ?? $defaultWidth))),
+                'font_size' => max(7, min(40, (int) request('fs_'.$field, $savedStyle['font_size'] ?? $defaultFontSize))),
+            ];
+        }
+
+        return $layout;
+    }
+
+    private function savedCheckVoucherPrintLayout()
+    {
+        $fallback = [];
+        if (Storage::exists('erp/check-voucher-print-layout.json')) {
+            $fallback = json_decode(Storage::get('erp/check-voucher-print-layout.json'), true) ?: [];
+        }
+
+        if (!Schema::hasTable('print_layouts')) {
+            return $fallback;
+        }
+
+        $layout = DB::table('print_layouts')
+            ->whereNull('company_id')
+            ->where('document_type', 'check_voucher')
+            ->where('layout_name', 'Default')
+            ->first();
+
+        if (!$layout) {
+            return $fallback;
+        }
+
+        return [
+            'settings' => [
+                'paper_size' => $layout->paper_size ?: ($fallback['settings']['paper_size'] ?? 'letter'),
+                'paper_width' => (int) ($layout->paper_width ?: ($fallback['settings']['paper_width'] ?? 816)),
+                'paper_height' => (int) ($layout->paper_height ?: ($fallback['settings']['paper_height'] ?? 1056)),
+                'template_url' => $layout->template_url ?: ($fallback['settings']['template_url'] ?? ''),
+                'print_template' => (bool) $layout->print_template,
+            ],
+            'positions' => json_decode($layout->positions ?: '{}', true) ?: ($fallback['positions'] ?? []),
+            'field_styles' => json_decode($layout->field_styles ?: '{}', true) ?: ($fallback['field_styles'] ?? []),
+            'custom_fields' => json_decode($layout->custom_fields ?: '[]', true) ?: ($fallback['custom_fields'] ?? []),
+        ];
+    }
+
+    private function defaultCheckVoucherPrintPositions()
+    {
+        return [
+            'logo_mark' => [388, 28],
+            'company_name' => [232, 108],
+            'form_title' => [338, 136],
+            'payee_label' => [52, 196],
+            'payee' => [58, 242],
+            'check_no_label' => [430, 202],
+            'check_no' => [640, 196],
+            'document_no_label' => [430, 242],
+            'document_no' => [640, 236],
+            'document_date_label' => [430, 282],
+            'document_date' => [640, 276],
+            'payment_info_title' => [58, 374],
+            'amount_header' => [432, 382],
+            'account_name_label' => [60, 424],
+            'account_name' => [196, 424],
+            'amount' => [500, 424],
+            'account_no_label' => [60, 462],
+            'account_no' => [196, 462],
+            'amount_words' => [384, 462],
+            'description_label' => [56, 538],
+            'description' => [204, 538],
+            'account_title_header' => [150, 636],
+            'debit_header' => [558, 636],
+            'credit_header' => [704, 636],
+            'debit_account_title' => [64, 690],
+            'debit_amount' => [540, 690],
+            'credit_account_title' => [84, 730],
+            'credit_amount' => [686, 730],
+            'total_label' => [448, 794],
+            'total_debit' => [540, 794],
+            'total_credit' => [686, 794],
+            'prepared_by_label' => [92, 846],
+            'prepared_by' => [70, 938],
+            'prepared_date_label' => [62, 982],
+            'checked_by_label' => [304, 846],
+            'checked_by' => [284, 938],
+            'checked_date_label' => [274, 982],
+            'approved_by_label' => [510, 846],
+            'approved_by' => [478, 938],
+            'approved_date_label' => [468, 982],
+            'received_by_label' => [664, 846],
+            'received_by' => [626, 922],
+            'received_date_label' => [626, 982],
+        ];
+    }
+
+    private function checkVoucherPrintFields()
+    {
+        return [
+            'logo_mark' => 'Logo Mark',
+            'company_name' => 'Company Name',
+            'form_title' => 'Form Title',
+            'payee_label' => 'Payee Label',
+            'payee' => 'Payee',
+            'check_no_label' => 'Check No Label',
+            'check_no' => 'Check No',
+            'document_no_label' => 'Document No Label',
+            'document_no' => 'Document No',
+            'document_date_label' => 'Document Date Label',
+            'document_date' => 'Document Date',
+            'payment_info_title' => 'Payment Info Title',
+            'amount_header' => 'Amount Header',
+            'account_name_label' => 'Account Name Label',
+            'account_name' => 'Account Name',
+            'amount' => 'Amount',
+            'account_no_label' => 'Account No Label',
+            'account_no' => 'Account No',
+            'amount_words' => 'Amount In Words',
+            'description_label' => 'Description Label',
+            'description' => 'Description',
+            'account_title_header' => 'Account Title Header',
+            'debit_header' => 'Debit Header',
+            'credit_header' => 'Credit Header',
+            'debit_account_title' => 'Debit Account Title',
+            'debit_amount' => 'Debit Amount',
+            'credit_account_title' => 'Credit Account Title',
+            'credit_amount' => 'Credit Amount',
+            'total_label' => 'Total Label',
+            'total_debit' => 'Total Debit',
+            'total_credit' => 'Total Credit',
+            'prepared_by_label' => 'Prepared By Label',
+            'prepared_by' => 'Prepared By',
+            'prepared_date_label' => 'Prepared Date Label',
+            'checked_by_label' => 'Checked By Label',
+            'checked_by' => 'Checked By',
+            'checked_date_label' => 'Checked Date Label',
+            'approved_by_label' => 'Approved By Label',
+            'approved_by' => 'Approved By',
+            'approved_date_label' => 'Approved Date Label',
+            'received_by_label' => 'Received By Label',
+            'received_by' => 'Received By',
+            'received_date_label' => 'Received Date Label',
+        ];
+    }
+
+    private function checkVoucherDefaultWidth($field)
+    {
+        if (in_array($field, ['company_name', 'description'])) {
+            return 390;
+        }
+        if (in_array($field, ['amount_words'])) {
+            return 350;
+        }
+        if (in_array($field, ['amount', 'debit_amount', 'credit_amount', 'total_debit', 'total_credit'])) {
+            return 90;
+        }
+        if (in_array($field, ['prepared_by', 'checked_by', 'approved_by', 'received_by'])) {
+            return 150;
+        }
+        if (in_array($field, ['payee', 'account_name', 'debit_account_title', 'credit_account_title'])) {
+            return 300;
+        }
+        if (in_array($field, ['logo_mark'])) {
+            return 44;
+        }
+
+        return 130;
+    }
+
+    private function checkVoucherCustomFields($savedFields, $fromRequest)
+    {
+        if (!$fromRequest && !request()->has('custom_fields_present')) {
+            return $this->sanitizeCheckVoucherCustomFields($savedFields);
+        }
+
+        $keys = (array) request('custom_key', []);
+        $labels = (array) request('custom_label', []);
+        $texts = (array) request('custom_text', []);
+        $xs = (array) request('custom_x', []);
+        $ys = (array) request('custom_y', []);
+        $widths = (array) request('custom_w', []);
+        $fontSizes = (array) request('custom_fs', []);
+
+        $fields = [];
+        foreach ($keys as $index => $key) {
+            $fields[] = [
+                'key' => $key,
+                'label' => $labels[$index] ?? 'Custom Field',
+                'text' => $texts[$index] ?? '',
+                'x' => $xs[$index] ?? 60,
+                'y' => $ys[$index] ?? 60,
+                'width' => $widths[$index] ?? 180,
+                'font_size' => $fontSizes[$index] ?? 11,
+            ];
+        }
+
+        return $this->sanitizeCheckVoucherCustomFields($fields);
+    }
+
+    private function sanitizeCheckVoucherCustomFields($fields)
+    {
+        return array_values(array_map(function ($field) {
+            return [
+                'key' => preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) ($field['key'] ?? 'custom_'.uniqid())),
+                'label' => trim((string) ($field['label'] ?? 'Custom Field')),
+                'text' => trim((string) ($field['text'] ?? '')),
+                'x' => max(0, min(1800, (int) ($field['x'] ?? 60))),
+                'y' => max(0, min(2400, (int) ($field['y'] ?? 60))),
+                'width' => max(30, min(1000, (int) ($field['width'] ?? 180))),
+                'font_size' => max(7, min(40, (int) ($field['font_size'] ?? 11))),
+            ];
+        }, is_array($fields) ? $fields : []));
     }
 
     private function emptyPaymentPrintData()
@@ -1532,12 +1925,16 @@ class ModuleController extends Controller
         return [
             'id' => null,
             'voucher_no' => 'No saved payment',
+            'document_no' => 'No saved payment',
+            'document_date' => now()->format('m/d/Y'),
             'payment_no' => '-',
-            'company' => 'SeaJet Holdings Inc.',
+            'company' => 'SEA-JET INTERNATIONAL FORWARDERS INC.',
             'supplier' => '-',
             'shipment_job_id' => '-',
             'payment_method' => '-',
             'bank_account' => '-',
+            'account_name' => '-',
+            'account_no' => '-',
             'check_no' => '-',
             'bill_no' => '-',
             'description' => 'No AP payment has been saved yet.',
@@ -1545,6 +1942,8 @@ class ModuleController extends Controller
             'gross' => 0,
             'withholding' => 0,
             'net' => 0,
+            'debit_account_title' => 'A/P-Trade (BDO - PHP)',
+            'credit_account_title' => 'Cash in Bank-BDO CA# 4898002879',
             'amount_words' => 'Zero Pesos Only',
         ];
     }
@@ -1617,6 +2016,58 @@ class ModuleController extends Controller
         }
 
         return DB::table($table)->where('purchase_document_id', $billId)->get();
+    }
+
+    private function apBillPrintData($bill)
+    {
+        if (!Schema::hasTable('purchase_documents')) {
+            return ['bill' => null, 'lines' => []];
+        }
+
+        $query = DB::table('purchase_documents')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_documents.supplier_id')
+            ->select('purchase_documents.*', 'suppliers.name as supplier_name', 'suppliers.address as supplier_master_address');
+
+        $record = is_numeric($bill)
+            ? $query->where('purchase_documents.id', $bill)->first()
+            : $query->where('purchase_documents.document_no', $bill)->first();
+
+        if (!$record) {
+            return ['bill' => null, 'lines' => []];
+        }
+
+        $lines = $this->apBillLines($record->id);
+        $total = (float) (data_get($record, 'grand_total') ?? data_get($record, 'net_amount') ?? data_get($record, 'gross_amount') ?? 0);
+
+        return [
+            'bill' => [
+                'id' => $record->id,
+                'vendor' => data_get($record, 'supplier_name') ?: '-',
+                'vendor_address' => data_get($record, 'supplier_address') ?: (data_get($record, 'supplier_master_address') ?: ''),
+                'date' => data_get($record, 'document_date') ? \Carbon\Carbon::parse(data_get($record, 'document_date'))->format('m/d/Y') : '',
+                'ref_no' => data_get($record, 'reference_no') ?: data_get($record, 'document_no'),
+                'bill_no' => data_get($record, 'document_no'),
+                'bill_due' => data_get($record, 'due_date') ? \Carbon\Carbon::parse(data_get($record, 'due_date'))->format('m/d/Y') : '',
+                'terms' => data_get($record, 'terms') ?: '',
+                'memo' => data_get($record, 'memo') ?: (data_get($record, 'remarks') ?: ''),
+                'currency' => data_get($record, 'currency') ?: 'PHP',
+                'total' => $total,
+            ],
+            'lines' => $lines,
+        ];
+    }
+
+    private function latestPaymentIdForBill($billNo)
+    {
+        if (!$billNo || !Schema::hasTable('payments')) {
+            return null;
+        }
+
+        return DB::table('payments')
+            ->where('bill_no', $billNo)
+            ->orderBy('payment_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->value('id');
     }
 
     private function paymentArrayById($id)
@@ -4323,18 +4774,29 @@ class ModuleController extends Controller
 
     public function financeSettings()
     {
+        $companyId = $this->defaultCompanyId();
+        $company = Schema::hasTable('companies') ? DB::table('companies')->where('id', $companyId)->first() : null;
+        $branches = $this->financeBranches($companyId);
+        $costCenters = $this->financeCostCenters($companyId);
+        $items = $this->financeItems($companyId);
+        $numberSeries = $this->financeNumberSeries($companyId);
+        $taxCodes = $this->financeTaxCodes($companyId);
+        $currencyRates = $this->financeCurrencyRates($companyId);
+        $bankAccounts = $this->financeBankAccounts($companyId);
+        $accounts = $this->financeAccountOptions($companyId);
+
         $settingStats = [
-            ['label' => 'Cost Centers', 'value' => '4', 'icon' => 'bi-diagram-3', 'tone' => 'primary'],
-            ['label' => 'Item List', 'value' => '8', 'icon' => 'bi-box-seam', 'tone' => 'success'],
-            ['label' => 'Currencies', 'value' => 'PHP / USD', 'icon' => 'bi-currency-exchange', 'tone' => 'warning'],
-            ['label' => 'Tax Codes', 'value' => 'VAT / WHT', 'icon' => 'bi-percent', 'tone' => 'danger'],
+            ['label' => 'Cost Centers', 'value' => $costCenters->count(), 'icon' => 'bi-diagram-3', 'tone' => 'primary'],
+            ['label' => 'Items', 'value' => $items->count(), 'icon' => 'bi-box-seam', 'tone' => 'success'],
+            ['label' => 'Bank Accounts', 'value' => $bankAccounts->count(), 'icon' => 'bi-bank', 'tone' => 'warning'],
+            ['label' => 'Tax Codes', 'value' => $taxCodes->count(), 'icon' => 'bi-percent', 'tone' => 'danger'],
         ];
 
         $settingGroups = [
             'Accounting Setup' => [
                 ['name' => 'Chart of Accounts', 'description' => 'GL accounts for AR, AP, revenue, expenses, VAT, WHT, bank, cash, and equity.', 'route' => route('erp.accounting.coa'), 'icon' => 'bi-journal-text', 'status' => 'Active'],
                 ['name' => 'Cost Centers', 'description' => 'Department, branch, and operation-level cost tracking for management reporting.', 'route' => route('erp.settings.index').'#cost-centers', 'icon' => 'bi-diagram-3', 'status' => 'Required'],
-                ['name' => 'Number Series', 'description' => 'Document numbering for BI, SOA, OR, AP bills, check vouchers, payments, and journal entries.', 'route' => route('erp.action', 'number-series'), 'icon' => 'bi-123', 'status' => 'Active'],
+                ['name' => 'Number Series', 'description' => 'Document numbering for BI, SOA, OR, AP bills, check vouchers, payments, and journal entries.', 'route' => route('erp.settings.index').'#number-series', 'icon' => 'bi-123', 'status' => 'Active'],
             ],
             'Billing & Item Setup' => [
                 ['name' => 'Item List', 'description' => 'Service, freight, documentation, terminal handling, reimbursable, and tax treatment defaults.', 'route' => route('erp.settings.index').'#item-list', 'icon' => 'bi-box-seam', 'status' => 'Required'],
@@ -4342,9 +4804,9 @@ class ModuleController extends Controller
                 ['name' => 'Print Layouts', 'description' => 'Pre-printed form alignment, paper size, field positions, and custom printable fields.', 'route' => route('erp.billings.print-layout.invoice'), 'icon' => 'bi-sliders', 'status' => 'Active'],
             ],
             'Tax, Currency & Banking' => [
-                ['name' => 'Tax Codes', 'description' => '12% VAT, zero-rated, exempt, EWT, CWT, and withholding defaults for AR/AP.', 'route' => route('erp.tax.calculator'), 'icon' => 'bi-percent', 'status' => 'Active'],
-                ['name' => 'Currency Rates', 'description' => 'USD/PHP exchange rates for invoice, AP, payment, bank, and FX revaluation.', 'route' => route('erp.fx.index'), 'icon' => 'bi-currency-dollar', 'status' => 'Required'],
-                ['name' => 'Bank Accounts', 'description' => 'PHP and USD bank accounts for receipts, payments, check printing, and reconciliation.', 'route' => route('erp.banking.cashbook'), 'icon' => 'bi-bank', 'status' => 'Active'],
+                ['name' => 'Tax Codes', 'description' => '12% VAT, zero-rated, exempt, EWT, CWT, and withholding defaults for AR/AP.', 'route' => route('erp.settings.index').'#tax-codes', 'icon' => 'bi-percent', 'status' => 'Active'],
+                ['name' => 'Currency Rates', 'description' => 'USD/PHP exchange rates for invoice, AP, payment, bank, and FX revaluation.', 'route' => route('erp.settings.index').'#currency-rates', 'icon' => 'bi-currency-dollar', 'status' => 'Required'],
+                ['name' => 'Bank Accounts', 'description' => 'PHP and USD bank accounts for receipts, payments, check printing, and reconciliation.', 'route' => route('erp.settings.index').'#bank-accounts', 'icon' => 'bi-bank', 'status' => 'Active'],
             ],
             'Controls' => [
                 ['name' => 'Approval Matrix', 'description' => 'Approval limits for billing, AP payments, credit overrides, FX, tax, and user access.', 'route' => route('erp.approval-matrix'), 'icon' => 'bi-check2-square', 'status' => 'Active'],
@@ -4353,42 +4815,339 @@ class ModuleController extends Controller
             ],
         ];
 
-        $costCenters = [
-            ['CC-MNL-OPS', 'Manila Operations', 'Operations', 'MANILA', 'SeaJet Logistics', 'Active'],
-            ['CC-CEB-OPS', 'Cebu Operations', 'Operations', 'CEBU', 'SeaJet Logistics', 'Active'],
-            ['CC-PAM-OPS', 'Pampanga Operations', 'Operations', 'PAMPANGA', 'SeaJet Logistics', 'Active'],
-            ['CC-HQ-FIN', 'Head Office Finance', 'Finance', 'Main', 'SeaJet Holdings', 'Active'],
-        ];
+        return view('erp.settings.index', compact(
+            'settingStats',
+            'settingGroups',
+            'company',
+            'branches',
+            'costCenters',
+            'items',
+            'numberSeries',
+            'taxCodes',
+            'currencyRates',
+            'bankAccounts',
+            'accounts'
+        ));
+    }
 
-        $items = [
-            ['SVC-FREIGHT', 'Ocean Freight', 'Service Revenue', 'Zero-rated', 'USD / PHP', 'Billable'],
-            ['SVC-THC', 'Terminal Handling', 'Service Revenue', '12% VAT', 'PHP', 'Billable'],
-            ['SVC-DOC', 'Documentation Fee', 'Service Revenue', '12% VAT', 'PHP', 'Billable'],
-            ['REIMB-PORT', 'Port Advances / Reimbursable', 'A/R Reimbursable Charges', 'Exempt', 'USD / PHP', 'Reimbursable'],
-            ['AP-FUEL', 'Fuel / Trucking Expense', 'Cost of Services', '12% VAT + EWT', 'PHP', 'AP Expense'],
-            ['AP-BROKER', 'Brokerage Expense', 'Cost of Services', '12% VAT + EWT', 'PHP', 'AP Expense'],
-            ['BANK-FEE', 'Bank Charges', 'Bank Fees', 'Exempt', 'USD / PHP', 'Expense'],
-            ['FX-ADJ', 'FX Gain / Loss Adjustment', 'FX Gain/Loss', 'N/A', 'USD / PHP', 'Journal'],
-        ];
+    public function saveFinanceCompanySettings()
+    {
+        $data = request()->validate([
+            'name' => 'required|string|max:255',
+            'tin' => 'nullable|string|max:100',
+            'address' => 'nullable|string|max:1000',
+            'base_currency' => 'required|string|max:3',
+        ]);
 
-        $numberSeries = [
-            ['Billing Invoice', 'BI-', '000001', '6 digits', 'Active'],
-            ['Statement of Account', 'SOA-', '000001', '6 digits', 'Active'],
-            ['Official Receipt', 'OR-', '000001', '6 digits', 'Active'],
-            ['AP Bill', 'BILL-', '000001', '6 digits', 'Active'],
-            ['Check Voucher', 'CV-', '000001', '6 digits', 'Active'],
-            ['Journal Voucher', 'JV-', '000001', '6 digits', 'Active'],
-        ];
+        if (Schema::hasTable('companies')) {
+            DB::table('companies')->where('id', $this->defaultCompanyId())->update($this->tablePayload('companies', $data + ['updated_at' => now()]));
+        }
 
-        $taxCodes = [
-            ['VAT12', 'Output/Input VAT 12%', '12%', 'VAT', 'Sales and purchases'],
-            ['ZERO', 'Zero-rated', '0%', 'VAT', 'Export services'],
-            ['EXEMPT', 'VAT Exempt', '0%', 'VAT', 'Reimbursements and exempt items'],
-            ['EWT2', 'Expanded Withholding Tax', '2%', 'Withholding', 'Supplier services'],
-            ['CWT2', 'Creditable Withholding Tax', '2%', 'Withholding', 'Customer collections'],
-        ];
+        return redirect()->route('erp.settings.index')->with('status', 'Company finance settings saved.');
+    }
 
-        return view('erp.settings.index', compact('settingStats', 'settingGroups', 'costCenters', 'items', 'numberSeries', 'taxCodes'));
+    public function saveFinanceBranch()
+    {
+        $data = request()->validate([
+            'id' => 'nullable|integer',
+            'code' => 'required|string|max:50',
+            'name' => 'required|string|max:255',
+            'address' => 'nullable|string|max:1000',
+            'is_active' => 'nullable|string',
+        ]);
+
+        $this->upsertFinanceRow('branches', $data['id'] ?? null, [
+            'company_id' => $this->defaultCompanyId(),
+            'code' => strtoupper($data['code']),
+            'name' => $data['name'],
+            'address' => $data['address'] ?? null,
+            'is_active' => isset($data['is_active']),
+        ]);
+
+        return redirect()->route('erp.settings.index')->with('status', 'Branch saved.');
+    }
+
+    public function saveFinanceCostCenter()
+    {
+        $data = request()->validate([
+            'id' => 'nullable|integer',
+            'code' => 'required|string|max:50',
+            'name' => 'required|string|max:255',
+            'department' => 'nullable|string|max:255',
+            'branch_id' => 'nullable|integer',
+            'is_active' => 'nullable|string',
+        ]);
+
+        $this->upsertFinanceRow('cost_centers', $data['id'] ?? null, [
+            'company_id' => $this->defaultCompanyId(),
+            'branch_id' => $data['branch_id'] ?? null,
+            'code' => strtoupper($data['code']),
+            'name' => $data['name'],
+            'department' => $data['department'] ?? null,
+            'is_active' => isset($data['is_active']),
+        ]);
+
+        return redirect(route('erp.settings.index').'#cost-centers')->with('status', 'Cost center saved.');
+    }
+
+    public function saveFinanceItem()
+    {
+        $data = request()->validate([
+            'id' => 'nullable|integer',
+            'sku' => 'required|string|max:100',
+            'name' => 'required|string|max:255',
+            'category' => 'nullable|string|max:255',
+            'unit_of_measure' => 'required|string|max:50',
+            'standard_cost' => 'nullable',
+            'selling_price' => 'nullable',
+            'is_active' => 'nullable|string',
+        ]);
+
+        $this->upsertFinanceRow('items', $data['id'] ?? null, [
+            'company_id' => $this->defaultCompanyId(),
+            'sku' => strtoupper($data['sku']),
+            'name' => $data['name'],
+            'category' => $data['category'] ?? null,
+            'unit_of_measure' => $data['unit_of_measure'],
+            'standard_cost' => $this->moneyToFloat($data['standard_cost'] ?? 0),
+            'selling_price' => $this->moneyToFloat($data['selling_price'] ?? 0),
+            'is_active' => isset($data['is_active']),
+        ]);
+
+        return redirect(route('erp.settings.index').'#item-list')->with('status', 'Item saved.');
+    }
+
+    public function saveFinanceNumberSeries()
+    {
+        $data = request()->validate([
+            'id' => 'nullable|integer',
+            'document_type' => 'required|string|max:100',
+            'prefix' => 'nullable|string|max:20',
+            'current_number' => 'required|integer|min:0',
+            'padding' => 'required|integer|min:1|max:12',
+            'is_active' => 'nullable|string',
+        ]);
+
+        $this->upsertFinanceRow('number_series', $data['id'] ?? null, [
+            'company_id' => $this->defaultCompanyId(),
+            'document_type' => $data['document_type'],
+            'prefix' => $data['prefix'] ?? null,
+            'current_number' => (int) $data['current_number'],
+            'padding' => (int) $data['padding'],
+            'is_active' => isset($data['is_active']),
+        ]);
+
+        return redirect(route('erp.settings.index').'#number-series')->with('status', 'Number series saved.');
+    }
+
+    public function saveFinanceTaxCode()
+    {
+        $data = request()->validate([
+            'id' => 'nullable|integer',
+            'code' => 'required|string|max:50',
+            'name' => 'required|string|max:255',
+            'rate' => 'required',
+            'tax_type' => 'required|string|max:100',
+            'classification' => 'nullable|string|max:100',
+            'is_withholding' => 'nullable|string',
+            'withholding_kind' => 'nullable|string|max:100',
+            'account_id' => 'nullable|integer',
+            'is_active' => 'nullable|string',
+        ]);
+
+        $this->upsertFinanceRow('tax_codes', $data['id'] ?? null, [
+            'company_id' => $this->defaultCompanyId(),
+            'code' => strtoupper($data['code']),
+            'name' => $data['name'],
+            'rate' => $this->moneyToFloat($data['rate']),
+            'tax_type' => $data['tax_type'],
+            'classification' => $data['classification'] ?? null,
+            'is_withholding' => isset($data['is_withholding']),
+            'withholding_kind' => $data['withholding_kind'] ?? null,
+            'account_id' => $data['account_id'] ?? null,
+            'is_active' => isset($data['is_active']),
+        ]);
+
+        return redirect(route('erp.settings.index').'#tax-codes')->with('status', 'Tax code saved.');
+    }
+
+    public function saveFinanceCurrencyRate()
+    {
+        $data = request()->validate([
+            'id' => 'nullable|integer',
+            'source_currency' => 'required|string|max:3',
+            'target_currency' => 'required|string|max:3',
+            'rate_date' => 'required|date',
+            'rate' => 'required',
+            'rate_source' => 'nullable|string|max:100',
+            'is_active' => 'nullable|string',
+        ]);
+
+        $this->upsertFinanceRow('currency_rates', $data['id'] ?? null, [
+            'company_id' => $this->defaultCompanyId(),
+            'source_currency' => strtoupper($data['source_currency']),
+            'target_currency' => strtoupper($data['target_currency']),
+            'rate_date' => $data['rate_date'],
+            'rate' => $this->moneyToFloat($data['rate']),
+            'rate_source' => $data['rate_source'] ?? null,
+            'is_active' => isset($data['is_active']),
+        ]);
+
+        return redirect(route('erp.settings.index').'#currency-rates')->with('status', 'Currency rate saved.');
+    }
+
+    public function saveFinanceBankAccount()
+    {
+        $data = request()->validate([
+            'id' => 'nullable|integer',
+            'bank_name' => 'required|string|max:255',
+            'branch_name' => 'nullable|string|max:255',
+            'account_name' => 'required|string|max:255',
+            'account_no' => 'required|string|max:100',
+            'swift_code' => 'nullable|string|max:50',
+            'currency' => 'required|string|max:3',
+            'book_balance' => 'nullable',
+            'bank_balance' => 'nullable',
+            'account_id' => 'nullable|integer',
+            'is_active' => 'nullable|string',
+        ]);
+
+        $this->upsertFinanceRow('bank_accounts', $data['id'] ?? null, [
+            'company_id' => $this->defaultCompanyId(),
+            'account_id' => $data['account_id'] ?? null,
+            'bank_name' => $data['bank_name'],
+            'branch_name' => $data['branch_name'] ?? null,
+            'account_name' => $data['account_name'],
+            'account_no' => $data['account_no'],
+            'swift_code' => $data['swift_code'] ?? null,
+            'currency' => strtoupper($data['currency']),
+            'book_balance' => $this->moneyToFloat($data['book_balance'] ?? 0),
+            'bank_balance' => $this->moneyToFloat($data['bank_balance'] ?? 0),
+            'is_active' => isset($data['is_active']),
+        ]);
+
+        return redirect(route('erp.settings.index').'#bank-accounts')->with('status', 'Bank account saved.');
+    }
+
+    private function upsertFinanceRow($table, $id, array $payload)
+    {
+        if (!Schema::hasTable($table)) {
+            return;
+        }
+
+        $payload = $this->tablePayload($table, $payload + ['updated_at' => now()]);
+        if ($id && DB::table($table)->where('id', $id)->exists()) {
+            DB::table($table)->where('id', $id)->update($payload);
+            return;
+        }
+
+        $payload['created_at'] = now();
+        DB::table($table)->insert($payload);
+    }
+
+    private function financeBranches($companyId)
+    {
+        if (!Schema::hasTable('branches')) {
+            return collect();
+        }
+
+        return DB::table('branches')
+            ->where('company_id', $companyId)
+            ->orderBy('code')
+            ->get();
+    }
+
+    private function financeCostCenters($companyId)
+    {
+        if (!Schema::hasTable('cost_centers')) {
+            return collect();
+        }
+
+        return DB::table('cost_centers')
+            ->leftJoin('branches', 'branches.id', '=', 'cost_centers.branch_id')
+            ->select('cost_centers.*', 'branches.code as branch_code', 'branches.name as branch_name')
+            ->where('cost_centers.company_id', $companyId)
+            ->orderBy('cost_centers.code')
+            ->get();
+    }
+
+    private function financeItems($companyId)
+    {
+        if (!Schema::hasTable('items')) {
+            return collect();
+        }
+
+        return DB::table('items')
+            ->where('company_id', $companyId)
+            ->orderBy('sku')
+            ->get();
+    }
+
+    private function financeNumberSeries($companyId)
+    {
+        if (!Schema::hasTable('number_series')) {
+            return collect();
+        }
+
+        return DB::table('number_series')
+            ->where('company_id', $companyId)
+            ->orderBy('document_type')
+            ->get();
+    }
+
+    private function financeTaxCodes($companyId)
+    {
+        if (!Schema::hasTable('tax_codes')) {
+            return collect();
+        }
+
+        return DB::table('tax_codes')
+            ->leftJoin('accounts', 'accounts.id', '=', 'tax_codes.account_id')
+            ->select('tax_codes.*', 'accounts.code as account_code', 'accounts.name as account_name')
+            ->where('tax_codes.company_id', $companyId)
+            ->orderBy('tax_codes.code')
+            ->get();
+    }
+
+    private function financeCurrencyRates($companyId)
+    {
+        if (!Schema::hasTable('currency_rates')) {
+            return collect();
+        }
+
+        return DB::table('currency_rates')
+            ->where('company_id', $companyId)
+            ->orderBy('rate_date', 'desc')
+            ->orderBy('source_currency')
+            ->limit(20)
+            ->get();
+    }
+
+    private function financeBankAccounts($companyId)
+    {
+        if (!Schema::hasTable('bank_accounts')) {
+            return collect();
+        }
+
+        return DB::table('bank_accounts')
+            ->leftJoin('accounts', 'accounts.id', '=', 'bank_accounts.account_id')
+            ->select('bank_accounts.*', 'accounts.code as gl_code', 'accounts.name as gl_name')
+            ->where('bank_accounts.company_id', $companyId)
+            ->orderBy('bank_accounts.bank_name')
+            ->get();
+    }
+
+    private function financeAccountOptions($companyId)
+    {
+        if (!Schema::hasTable('accounts')) {
+            return collect();
+        }
+
+        return DB::table('accounts')
+            ->where('company_id', $companyId)
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get();
     }
 
     public function agingReport()

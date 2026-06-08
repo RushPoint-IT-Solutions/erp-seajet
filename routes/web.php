@@ -45,11 +45,17 @@ Route::prefix('/erp/users')->name('erp.users.')->middleware(['auth', 'user.acces
 });
 Route::middleware(['auth', 'user.access:administrator,admin,accounting,finance'])->group(function () {
     Route::get('/erp/payables/vendor-bills/create', 'Erp\ModuleController@vendorBillCreate')->name('erp.payables.vendor-bills.create');
+    Route::get('/erp/payables/vendor-bills/view/{bill}', 'Erp\ModuleController@vendorBillView')->name('erp.payables.vendor-bills.view');
+    Route::get('/erp/payables/vendor-bills/print/{bill}', 'Erp\ModuleController@vendorBillPrint')->name('erp.payables.vendor-bills.print');
+    Route::post('/erp/payables/vendor-bills/{bill}/attachments', 'Erp\ModuleController@uploadVendorBillAttachments')->name('erp.payables.vendor-bills.attachments');
     Route::post('/erp/payables/vendor-bills/review', 'Erp\ModuleController@vendorBillReview')->name('erp.payables.vendor-bills.review');
     Route::get('/erp/expenses', 'Erp\ModuleController@expensesIndex')->name('erp.expenses.index');
     Route::get('/erp/payables/payments/create', 'Erp\ModuleController@apPaymentCreate')->name('erp.payables.payments.create');
     Route::post('/erp/payables/payments/review', 'Erp\ModuleController@apPaymentReview')->name('erp.payables.payments.review');
     Route::get('/erp/payables/payment-approvals', 'Erp\ModuleController@paymentApprovals')->name('erp.payables.approvals');
+    Route::get('/erp/payables/check-voucher/print-layout', 'Erp\ModuleController@checkVoucherPrintLayout')->name('erp.payables.check-voucher.layout');
+    Route::post('/erp/payables/check-voucher/print-layout/save', 'Erp\ModuleController@saveCheckVoucherPrintLayout')->name('erp.payables.check-voucher.layout.save');
+    Route::get('/erp/payables/check-voucher/bill/{bill}', 'Erp\ModuleController@checkVoucherForBill')->name('erp.payables.check-voucher.bill');
     Route::get('/erp/payables/check-voucher/preview/{payment?}', 'Erp\ModuleController@checkVoucherPreview')->name('erp.payables.check-voucher');
     Route::get('/erp/payables/check/print/{payment?}', 'Erp\ModuleController@checkPrint')->name('erp.payables.check-print');
     Route::get('/erp/payables/aging', 'Erp\ModuleController@apAging')->name('erp.payables.aging');
@@ -117,4 +123,12 @@ Route::middleware(['auth', 'user.access:administrator,admin,accounting,finance']
     Route::get('/erp/customer-billing/aging', 'Erp\ModuleController@agingReport')->name('erp.customer-billing.aging');
 });
 Route::get('/erp/settings', 'Erp\ModuleController@financeSettings')->name('erp.settings.index')->middleware(['auth', 'user.access:administrator,admin,accounting']);
+Route::post('/erp/settings/company', 'Erp\ModuleController@saveFinanceCompanySettings')->name('erp.settings.company.save')->middleware(['auth', 'user.access:administrator,admin,accounting']);
+Route::post('/erp/settings/branches', 'Erp\ModuleController@saveFinanceBranch')->name('erp.settings.branches.save')->middleware(['auth', 'user.access:administrator,admin,accounting']);
+Route::post('/erp/settings/cost-centers', 'Erp\ModuleController@saveFinanceCostCenter')->name('erp.settings.cost-centers.save')->middleware(['auth', 'user.access:administrator,admin,accounting']);
+Route::post('/erp/settings/items', 'Erp\ModuleController@saveFinanceItem')->name('erp.settings.items.save')->middleware(['auth', 'user.access:administrator,admin,accounting']);
+Route::post('/erp/settings/number-series', 'Erp\ModuleController@saveFinanceNumberSeries')->name('erp.settings.number-series.save')->middleware(['auth', 'user.access:administrator,admin,accounting']);
+Route::post('/erp/settings/tax-codes', 'Erp\ModuleController@saveFinanceTaxCode')->name('erp.settings.tax-codes.save')->middleware(['auth', 'user.access:administrator,admin,accounting']);
+Route::post('/erp/settings/currency-rates', 'Erp\ModuleController@saveFinanceCurrencyRate')->name('erp.settings.currency-rates.save')->middleware(['auth', 'user.access:administrator,admin,accounting']);
+Route::post('/erp/settings/bank-accounts', 'Erp\ModuleController@saveFinanceBankAccount')->name('erp.settings.bank-accounts.save')->middleware(['auth', 'user.access:administrator,admin,accounting']);
 Route::get('/erp/{module}', 'Erp\ModuleController@show')->name('erp.modules.show')->middleware(['auth', 'user.access:administrator,admin,accounting,finance']);

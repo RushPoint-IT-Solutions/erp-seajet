@@ -13,13 +13,14 @@
     </div>
     <div class="erp-card p-3">
         <table class="table table-hover align-middle module-table w-100">
-            <thead><tr><th>Payment No</th><th>Supplier</th><th>Shipment Job ID</th><th>Currency</th><th class="text-end">Amount</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+            <thead><tr><th>Payment No</th><th>Supplier</th><th>Shipment Job ID</th><th>Check No</th><th>Currency</th><th class="text-end">Amount</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
             <tbody>
             @foreach($approvals as $row)
                 <tr>
                     <td>{{ $row['payment_no'] }}</td>
                     <td>{{ $row['supplier'] }}</td>
                     <td>{{ $row['shipment_job_id'] }}</td>
+                    <td>{{ $row['check_no'] }}</td>
                     <td>{{ $row['currency'] }}</td>
                     <td class="text-end">{{ $row['amount'] }}</td>
                     <td>{{ $row['status'] }}</td>

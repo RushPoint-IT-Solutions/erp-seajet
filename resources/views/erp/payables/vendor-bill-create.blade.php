@@ -81,8 +81,24 @@
 @section('content')
     <div class="bill-workspace">
         @php($bill = $bill ?? [])
+        @php($lines = collect($lines ?? []))
+        @php($attachments = collect($attachments ?? []))
+        @if(session('status'))
+            <div class="alert alert-success">{{ session('status') }}</div>
+        @endif
+        @if($errors->any())
+            <div class="alert alert-danger">
+                <div class="fw-semibold mb-1">Please fix the highlighted fields.</div>
+                <ul class="mb-0">
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
         <form method="post" action="{{ route('erp.payables.vendor-bills.review') }}" id="billForm" enctype="multipart/form-data">
             {{ csrf_field() }}
+            <input type="hidden" name="original_bill_no" value="{{ $bill['bill_no'] ?? '' }}">
 
             <div class="bill-toolbar d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 no-print">
                 <div class="d-flex flex-wrap gap-2">
@@ -101,16 +117,16 @@
 
             <div class="d-flex flex-wrap align-items-center gap-4 mb-3">
                 <div class="d-flex align-items-center gap-3">
-                    <label class="form-check-label"><input class="form-check-input me-1" type="radio" name="transaction_type" value="Bill" checked> Bill</label>
-                    <label class="form-check-label"><input class="form-check-input me-1" type="radio" name="transaction_type" value="Credit"> Credit</label>
+                    <label class="form-check-label"><input class="form-check-input me-1" type="radio" name="transaction_type" value="Bill" {{ ($bill['transaction_type'] ?? 'Bill') === 'Bill' ? 'checked' : '' }}> Bill</label>
+                    <label class="form-check-label"><input class="form-check-input me-1" type="radio" name="transaction_type" value="Credit" {{ ($bill['transaction_type'] ?? 'Bill') === 'Credit' ? 'checked' : '' }}> Credit</label>
                 </div>
                 <div class="d-flex align-items-center gap-2 flex-grow-1" style="max-width: 460px">
                     <label class="fw-semibold small text-muted text-nowrap">A/P Account</label>
                     <select name="ap_account" class="form-select form-select-sm bill-field">
                         <option value=""></option>
-                        <option>AP-Trade (BDO - USD)</option>
-                        <option>Accounts Payable Trade - PHP</option>
-                        <option>Operating Expense Payable</option>
+                        @foreach(['AP-Trade (BDO - USD)', 'Accounts Payable Trade - PHP', 'Operating Expense Payable'] as $account)
+                            <option value="{{ $account }}" {{ ($bill['ap_account'] ?? '') === $account ? 'selected' : '' }}>{{ $account }}</option>
+                        @endforeach
                     </select>
                 </div>
                     <label class="form-check-label ms-auto"><input class="form-check-input me-1" type="checkbox" name="bill_received" value="Yes" {{ ($bill['bill_received'] ?? '') === 'Yes' ? 'checked' : '' }}> Bill Received</label>
@@ -154,8 +170,8 @@
                                     </select>
                                 </div>
                                 <div class="col-7">
-                                    <label class="form-label small text-muted">Bill No</label>
-                                    <input name="bill_no" class="form-control bill-field" value="{{ $bill['bill_no'] ?? $nextBillNo }}">
+                                    <label class="form-label small text-muted">Bill No <span class="fw-normal">(Automatic)</span></label>
+                                    <input name="bill_no" class="form-control bill-field bg-light" value="{{ $bill['bill_no'] ?? $nextBillNo }}" readonly>
                                 </div>
                             </div>
                         </div>
@@ -253,45 +269,47 @@
                         </tr>
                         </thead>
                         <tbody>
+                        @forelse($lines->count() ? $lines : collect([null]) as $index => $line)
                         <tr>
                             <td>
                                 <select name="expense_account[]" class="form-select">
                                     <option value=""></option>
-                                    <option>Rebates</option>
-                                    <option>5000 - Cost of Services</option>
-                                    <option>5100 - Operating Expenses</option>
-                                    <option>2200 - Input VAT Clearing</option>
+                                    @foreach(['Reimbursable charges', 'Rebates', '5000 - Cost of Services', '5100 - Operating Expenses', '2200 - Input VAT Clearing'] as $account)
+                                        <option value="{{ $account }}" {{ ($line && ($line->account_name ?? '') === $account) ? 'selected' : '' }}>{{ $account }}</option>
+                                    @endforeach
                                 </select>
                             </td>
                             <td>
                                 <select name="expense_tax[]" class="form-select">
                                     <option value=""></option>
-                                    <option>VAT12</option>
-                                    <option>ZERO</option>
-                                    <option>EXEMPT</option>
+                                    @foreach(['VAT12', 'ZERO', 'EXEMPT'] as $tax)
+                                        <option value="{{ $tax }}" {{ ($line && ($line->tax_category ?? '') === $tax) ? 'selected' : '' }}>{{ $tax }}</option>
+                                    @endforeach
                                 </select>
                             </td>
-                            <td><input name="expense_amount[]" class="form-control text-end expense-amount" value=""></td>
-                            <td><input name="expense_memo[]" class="form-control" value=""></td>
+                            <td><input name="expense_amount[]" class="form-control text-end expense-amount" value="{{ $line ? number_format((float) ($line->amount ?? $line->line_total ?? 0), 2) : '' }}"></td>
+                            <td><input name="expense_memo[]" class="form-control" value="{{ $line ? ($line->memo ?? $line->description ?? '') : '' }}"></td>
                             <td>
                                 <select name="expense_customer_job[]" class="form-select line-customer">
                                     <option value=""></option>
                                     @foreach($customers as $customer)
-                                        <option value="{{ $customer['customer_id'] }}">{{ $customer['customer_id'] }} - {{ $customer['name'] }}</option>
+                                        <option value="{{ $customer['customer_id'] }}" {{ ($line && ($line->customer_job_id ?? '') === $customer['customer_id']) ? 'selected' : '' }}>{{ $customer['customer_id'] }} - {{ $customer['name'] }}</option>
                                     @endforeach
                                 </select>
                             </td>
-                            <td class="text-center"><input name="expense_billable[]" class="form-check-input" type="checkbox" value="Yes"></td>
+                            <td class="text-center"><input name="expense_billable[{{ $index }}]" class="form-check-input expense-billable" type="checkbox" value="Yes" {{ ($line && !empty($line->is_billable)) ? 'checked' : '' }}></td>
                             <td>
                                 <select name="expense_class[]" class="form-select">
                                     <option value=""></option>
-                                    <option>MANILA</option>
-                                    <option>PAMPANGA</option>
-                                    <option>CEBU</option>
+                                    @foreach(['MANILA', 'PAMPANGA', 'CEBU'] as $class)
+                                        <option value="{{ $class }}" {{ ($line && ($line->class_code ?? '') === $class) ? 'selected' : '' }}>{{ $class }}</option>
+                                    @endforeach
                                 </select>
                             </td>
                             <td class="text-center no-print"><button type="button" class="btn btn-sm btn-outline-danger remove-line"><i class="bi bi-trash"></i></button></td>
                         </tr>
+                        @empty
+                        @endforelse
                         </tbody>
                     </table>
                 </div>
@@ -309,6 +327,13 @@
                         <button class="btn btn-primary" name="save_mode" value="new"><i class="bi bi-save2 me-1"></i>Save & New</button>
                     </div>
                 </div>
+                @if($attachments->count())
+                    <div class="d-flex flex-wrap gap-2 mt-3">
+                        @foreach($attachments as $attachment)
+                            <span class="badge badge-soft py-2 px-3"><i class="bi bi-paperclip me-1"></i>{{ $attachment->original_name }}</span>
+                        @endforeach
+                    </div>
+                @endif
             </div>
         </form>
     </div>
@@ -368,6 +393,12 @@
             $('#phpAmount').val(php ? money(php) : '');
         }
 
+        function reindexRows() {
+            $('#expenseLines tbody tr').each(function (index) {
+                $(this).find('.expense-billable').attr('name', 'expense_billable[' + index + ']');
+            });
+        }
+
         $('#supplierSelect').on('change', function () {
             syncSupplier();
             recalc();
@@ -382,15 +413,18 @@
             row.find('input[type="checkbox"]').prop('checked', false);
             row.find('select').val('');
             $('#expenseLines tbody').append(row);
+            reindexRows();
         });
 
         $('#expenseLines').on('click', '.remove-line', function () {
             if ($('#expenseLines tbody tr').length > 1) {
                 $(this).closest('tr').remove();
+                reindexRows();
                 recalc();
             }
         });
 
+        reindexRows();
         recalc();
     });
 </script>

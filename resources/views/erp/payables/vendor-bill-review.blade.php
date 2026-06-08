@@ -9,8 +9,26 @@
             <h1 class="h3 fw-bold mb-1">Vendor Bill Ready for Approval</h1>
             <p class="text-muted mb-0">Shipment-linked AP bill captured with withholding tax and multi-currency details.</p>
         </div>
-        <a href="{{ route('erp.payables.approvals') }}" class="btn btn-primary"><i class="bi bi-check2-square me-1"></i> Send for Approval</a>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{{ route('erp.payables.vendor-bills.print', $bill['bill_no']) }}" class="btn btn-outline-secondary"><i class="bi bi-printer me-1"></i> Print Bill</a>
+            <a href="{{ route('erp.payables.check-voucher.bill', $bill['bill_no']) }}" class="btn btn-outline-secondary"><i class="bi bi-receipt me-1"></i> Check Voucher</a>
+            <a href="{{ route('erp.payables.check-voucher.layout') }}" class="btn btn-outline-secondary"><i class="bi bi-sliders me-1"></i> Voucher Layout</a>
+            <a href="{{ route('erp.payables.approvals') }}" class="btn btn-primary"><i class="bi bi-check2-square me-1"></i> Send for Approval</a>
+        </div>
     </div>
+    @if(session('status'))
+        <div class="alert alert-success">{{ session('status') }}</div>
+    @endif
+    @if($errors->any())
+        <div class="alert alert-danger">
+            <div class="fw-semibold mb-1">Please fix the highlighted fields.</div>
+            <ul class="mb-0">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
     <div class="erp-card p-4">
         <div class="row g-3">
             @foreach($bill as $label => $value)
@@ -53,18 +71,32 @@
                 </table>
             </div>
         @endif
-        @if(isset($attachments) && count($attachments))
-            <hr>
-            <h2 class="h6 fw-bold">Attached Documents</h2>
-            <div class="d-flex flex-wrap gap-2">
-                @foreach($attachments as $attachment)
-                    <span class="badge badge-soft py-2 px-3"><i class="bi bi-paperclip me-1"></i>{{ $attachment->original_name }}</span>
-                @endforeach
+        <hr>
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+                <h2 class="h6 fw-bold">Attached Documents</h2>
+                @if(isset($attachments) && count($attachments))
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach($attachments as $attachment)
+                            <span class="badge badge-soft py-2 px-3"><i class="bi bi-paperclip me-1"></i>{{ $attachment->original_name }}</span>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="text-muted small">No documents attached yet.</div>
+                @endif
             </div>
-        @endif
+            <form method="post" action="{{ route('erp.payables.vendor-bills.attachments', $bill['bill_no']) }}" enctype="multipart/form-data" class="d-flex flex-wrap gap-2">
+                {{ csrf_field() }}
+                <input type="file" name="attachments[]" class="form-control form-control-sm" multiple required>
+                <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-upload me-1"></i>Upload</button>
+            </form>
+        </div>
         <div class="d-flex gap-2 mt-3">
             <a href="{{ route('erp.expenses.index') }}" class="btn btn-outline-secondary"><i class="bi bi-list-ul me-1"></i> Expense List</a>
+            <a href="{{ route('erp.payables.vendor-bills.create', ['bill' => $bill['bill_no']]) }}" class="btn btn-outline-secondary"><i class="bi bi-pencil me-1"></i> Edit Bill</a>
             <a href="{{ route('erp.payables.vendor-bills.create') }}" class="btn btn-outline-secondary"><i class="bi bi-plus-lg me-1"></i> Enter Another Bill</a>
+            <a href="{{ route('erp.payables.vendor-bills.print', $bill['bill_no']) }}" class="btn btn-outline-secondary"><i class="bi bi-printer me-1"></i> Print Bill</a>
+            <a href="{{ route('erp.payables.check-voucher.bill', $bill['bill_no']) }}" class="btn btn-outline-secondary"><i class="bi bi-receipt me-1"></i> Check Voucher</a>
             <a href="{{ route('erp.payables.payments.create', ['bill' => $bill['bill_no']]) }}" class="btn btn-primary"><i class="bi bi-cash-stack me-1"></i> Pay Bill</a>
         </div>
     </div>

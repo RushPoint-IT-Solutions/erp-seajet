@@ -6,14 +6,13 @@
 @section('content')
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
         <div>
-            <h1 class="h3 fw-bold mb-1">C) Accounts Payable (AP)</h1>
+            <h1 class="h3 fw-bold mb-1">Accounts Payable (AP)</h1>
             <p class="text-muted mb-0">Vendor bills, shipment-linked client tagging, payment approvals, vouchers, checks, withholding tax, aging, and USD/PHP payables.</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
             <a href="{{ route('erp.payables.vendor-bills.create') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i> Vendor Bill</a>
             <a href="{{ route('erp.payables.approvals') }}" class="btn btn-outline-secondary"><i class="bi bi-check2-square me-1"></i> Approvals</a>
             <a href="{{ route('erp.payables.payments.create') }}" class="btn btn-outline-secondary"><i class="bi bi-credit-card me-1"></i> Pay Bills</a>
-            <a href="{{ route('erp.payables.check-voucher') }}" class="btn btn-outline-secondary"><i class="bi bi-printer me-1"></i> Check Voucher</a>
             <a href="{{ route('erp.payables.aging') }}" class="btn btn-outline-secondary"><i class="bi bi-clock-history me-1"></i> AP Aging</a>
             <a href="{{ route('erp.export', 'expenses') }}" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-excel me-1"></i> Export</a>
         </div>
@@ -72,8 +71,8 @@
                                 <td><span class="badge badge-soft">{{ $expense[6] }}</span></td>
                                 <td>{{ $expense[7] }}</td>
                                 <td class="text-end no-print">
+                                    <a href="{{ route('erp.payables.vendor-bills.view', $expense[0]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="View bill"><i class="bi bi-eye"></i></a>
                                     <a href="{{ route('erp.payables.vendor-bills.create', ['bill' => $expense[0]]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="Edit bill"><i class="bi bi-pencil"></i></a>
-                                    <a href="{{ route('erp.payables.check-voucher') }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="Print check voucher"><i class="bi bi-printer"></i></a>
                                     <a href="{{ route('erp.payables.payments.create', ['bill' => $expense[0]]) }}" class="btn btn-sm btn-primary" data-bs-toggle="tooltip" title="Process payment"><i class="bi bi-cash"></i></a>
                                 </td>
                             </tr>
