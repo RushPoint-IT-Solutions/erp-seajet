@@ -12,11 +12,7 @@ class UserAccessControl
         $allowedRoles = empty($roles) ? ['admin'] : $roles;
 
         if (!$user) {
-            if (config('app.debug')) {
-                return $next($request);
-            }
-
-            abort(403, 'User access control requires an authenticated user.');
+            return redirect()->guest(route('login'));
         }
 
         $userRole = strtolower((string) ($user->role ?? 'viewer'));

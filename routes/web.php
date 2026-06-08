@@ -11,22 +11,29 @@
 |
 */
 
-Route::get('/', 'Erp\DashboardController@index')->name('erp.dashboard');
-Route::get('/erp/transactions/data', 'Erp\DashboardController@transactions')->name('erp.transactions.data');
+Route::get('/login', 'Auth\LoginController@showLoginForm')->name('login');
+Route::post('/login', 'Auth\LoginController@login');
+Route::post('/logout', 'Auth\LoginController@logout')->name('logout');
+
 Route::get('/client/invoices/{token}', 'Erp\ModuleController@publicInvoice')->name('erp.public.invoice');
 Route::get('/client/invoices/{token}/checkout', 'Erp\ModuleController@publicCheckout')->name('erp.public.checkout');
 Route::post('/webhooks/stripe', 'Erp\ModuleController@stripeWebhook')->name('erp.webhooks.stripe');
-Route::middleware('user.access:administrator,admin,accounting,finance')->group(function () {
+
+Route::middleware(['auth', 'user.access:administrator,admin,accounting,finance'])->group(function () {
+    Route::get('/', 'Erp\DashboardController@index')->name('erp.dashboard');
+    Route::get('/erp/transactions/data', 'Erp\DashboardController@transactions')->name('erp.transactions.data');
     Route::get('/erp/notifications', 'Erp\ModuleController@notifications')->name('erp.notifications');
     Route::get('/erp/action/approval-matrix', 'Erp\ModuleController@approvalMatrix')->name('erp.approval-matrix');
     Route::get('/erp/action/{action}', 'Erp\ModuleController@action')->name('erp.action');
     Route::get('/erp/export/{type}', 'Erp\ModuleController@export')->name('erp.export');
     Route::get('/erp/customers', 'Erp\ModuleController@customers')->name('erp.customers.index');
     Route::get('/erp/customers/create', 'Erp\ModuleController@customerCreate')->name('erp.customers.create');
+    Route::post('/erp/customers', 'Erp\ModuleController@customerStore')->name('erp.customers.store');
     Route::get('/erp/suppliers', 'Erp\ModuleController@suppliers')->name('erp.suppliers.index');
     Route::get('/erp/suppliers/create', 'Erp\ModuleController@supplierCreate')->name('erp.suppliers.create');
+    Route::post('/erp/suppliers', 'Erp\ModuleController@supplierStore')->name('erp.suppliers.store');
 });
-Route::prefix('/erp/users')->name('erp.users.')->middleware('user.access:administrator,admin')->group(function () {
+Route::prefix('/erp/users')->name('erp.users.')->middleware(['auth', 'user.access:administrator,admin'])->group(function () {
     Route::get('/', 'Erp\ModuleController@usersIndex')->name('index');
     Route::get('/create', 'Erp\ModuleController@userCreate')->name('create');
     Route::post('/review', 'Erp\ModuleController@userReview')->name('review');
@@ -36,7 +43,7 @@ Route::prefix('/erp/users')->name('erp.users.')->middleware('user.access:adminis
     Route::get('/status/update', 'Erp\ModuleController@userStatus')->name('status');
     Route::post('/status/review', 'Erp\ModuleController@userStatusReview')->name('status.review');
 });
-Route::middleware('user.access:administrator,admin,accounting,finance')->group(function () {
+Route::middleware(['auth', 'user.access:administrator,admin,accounting,finance'])->group(function () {
     Route::get('/erp/payables/vendor-bills/create', 'Erp\ModuleController@vendorBillCreate')->name('erp.payables.vendor-bills.create');
     Route::post('/erp/payables/vendor-bills/review', 'Erp\ModuleController@vendorBillReview')->name('erp.payables.vendor-bills.review');
     Route::get('/erp/expenses', 'Erp\ModuleController@expensesIndex')->name('erp.expenses.index');
@@ -109,5 +116,5 @@ Route::middleware('user.access:administrator,admin,accounting,finance')->group(f
     Route::get('/erp/customer-billing/templates', 'Erp\ModuleController@customerBillingTemplates')->name('erp.customer-billing.templates');
     Route::get('/erp/customer-billing/aging', 'Erp\ModuleController@agingReport')->name('erp.customer-billing.aging');
 });
-Route::get('/erp/settings', 'Erp\ModuleController@financeSettings')->name('erp.settings.index')->middleware('user.access:administrator,admin,accounting');
-Route::get('/erp/{module}', 'Erp\ModuleController@show')->name('erp.modules.show')->middleware('user.access:administrator,admin,accounting,finance');
+Route::get('/erp/settings', 'Erp\ModuleController@financeSettings')->name('erp.settings.index')->middleware(['auth', 'user.access:administrator,admin,accounting']);
+Route::get('/erp/{module}', 'Erp\ModuleController@show')->name('erp.modules.show')->middleware(['auth', 'user.access:administrator,admin,accounting,finance']);

@@ -91,7 +91,7 @@
                     <a href="{{ route('erp.expenses.index') }}" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg me-1"></i>Delete</a>
                     <button class="btn btn-sm btn-outline-secondary" type="button" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
                     <a href="{{ route('erp.action', 'upload-document') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-paperclip me-1"></i>Attach File</a>
-                    <a href="{{ route('erp.action', 'create-po') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-list-check me-1"></i>Select PO</a>
+                    <a href="{{ route('erp.suppliers.index') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-building me-1"></i>Select Vendor</a>
                     <button class="btn btn-sm btn-outline-secondary" type="button" id="recalculateBill"><i class="bi bi-calculator me-1"></i>Recalculate</button>
                     <a href="{{ route('erp.payables.payments.create') }}" class="btn btn-sm btn-primary"><i class="bi bi-cash-stack me-1"></i>Pay Bill</a>
                 </div>

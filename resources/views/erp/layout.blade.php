@@ -306,6 +306,24 @@
                 </select>
                 <a href="{{ route('erp.notifications') }}" class="btn btn-outline-secondary btn-sm" title="Notifications"><i class="bi bi-bell"></i></a>
                 <a href="{{ route('erp.invoices.create') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i> Quick Entry</a>
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-person-circle me-1"></i>{{ auth()->user()->name ?? 'User' }}
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end">
+                        <div class="dropdown-header">
+                            <div class="fw-semibold">{{ auth()->user()->email ?? '' }}</div>
+                            <small>{{ auth()->user()->role ?? '' }}</small>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <form method="post" action="{{ route('logout') }}">
+                            @csrf
+                            <button type="submit" class="dropdown-item">
+                                <i class="bi bi-box-arrow-right me-2"></i>Logout
+                            </button>
+                        </form>
+                    </div>
+                </div>
             </div>
         </header>
         <section class="p-4">

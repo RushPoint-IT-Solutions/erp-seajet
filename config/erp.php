@@ -15,7 +15,6 @@ return [
         'billing' => ['label' => 'Billing Invoice', 'icon' => 'bi-file-earmark-text', 'route' => 'erp.modules.show'],
         'collections' => ['label' => 'Collections', 'icon' => 'bi-cash-coin', 'route' => 'erp.modules.show'],
         'payables' => ['label' => 'Accounts Payable', 'icon' => 'bi-credit-card-2-front', 'route' => 'erp.modules.show'],
-        'purchasing' => ['label' => 'Purchasing', 'icon' => 'bi-cart-check', 'route' => 'erp.modules.show'],
         'banking' => ['label' => 'Banking', 'icon' => 'bi-bank', 'route' => 'erp.modules.show'],
         'fx' => ['label' => 'Multi-Currency & FX', 'icon' => 'bi-currency-exchange', 'route' => 'erp.fx.index'],
         'reports' => ['label' => 'Financial Reports', 'icon' => 'bi-bar-chart-line', 'route' => 'erp.modules.show'],

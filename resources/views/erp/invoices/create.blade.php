@@ -126,8 +126,20 @@
 
 @section('content')
     <div class="invoice-workspace">
+        @if($errors->any())
+            <div class="alert alert-danger">
+                <div class="fw-semibold mb-1">Please fix the invoice before saving.</div>
+                <ul class="mb-0">
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
         <form method="post" action="{{ route('erp.invoices.review') }}" id="invoiceForm">
             {{ csrf_field() }}
+            <input type="hidden" name="original_invoice_no" value="{{ $isEdit && !empty($editingInvoice['invoice_no']) ? $editingInvoice['invoice_no'] : '' }}">
 
             <div class="invoice-toolbar d-flex flex-wrap align-items-center justify-content-between gap-2">
                 <div class="d-flex align-items-center gap-3">

@@ -14,7 +14,7 @@
         </div>
         <div class="d-flex justify-content-end gap-2 mt-4">
             <a href="{{ route('erp.billings.delete', $delete['invoice_no'] ?? 'BI-2026-01042') }}" class="btn btn-outline-secondary">Edit</a>
-            <a href="{{ route('erp.billings.index') }}" class="btn btn-danger">Void Billing</a>
+            <a href="{{ route('erp.invoices.index') }}" class="btn btn-danger">Back to Invoices</a>
         </div>
     </div>
 @endsection

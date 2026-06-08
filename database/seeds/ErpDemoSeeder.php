@@ -132,6 +132,7 @@ class ErpDemoSeeder extends Seeder
                 'credit_limit' => 150000,
                 'payment_terms' => '90 Days',
                 'credit_term_days' => 90,
+                'currency' => 'PHP',
                 'default_class_code' => 'PAMPANGA',
                 'default_ar_account_code' => 'AR_TRADE_DN',
                 'created_at' => now(),

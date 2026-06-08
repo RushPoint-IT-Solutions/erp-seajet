@@ -12,6 +12,10 @@
         <a href="{{ route('erp.payments.create', ['invoice' => $invoice['invoice_no'] ?? '']) }}" class="btn btn-primary"><i class="bi bi-cash me-1"></i> Proceed to Payment</a>
     </div>
 
+    @if(!empty($invoice['saved_message']))
+        <div class="alert alert-success">{{ $invoice['saved_message'] }}</div>
+    @endif
+
     <div class="erp-card p-4">
         <div class="row g-3">
             @foreach($invoice as $label => $value)

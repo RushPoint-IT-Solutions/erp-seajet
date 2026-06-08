@@ -22,6 +22,10 @@
         </div>
     </div>
 
+    @if(session('success'))
+        <div class="alert alert-success">{{ session('success') }}</div>
+    @endif
+
     <div class="row g-3 mb-4">
         @foreach($stats as $stat)
             <div class="col-md-6 col-xl-3">
@@ -134,6 +138,7 @@
                                 <td class="text-end">
                                     <a href="{{ route('erp.billings.print-invoice', ['invoice' => $invoice[0]]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="View"><i class="bi bi-eye"></i></a>
                                     <a href="{{ route('erp.billings.edit', $invoice[0]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="Edit"><i class="bi bi-pencil"></i></a>
+                                    <a href="{{ route('erp.billings.delete', $invoice[0]) }}" class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" title="Cancel"><i class="bi bi-x-circle"></i></a>
                                     <a href="{{ route('erp.payments.create', ['invoice' => $invoice[0]]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="Payment"><i class="bi bi-credit-card"></i></a>
                                 </td>
                             </tr>

@@ -17,6 +17,10 @@
         </div>
     </div>
 
+    @if(session('success'))
+        <div class="alert alert-success">{{ session('success') }}</div>
+    @endif
+
     <div class="row g-3 mb-4">
         @foreach($stats as $stat)
             <div class="col-md-6 col-xl-3">

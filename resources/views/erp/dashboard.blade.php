@@ -119,9 +119,9 @@
                 <hr>
                 <h3 class="h6 fw-bold mb-3">Approval Queue</h3>
                 <div class="d-flex flex-column gap-2">
-                    <div class="d-flex justify-content-between"><span>Purchase Orders</span><span class="badge text-bg-warning">7</span></div>
-                    <div class="d-flex justify-content-between"><span>Supplier Bills</span><span class="badge text-bg-danger">4</span></div>
-                    <div class="d-flex justify-content-between"><span>Journal Entries</span><span class="badge text-bg-secondary">3</span></div>
+                    @foreach($approvalQueue as $item)
+                        <div class="d-flex justify-content-between"><span>{{ $item['label'] }}</span><span class="badge text-bg-secondary">{{ $item['count'] }}</span></div>
+                    @endforeach
                 </div>
             </div>
         </div>
@@ -130,17 +130,20 @@
 
 @push('scripts')
 <script>
+    var financialChart = @json($chart);
+    var agingChart = @json($aging);
+
     new ApexCharts(document.querySelector('#salesExpenseChart'), {
         chart: { type: 'area', height: 330, toolbar: { show: false } },
         colors: ['#fe790d', '#2c3e50', '#22c55e'],
         dataLabels: { enabled: false },
         stroke: { curve: 'smooth', width: 3 },
         series: [
-            { name: 'Revenue', data: [420000, 510000, 580000, 610000, 845230, 790000] },
-            { name: 'Expenses', data: [230000, 280000, 300000, 340000, 382410, 360000] },
-            { name: 'Profit', data: [190000, 230000, 280000, 270000, 462820, 430000] }
+            { name: 'Revenue', data: financialChart.revenue },
+            { name: 'Expenses', data: financialChart.expenses },
+            { name: 'Profit', data: financialChart.profit }
         ],
-        xaxis: { categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'] },
+        xaxis: { categories: financialChart.labels },
         yaxis: { labels: { formatter: value => 'PHP ' + Math.round(value / 1000) + 'k' } },
         fill: { type: 'gradient', gradient: { opacityFrom: .35, opacityTo: .05 } },
         grid: { borderColor: '#edf0f5' }
@@ -148,9 +151,9 @@
 
     new ApexCharts(document.querySelector('#agingChart'), {
         chart: { type: 'donut', height: 255 },
-        labels: ['Current', '30 Days', '60 Days', '90 Days', '120+ Days'],
+        labels: agingChart.map(item => item.bucket),
         colors: ['#22c55e', '#84cc16', '#f59e0b', '#ef4444', '#7f1d1d'],
-        series: [84200, 61700, 45900, 28900, 17900],
+        series: agingChart.map(item => Number(item.amount)),
         legend: { position: 'bottom' },
         dataLabels: { enabled: false }
     }).render();

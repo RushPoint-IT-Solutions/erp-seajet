@@ -115,11 +115,15 @@ class ModuleController extends Controller
         ['user_id' => 'USR-001', 'name' => 'Maria Santos', 'email' => 'maria.santos@seajet.test', 'role' => 'Admin', 'department' => 'Accounting', 'branch' => 'Main', 'status' => 'Active', 'last_login' => '2026-05-24 09:15'],
         ['user_id' => 'USR-002', 'name' => 'John Cruz', 'email' => 'john.cruz@seajet.test', 'role' => 'Finance', 'department' => 'Finance', 'branch' => 'Main', 'status' => 'Active', 'last_login' => '2026-05-24 08:55'],
         ['user_id' => 'USR-003', 'name' => 'Ana Reyes', 'email' => 'ana.reyes@seajet.test', 'role' => 'Viewer', 'department' => 'Management', 'branch' => 'All', 'status' => 'Active', 'last_login' => '2026-05-23 17:20'],
-        ['user_id' => 'USR-004', 'name' => 'Leo Garcia', 'email' => 'leo.garcia@seajet.test', 'role' => 'Purchasing', 'department' => 'Purchasing', 'branch' => 'Cebu', 'status' => 'Pending Invite', 'last_login' => '-'],
+        ['user_id' => 'USR-004', 'name' => 'Leo Garcia', 'email' => 'leo.garcia@seajet.test', 'role' => 'Payables', 'department' => 'Accounting', 'branch' => 'Cebu', 'status' => 'Pending Invite', 'last_login' => '-'],
     ];
 
     public function show($module)
     {
+        if ($module === 'purchasing') {
+            return redirect()->route('erp.expenses.index');
+        }
+
         $modules = $this->modules();
         abort_unless(isset($modules[$module]), 404);
 
@@ -169,7 +173,7 @@ class ModuleController extends Controller
         $approvalLevels = [
             ['Billing Invoice', 'Create / revise invoice', 'Sales', 'Accounting', 'Finance Manager', '50,000.00+', 'Requires Shipment Job ID and customer credit check'],
             ['Customer Credit', 'Credit limit override', 'Accounting', 'Finance Manager', 'Admin', 'Any override', '90-day terms and overdue accounts require approval'],
-            ['Vendor Bill', 'Record supplier bill', 'Purchasing', 'Accounting', 'Finance Manager', '25,000.00+', 'Requires supplier, client tag, WHT, and Shipment Job ID'],
+            ['Vendor Bill', 'Record supplier bill', 'Accounting', 'Accounting', 'Finance Manager', '25,000.00+', 'Requires supplier, client tag, WHT, and Shipment Job ID'],
             ['AP Payment', 'Bank, cheque, online transfer', 'Accounting', 'Finance Manager', 'Admin', '10,000.00+', 'Approved payment required before check voucher release'],
             ['Bank Reconciliation', 'Finalize reconciliation', 'Finance', 'Finance Manager', 'Admin', 'All accounts', 'Outstanding checks/deposits must be reviewed'],
             ['FX Revaluation', 'Post realized/unrealized FX', 'Accounting', 'Finance Manager', 'Admin', 'USD entries', 'Posts to GL after rate review'],
@@ -182,7 +186,7 @@ class ModuleController extends Controller
             ['Accounting', 'AR, AP, GL, Tax', 'Prepare only', 'Create invoices, journals, bills, receipts, tax summaries'],
             ['Finance', 'Banking, payments, reports', 'Level 1 approval', 'Approve payments, bank reconciliation, cash position'],
             ['Sales', 'Customers, billing requests', 'Prepare only', 'Create customer records and billing drafts'],
-            ['Purchasing', 'Suppliers, vendor bills', 'Prepare only', 'Create suppliers, PO requests, vendor bill drafts'],
+            ['Payables', 'Vendors and vendor bills', 'Prepare only', 'Create suppliers and vendor bill drafts'],
             ['Viewer', 'Read-only reports', 'No approval', 'Dashboard, reports, printable forms'],
         ];
 
@@ -258,42 +262,42 @@ class ModuleController extends Controller
                 ],
             ],
             'create-pr' => [
-                'title' => 'Create Purchase Request',
-                'subtitle' => 'Prepare purchase requests before PO approval and supplier bill entry.',
-                'primary' => ['label' => 'Purchasing Module', 'route' => route('erp.modules.show', 'purchasing'), 'icon' => 'bi-cart-check'],
-                'cards' => [['Draft PRs', '5'], ['For Approval', '2'], ['Converted to PO', '8'], ['Rejected', '1']],
-                'steps' => ['Enter request department and branch', 'Add supplier or item/service details', 'Attach supporting documents', 'Submit for approval'],
-                'columns' => ['PR No.', 'Department', 'Supplier', 'Amount', 'Status'],
+                'title' => 'Create Vendor Bill',
+                'subtitle' => 'Record supplier charges and route them into Accounts Payable.',
+                'primary' => ['label' => 'Accounts Payable', 'route' => route('erp.expenses.index'), 'icon' => 'bi-receipt-cutoff'],
+                'cards' => [['Draft Bills', '5'], ['For Approval', '2'], ['For Payment', '8'], ['Rejected', '1']],
+                'steps' => ['Select vendor and branch', 'Add supplier service or charge details', 'Attach supporting documents', 'Submit for AP approval'],
+                'columns' => ['Bill No.', 'Department', 'Supplier', 'Amount', 'Status'],
                 'rows' => [
-                    ['PR-2026-0042', 'Operations', 'Pacific Fuel Services', '76,880.00', 'For Approval'],
-                    ['PR-2026-0041', 'Admin', 'Harbor Office Center', '18,000.00', 'Draft'],
-                    ['PR-2026-0040', 'Accounting', 'Metro Industrial Supply', '127,900.00', 'Approved'],
+                    ['BILL-2026-0042', 'Operations', 'Pacific Fuel Services', '76,880.00', 'For Approval'],
+                    ['BILL-2026-0041', 'Admin', 'Harbor Office Center', '18,000.00', 'Draft'],
+                    ['BILL-2026-0040', 'Accounting', 'Metro Industrial Supply', '127,900.00', 'Approved'],
                 ],
             ],
             'create-po' => [
-                'title' => 'Create Purchase Order',
-                'subtitle' => 'Issue purchase orders from approved requests with supplier terms and approval control.',
+                'title' => 'Review Vendor Bill Support',
+                'subtitle' => 'Check supplier terms, attachments, tax, and shipment tagging before AP approval.',
                 'primary' => ['label' => 'Vendor Bill Entry', 'route' => route('erp.payables.vendor-bills.create'), 'icon' => 'bi-receipt'],
-                'cards' => [['Open POs', '11'], ['Receiving', '4'], ['Closed', '19'], ['Overdue', '1']],
-                'steps' => ['Select approved PR', 'Confirm supplier terms and currency', 'Review tax and delivery details', 'Approve and send PO'],
-                'columns' => ['PO No.', 'Supplier', 'Branch', 'Amount', 'Status'],
+                'cards' => [['Open Bills', '11'], ['For Review', '4'], ['Approved', '19'], ['Overdue', '1']],
+                'steps' => ['Select vendor bill', 'Confirm supplier terms and currency', 'Review tax and shipment details', 'Approve for payment'],
+                'columns' => ['Bill No.', 'Supplier', 'Branch', 'Amount', 'Status'],
                 'rows' => [
-                    ['PO-2026-00491', 'Metro Industrial Supply', 'Main', '127,900.00', 'Approved'],
-                    ['PO-2026-00490', 'Pacific Fuel Services', 'Cebu', '76,880.00', 'Receiving'],
-                    ['PO-2026-00489', 'Harbor Office Center', 'Pampanga', '18,000.00', 'Closed'],
+                    ['BILL-2026-00491', 'Metro Industrial Supply', 'Main', '127,900.00', 'Approved'],
+                    ['BILL-2026-00490', 'Pacific Fuel Services', 'Cebu', '76,880.00', 'For Review'],
+                    ['BILL-2026-00489', 'Harbor Office Center', 'Pampanga', '18,000.00', 'Closed'],
                 ],
             ],
             'receive-goods-services' => [
-                'title' => 'Receive Goods / Services',
-                'subtitle' => 'Record service completion or goods receiving before supplier bill approval.',
+                'title' => 'Review Service Completion',
+                'subtitle' => 'Record completion details and supporting files before supplier bill approval.',
                 'primary' => ['label' => 'Vendor Bill Entry', 'route' => route('erp.payables.vendor-bills.create'), 'icon' => 'bi-receipt'],
-                'cards' => [['For Receiving', '4'], ['Received Today', '6'], ['Partial', '2'], ['Matched', '9']],
-                'steps' => ['Select PO', 'Confirm quantity or service completion', 'Attach delivery or service proof', 'Match to supplier bill'],
-                'columns' => ['Receiving No.', 'PO No.', 'Supplier', 'Shipment Job ID', 'Status'],
+                'cards' => [['For Review', '4'], ['Reviewed Today', '6'], ['Partial', '2'], ['Matched', '9']],
+                'steps' => ['Select vendor bill', 'Confirm quantity or service completion', 'Attach delivery or service proof', 'Match to supplier bill'],
+                'columns' => ['Review No.', 'Bill No.', 'Supplier', 'Shipment Job ID', 'Status'],
                 'rows' => [
-                    ['RCV-2026-0028', 'PO-2026-00490', 'Pacific Fuel Services', 'JOB-SEA-2026-0398', 'Partial'],
-                    ['RCV-2026-0027', 'PO-2026-00491', 'Metro Industrial Supply', 'JOB-SEA-2026-0423', 'Matched'],
-                    ['RCV-2026-0026', 'PO-2026-00489', 'Harbor Office Center', 'JOB-SEA-2026-0365', 'Closed'],
+                    ['REV-2026-0028', 'BILL-2026-00490', 'Pacific Fuel Services', 'JOB-SEA-2026-0398', 'Partial'],
+                    ['REV-2026-0027', 'BILL-2026-00491', 'Metro Industrial Supply', 'JOB-SEA-2026-0423', 'Matched'],
+                    ['REV-2026-0026', 'BILL-2026-00489', 'Harbor Office Center', 'JOB-SEA-2026-0365', 'Closed'],
                 ],
             ],
             'supplier-performance' => [
@@ -488,9 +492,38 @@ class ModuleController extends Controller
         $totalCreditLimit = 0.0;
         $watchlistCount = 0;
         $vatableCount = 0;
+        $arAccounts = [
+            'AR_TRADE_BI' => 'A/Trade-Billing Invoice',
+            'AR_REIMBURSABLE' => 'A/R Reimbursable Charges',
+            'AR_TRADE_SOAA' => 'A/R Trade-SOA A',
+            'AR_TRADE_DN' => 'A/R Trade-Debit Note',
+        ];
 
-        foreach ($this->customers as $customer) {
-            $totalCreditLimit += $this->moneyToFloat($customer['credit_limit']);
+        $customers = DB::table('customers')
+            ->orderBy('name')
+            ->get()
+            ->map(function ($customer) use ($arAccounts) {
+                return [
+                    'id' => $customer->id,
+                    'customer_id' => $customer->customer_id ?: $customer->code,
+                    'name' => $customer->name,
+                    'tin' => $customer->tin,
+                    'vat_classification' => $customer->tax_classification ?: '12% VAT',
+                    'contact_person' => $customer->contact_person ?: '-',
+                    'email' => $customer->email,
+                    'phone' => $customer->phone,
+                    'terms' => $customer->payment_terms,
+                    'credit_limit' => $customer->currency.' '.number_format((float) $customer->credit_limit, 2),
+                    'credit_limit_value' => (float) $customer->credit_limit,
+                    'credit_status' => $customer->credit_status ?: 'Within Limit',
+                    'currency' => $customer->currency,
+                    'class' => $customer->default_class_code,
+                    'ar_account' => isset($arAccounts[$customer->default_ar_account_code]) ? $arAccounts[$customer->default_ar_account_code] : $customer->default_ar_account_code,
+                ];
+            });
+
+        foreach ($customers as $customer) {
+            $totalCreditLimit += $customer['credit_limit_value'];
 
             if (strtolower($customer['credit_status']) === 'watchlist') {
                 $watchlistCount++;
@@ -502,9 +535,9 @@ class ModuleController extends Controller
         }
 
         return view('erp.customers.index', [
-            'customers' => $this->customers,
+            'customers' => $customers,
             'stats' => [
-                ['label' => 'Active Clients', 'value' => count($this->customers), 'icon' => 'bi-people-fill', 'tone' => 'primary'],
+                ['label' => 'Active Clients', 'value' => $customers->count(), 'icon' => 'bi-people-fill', 'tone' => 'primary'],
                 ['label' => 'Credit Limit', 'value' => 'PHP '.number_format($totalCreditLimit, 2), 'icon' => 'bi-bank', 'tone' => 'success'],
                 ['label' => 'Watchlist', 'value' => $watchlistCount, 'icon' => 'bi-exclamation-triangle', 'tone' => 'warning'],
                 ['label' => 'VATable Clients', 'value' => $vatableCount, 'icon' => 'bi-percent', 'tone' => 'danger'],
@@ -520,17 +553,326 @@ class ModuleController extends Controller
 
     public function customerCreate()
     {
-        return view('erp.customers.create');
+        $nextCustomerNumber = ((int) DB::table('customers')->max('id')) + 1;
+
+        return view('erp.customers.create', [
+            'nextCustomerCode' => 'CUST-'.str_pad($nextCustomerNumber, 3, '0', STR_PAD_LEFT),
+        ]);
+    }
+
+    public function customerStore()
+    {
+        $data = request()->validate([
+            'customer_id' => 'required|string|max:50',
+            'name' => 'required|string|max:255',
+            'tin' => 'nullable|string|max:255',
+            'tax_classification' => 'required|string|max:255',
+            'payment_terms' => 'required|string|max:50',
+            'currency' => 'required|string|max:3',
+            'default_class_code' => 'required|string|max:50',
+            'contact_person' => 'nullable|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'nullable|string|max:255',
+            'billing_address' => 'nullable|string|max:1000',
+            'credit_limit' => 'nullable|numeric|min:0',
+            'credit_status' => 'required|string|max:50',
+            'default_ar_account_code' => 'required|string|max:50',
+        ]);
+
+        $companyId = $this->defaultCompanyId();
+        $code = strtoupper(trim($data['customer_id']));
+
+        $exists = DB::table('customers')
+            ->where('company_id', $companyId)
+            ->where(function ($query) use ($code) {
+                $query->where('code', $code)
+                    ->orWhere('customer_id', $code);
+            })
+            ->exists();
+
+        if ($exists) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->withErrors(['customer_id' => 'This customer ID already exists.']);
+        }
+
+        DB::table('customers')->insert([
+            'company_id' => $companyId,
+            'code' => $code,
+            'customer_id' => $code,
+            'name' => $data['name'],
+            'tin' => isset($data['tin']) ? $data['tin'] : null,
+            'tax_classification' => $data['tax_classification'],
+            'email' => isset($data['email']) ? $data['email'] : null,
+            'phone' => isset($data['phone']) ? $data['phone'] : null,
+            'billing_address' => isset($data['billing_address']) ? $data['billing_address'] : null,
+            'contact_person' => isset($data['contact_person']) ? $data['contact_person'] : null,
+            'credit_limit' => isset($data['credit_limit']) ? $data['credit_limit'] : 0,
+            'credit_status' => $data['credit_status'],
+            'payment_terms' => $data['payment_terms'],
+            'credit_term_days' => $this->paymentTermDays($data['payment_terms']),
+            'currency' => $data['currency'],
+            'default_class_code' => $data['default_class_code'],
+            'default_ar_account_code' => $data['default_ar_account_code'],
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return redirect()
+            ->route('erp.customers.index')
+            ->with('success', 'Customer '.$code.' was saved to the database.');
+    }
+
+    private function defaultCompanyId()
+    {
+        $companyId = DB::table('companies')->orderBy('id')->value('id');
+
+        if ($companyId) {
+            return $companyId;
+        }
+
+        return DB::table('companies')->insertGetId([
+            'code' => 'SJ',
+            'name' => 'SeaJet Holdings Inc.',
+            'tin' => '000-123-456-000',
+            'address' => 'Harbor Business Center, Manila, Philippines',
+            'base_currency' => 'PHP',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function paymentTermDays($paymentTerms)
+    {
+        if (preg_match('/\d+/', $paymentTerms, $matches)) {
+            return (int) $matches[0];
+        }
+
+        return 0;
     }
 
     public function suppliers()
     {
-        return view('erp.suppliers.index', ['suppliers' => $this->suppliers]);
+        $suppliers = $this->vendorRows();
+
+        return view('erp.suppliers.index', [
+            'suppliers' => $suppliers,
+            'stats' => $this->vendorDashboardStats($suppliers),
+            'recentBills' => $this->vendorRecentBills(),
+            'agingBuckets' => $this->vendorAgingBuckets(),
+        ]);
     }
 
     public function supplierCreate()
     {
-        return view('erp.suppliers.create');
+        $nextSupplierNumber = ((int) DB::table('suppliers')->max('id')) + 1;
+
+        return view('erp.suppliers.create', [
+            'nextSupplierCode' => 'SUP-'.str_pad($nextSupplierNumber, 3, '0', STR_PAD_LEFT),
+        ]);
+    }
+
+    public function supplierStore()
+    {
+        $data = request()->validate([
+            'supplier_id' => 'required|string|max:50',
+            'name' => 'required|string|max:255',
+            'tin' => 'nullable|string|max:255',
+            'tax_classification' => 'required|string|max:255',
+            'payment_terms' => 'required|string|max:50',
+            'currency' => 'required|string|max:3',
+            'default_class_code' => 'required|string|max:50',
+            'contact_person' => 'nullable|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'nullable|string|max:255',
+            'address' => 'nullable|string|max:1000',
+            'default_ap_account' => 'nullable|string|max:255',
+            'preferred_payment_method' => 'nullable|string|max:255',
+            'withholding_tax' => 'nullable|string|max:50',
+        ]);
+
+        $companyId = $this->defaultCompanyId();
+        $code = strtoupper(trim($data['supplier_id']));
+        $exists = DB::table('suppliers')
+            ->where('company_id', $companyId)
+            ->where('code', $code)
+            ->exists();
+
+        if ($exists) {
+            return redirect()->back()->withInput()->withErrors(['supplier_id' => 'This vendor ID already exists.']);
+        }
+
+        DB::table('suppliers')->insert([
+            'company_id' => $companyId,
+            'code' => $code,
+            'name' => $data['name'],
+            'tin' => isset($data['tin']) ? $data['tin'] : null,
+            'tax_classification' => $data['tax_classification'],
+            'contact_person' => isset($data['contact_person']) ? $data['contact_person'] : null,
+            'email' => isset($data['email']) ? $data['email'] : null,
+            'phone' => isset($data['phone']) ? $data['phone'] : null,
+            'address' => isset($data['address']) ? $data['address'] : null,
+            'payment_terms' => $data['payment_terms'],
+            'payment_term_days' => $this->paymentTermDays($data['payment_terms']),
+            'currency' => $data['currency'],
+            'preferred_payment_method' => isset($data['preferred_payment_method']) ? $data['preferred_payment_method'] : null,
+            'default_class_code' => $data['default_class_code'],
+            'default_ap_account' => isset($data['default_ap_account']) ? $data['default_ap_account'] : null,
+            'withholding_tax' => isset($data['withholding_tax']) ? $data['withholding_tax'] : '0%',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return redirect()->route('erp.suppliers.index')->with('success', 'Vendor '.$code.' was saved to the database.');
+    }
+
+    private function vendorRows()
+    {
+        if (!Schema::hasTable('suppliers')) {
+            return $this->suppliers;
+        }
+
+        return DB::table('suppliers')
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->map(function ($supplier) {
+                $openAp = $this->supplierOpenPayable($supplier->id);
+
+                return [
+                    'id' => $supplier->id,
+                    'supplier_id' => $supplier->code,
+                    'name' => $supplier->name,
+                    'tin' => $supplier->tin,
+                    'vat_classification' => $supplier->tax_classification ?: '12% VAT',
+                    'contact_person' => $supplier->contact_person ?: '-',
+                    'email' => $supplier->email,
+                    'phone' => $supplier->phone,
+                    'address' => $supplier->address,
+                    'terms' => $supplier->payment_terms,
+                    'payment_method' => $supplier->preferred_payment_method ?: '-',
+                    'withholding_tax' => $supplier->withholding_tax ?: '0%',
+                    'currency' => $supplier->currency ?: 'PHP',
+                    'class' => $supplier->default_class_code ?: 'MANILA',
+                    'ap_account' => $supplier->default_ap_account ?: 'Accounts Payable Trade',
+                    'open_bills' => $this->supplierOpenBillCount($supplier->id),
+                    'open_ap' => $openAp,
+                    'open_ap_display' => ($supplier->currency ?: 'PHP').' '.number_format($openAp, 2),
+                ];
+            })
+            ->all();
+    }
+
+    private function vendorDashboardStats(array $suppliers)
+    {
+        $activeCount = count($suppliers);
+        $openBills = array_sum(array_column($suppliers, 'open_bills'));
+        $openAp = array_sum(array_column($suppliers, 'open_ap'));
+        $withholdingCount = count(array_filter($suppliers, function ($supplier) {
+            return ($supplier['withholding_tax'] ?? '0%') !== '0%';
+        }));
+
+        return [
+            ['label' => 'Active Vendors', 'value' => $activeCount, 'icon' => 'bi-building-fill', 'tone' => 'primary'],
+            ['label' => 'Open AP', 'value' => 'PHP '.number_format($openAp, 2), 'icon' => 'bi-credit-card-2-front', 'tone' => 'danger'],
+            ['label' => 'Open Bills', 'value' => $openBills, 'icon' => 'bi-receipt', 'tone' => 'warning'],
+            ['label' => 'Withholding Setup', 'value' => $withholdingCount, 'icon' => 'bi-percent', 'tone' => 'success'],
+        ];
+    }
+
+    private function vendorRecentBills()
+    {
+        if (!Schema::hasTable('purchase_documents')) {
+            return [];
+        }
+
+        return DB::table('purchase_documents')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_documents.supplier_id')
+            ->select(
+                'purchase_documents.document_no',
+                'suppliers.name as supplier_name',
+                'purchase_documents.shipment_job_id',
+                'purchase_documents.currency',
+                'purchase_documents.grand_total',
+                'purchase_documents.paid_total',
+                'purchase_documents.status',
+                'purchase_documents.document_date'
+            )
+            ->orderBy('purchase_documents.document_date', 'desc')
+            ->orderBy('purchase_documents.id', 'desc')
+            ->limit(6)
+            ->get()
+            ->map(function ($bill) {
+                return [
+                    'bill_no' => $bill->document_no,
+                    'supplier' => $bill->supplier_name ?: '-',
+                    'shipment_job_id' => $bill->shipment_job_id ?: '-',
+                    'currency' => $bill->currency ?: 'PHP',
+                    'amount' => number_format((float) $bill->grand_total, 2),
+                    'balance' => number_format(max(0, (float) $bill->grand_total - (float) $bill->paid_total), 2),
+                    'status' => ucwords(str_replace('_', ' ', $bill->status)),
+                    'date' => $bill->document_date,
+                ];
+            })
+            ->all();
+    }
+
+    private function vendorAgingBuckets()
+    {
+        $buckets = ['Current' => 0.0, '30 Days' => 0.0, '60 Days' => 0.0, '90+ Days' => 0.0];
+
+        if (Schema::hasTable('purchase_documents')) {
+            DB::table('purchase_documents')
+                ->select('due_date', 'grand_total', 'paid_total', 'status')
+                ->whereNotIn('status', ['paid', 'cancelled', 'voided'])
+                ->get()
+                ->each(function ($bill) use (&$buckets) {
+                    $balance = max(0, (float) $bill->grand_total - (float) $bill->paid_total);
+                    $daysPastDue = $bill->due_date ? now()->diffInDays(\Carbon\Carbon::parse($bill->due_date), false) * -1 : 0;
+
+                    if ($daysPastDue <= 0) {
+                        $buckets['Current'] += $balance;
+                    } elseif ($daysPastDue <= 30) {
+                        $buckets['30 Days'] += $balance;
+                    } elseif ($daysPastDue <= 60) {
+                        $buckets['60 Days'] += $balance;
+                    } else {
+                        $buckets['90+ Days'] += $balance;
+                    }
+                });
+        }
+
+        return collect($buckets)->map(function ($amount, $label) {
+            return ['label' => $label, 'value' => 'PHP '.number_format($amount, 2)];
+        })->values()->all();
+    }
+
+    private function supplierOpenPayable($supplierId)
+    {
+        if (!Schema::hasTable('purchase_documents')) {
+            return 0.0;
+        }
+
+        return (float) DB::table('purchase_documents')
+            ->where('supplier_id', $supplierId)
+            ->whereNotIn('status', ['paid', 'cancelled', 'voided'])
+            ->select(DB::raw('COALESCE(SUM(grand_total - paid_total), 0) as balance'))
+            ->value('balance');
+    }
+
+    private function supplierOpenBillCount($supplierId)
+    {
+        if (!Schema::hasTable('purchase_documents')) {
+            return 0;
+        }
+
+        return (int) DB::table('purchase_documents')
+            ->where('supplier_id', $supplierId)
+            ->whereNotIn('status', ['paid', 'cancelled', 'voided'])
+            ->count();
     }
 
     public function usersIndex()
@@ -604,8 +946,8 @@ class ModuleController extends Controller
     public function vendorBillCreate()
     {
         return view('erp.payables.vendor-bill-create', [
-            'suppliers' => $this->suppliers,
-            'customers' => $this->customers,
+            'suppliers' => $this->vendorRows(),
+            'customers' => $this->customerSelectOptions(),
         ]);
     }
 
@@ -690,7 +1032,7 @@ class ModuleController extends Controller
     public function apPaymentCreate()
     {
         return view('erp.payables.payment-create', [
-            'suppliers' => $this->suppliers,
+            'suppliers' => $this->vendorRows(),
         ]);
     }
 
@@ -1109,7 +1451,7 @@ class ModuleController extends Controller
     public function invoiceCreate()
     {
         return view('erp.invoices.create', [
-            'customers' => $this->customers,
+            'customers' => $this->customerSelectOptions(),
             'invoiceTemplates' => $this->invoiceTemplates(),
         ]);
     }
@@ -1145,17 +1487,8 @@ class ModuleController extends Controller
                 ['label' => 'Create invoice', 'route' => route('erp.invoices.create'), 'icon' => 'bi-plus-lg'],
                 ['label' => 'Receive payment', 'route' => route('erp.payments.create'), 'icon' => 'bi-credit-card'],
             ],
-            'agingBuckets' => [
-                ['label' => 'Current', 'value' => 'PHP 98,500.00', 'icon' => 'bi-calendar-check', 'tone' => 'success'],
-                ['label' => '30 Days', 'value' => 'USD 1,840.00', 'icon' => 'bi-calendar2-week', 'tone' => 'primary'],
-                ['label' => '60 Days', 'value' => 'PHP 36,500.00', 'icon' => 'bi-calendar2-minus', 'tone' => 'warning'],
-                ['label' => '90+ Days', 'value' => 'PHP 12,400.00', 'icon' => 'bi-calendar2-x', 'tone' => 'danger'],
-            ],
-            'agingRows' => [
-                ['North Harbor Trading', 'BI-2026-01042', 'PHP', '98,500.00', '0.00', '0.00', '0.00'],
-                ['Blue Anchor Logistics', 'SOAA-2026-00211', 'USD', '0.00', '1,840.00', '0.00', '0.00'],
-                ['Island Prime Foods', 'DN-2026-00042', 'PHP', '0.00', '0.00', '36,500.00', '12,400.00'],
-            ],
+            'agingBuckets' => $this->invoiceAgingBuckets(),
+            'agingRows' => $this->invoiceAgingRows(),
         ]);
     }
 
@@ -1169,20 +1502,37 @@ class ModuleController extends Controller
         return view('erp.invoices.create', [
             'isEdit' => true,
             'editingInvoice' => $this->billingPrintInvoiceDataFromReference($invoice),
-            'customers' => $this->customers,
+            'customers' => $this->customerSelectOptions(),
             'invoiceTemplates' => $this->invoiceTemplates(),
         ]);
     }
 
     public function billingDelete($invoice)
     {
-        return view('erp.billings.delete', ['invoiceNo' => $invoice]);
+        return view('erp.billings.delete', [
+            'invoiceNo' => $invoice,
+            'billing' => $this->billingPrintInvoiceDataFromReference($invoice),
+        ]);
     }
 
     public function billingDeleteReview()
     {
+        $data = request()->only(['invoice_no', 'customer', 'shipment_job_id', 'delete_action', 'reason']);
+        $invoiceNo = trim((string) ($data['invoice_no'] ?? ''));
+        $newStatus = stripos((string) ($data['delete_action'] ?? ''), 'cancel') !== false ? 'cancelled' : 'voided';
+
+        if ($invoiceNo !== '' && Schema::hasTable('sales_documents')) {
+            DB::table('sales_documents')
+                ->where('document_no', $invoiceNo)
+                ->update([
+                    'status' => $newStatus,
+                    'remarks' => trim((string) ($data['reason'] ?? '')),
+                    'updated_at' => now(),
+                ]);
+        }
+
         return view('erp.billings.delete-review', [
-            'delete' => request()->only(['invoice_no', 'customer', 'shipment_job_id', 'delete_action', 'reason']),
+            'delete' => array_merge($data, ['new_status' => $newStatus]),
         ]);
     }
 
@@ -1830,12 +2180,343 @@ class ModuleController extends Controller
 
     private function billingRows()
     {
+        if (!Schema::hasTable('sales_documents')) {
+            return [];
+        }
+
+        return DB::table('sales_documents')
+            ->leftJoin('customers', 'customers.id', '=', 'sales_documents.customer_id')
+            ->select(
+                'sales_documents.document_no',
+                'sales_documents.job_shipment_id',
+                'sales_documents.shipment_reference',
+                'sales_documents.currency',
+                'sales_documents.grand_total',
+                'sales_documents.status',
+                'sales_documents.document_date',
+                'customers.name as customer_name'
+            )
+            ->whereIn('sales_documents.document_type', ['invoice', 'billing_invoice', 'statement_of_account_a', 'soa_a', 'debit_note'])
+            ->orderBy('sales_documents.document_date', 'desc')
+            ->orderBy('sales_documents.id', 'desc')
+            ->get()
+            ->map(function ($invoice) {
+                return [
+                    $invoice->document_no,
+                    $invoice->customer_name ?: 'Guest / Non-tax Client',
+                    $invoice->job_shipment_id ?: $invoice->shipment_reference,
+                    $invoice->currency ?: 'PHP',
+                    number_format((float) $invoice->grand_total, 2),
+                    ucwords(str_replace('_', ' ', $invoice->status ?: 'draft')),
+                    $invoice->document_date,
+                ];
+            })
+            ->all();
+    }
+
+    private function customerSelectOptions()
+    {
+        if (!Schema::hasTable('customers')) {
+            return $this->customers;
+        }
+
+        return DB::table('customers')
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->map(function ($customer) {
+                $taxClassification = $customer->tax_classification ?: '12%';
+                if (stripos($taxClassification, '12%') !== false) {
+                    $taxClassification = '12%';
+                } elseif (stripos($taxClassification, 'zero') !== false) {
+                    $taxClassification = 'zero-rated';
+                } elseif (stripos($taxClassification, 'exempt') !== false) {
+                    $taxClassification = 'exempt';
+                }
+
+                return [
+                    'customer_id' => $customer->customer_id ?: $customer->code,
+                    'name' => $customer->name,
+                    'tin' => $customer->tin,
+                    'terms' => $customer->payment_terms,
+                    'currency' => $customer->currency ?: 'PHP',
+                    'class' => $customer->default_class_code ?: 'MANILA',
+                    'vat_classification' => $taxClassification,
+                ];
+            })
+            ->all();
+    }
+
+    private function invoiceAgingRows()
+    {
+        if (!Schema::hasTable('sales_documents')) {
+            return [];
+        }
+
+        return DB::table('sales_documents')
+            ->leftJoin('customers', 'customers.id', '=', 'sales_documents.customer_id')
+            ->select(
+                'sales_documents.document_no',
+                'sales_documents.currency',
+                'sales_documents.grand_total',
+                'sales_documents.paid_total',
+                'sales_documents.due_date',
+                'customers.name as customer_name'
+            )
+            ->whereNotIn('sales_documents.status', ['cancelled', 'voided'])
+            ->whereIn('sales_documents.document_type', ['invoice', 'billing_invoice', 'statement_of_account_a', 'soa_a', 'debit_note'])
+            ->orderBy('sales_documents.due_date')
+            ->get()
+            ->map(function ($invoice) {
+                $balance = max(0, (float) $invoice->grand_total - (float) $invoice->paid_total);
+                $daysPastDue = $invoice->due_date ? now()->diffInDays(\Carbon\Carbon::parse($invoice->due_date), false) * -1 : 0;
+                $current = $daysPastDue <= 0 ? $balance : 0;
+                $thirty = $daysPastDue > 0 && $daysPastDue <= 30 ? $balance : 0;
+                $sixty = $daysPastDue > 30 && $daysPastDue <= 60 ? $balance : 0;
+                $ninety = $daysPastDue > 60 ? $balance : 0;
+
+                return [
+                    $invoice->customer_name ?: 'Guest / Non-tax Client',
+                    $invoice->document_no,
+                    $invoice->currency ?: 'PHP',
+                    number_format($current, 2),
+                    number_format($thirty, 2),
+                    number_format($sixty, 2),
+                    number_format($ninety, 2),
+                ];
+            })
+            ->all();
+    }
+
+    private function invoiceAgingBuckets()
+    {
+        $rows = $this->invoiceAgingRows();
+        $totals = ['Current' => 0, '30 Days' => 0, '60 Days' => 0, '90+ Days' => 0];
+
+        foreach ($rows as $row) {
+            $totals['Current'] += $this->moneyToFloat($row[3]);
+            $totals['30 Days'] += $this->moneyToFloat($row[4]);
+            $totals['60 Days'] += $this->moneyToFloat($row[5]);
+            $totals['90+ Days'] += $this->moneyToFloat($row[6]);
+        }
+
         return [
-            ['BI-2026-01042', 'North Harbor Trading', 'JOB-SEA-2026-0422', 'PHP', '98,500.00', 'Posted', '2026-05-24'],
-            ['SOAA-2026-00211', 'Blue Anchor Logistics', 'JOB-SEA-2026-0398', 'USD', '1,840.00', 'Posted', '2026-05-23'],
-            ['DN-2026-00042', 'Island Prime Foods', 'JOB-SEA-2026-0365', 'PHP', '48,900.00', 'Posted', '2026-05-22'],
-            ['BI-2026-01043', 'Metro Manila Forwarders', 'JOB-SEA-2026-0423', 'PHP', '127,900.00', 'Posted', '2026-05-24'],
+            ['label' => 'Current', 'value' => 'PHP '.number_format($totals['Current'], 2), 'icon' => 'bi-calendar-check', 'tone' => 'success'],
+            ['label' => '30 Days', 'value' => 'PHP '.number_format($totals['30 Days'], 2), 'icon' => 'bi-calendar2-week', 'tone' => 'primary'],
+            ['label' => '60 Days', 'value' => 'PHP '.number_format($totals['60 Days'], 2), 'icon' => 'bi-calendar2-minus', 'tone' => 'warning'],
+            ['label' => '90+ Days', 'value' => 'PHP '.number_format($totals['90+ Days'], 2), 'icon' => 'bi-calendar2-x', 'tone' => 'danger'],
         ];
+    }
+
+    private function saveInvoiceData(array $data, array $totals)
+    {
+        return DB::transaction(function () use ($data, $totals) {
+            $companyId = $this->defaultCompanyId();
+            $customerId = $this->invoiceCustomerId($companyId, $data);
+            $documentNo = trim((string) $data['invoice_no']);
+            $originalDocumentNo = trim((string) ($data['original_invoice_no'] ?? ''));
+            $templates = array_values(array_filter((array) ($data['invoice_template'] ?? [])));
+            $documentType = $this->invoiceDocumentType($documentNo, $templates);
+            $paidTotal = $this->moneyToFloat($data['total_payment'] ?? 0);
+            $status = $paidTotal > 0 && $paidTotal >= $totals['soa_total'] ? 'paid' : 'posted';
+
+            $payload = [
+                'company_id' => $companyId,
+                'branch_id' => DB::table('branches')->where('company_id', $companyId)->orderBy('id')->value('id'),
+                'customer_id' => $customerId,
+                'customer_id_text' => $data['customer_id'] ?? null,
+                'document_type' => $documentType,
+                'document_no' => $documentNo,
+                'transaction_no' => $data['transaction_no'] ?? $documentNo,
+                'soa_no' => $data['soa_no'] ?? null,
+                'document_date' => $data['invoice_date'] ?: now()->toDateString(),
+                'due_date' => !empty($data['due_date']) ? $data['due_date'] : null,
+                'invoice_to' => $data['invoice_to'] ?? null,
+                'consignee' => $data['consignee'] ?? null,
+                'shipment_reference' => $data['job_shipment_id'] ?? null,
+                'job_shipment_id' => $data['job_shipment_id'] ?? null,
+                'mawb_no' => $data['mawb_no'] ?? null,
+                'hawb_no' => $data['hawb_no'] ?? null,
+                'date_shipped' => !empty($data['date_shipped']) ? $data['date_shipped'] : null,
+                'origin_dest' => $data['origin_dest'] ?? null,
+                'commodity' => $data['commodity'] ?? null,
+                'vat_classification' => $data['vat_classification'] ?? null,
+                'class_code' => $data['class_code'] ?? null,
+                'ar_account_code' => $this->arAccountCode($data['ar_account'] ?? null),
+                'template_code' => $templates[0] ?? null,
+                'invoice_templates' => json_encode($templates),
+                'uses_pre_printed_form' => in_array('Billing Invoice', $templates, true) || in_array('SOA_B', $templates, true),
+                'credit_term_days' => (int) ($data['credit_term_days'] ?: 0),
+                'currency' => $data['currency'] ?: 'PHP',
+                'subtotal' => $totals['vatable_sales'],
+                'vatable_amount' => $totals['vatable_sales'],
+                'zero_rated_amount' => ($data['vat_classification'] ?? '') === 'zero-rated' ? $totals['vatable_sales'] : 0,
+                'vat_exempt_amount' => ($data['vat_classification'] ?? '') === 'exempt' ? $totals['vatable_sales'] : 0,
+                'tax_total' => $totals['vat_amount'],
+                'freight_total' => $totals['reimbursement_total'],
+                'grand_total' => $totals['soa_total'],
+                'invoice_amount' => $totals['billing_total'],
+                'paid_total' => $paidTotal,
+                'total_payment' => $paidTotal,
+                'balance_due' => max(0, $totals['soa_total'] - $paidTotal),
+                'status' => $status,
+                'remarks' => $data['description'] ?? null,
+                'customer_message' => $data['customer_message'] ?? null,
+                'memo' => $data['memo'] ?? null,
+                'customer_tax_code' => $data['customer_tax_code'] ?? null,
+                'updated_at' => now(),
+            ];
+
+            $existing = null;
+            if ($originalDocumentNo !== '') {
+                $existing = DB::table('sales_documents')->where('document_no', $originalDocumentNo)->first();
+            }
+            if (!$existing) {
+                $existing = DB::table('sales_documents')->where('document_no', $documentNo)->first();
+            }
+
+            if ($existing) {
+                DB::table('sales_documents')->where('id', $existing->id)->update($payload);
+                $salesDocumentId = $existing->id;
+                DB::table('sales_document_lines')->where('sales_document_id', $salesDocumentId)->delete();
+            } else {
+                $payload['created_at'] = now();
+                $salesDocumentId = DB::table('sales_documents')->insertGetId($payload);
+            }
+
+            $this->saveInvoiceLines($salesDocumentId, $data);
+
+            return DB::table('sales_documents')->where('id', $salesDocumentId)->first();
+        });
+    }
+
+    private function saveInvoiceLines($salesDocumentId, array $data)
+    {
+        $items = (array) ($data['item'] ?? []);
+        $descriptions = (array) ($data['item_description'] ?? []);
+        $quantities = (array) ($data['qty'] ?? []);
+        $unitPrices = (array) ($data['unit_price'] ?? []);
+        $classes = (array) ($data['line_class'] ?? []);
+        $taxCategories = (array) ($data['tax_category'] ?? []);
+        $count = max(count($items), count($descriptions), count($quantities), count($unitPrices));
+
+        for ($index = 0; $index < $count; $index++) {
+            $description = trim((string) ($descriptions[$index] ?? ''));
+            $item = trim((string) ($items[$index] ?? ''));
+            $quantity = $this->moneyToFloat($quantities[$index] ?? 0);
+            $unitPrice = $this->moneyToFloat($unitPrices[$index] ?? 0);
+
+            if ($description === '' && $item === '' && $quantity === 0.0 && $unitPrice === 0.0) {
+                continue;
+            }
+
+            DB::table('sales_document_lines')->insert([
+                'sales_document_id' => $salesDocumentId,
+                'item_name' => $item !== '' ? $item : null,
+                'description' => $description !== '' ? $description : $item,
+                'quantity' => $quantity ?: 1,
+                'unit_price' => $unitPrice,
+                'discount_amount' => 0,
+                'tax_code_id' => $this->taxCodeId($taxCategories[$index] ?? null),
+                'line_total' => $unitPrice * ($quantity ?: 1),
+                'class_code' => $classes[$index] ?? null,
+                'tax_category' => $taxCategories[$index] ?? null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    private function invoiceCustomerId($companyId, array $data)
+    {
+        $customerCode = trim((string) ($data['customer_id'] ?? ''));
+        $customerName = trim((string) ($data['customer_name'] ?? 'Guest / Non-tax Client'));
+
+        $customer = DB::table('customers')
+            ->where('company_id', $companyId)
+            ->where(function ($query) use ($customerCode, $customerName) {
+                $query->where('code', $customerCode)
+                    ->orWhere('customer_id', $customerCode)
+                    ->orWhere('name', $customerName);
+            })
+            ->first();
+
+        if ($customer) {
+            return $customer->id;
+        }
+
+        return DB::table('customers')->insertGetId([
+            'company_id' => $companyId,
+            'code' => $customerCode !== '' && $customerCode !== 'GUEST' ? $customerCode : 'GUEST',
+            'customer_id' => $customerCode !== '' && $customerCode !== 'GUEST' ? $customerCode : 'GUEST',
+            'name' => $customerName !== '' ? $customerName : 'Guest / Non-tax Client',
+            'tin' => $data['tin'] ?? null,
+            'tax_classification' => $data['vat_classification'] ?? 'exempt',
+            'billing_address' => $data['invoice_to'] ?? null,
+            'credit_limit' => 0,
+            'credit_status' => 'Within Limit',
+            'payment_terms' => !empty($data['credit_term_days']) ? $data['credit_term_days'].' Days' : 'Due on Receipt',
+            'credit_term_days' => (int) ($data['credit_term_days'] ?: 0),
+            'currency' => $data['currency'] ?: 'PHP',
+            'default_class_code' => $data['class_code'] ?: 'MANILA',
+            'default_ar_account_code' => $this->arAccountCode($data['ar_account'] ?? null),
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function invoiceDocumentType($documentNo, array $templates)
+    {
+        if (stripos($documentNo, 'SOAA') === 0 || in_array('SOA_A', $templates, true)) {
+            return 'statement_of_account_a';
+        }
+        if (stripos($documentNo, 'DN') === 0 || in_array('Debit Note', $templates, true)) {
+            return 'debit_note';
+        }
+
+        return 'billing_invoice';
+    }
+
+    private function arAccountCode($label)
+    {
+        $map = [
+            'A/Trade-Billing Invoice' => 'AR_TRADE_BI',
+            'A/R-Reimbursable Charges' => 'AR_REIMBURSABLE',
+            'A/R Reimbursable Charges' => 'AR_REIMBURSABLE',
+            'A/R Trade-SOA A' => 'AR_TRADE_SOAA',
+            'A/R Trade-Debit Note' => 'AR_TRADE_DN',
+        ];
+
+        return $map[$label] ?? ($label ?: 'AR_TRADE_BI');
+    }
+
+    private function arAccountLabel($code)
+    {
+        $map = [
+            'AR_TRADE_BI' => 'A/Trade-Billing Invoice',
+            'AR_REIMBURSABLE' => 'A/R-Reimbursable Charges',
+            'AR_TRADE_SOAA' => 'A/R Trade-SOA A',
+            'AR_TRADE_DN' => 'A/R Trade-Debit Note',
+        ];
+
+        return $map[$code] ?? ($code ?: 'A/Trade-Billing Invoice');
+    }
+
+    private function taxCodeId($taxCategory)
+    {
+        if (!Schema::hasTable('tax_codes')) {
+            return null;
+        }
+
+        $code = 'EXEMPT';
+        if ($taxCategory === '12%') {
+            $code = 'VAT12';
+        } elseif ($taxCategory === 'zero-rated' || $taxCategory === 'Zero-rated') {
+            $code = 'ZERO';
+        }
+
+        return DB::table('tax_codes')->where('code', $code)->value('id');
     }
 
     private function billingPrintInvoiceFallbacks()
@@ -1962,8 +2643,7 @@ class ModuleController extends Controller
                             'sales_documents.*',
                             'customers.name as customer_name',
                             'customers.tin as customer_tin',
-                            'customers.billing_address as customer_billing_address',
-                            'customers.address as customer_address'
+                            'customers.billing_address as customer_billing_address'
                         );
                 } else {
                     $query->select('sales_documents.*');
@@ -2001,14 +2681,14 @@ class ModuleController extends Controller
                         'invoice_date' => $invoice->document_date,
                         'due_date' => $column('due_date', $fallback['due_date'] ?? ''),
                         'soa_no' => $column('soa_no', $fallback['soa_no'] ?? ''),
-                        'invoice_to' => $column('invoice_to', $column('customer_billing_address', $column('customer_address', $fallback['invoice_to'] ?? ''))),
+                        'invoice_to' => $column('invoice_to', $column('customer_billing_address', $fallback['invoice_to'] ?? '')),
                         'consignee' => $column('consignee', ''),
                         'tin' => $column('customer_tin', $fallback['tin'] ?? ''),
                         'credit_term_days' => $column('credit_term_days', $fallback['credit_term_days'] ?? ''),
                         'vat_classification' => $column('vat_classification', $fallback['vat_classification'] ?? ''),
                         'class_code' => $column('class_code', $fallback['class_code'] ?? ''),
-                        'ar_account' => $fallback['ar_account'] ?? 'A/Trade-Billing Invoice',
-                        'invoice_template' => $fallback['invoice_template'] ?? [],
+                        'ar_account' => $this->arAccountLabel($column('ar_account_code', null)),
+                        'invoice_template' => json_decode($column('invoice_templates', '[]'), true) ?: ($column('template_code') ? [$column('template_code')] : ($fallback['invoice_template'] ?? [])),
                         'currency' => $invoice->currency ?? $fallback['currency'] ?? 'PHP',
                         'mawb_no' => $column('mawb_no', $fallback['mawb_no'] ?? ''),
                         'hawb_no' => $column('hawb_no', $fallback['hawb_no'] ?? ''),
@@ -2048,6 +2728,9 @@ class ModuleController extends Controller
                             })->all();
                             $data['tax_category'] = $lines->map(function ($line) use ($invoice) {
                                 return (property_exists($line, 'tax_category') && $line->tax_category) ? $line->tax_category : ($invoice->vat_classification ?? '12%');
+                            })->all();
+                            $data['line_class'] = $lines->map(function ($line) use ($invoice) {
+                                return (property_exists($line, 'class_code') && $line->class_code) ? $line->class_code : ($invoice->class_code ?? '');
                             })->all();
 
                             $hasReimbursementLine = false;
@@ -2450,12 +3133,26 @@ class ModuleController extends Controller
             'line_class',
             'tax_category',
             'line_amount',
+            'original_invoice_no',
         ]);
 
         $invoiceNo = trim((string) ($data['invoice_no'] ?? ''));
         $transactionNo = trim((string) ($data['transaction_no'] ?? ''));
         $data['invoice_no'] = $invoiceNo !== '' ? $invoiceNo : $transactionNo;
         $data['transaction_no'] = $data['invoice_no'];
+        $originalInvoiceNo = trim((string) ($data['original_invoice_no'] ?? ''));
+
+        if ($data['invoice_no'] === '') {
+            return redirect()->back()->withInput()->withErrors(['invoice_no' => 'Invoice number is required.']);
+        }
+
+        $duplicateQuery = DB::table('sales_documents')->where('document_no', $data['invoice_no']);
+        if ($originalInvoiceNo !== '') {
+            $duplicateQuery->where('document_no', '<>', $originalInvoiceNo);
+        }
+        if ($duplicateQuery->exists()) {
+            return redirect()->back()->withInput()->withErrors(['invoice_no' => 'This invoice number already exists.']);
+        }
 
         $totals = $this->billingTotals($data);
         $data['invoice_amount'] = number_format($totals['billing_total'], 2);
@@ -2465,6 +3162,10 @@ class ModuleController extends Controller
         $selectedTemplates = array_values(array_filter(array_map('trim', (array) ($data['invoice_template'] ?? []))));
         $data['invoice_template'] = $selectedTemplates;
         $data['invoice_templates_display'] = implode(', ', $selectedTemplates);
+        $savedInvoice = $this->saveInvoiceData($data, $totals);
+        $data['id'] = $savedInvoice->id;
+        $data['status'] = $savedInvoice->status;
+        $data['saved_message'] = 'Invoice '.$data['invoice_no'].' was saved to the database.';
 
         return view('erp.invoices.review', [
             'invoice' => $data,
@@ -3067,18 +3768,6 @@ class ModuleController extends Controller
                     ['Harbor Office Center', 'BILL-2420', 'JOB-SEA-2026-0365', 'PHP', '0%', 'Approved'],
                 ],
             ],
-            'purchasing' => [
-                'title' => 'Purchasing',
-                'subtitle' => 'Purchase requests, purchase orders, service/goods receiving, supplier bills, and approval workflows.',
-                'actions' => ['Create PR', 'Create PO', 'Receive Goods / Services', 'Supplier Performance'],
-                'features' => ['Purchase Request', 'RFQ', 'Purchase Order', 'Receiving', 'Three-way Match', 'Approval Workflow', 'Supplier Terms', 'Attachments'],
-                'columns' => ['PO No.', 'Supplier', 'Branch', 'Expected Date', 'Amount', 'Status'],
-                'rows' => [
-                    ['PO-2026-00491', 'Metro Industrial Supply', 'Main', '2026-05-29', '127,900.00', 'Approved'],
-                    ['PO-2026-00490', 'Pacific Fuel Services', 'South', '2026-05-28', '76,880.00', 'Receiving'],
-                    ['PO-2026-00489', 'Harbor Office Center', 'Main', '2026-05-27', '18,000.00', 'Closed'],
-                ],
-            ],
             'banking' => [
                 'title' => 'Banking',
                 'subtitle' => 'Cashbook, multi-bank accounts, deposits, withdrawals, FX tracking, reconciliation, and daily cash position.',
@@ -3304,7 +3993,7 @@ class ModuleController extends Controller
                 'features' => ['Role-based Access', 'Multi-company', 'Multi-branch', 'Currency Setup', 'Tax Defaults', 'Document Numbering', 'Email Settings', 'Stripe Settings', 'Activity Logs'],
                 'columns' => ['Setting Area', 'Description', 'Owner', 'Last Updated', 'Status', 'Action'],
                 'rows' => [
-                    ['Users & Roles', 'Admin, Accounting, Finance, Sales, Purchasing, Viewer', 'Admin', '2026-05-24', 'Active', 'Review'],
+                    ['Users & Roles', 'Admin, Accounting, Finance, Sales, Payables, Viewer', 'Admin', '2026-05-24', 'Active', 'Review'],
                     ['Approval Matrix', 'Payment, credit, FX, and posting approvals', 'Finance', '2026-05-24', 'Active', 'Review'],
                     ['Number Series', 'BI, SOA, OR, AP, CV, JV numbering', 'Accounting', '2026-05-23', 'Active', 'Review'],
                 ],
@@ -3313,7 +4002,7 @@ class ModuleController extends Controller
                 'title' => 'Users & Role-Based Access',
                 'subtitle' => 'Roles, permissions, departments, approval workflows, login logs, and audit trails.',
                 'actions' => ['Invite User', 'Create Role', 'Approval Matrix', 'Audit Logs'],
-                'features' => ['Admin', 'Accounting', 'Finance', 'Sales', 'Purchasing', 'Operations', 'Viewer', 'Department Access'],
+                'features' => ['Admin', 'Accounting', 'Finance', 'Sales', 'Payables', 'Operations', 'Viewer', 'Department Access'],
                 'columns' => ['User', 'Role', 'Department', 'Branch', 'Last Login', 'Status'],
                 'rows' => [
                     ['Maria Santos', 'Admin', 'Accounting', 'Main', '2026-05-24 09:15', 'Active'],

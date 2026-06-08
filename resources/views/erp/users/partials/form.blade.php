@@ -13,11 +13,11 @@
     </div>
     <div class="col-md-3">
         <label class="form-label">Role</label>
-        <select name="role" class="form-select erp-select"><option>Admin</option><option>Accounting</option><option>Finance</option><option>Sales</option><option>Purchasing</option><option>Warehouse</option><option>Viewer</option></select>
+        <select name="role" class="form-select erp-select"><option>Admin</option><option>Accounting</option><option>Finance</option><option>Sales</option><option>Payables</option><option>Warehouse</option><option>Viewer</option></select>
     </div>
     <div class="col-md-3">
         <label class="form-label">Department</label>
-        <select name="department" class="form-select erp-select"><option>Accounting</option><option>Finance</option><option>Sales</option><option>Purchasing</option><option>Operations</option><option>Management</option></select>
+        <select name="department" class="form-select erp-select"><option>Accounting</option><option>Finance</option><option>Sales</option><option>Payables</option><option>Operations</option><option>Management</option></select>
     </div>
     <div class="col-md-3">
         <label class="form-label">Branch</label>
