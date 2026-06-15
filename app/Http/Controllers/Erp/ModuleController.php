@@ -5269,6 +5269,7 @@ class ModuleController extends Controller
                 ['name' => 'Collection Forecast', 'description' => 'Expected receipts by due date, client terms, and payment status.', 'route' => route('erp.export', 'collection-forecast'), 'icon' => 'bi-calendar2-check', 'frequency' => 'Weekly', 'owner' => 'Finance'],
             ],
             'Financial Statements' => [
+                ['name' => 'Trial Balance', 'description' => 'REPORTS.xlsx-style trial balance using account titles from Chart of Accounts.', 'route' => route('erp.reports.trial-balance'), 'icon' => 'bi-columns-gap', 'frequency' => 'Monthly', 'owner' => 'Accounting'],
                 ['name' => 'Workbook Report Pack', 'description' => 'Trial balance, ledger, bank recon, disbursement, journal, cash receipt books, and sales journals from the REPORTS.xlsx layout.', 'route' => route('erp.reports.workbook'), 'icon' => 'bi-folder-check', 'frequency' => 'Monthly', 'owner' => 'Finance'],
                 ['name' => 'Financial Statement Pack', 'description' => 'Complete finance report center for statements, ledgers, AR, AP, cash, tax, and management reports.', 'route' => route('erp.reports.financial-statements'), 'icon' => 'bi-file-earmark-spreadsheet', 'frequency' => 'Monthly', 'owner' => 'Finance'],
                 ['name' => 'Profit & Loss', 'description' => 'Revenue, cost of services, operating expenses, and net income by period.', 'route' => route('erp.statements.profit-loss'), 'icon' => 'bi-graph-up', 'frequency' => 'Monthly', 'owner' => 'Finance'],
@@ -5307,6 +5308,18 @@ class ModuleController extends Controller
         $summaryCards = $this->workbookReportSummaryCards();
 
         return view('erp.reports.workbook', compact('reports', 'report', 'activeReport', 'company', 'period', 'rows', 'summaryCards'));
+    }
+
+    public function trialBalanceReport()
+    {
+        $reports = $this->workbookReportDefinitions();
+        $activeReport = $reports['trial-balance'];
+        $company = Schema::hasTable('companies') ? DB::table('companies')->where('id', $this->defaultCompanyId())->first() : null;
+        $period = request('period', date('Y-m'));
+        $rows = $this->trialBalanceWorkbookRows($period);
+        $totals = $this->trialBalanceTotals($rows, $activeReport['columns']);
+
+        return view('erp.reports.trial-balance', compact('activeReport', 'company', 'period', 'rows', 'totals'));
     }
 
     public function clientStatementOfAccount()
@@ -5545,7 +5558,7 @@ class ModuleController extends Controller
         $definition = $definitions[$report] ?? $definitions['trial-balance'];
 
         if ($report === 'trial-balance') {
-            return $this->trialBalanceWorkbookRows();
+            return $this->trialBalanceWorkbookRows($period);
         }
         if ($report === 'general-ledger') {
             return $this->generalLedgerWorkbookRows($period);
@@ -5584,34 +5597,41 @@ class ModuleController extends Controller
         ];
     }
 
-    private function trialBalanceWorkbookRows()
+    private function trialBalanceWorkbookRows($period = null)
     {
         if (!Schema::hasTable('accounts')) {
             return [];
         }
 
-        $accounts = DB::table('accounts')->orderBy('type')->orderBy('code')->get();
-        $journalBalances = $this->journalBalancesByAccount();
-        $salesTotal = Schema::hasTable('sales_documents') ? (float) DB::table('sales_documents')->sum('grand_total') : 0;
-        $soaTotal = Schema::hasTable('sales_documents') && Schema::hasColumn('sales_documents', 'template_code')
-            ? (float) DB::table('sales_documents')->where('template_code', 'like', '%SOA%')->sum('grand_total')
-            : 0;
-        $receiptTotal = Schema::hasTable('receipts') ? (float) DB::table('receipts')->sum('amount') : 0;
-        $paymentTotal = Schema::hasTable('payments') ? (float) DB::table('payments')->sum('amount') : 0;
+        list($startDate, $endDate) = $this->trialBalanceDateRange($period);
+        $accounts = $this->trialBalanceAccounts();
+        $normals = [];
 
-        return $accounts->map(function ($account) use ($journalBalances, $salesTotal, $soaTotal, $receiptTotal, $paymentTotal) {
-            $name = $account->name;
-            $type = strtolower((string) $account->type);
-            $opening = (float) ($account->opening_balance ?? 0);
-            $journal = (float) ($journalBalances[$account->id] ?? 0);
-            $sales = strpos($type, 'revenue') !== false ? $salesTotal : 0;
-            $soa = strpos(strtolower($name), 'receivable') !== false ? $soaTotal : 0;
-            $receipts = strpos(strtolower($name), 'cash') !== false ? $receiptTotal : 0;
-            $disbursements = strpos(strtolower($name), 'cash') !== false || strpos(strtolower($name), 'payable') !== false ? -1 * $paymentTotal : 0;
+        foreach ($accounts as $account) {
+            $normals[$account->id] = $this->trialBalanceNormalBalance($account);
+        }
+
+        $beginningMovements = $startDate
+            ? $this->trialBalanceJournalMovements(null, date('Y-m-d', strtotime($startDate.' -1 day')), $normals, true)
+            : [];
+        $periodMovements = $this->trialBalanceJournalMovements($startDate, $endDate, $normals, false);
+
+        if (!$this->trialBalanceHasPeriodMovements($periodMovements)) {
+            $periodMovements = $this->trialBalanceDocumentMovements($startDate, $endDate, $accounts, $normals);
+        }
+
+        return $accounts->map(function ($account) use ($beginningMovements, $periodMovements) {
+            $opening = (float) ($account->opening_balance ?? 0) + (float) ($beginningMovements[$account->id]['TOTAL'] ?? 0);
+            $sales = (float) ($periodMovements[$account->id]['SALES BOOK'] ?? 0);
+            $soa = (float) ($periodMovements[$account->id]['SOA'] ?? 0);
+            $receipts = (float) ($periodMovements[$account->id]['OFFICIAL RECEIPT'] ?? 0);
+            $disbursements = (float) ($periodMovements[$account->id]['CASH DISBURSEMENT BOOK'] ?? 0);
+            $journal = (float) ($periodMovements[$account->id]['JOURNAL BOOK'] ?? 0);
             $ending = $opening + $sales + $soa + $receipts + $disbursements + $journal;
+            $title = trim(($account->code ? $account->code.' - ' : '').$account->name);
 
             return [
-                'ACCOUNT TITLES' => $name,
+                'ACCOUNT TITLES' => $title,
                 'BEGINNING BALANCE' => $opening,
                 'SALES BOOK' => $sales,
                 'SOA' => $soa,
@@ -5621,6 +5641,344 @@ class ModuleController extends Controller
                 'ENDING TRIAL BALANCE' => $ending,
             ];
         })->all();
+    }
+
+    private function trialBalanceTotals(array $rows, array $columns)
+    {
+        $totals = [];
+
+        foreach ($columns as $column) {
+            $totals[$column] = $column === 'ACCOUNT TITLES' ? '' : 0.0;
+            foreach ($rows as $row) {
+                if (isset($row[$column]) && is_numeric($row[$column])) {
+                    $totals[$column] += (float) $row[$column];
+                }
+            }
+        }
+
+        $totals['ACCOUNT TITLES'] = 'TOTAL';
+
+        return $totals;
+    }
+
+    private function trialBalanceDateRange($period)
+    {
+        if ($period && preg_match('/^\d{4}-\d{2}$/', $period)) {
+            $start = $period.'-01';
+            return [$start, date('Y-m-t', strtotime($start))];
+        }
+
+        return [null, null];
+    }
+
+    private function trialBalanceAccounts()
+    {
+        $query = DB::table('accounts')
+            ->leftJoin('account_categories', 'account_categories.id', '=', 'accounts.account_category_id')
+            ->select(
+                'accounts.id',
+                'accounts.code',
+                'accounts.name',
+                'accounts.type',
+                'accounts.opening_balance',
+                'account_categories.normal_balance',
+                'account_categories.name as category_name'
+            )
+            ->orderBy('accounts.type')
+            ->orderBy('accounts.code');
+
+        return $query->get();
+    }
+
+    private function trialBalanceNormalBalance($account)
+    {
+        $normal = strtolower((string) ($account->normal_balance ?? ''));
+        if (in_array($normal, ['debit', 'credit'], true)) {
+            return $normal;
+        }
+
+        $type = strtolower((string) ($account->type ?? $account->category_name ?? ''));
+        if (strpos($type, 'liabil') !== false || strpos($type, 'equity') !== false || strpos($type, 'revenue') !== false || strpos($type, 'income') !== false) {
+            return 'credit';
+        }
+
+        return 'debit';
+    }
+
+    private function trialBalanceSignedAmount($debit, $credit, $normal)
+    {
+        $debit = (float) $debit;
+        $credit = (float) $credit;
+
+        return $normal === 'credit' ? $credit - $debit : $debit - $credit;
+    }
+
+    private function trialBalanceJournalMovements($startDate, $endDate, array $normals, $singleTotalColumn = false)
+    {
+        if (!Schema::hasTable('journal_entry_lines') || !Schema::hasTable('journal_entries')) {
+            return [];
+        }
+
+        $query = DB::table('journal_entry_lines')
+            ->join('journal_entries', 'journal_entries.id', '=', 'journal_entry_lines.journal_entry_id')
+            ->select(
+                'journal_entry_lines.account_id',
+                'journal_entries.source_module',
+                DB::raw('SUM(journal_entry_lines.debit) as debit_total'),
+                DB::raw('SUM(journal_entry_lines.credit) as credit_total')
+            )
+            ->groupBy('journal_entry_lines.account_id', 'journal_entries.source_module');
+
+        if ($startDate) {
+            $query->where('journal_entries.journal_date', '>=', $startDate);
+        }
+        if ($endDate) {
+            $query->where('journal_entries.journal_date', '<=', $endDate);
+        }
+
+        $movements = [];
+        foreach ($query->get() as $line) {
+            $accountId = (int) $line->account_id;
+            $column = $singleTotalColumn ? 'TOTAL' : $this->trialBalanceColumnForSource($line->source_module);
+            $amount = $this->trialBalanceSignedAmount($line->debit_total, $line->credit_total, $normals[$accountId] ?? 'debit');
+            $movements[$accountId][$column] = ($movements[$accountId][$column] ?? 0) + $amount;
+        }
+
+        return $movements;
+    }
+
+    private function trialBalanceColumnForSource($source)
+    {
+        $source = strtolower((string) $source);
+
+        if (strpos($source, 'soa') !== false || strpos($source, 'statement') !== false) {
+            return 'SOA';
+        }
+        if (strpos($source, 'sale') !== false || strpos($source, 'invoice') !== false || strpos($source, 'billing') !== false) {
+            return 'SALES BOOK';
+        }
+        if (strpos($source, 'receipt') !== false || strpos($source, 'collection') !== false || $source === 'or') {
+            return 'OFFICIAL RECEIPT';
+        }
+        if (strpos($source, 'disbursement') !== false || strpos($source, 'payment') !== false || strpos($source, 'payable') !== false || $source === 'ap') {
+            return 'CASH DISBURSEMENT BOOK';
+        }
+
+        return 'JOURNAL BOOK';
+    }
+
+    private function trialBalanceHasPeriodMovements(array $movements)
+    {
+        foreach ($movements as $columns) {
+            foreach ($columns as $amount) {
+                if (abs((float) $amount) >= 0.005) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function trialBalanceDocumentMovements($startDate, $endDate, $accounts, array $normals)
+    {
+        $movements = [];
+        $ids = $this->trialBalanceAccountIds($accounts);
+
+        $this->trialBalanceSalesDocumentMovements($movements, $ids, $normals, $startDate, $endDate);
+        $this->trialBalanceReceiptMovements($movements, $ids, $normals, $startDate, $endDate);
+        $this->trialBalancePurchaseDocumentMovements($movements, $ids, $normals, $startDate, $endDate);
+        $this->trialBalancePaymentMovements($movements, $ids, $normals, $startDate, $endDate);
+
+        return $movements;
+    }
+
+    private function trialBalanceAccountIds($accounts)
+    {
+        return [
+            'cash' => $this->trialBalanceFindAccountId($accounts, ['cash in bank', 'cash on hand', 'cash']),
+            'ar_trade' => $this->trialBalanceFindAccountId($accounts, ['a/trade-billing invoice', 'accounts receivable', 'a/r trade']),
+            'ar_soa' => $this->trialBalanceFindAccountId($accounts, ['a/r trade-soa a', 'soa a', 'statement of account']),
+            'ar_reimbursable' => $this->trialBalanceFindAccountId($accounts, ['a/r-reimbursable charges', 'a/r reimbursable charges', 'reimbursable']),
+            'revenue' => $this->trialBalanceFindAccountId($accounts, ['service income', 'service revenue', 'revenue', 'income']),
+            'reimbursable_revenue' => $this->trialBalanceFindAccountId($accounts, ['reimbursable charges (cr)', 'reimbursable charges', 'reimbursable income']),
+            'expense' => $this->trialBalanceFindAccountId($accounts, ['expense', 'cost of services', 'cost']),
+            'output_vat' => $this->trialBalanceFindAccountId($accounts, ['output vat', 'vat payable']),
+            'input_vat' => $this->trialBalanceFindAccountId($accounts, ['input vat', 'vat input']),
+            'ap_trade' => $this->trialBalanceFindAccountId($accounts, ['accounts payable', 'a/p trade', 'payable']),
+        ];
+    }
+
+    private function trialBalanceFindAccountId($accounts, array $needles)
+    {
+        foreach ($needles as $needle) {
+            $needle = strtolower($needle);
+            foreach ($accounts as $account) {
+                $haystack = strtolower(trim(($account->code ?? '').' '.($account->name ?? '').' '.($account->type ?? '').' '.($account->category_name ?? '')));
+                if (strpos($haystack, $needle) !== false) {
+                    return (int) $account->id;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function trialBalanceAddMovement(array &$movements, $accountId, $column, $debit, $credit, array $normals)
+    {
+        if (!$accountId) {
+            return;
+        }
+
+        $amount = $this->trialBalanceSignedAmount($debit, $credit, $normals[$accountId] ?? 'debit');
+        $movements[$accountId][$column] = ($movements[$accountId][$column] ?? 0) + $amount;
+    }
+
+    private function trialBalanceSalesDocumentMovements(array &$movements, array $ids, array $normals, $startDate, $endDate)
+    {
+        if (!Schema::hasTable('sales_documents')) {
+            return;
+        }
+
+        $query = DB::table('sales_documents')
+            ->whereNotIn('status', ['cancelled', 'voided']);
+
+        if ($startDate) {
+            $query->where('document_date', '>=', $startDate);
+        }
+        if ($endDate) {
+            $query->where('document_date', '<=', $endDate);
+        }
+
+        $columns = ['id', 'document_type', 'template_code', 'ar_account_code', 'subtotal', 'tax_total', 'freight_total', 'grand_total'];
+        if (!Schema::hasColumn('sales_documents', 'template_code')) {
+            $columns[2] = DB::raw('null as template_code');
+        }
+        if (!Schema::hasColumn('sales_documents', 'ar_account_code')) {
+            $columns[3] = DB::raw('null as ar_account_code');
+        }
+
+        foreach ($query->get($columns) as $document) {
+            $isSoa = stripos((string) $document->template_code, 'SOA') !== false || stripos((string) $document->document_type, 'soa') !== false;
+            $column = $isSoa ? 'SOA' : 'SALES BOOK';
+            $subtotal = (float) ($document->subtotal ?: max(0, (float) $document->grand_total - (float) $document->tax_total - (float) $document->freight_total));
+            $tax = (float) $document->tax_total;
+            $freight = (float) $document->freight_total;
+            $arAccountId = $this->trialBalanceArAccountId($document->ar_account_code, $ids, $isSoa);
+            $reimbursableDebit = $document->ar_account_code === 'AR_REIMBURSABLE' ? (float) $document->grand_total : $freight;
+            $tradeDebit = max(0, (float) $document->grand_total - $reimbursableDebit);
+
+            $this->trialBalanceAddMovement($movements, $arAccountId, $column, $tradeDebit, 0, $normals);
+            $this->trialBalanceAddMovement($movements, $ids['revenue'], $column, 0, $subtotal, $normals);
+            $this->trialBalanceAddMovement($movements, $ids['output_vat'], $column, 0, $tax, $normals);
+            $this->trialBalanceAddMovement($movements, $ids['ar_reimbursable'], $column, $reimbursableDebit, 0, $normals);
+            $this->trialBalanceAddMovement($movements, $ids['reimbursable_revenue'] ?: $ids['revenue'], $column, 0, $freight, $normals);
+        }
+    }
+
+    private function trialBalanceArAccountId($code, array $ids, $isSoa)
+    {
+        if ($code === 'AR_REIMBURSABLE') {
+            return $ids['ar_reimbursable'] ?: $ids['ar_trade'];
+        }
+        if ($code === 'AR_TRADE_SOAA' || $isSoa) {
+            return $ids['ar_soa'] ?: $ids['ar_trade'];
+        }
+
+        return $ids['ar_trade'] ?: $ids['ar_soa'] ?: $ids['ar_reimbursable'];
+    }
+
+    private function trialBalanceReceiptMovements(array &$movements, array $ids, array $normals, $startDate, $endDate)
+    {
+        if (!Schema::hasTable('receipts')) {
+            return;
+        }
+
+        $query = DB::table('receipts')->whereNotIn('status', ['cancelled', 'voided']);
+        if ($startDate) {
+            $query->where('receipt_date', '>=', $startDate);
+        }
+        if ($endDate) {
+            $query->where('receipt_date', '<=', $endDate);
+        }
+
+        foreach ($query->get(['amount']) as $receipt) {
+            $amount = (float) $receipt->amount;
+            $this->trialBalanceAddMovement($movements, $ids['cash'], 'OFFICIAL RECEIPT', $amount, 0, $normals);
+            $this->trialBalanceAddMovement($movements, $ids['ar_trade'] ?: $ids['ar_soa'], 'OFFICIAL RECEIPT', 0, $amount, $normals);
+        }
+    }
+
+    private function trialBalancePurchaseDocumentMovements(array &$movements, array $ids, array $normals, $startDate, $endDate)
+    {
+        if (!Schema::hasTable('purchase_documents')) {
+            return;
+        }
+
+        $query = DB::table('purchase_documents')->whereNotIn('status', ['cancelled', 'voided']);
+        if ($startDate) {
+            $query->where('document_date', '>=', $startDate);
+        }
+        if ($endDate) {
+            $query->where('document_date', '<=', $endDate);
+        }
+
+        foreach ($query->get(['id', 'grand_total', 'tax_total']) as $bill) {
+            $lineTotal = $this->trialBalancePurchaseLineMovements($movements, $bill->id, $normals);
+            $tax = (float) ($bill->tax_total ?? 0);
+            $expenseTotal = max(0, (float) $bill->grand_total - $tax);
+
+            if ($lineTotal <= 0) {
+                $this->trialBalanceAddMovement($movements, $ids['expense'], 'JOURNAL BOOK', $expenseTotal, 0, $normals);
+            }
+
+            $this->trialBalanceAddMovement($movements, $ids['input_vat'], 'JOURNAL BOOK', $tax, 0, $normals);
+            $this->trialBalanceAddMovement($movements, $ids['ap_trade'], 'JOURNAL BOOK', 0, (float) $bill->grand_total, $normals);
+        }
+    }
+
+    private function trialBalancePurchaseLineMovements(array &$movements, $billId, array $normals)
+    {
+        $table = Schema::hasTable('vendor_bill_lines') ? 'vendor_bill_lines' : (Schema::hasTable('purchase_document_lines') ? 'purchase_document_lines' : null);
+        if (!$table) {
+            return 0;
+        }
+
+        $columns = Schema::getColumnListing($table);
+        $amountColumn = in_array('amount', $columns, true) ? 'amount' : 'line_total';
+        $lines = DB::table($table)
+            ->where('purchase_document_id', $billId)
+            ->get(['account_id', $amountColumn.' as amount']);
+
+        $lineTotal = 0.0;
+        foreach ($lines as $line) {
+            $amount = (float) $line->amount;
+            $lineTotal += $amount;
+            $this->trialBalanceAddMovement($movements, $line->account_id, 'JOURNAL BOOK', $amount, 0, $normals);
+        }
+
+        return $lineTotal;
+    }
+
+    private function trialBalancePaymentMovements(array &$movements, array $ids, array $normals, $startDate, $endDate)
+    {
+        if (!Schema::hasTable('payments')) {
+            return;
+        }
+
+        $query = DB::table('payments')->whereNotIn('status', ['cancelled', 'voided']);
+        if ($startDate) {
+            $query->where('payment_date', '>=', $startDate);
+        }
+        if ($endDate) {
+            $query->where('payment_date', '<=', $endDate);
+        }
+
+        foreach ($query->get(['amount']) as $payment) {
+            $amount = (float) $payment->amount;
+            $this->trialBalanceAddMovement($movements, $ids['ap_trade'], 'CASH DISBURSEMENT BOOK', $amount, 0, $normals);
+            $this->trialBalanceAddMovement($movements, $ids['cash'], 'CASH DISBURSEMENT BOOK', 0, $amount, $normals);
+        }
     }
 
     private function journalBalancesByAccount()
