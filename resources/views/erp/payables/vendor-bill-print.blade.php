@@ -31,6 +31,38 @@
         align-items: start;
         min-height: 172px;
     }
+    .bill-print-brand {
+        display: grid;
+        grid-template-columns: 100px 1fr;
+        gap: 16px;
+        align-items: center;
+        padding-top: 2px;
+    }
+    .bill-print-logo {
+        width: 90px;
+        height: 56px;
+        object-fit: contain;
+    }
+    .bill-print-company {
+        text-align: center;
+        line-height: 1.18;
+    }
+    .bill-print-company-name {
+        font-size: 15px;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+    .bill-print-company-meta {
+        font-size: 10px;
+        font-weight: 600;
+    }
+    .bill-print-form-title {
+        margin-top: 24px;
+        text-align: center;
+        font-size: 18px;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
     .bill-small-grid {
         display: grid;
         grid-template-columns: 88px 1fr;
@@ -121,17 +153,131 @@
         font-weight: 500;
     }
     @media print {
+        @page { size: 8.5in 11in; margin: 0.18in; }
+        html, body {
+            width: 8.5in;
+            height: 11in;
+            overflow: hidden;
+        }
         .erp-sidebar, .erp-topbar, .no-print { display: none !important; }
         .erp-main { margin: 0 !important; }
         .erp-main > section { padding: 0 !important; }
-        body { background: #fff !important; }
+        body {
+            background: #fff !important;
+            color: #000 !important;
+            -webkit-print-color-adjust: economy;
+            print-color-adjust: economy;
+        }
+        .bill-print-wrap { overflow: hidden; }
         .bill-print-sheet {
-            width: auto;
-            min-height: auto;
+            width: 8.14in;
+            height: 10.64in;
+            min-height: 0;
+            max-height: 10.64in;
+            overflow: hidden;
             border: 0;
             box-shadow: none;
             margin: 0;
-            padding: 72px 58px 56px;
+            padding: 0;
+            font-family: "Courier New", "Lucida Console", monospace;
+            font-size: 10px;
+            line-height: 1.12;
+            color: #000 !important;
+            page-break-after: avoid;
+            page-break-inside: avoid;
+        }
+        .bill-print-sheet * {
+            color: #000 !important;
+            box-shadow: none !important;
+        }
+        .bill-top-grid {
+            min-height: 0;
+            gap: 22px;
+            grid-template-columns: 1fr 250px;
+        }
+        .bill-print-logo {
+            display: none;
+        }
+        .bill-print-brand {
+            display: block;
+            padding-top: 0;
+        }
+        .bill-print-company {
+            text-align: left;
+            line-height: 1.1;
+        }
+        .bill-print-company::before {
+            content: "SEA-JET";
+            display: block;
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: 1px;
+        }
+        .bill-print-company-name { font-size: 12px; }
+        .bill-print-company-meta { font-size: 9px; }
+        .bill-print-form-title {
+            margin-top: 8px;
+            text-align: left;
+            font-size: 13px;
+        }
+        .bill-small-grid,
+        .bill-box,
+        .bill-meta-box,
+        .bill-expense-table {
+            border-color: #000;
+        }
+        .bill-small-grid > div {
+            min-height: 20px;
+            padding: 3px 5px;
+            border-color: #000;
+        }
+        .bill-info-row {
+            grid-template-columns: 260px 1fr;
+            gap: 22px;
+            margin-top: 8px;
+        }
+        .bill-box { min-height: 76px; }
+        .bill-box-label {
+            padding: 3px 5px;
+            border-color: #000;
+        }
+        .bill-box-body {
+            padding: 4px 5px;
+            font-family: "Courier New", "Lucida Console", monospace;
+            font-size: 10px;
+            line-height: 1.08;
+        }
+        .bill-meta-box {
+            min-height: 76px;
+            padding: 4px 5px;
+        }
+        .bill-meta-line {
+            margin-bottom: 5px;
+            grid-template-columns: 58px 1fr;
+            gap: 8px;
+        }
+        .bill-title {
+            margin: 8px 0 5px;
+            font-size: 15px;
+        }
+        .bill-expense-table th,
+        .bill-expense-table td {
+            padding: 2px 4px;
+            border-color: #000;
+        }
+        .bill-expense-table tbody td {
+            height: 18px;
+        }
+        .bill-expense-table tbody tr.filler td {
+            height: 200px;
+        }
+        .bill-total-line {
+            margin-top: 4px;
+            font-size: 9px;
+        }
+        .bill-total {
+            margin-top: 5px;
+            font-size: 13px;
         }
     }
 </style>
@@ -146,7 +292,17 @@
     <div class="bill-print-wrap">
         <div class="bill-print-sheet">
             <div class="bill-top-grid">
-                <div></div>
+                <div>
+                    <div class="bill-print-brand">
+                        <img src="{{ asset('images/gen_off_seajetlogo.webp') }}" class="bill-print-logo" alt="SeaJet logo">
+                        <div class="bill-print-company">
+                            <div class="bill-print-company-name">Sea-Jet International Forwarders, Inc.</div>
+                            <div class="bill-print-company-meta">Unit 18 & 19 Bldg. B, Cargo Village Complex</div>
+                            <div class="bill-print-company-meta">Paranaque City 1704, Philippines</div>
+                        </div>
+                    </div>
+                    <div class="bill-print-form-title">Vendor Bill</div>
+                </div>
                 <div class="bill-small-grid">
                     <div>Date</div>
                     <div>Ref. No.</div>

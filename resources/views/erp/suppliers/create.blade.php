@@ -98,6 +98,15 @@
                 </select>
             </div>
             <div class="col-md-4">
+                <label class="form-label">Default Expense Account</label>
+                <select name="default_expense_account_id" class="form-select erp-select">
+                    <option value=""></option>
+                    @foreach($expenseAccounts as $account)
+                        <option value="{{ $account->id }}" {{ (string) old('default_expense_account_id') === (string) $account->id ? 'selected' : '' }}>{{ $account->label }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-4">
                 <label class="form-label">Preferred Payment Method</label>
                 <select name="preferred_payment_method" class="form-select erp-select">
                     @foreach(['Cheque', 'Bank Transfer', 'Online Transfer'] as $option)

@@ -35,7 +35,7 @@
     </div>
 
     <div class="row g-3 mb-4">
-        <div class="col-lg-8">
+        <div class="col-12">
             <div class="erp-card p-3 h-100">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                     <div>
@@ -79,26 +79,6 @@
                         @endforeach
                         </tbody>
                     </table>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-4">
-            <div class="erp-card p-3 h-100">
-                <h2 class="h6 fw-bold mb-3">AP Workflow</h2>
-                <div class="list-group list-group-flush mb-3">
-                    @foreach($apWorkflows as $workflow)
-                        <a href="{{ $workflow['route'] }}" class="list-group-item list-group-item-action px-0 d-flex align-items-center justify-content-between">
-                            <span><i class="bi {{ $workflow['icon'] }} me-2 text-primary"></i>{{ $workflow['label'] }}</span>
-                            <i class="bi bi-arrow-right-short"></i>
-                        </a>
-                    @endforeach
-                </div>
-                <hr>
-                <h3 class="h6 fw-bold mb-3">Features</h3>
-                <div class="d-flex flex-wrap gap-2">
-                    @foreach($apFeatures as $feature)
-                        <span class="badge badge-soft py-2 px-3"><i class="bi {{ $feature['icon'] }} me-1"></i>{{ $feature['label'] }}</span>
-                    @endforeach
                 </div>
             </div>
         </div>

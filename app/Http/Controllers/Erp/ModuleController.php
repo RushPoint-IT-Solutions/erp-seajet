@@ -837,6 +837,7 @@ class ModuleController extends Controller
 
         return view('erp.suppliers.create', [
             'nextSupplierCode' => 'SUP-'.str_pad($nextSupplierNumber, 3, '0', STR_PAD_LEFT),
+            'expenseAccounts' => $this->expenseAccountOptions(),
         ]);
     }
 
@@ -855,6 +856,7 @@ class ModuleController extends Controller
             'phone' => 'nullable|string|max:255',
             'address' => 'nullable|string|max:1000',
             'default_ap_account' => 'nullable|string|max:255',
+            'default_expense_account_id' => 'nullable|integer',
             'preferred_payment_method' => 'nullable|string|max:255',
             'withholding_tax' => 'nullable|string|max:50',
         ]);
@@ -886,6 +888,7 @@ class ModuleController extends Controller
             'preferred_payment_method' => isset($data['preferred_payment_method']) ? $data['preferred_payment_method'] : null,
             'default_class_code' => $data['default_class_code'],
             'default_ap_account' => isset($data['default_ap_account']) ? $data['default_ap_account'] : null,
+            'default_expense_account_id' => $data['default_expense_account_id'] ?? null,
             'withholding_tax' => isset($data['withholding_tax']) ? $data['withholding_tax'] : '0%',
             'is_active' => true,
             'created_at' => now(),
@@ -924,6 +927,8 @@ class ModuleController extends Controller
                     'currency' => $supplier->currency ?: 'PHP',
                     'class' => $supplier->default_class_code ?: 'MANILA',
                     'ap_account' => $supplier->default_ap_account ?: 'Accounts Payable Trade',
+                    'expense_account_id' => $supplier->default_expense_account_id ?? null,
+                    'expense_account' => $this->accountLabelById($supplier->default_expense_account_id ?? null),
                     'open_bills' => $this->supplierOpenBillCount($supplier->id),
                     'open_ap' => $openAp,
                     'open_ap_display' => ($supplier->currency ?: 'PHP').' '.number_format($openAp, 2),
@@ -947,6 +952,77 @@ class ModuleController extends Controller
             ['label' => 'Open Bills', 'value' => $openBills, 'icon' => 'bi-receipt', 'tone' => 'warning'],
             ['label' => 'Withholding Setup', 'value' => $withholdingCount, 'icon' => 'bi-percent', 'tone' => 'success'],
         ];
+    }
+
+    private function expenseAccountOptions()
+    {
+        if (!Schema::hasTable('accounts')) {
+            return collect();
+        }
+
+        return DB::table('accounts')
+            ->leftJoin('account_categories', 'account_categories.id', '=', 'accounts.account_category_id')
+            ->select('accounts.id', 'accounts.code', 'accounts.name', 'account_categories.name as category')
+            ->where('accounts.is_active', true)
+            ->where(function ($query) {
+                $query->where('account_categories.name', 'like', '%Expense%')
+                    ->orWhere('account_categories.name', 'like', '%Cost%')
+                    ->orWhere('accounts.name', 'like', '%Expense%')
+                    ->orWhere('accounts.name', 'like', '%Cost%');
+            })
+            ->orderBy('accounts.code')
+            ->get()
+            ->map(function ($account) {
+                $label = trim(($account->code ? $account->code.' - ' : '').$account->name);
+
+                return (object) [
+                    'id' => $account->id,
+                    'code' => $account->code,
+                    'name' => $account->name,
+                    'label' => $label,
+                    'category' => $account->category,
+                ];
+            });
+    }
+
+    private function accountLabelById($accountId)
+    {
+        if (!$accountId || !Schema::hasTable('accounts')) {
+            return '';
+        }
+
+        $account = DB::table('accounts')->where('id', $accountId)->first();
+        if (!$account) {
+            return '';
+        }
+
+        return trim(($account->code ? $account->code.' - ' : '').$account->name);
+    }
+
+    private function expenseAccountIdFromLabel($label)
+    {
+        $label = trim((string) $label);
+        if ($label === '' || !Schema::hasTable('accounts')) {
+            return null;
+        }
+
+        $code = trim(strtok($label, '-'));
+        $query = DB::table('accounts');
+        if ($code !== '') {
+            $query->where('code', $code);
+        }
+
+        $id = $query->value('id');
+        if ($id) {
+            return $id;
+        }
+
+        $name = trim(preg_replace('/^[^-]+-\s*/', '', $label));
+
+        return DB::table('accounts')
+            ->where('name', $name)
+            ->orWhere(DB::raw("concat(code, ' - ', name)"), $label)
+            ->value('id');
     }
 
     private function vendorRecentBills()
@@ -1118,6 +1194,7 @@ class ModuleController extends Controller
         return view('erp.payables.vendor-bill-create', [
             'suppliers' => $this->vendorRows(),
             'customers' => $this->customerSelectOptions(),
+            'expenseAccounts' => $this->expenseAccountOptions(),
             'bill' => $bill,
             'lines' => $bill ? $this->apBillLines($bill['id']) : collect(),
             'attachments' => $bill ? $this->documentAttachments('purchase_document', $bill['id']) : collect(),
@@ -1568,6 +1645,7 @@ class ModuleController extends Controller
 
             DB::table($table)->insert($this->tablePayload($table, [
                 'purchase_document_id' => $billId,
+                'account_id' => $this->expenseAccountIdFromLabel($account),
                 'account_name' => $account,
                 'tax_category' => $taxes[$index] ?? null,
                 'amount' => $amount,

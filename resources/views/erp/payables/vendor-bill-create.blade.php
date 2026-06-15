@@ -27,6 +27,44 @@
         border-radius: 4px;
         box-shadow: 0 8px 24px rgba(15, 23, 42, .08);
     }
+    .bill-brand-header {
+        display: grid;
+        grid-template-columns: 120px minmax(0, 1fr) 120px;
+        align-items: center;
+        gap: 18px;
+        border: 1px solid #b6c2d2;
+        border-radius: 4px;
+        background: #fff;
+        padding: 14px 18px;
+        margin-bottom: 14px;
+    }
+    .bill-brand-logo {
+        width: 112px;
+        height: 58px;
+        object-fit: contain;
+    }
+    .bill-company {
+        text-align: center;
+        color: #111827;
+        line-height: 1.2;
+    }
+    .bill-company-name {
+        font-size: 18px;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+    .bill-company-meta {
+        font-size: 11px;
+        font-weight: 600;
+        color: #4b5563;
+    }
+    .bill-document-title {
+        text-align: right;
+        color: #991b1b;
+        font-size: 22px;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
     .bill-head {
         background: #eef4ff;
         border: 1px solid #b6c2d2;
@@ -83,6 +121,7 @@
         @php($bill = $bill ?? [])
         @php($lines = collect($lines ?? []))
         @php($attachments = collect($attachments ?? []))
+        @php($errors = $errors ?? new \Illuminate\Support\ViewErrorBag)
         @if(session('status'))
             <div class="alert alert-success">{{ session('status') }}</div>
         @endif
@@ -133,6 +172,15 @@
             </div>
 
             <div class="bill-shell p-3">
+                <div class="bill-brand-header">
+                    <img src="{{ asset('images/gen_off_seajetlogo.webp') }}" class="bill-brand-logo" alt="SeaJet logo">
+                    <div class="bill-company">
+                        <div class="bill-company-name">Sea-Jet International Forwarders, Inc.</div>
+                        <div class="bill-company-meta">Unit 18 & 19 Bldg. B, Cargo Village Complex</div>
+                        <div class="bill-company-meta">Paranaque City 1704, Philippines</div>
+                    </div>
+                    <div class="bill-document-title">Vendor Bill</div>
+                </div>
                 <div class="bill-head mb-3">
                     <div class="row g-3 align-items-start">
                         <div class="col-lg-4">
@@ -148,6 +196,7 @@
                                                 data-terms="{{ $supplier['terms'] }}"
                                                 data-currency="{{ $supplier['currency'] }}"
                                                 data-wht="{{ $supplier['withholding_tax'] }}"
+                                                data-expense-account="{{ $supplier['expense_account'] }}"
                                                 {{ ($bill['supplier_id'] ?? '') === $supplier['supplier_id'] ? 'selected' : '' }}>
                                             {{ $supplier['supplier_id'] }} - {{ $supplier['name'] }}
                                         </option>
@@ -269,13 +318,24 @@
                         </tr>
                         </thead>
                         <tbody>
-                        @forelse($lines->count() ? $lines : collect([null]) as $index => $line)
+                        <?php
+                            $billLines = $lines->count() ? $lines : collect([null]);
+                            $expenseAccountLabels = $expenseAccounts->pluck('label')->all();
+                        ?>
+                        @foreach($billLines as $index => $line)
                         <tr>
                             <td>
-                                <select name="expense_account[]" class="form-select">
+                                <select name="expense_account[]" class="form-select expense-account expense-account-search">
                                     <option value=""></option>
-                                    @foreach(['Reimbursable charges', 'Rebates', '5000 - Cost of Services', '5100 - Operating Expenses', '2200 - Input VAT Clearing'] as $account)
-                                        <option value="{{ $account }}" {{ ($line && ($line->account_name ?? '') === $account) ? 'selected' : '' }}>{{ $account }}</option>
+                                    <?php
+                                        $lineAccount = $line ? ($line->account_name ?? '') : '';
+                                        $lineAccountInOptions = in_array($lineAccount, $expenseAccountLabels, true);
+                                    ?>
+                                    @if($lineAccount && !$lineAccountInOptions)
+                                        <option value="{{ $lineAccount }}" selected>{{ $lineAccount }}</option>
+                                    @endif
+                                    @foreach($expenseAccounts as $account)
+                                        <option value="{{ $account->label }}" {{ ($line && ($line->account_name ?? '') === $account->label) ? 'selected' : '' }}>{{ $account->label }}</option>
                                     @endforeach
                                 </select>
                             </td>
@@ -290,7 +350,7 @@
                             <td><input name="expense_amount[]" class="form-control text-end expense-amount" value="{{ $line ? number_format((float) ($line->amount ?? $line->line_total ?? 0), 2) : '' }}"></td>
                             <td><input name="expense_memo[]" class="form-control" value="{{ $line ? ($line->memo ?? $line->description ?? '') : '' }}"></td>
                             <td>
-                                <select name="expense_customer_job[]" class="form-select line-customer">
+                                <select name="expense_customer_job[]" class="form-select line-customer customer-job-search">
                                     <option value=""></option>
                                     @foreach($customers as $customer)
                                         <option value="{{ $customer['customer_id'] }}" {{ ($line && ($line->customer_job_id ?? '') === $customer['customer_id']) ? 'selected' : '' }}>{{ $customer['customer_id'] }} - {{ $customer['name'] }}</option>
@@ -308,8 +368,7 @@
                             </td>
                             <td class="text-center no-print"><button type="button" class="btn btn-sm btn-outline-danger remove-line"><i class="bi bi-trash"></i></button></td>
                         </tr>
-                        @empty
-                        @endforelse
+                        @endforeach
                         </tbody>
                     </table>
                 </div>
@@ -355,6 +414,34 @@
             return $('#currencySelect').val() || 'USD';
         }
 
+        function initExpenseAccountSearch(scope) {
+            $(scope || document).find('.expense-account-search').each(function () {
+                var select = $(this);
+                if (select.hasClass('select2-hidden-accessible')) {
+                    return;
+                }
+                select.select2({
+                    width: 'resolve',
+                    placeholder: 'Search account',
+                    allowClear: true
+                });
+            });
+        }
+
+        function initCustomerJobSearch(scope) {
+            $(scope || document).find('.customer-job-search').each(function () {
+                var select = $(this);
+                if (select.hasClass('select2-hidden-accessible')) {
+                    return;
+                }
+                select.select2({
+                    width: 'resolve',
+                    placeholder: 'Search customer',
+                    allowClear: true
+                });
+            });
+        }
+
         function syncSupplier() {
             var option = $('#supplierSelect option:selected');
             if (!option.val()) {
@@ -367,6 +454,13 @@
             $('#supplierAddress').val(option.data('address') || '');
             $('#termsSelect').val(option.data('terms') || '');
             $('#currencySelect').val(option.data('currency') || currency());
+            var expenseAccount = option.data('expense-account') || '';
+            if (expenseAccount) {
+                var firstAccount = $('#expenseLines tbody tr:first .expense-account');
+                if (!firstAccount.val()) {
+                    firstAccount.val(expenseAccount).trigger('change');
+                }
+            }
         }
 
         function recalc() {
@@ -408,11 +502,20 @@
         $('#recalculateBill').on('click', recalc);
 
         $('#addExpenseLine').on('click', function () {
-            var row = $('#expenseLines tbody tr:first').clone();
+            var source = $('#expenseLines tbody tr:first');
+            source.find('.expense-account-search.select2-hidden-accessible').select2('destroy');
+            source.find('.customer-job-search.select2-hidden-accessible').select2('destroy');
+            source.find('.select2-container').remove();
+
+            var row = source.clone();
             row.find('input[type="text"], input:not([type])').val('');
             row.find('input[type="checkbox"]').prop('checked', false);
             row.find('select').val('');
             $('#expenseLines tbody').append(row);
+            initExpenseAccountSearch(source);
+            initCustomerJobSearch(source);
+            initExpenseAccountSearch(row);
+            initCustomerJobSearch(row);
             reindexRows();
         });
 
@@ -425,6 +528,8 @@
         });
 
         reindexRows();
+        initExpenseAccountSearch(document);
+        initCustomerJobSearch(document);
         recalc();
     });
 </script>

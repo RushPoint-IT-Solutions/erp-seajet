@@ -75,6 +75,7 @@ class ImportVendorsSeajet extends Command
             foreach ($rows as $index => $row) {
                 $branch = $this->branchFromAddress($row['address']);
                 $tax = $this->taxClassification($row['tax_type']);
+                $defaultExpenseAccountId = $this->defaultExpenseAccountId($companyId);
                 $stats[strtolower($branch)]++;
                 $stats[$tax === '12%' ? 'vat' : str_replace('-', '_', $tax)]++;
 
@@ -94,6 +95,7 @@ class ImportVendorsSeajet extends Command
                     'preferred_payment_method' => null,
                     'default_class_code' => $branch,
                     'default_ap_account' => 'Accounts Payable Trade',
+                    'default_expense_account_id' => $defaultExpenseAccountId,
                     'withholding_tax' => '0%',
                     'is_active' => true,
                     'created_at' => $now,
@@ -211,6 +213,29 @@ class ImportVendorsSeajet extends Command
     private function supplierPayload(array $payload)
     {
         return array_intersect_key($payload, array_flip(Schema::getColumnListing('suppliers')));
+    }
+
+    private function defaultExpenseAccountId($companyId)
+    {
+        if (!Schema::hasTable('accounts')) {
+            return null;
+        }
+
+        $account = DB::table('accounts')
+            ->leftJoin('account_categories', 'account_categories.id', '=', 'accounts.account_category_id')
+            ->where('accounts.company_id', $companyId)
+            ->where('accounts.is_active', true)
+            ->where(function ($query) {
+                $query->where('accounts.name', 'like', '%Operating Expense%')
+                    ->orWhere('accounts.name', 'like', '%Expense%')
+                    ->orWhere('account_categories.name', 'like', '%Expense%')
+                    ->orWhere('account_categories.name', 'like', '%Cost%');
+            })
+            ->orderBy('accounts.code')
+            ->select('accounts.id')
+            ->first();
+
+        return $account ? $account->id : null;
     }
 
     private function clean($value)

@@ -123,6 +123,7 @@
                     <th>Currency</th>
                     <th>Class</th>
                     <th>AP Account</th>
+                    <th>Expense Account</th>
                     <th class="text-end">Open Bills</th>
                     <th class="text-end">Open AP</th>
                     <th class="text-end">Actions</th>
@@ -144,6 +145,7 @@
                         <td>{{ $supplier['currency'] }}</td>
                         <td>{{ $supplier['class'] }}</td>
                         <td>{{ $supplier['ap_account'] }}</td>
+                        <td>{{ $supplier['expense_account'] ?: '-' }}</td>
                         <td class="text-end">{{ $supplier['open_bills'] }}</td>
                         <td class="text-end fw-semibold">{{ $supplier['open_ap_display'] }}</td>
                         <td class="text-end">
