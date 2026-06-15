@@ -140,6 +140,12 @@
         .erp-nav button[aria-expanded="true"] .nav-caret {
             transform: rotate(180deg);
         }
+        .erp-nav .nav-group:hover > .collapse,
+        .erp-nav .nav-group:focus-within > .collapse {
+            display: block;
+            height: auto !important;
+            visibility: visible;
+        }
         .erp-main {
             min-width: 0;
         }
@@ -254,7 +260,7 @@
                     }
                     $collapseId = 'sidebarSection'.$sectionIndex;
                 @endphp
-                <div class="mb-1">
+                <div class="mb-1 {{ isset($section['items']) ? 'nav-group' : '' }}">
                     @if(isset($section['items']))
                         <button class="{{ $sectionActive ? 'active' : '' }}" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}" aria-expanded="{{ $sectionActive ? 'true' : 'false' }}" aria-controls="{{ $collapseId }}">
                             <i class="bi {{ $section['icon'] }}"></i>
