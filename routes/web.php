@@ -29,6 +29,9 @@ Route::middleware(['auth', 'user.access:administrator,admin,accounting,finance']
     Route::get('/erp/customers', 'Erp\ModuleController@customers')->name('erp.customers.index');
     Route::get('/erp/customers/create', 'Erp\ModuleController@customerCreate')->name('erp.customers.create');
     Route::post('/erp/customers', 'Erp\ModuleController@customerStore')->name('erp.customers.store');
+    Route::get('/erp/customers/{customer}/edit', 'Erp\ModuleController@customerEdit')->name('erp.customers.edit');
+    Route::put('/erp/customers/{customer}', 'Erp\ModuleController@customerUpdate')->name('erp.customers.update');
+    Route::get('/erp/customers/{customer}', 'Erp\ModuleController@customerShow')->name('erp.customers.show');
     Route::get('/erp/suppliers', 'Erp\ModuleController@suppliers')->name('erp.suppliers.index');
     Route::get('/erp/suppliers/create', 'Erp\ModuleController@supplierCreate')->name('erp.suppliers.create');
     Route::post('/erp/suppliers', 'Erp\ModuleController@supplierStore')->name('erp.suppliers.store');
@@ -106,7 +109,9 @@ Route::middleware(['auth', 'user.access:administrator,admin,accounting,finance']
 
     Route::get('/erp/invoices', 'Erp\ModuleController@invoiceIndex')->name('erp.invoices.index');
     Route::get('/erp/invoices/create', 'Erp\ModuleController@invoiceCreate')->name('erp.invoices.create');
+    Route::get('/erp/invoices/{invoice}', 'Erp\ModuleController@invoiceShow')->name('erp.invoices.show');
     Route::post('/erp/invoices/review', 'Erp\ModuleController@invoiceReview')->name('erp.invoices.review');
+    Route::get('/erp/payments', 'Erp\ModuleController@paymentCreate')->name('erp.payments.index');
     Route::get('/erp/payments/create', 'Erp\ModuleController@paymentCreate')->name('erp.payments.create');
     Route::post('/erp/payments/receipt', 'Erp\ModuleController@paymentReceipt')->name('erp.payments.receipt');
 
@@ -119,6 +124,8 @@ Route::middleware(['auth', 'user.access:administrator,admin,accounting,finance']
 
     Route::get('/erp/reports', 'Erp\ModuleController@reportsIndex')->name('erp.reports.index');
     Route::get('/erp/reports/financial-statements', 'Erp\ModuleController@financialStatementsReport')->name('erp.reports.financial-statements');
+    Route::get('/erp/reports/workbook/{report?}', 'Erp\ModuleController@workbookReport')->name('erp.reports.workbook');
+    Route::get('/erp/reports/client-statement-of-account', 'Erp\ModuleController@clientStatementOfAccount')->name('erp.reports.client-soa');
     Route::get('/erp/customer-billing/templates', 'Erp\ModuleController@customerBillingTemplates')->name('erp.customer-billing.templates');
     Route::get('/erp/customer-billing/aging', 'Erp\ModuleController@agingReport')->name('erp.customer-billing.aging');
 });

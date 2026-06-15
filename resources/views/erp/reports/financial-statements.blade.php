@@ -3,13 +3,129 @@
 @section('title', 'Financial Statements')
 @section('page-title', 'Financial Statements')
 
+@push('styles')
+<style>
+    .statement-page {
+        max-width: 216mm;
+        margin: 0 auto;
+    }
+    .statement-paper {
+        background: #fff;
+        border: 1px solid #d8dde6;
+        box-shadow: 0 14px 36px rgba(15, 23, 42, .08);
+        padding: 18mm 20mm;
+        color: #111;
+        font-family: "Times New Roman", Times, serif;
+    }
+    .statement-header {
+        text-align: center;
+        line-height: 1.15;
+        margin-bottom: 7mm;
+    }
+    .statement-company {
+        font-weight: 700;
+        font-size: 14px;
+    }
+    .statement-title {
+        font-weight: 700;
+        font-size: 18px;
+    }
+    .statement-subtitle {
+        font-weight: 700;
+        font-size: 14px;
+    }
+    .statement-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+    .statement-table th {
+        font-weight: 700;
+        text-align: right;
+        text-decoration: underline;
+        padding: 0 0 4mm 7mm;
+        width: 27mm;
+        white-space: nowrap;
+    }
+    .statement-table th:first-child {
+        text-align: left;
+        text-decoration: none;
+        width: auto;
+        padding-left: 0;
+    }
+    .statement-table td {
+        padding: .7mm 0 .7mm 7mm;
+        vertical-align: top;
+    }
+    .statement-table td:first-child {
+        padding-left: 0;
+    }
+    .statement-section td {
+        padding-top: 4mm;
+        padding-bottom: 2mm;
+        font-weight: 700;
+    }
+    .statement-amount {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+    .statement-total td {
+        border-top: 1px solid #111;
+        font-weight: 700;
+        padding-top: 1.5mm;
+    }
+    .statement-result td {
+        border-top: 1px solid #111;
+        font-weight: 700;
+        padding-top: 1.5mm;
+    }
+    .statement-final td {
+        border-top: 3px double #111;
+        font-weight: 700;
+        padding-top: 1.5mm;
+    }
+    .report-library {
+        font-family: Inter, "Segoe UI", Arial, sans-serif;
+    }
+    @media print {
+        @page { size: A4 portrait; margin: 10mm; }
+        body { background: #fff !important; }
+        .no-print, .erp-sidebar, .erp-topbar, .report-library { display: none !important; }
+        .erp-shell, .erp-main, .erp-content, main, section {
+            display: block !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+        }
+        .statement-page {
+            max-width: none;
+            margin: 0;
+        }
+        .statement-paper {
+            border: 0;
+            box-shadow: none;
+            padding: 0;
+        }
+    }
+</style>
+@endpush
+
 @section('content')
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+@php
+    $money = function ($amount) {
+        $amount = (float) $amount;
+        return $amount < 0 ? '(' . number_format(abs($amount), 2) . ')' : number_format($amount, 2);
+    };
+    $companyName = $company && !empty($company->name) ? $company->name : 'Sea-Jet International Forwarders, Inc.';
+@endphp
+
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 no-print">
         <div>
             <h1 class="h3 fw-bold mb-1">Financial Statements</h1>
-            <p class="text-muted mb-0">Complete finance report pack for statements, ledgers, AR, AP, cash, tax, and management review.</p>
+            <p class="text-muted mb-0">Printable income statement summary with budgets, actuals, and variances.</p>
         </div>
-        <div class="d-flex flex-wrap gap-2 no-print">
+        <div class="d-flex flex-wrap gap-2">
             <a href="{{ route('erp.reports.index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Reports</a>
             <a href="{{ route('erp.export', 'financial-statements-excel') }}" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
             <a href="{{ route('erp.export', 'financial-statements-pdf') }}" class="btn btn-outline-secondary"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
@@ -50,7 +166,7 @@
         </div>
     </form>
 
-    <div class="row g-3 mb-4">
+    <div class="row g-3 mb-4 no-print">
         @foreach($summaryCards as $card)
             <div class="col-md-6 col-xl-3">
                 <div class="erp-card kpi-card p-3 h-100">
@@ -66,46 +182,111 @@
         @endforeach
     </div>
 
-    <div class="row g-4 mb-4">
-        @foreach($statementSections as $title => $rows)
-            <div class="col-xl-4">
-                <div class="erp-card p-3 h-100">
-                    <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
-                        <div>
-                            <h2 class="h6 fw-bold mb-1">{{ $title }}</h2>
-                            <small class="text-muted">{{ $period }} · {{ $currency }}</small>
-                        </div>
-                        <span class="badge badge-soft">Draft</span>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-sm align-middle mb-0">
-                            <thead>
-                            <tr>
-                                <th>Line Item</th>
-                                <th class="text-end">Amount</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            @foreach($rows as $row)
-                                <tr>
-                                    <td>
-                                        <div class="fw-semibold">{{ $row[0] }}</div>
-                                        <div class="text-muted small">{{ $row[2] }}</div>
-                                    </td>
-                                    <td class="text-end fw-semibold {{ $row[1] < 0 ? 'text-danger' : '' }}">
-                                        {{ $row[1] < 0 ? '(' : '' }}{{ number_format(abs($row[1]), 2) }}{{ $row[1] < 0 ? ')' : '' }}
-                                    </td>
-                                </tr>
-                            @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+    <div class="statement-page mb-4">
+        <div class="statement-paper">
+            <div class="statement-header">
+                <div class="statement-company">{{ $companyName }}</div>
+                <div class="statement-title">{{ $incomeStatement['title'] }}</div>
+                <div class="statement-subtitle">{{ $incomeStatement['subtitle'] }}</div>
             </div>
-        @endforeach
+
+            <table class="statement-table">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Year to Date<br>Actual</th>
+                        <th>Year to Date<br>Budget</th>
+                        <th>Year to Date<br>Variance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="statement-section"><td colspan="4">Operating Revenue</td></tr>
+                    @foreach($incomeStatement['sections']['Operating Revenue'] as $row)
+                        <tr>
+                            <td>{{ $row['label'] }}</td>
+                            <td class="statement-amount">{{ $money($row['actual']) }}</td>
+                            <td class="statement-amount">{{ $money($row['budget']) }}</td>
+                            <td class="statement-amount">{{ $money($row['variance']) }}</td>
+                        </tr>
+                    @endforeach
+                    <tr class="statement-total">
+                        <td>Total Operating Revenue</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['operating_revenue']['actual']) }}</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['operating_revenue']['budget']) }}</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['operating_revenue']['variance']) }}</td>
+                    </tr>
+
+                    <tr class="statement-section"><td colspan="4">Operating Expenses</td></tr>
+                    @foreach($incomeStatement['sections']['Operating Expenses'] as $row)
+                        <tr>
+                            <td>{{ $row['label'] }}</td>
+                            <td class="statement-amount">{{ $money($row['actual']) }}</td>
+                            <td class="statement-amount">{{ $money($row['budget']) }}</td>
+                            <td class="statement-amount">{{ $money($row['variance']) }}</td>
+                        </tr>
+                    @endforeach
+                    <tr class="statement-total">
+                        <td>Total Operating Expenses</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['operating_expenses']['actual']) }}</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['operating_expenses']['budget']) }}</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['operating_expenses']['variance']) }}</td>
+                    </tr>
+                    <tr class="statement-result">
+                        <td>Net Operating Revenue (Loss)</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['net_operating']['actual']) }}</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['net_operating']['budget']) }}</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['net_operating']['variance']) }}</td>
+                    </tr>
+
+                    <tr class="statement-section"><td colspan="4">Non-Operating Revenue</td></tr>
+                    @foreach($incomeStatement['sections']['Non-Operating Revenue'] as $row)
+                        <tr>
+                            <td>{{ $row['label'] }}</td>
+                            <td class="statement-amount">{{ $money($row['actual']) }}</td>
+                            <td class="statement-amount">{{ $money($row['budget']) }}</td>
+                            <td class="statement-amount">{{ $money($row['variance']) }}</td>
+                        </tr>
+                    @endforeach
+                    <tr class="statement-total">
+                        <td>Total Non-Operating Revenue</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['non_operating_revenue']['actual']) }}</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['non_operating_revenue']['budget']) }}</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['non_operating_revenue']['variance']) }}</td>
+                    </tr>
+
+                    <tr class="statement-section"><td colspan="4">Non-Operating Expenses</td></tr>
+                    @foreach($incomeStatement['sections']['Non-Operating Expenses'] as $row)
+                        <tr>
+                            <td>{{ $row['label'] }}</td>
+                            <td class="statement-amount">{{ $money($row['actual']) }}</td>
+                            <td class="statement-amount">{{ $money($row['budget']) }}</td>
+                            <td class="statement-amount">{{ $money($row['variance']) }}</td>
+                        </tr>
+                    @endforeach
+                    <tr class="statement-total">
+                        <td>Total Non-Operating Expenses</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['non_operating_expenses']['actual']) }}</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['non_operating_expenses']['budget']) }}</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['non_operating_expenses']['variance']) }}</td>
+                    </tr>
+                    <tr class="statement-result">
+                        <td>Net Non-Operating Revenue (Loss)</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['net_non_operating']['actual']) }}</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['net_non_operating']['budget']) }}</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['net_non_operating']['variance']) }}</td>
+                    </tr>
+                    <tr class="statement-final">
+                        <td>Total Net Revenue (Loss)</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['total_net']['actual']) }}</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['total_net']['budget']) }}</td>
+                        <td class="statement-amount">{{ $money($incomeStatement['totals']['total_net']['variance']) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    <div class="erp-card p-3">
+    <div class="erp-card p-3 report-library">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
             <div>
                 <h2 class="h6 fw-bold mb-0">Required Finance Reports</h2>

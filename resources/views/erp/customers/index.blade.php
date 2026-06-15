@@ -86,8 +86,11 @@
                                 <td>{{ $customer['class'] }}</td>
                                 <td>{{ $customer['ar_account'] }}</td>
                                 <td class="text-end">
+                                    <a href="{{ route('erp.customers.show', $customer['id']) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="View client"><i class="bi bi-eye"></i></a>
+                                    <a href="{{ route('erp.customers.edit', $customer['id']) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="Edit client"><i class="bi bi-pencil-square"></i></a>
                                     <a href="{{ route('erp.invoices.create', ['customer' => $customer['customer_id']]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="Invoice"><i class="bi bi-file-earmark-plus"></i></a>
                                     <a href="{{ route('erp.payments.create', ['customer' => $customer['customer_id']]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="Payment"><i class="bi bi-cash"></i></a>
+                                    <a href="{{ route('erp.reports.client-soa', ['customer_id' => $customer['id']]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="Print SOA for active invoices"><i class="bi bi-printer"></i></a>
                                 </td>
                             </tr>
                         @endforeach

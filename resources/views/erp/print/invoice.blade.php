@@ -45,6 +45,30 @@
         justify-content: flex-start;
         line-height: .92;
         white-space: pre-line;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+    .bi-field.fit-single-line {
+        align-items: center;
+        min-height: 14px;
+        white-space: nowrap;
+        overflow-wrap: normal;
+        word-break: normal;
+    }
+    .bi-field.fit-multiline {
+        line-height: 1.08;
+    }
+    .print-field-customer,
+    .print-field-address {
+        max-height: 42px;
+    }
+    .print-field-origin_dest,
+    .print-field-commodity {
+        max-height: 24px;
+    }
+    .print-field-line_description {
+        max-height: 360px;
     }
     @foreach($hiddenFields as $hiddenField)
     .print-field-{{ $hiddenField }} {
@@ -208,39 +232,62 @@
 
         <div class="bi-field print-field-cash_sales" style="left: {{ $p['cash_sales'][0] }}px; top: {{ $p['cash_sales'][1] }}px; {{ $fieldStyle('cash_sales') }}">[ ]</div>
         <div class="bi-field print-field-charge_sales" style="left: {{ $p['charge_sales'][0] }}px; top: {{ $p['charge_sales'][1] }}px; {{ $fieldStyle('charge_sales') }}">[x]</div>
-        <div class="bi-field print-field-customer" style="left: {{ $p['customer'][0] }}px; top: {{ $p['customer'][1] }}px; {{ $fieldStyle('customer') }}">{{ $print['customer'] }}</div>
-        <div class="bi-field print-field-address" style="left: {{ $p['address'][0] }}px; top: {{ $p['address'][1] }}px; {{ $fieldStyle('address') }}">{{ $print['address'] }}</div>
-        <div class="bi-field print-field-tin" style="left: {{ $p['tin'][0] }}px; top: {{ $p['tin'][1] }}px; {{ $fieldStyle('tin') }}">{{ $print['tin'] }}</div>
-        <div class="bi-field print-field-mawb" style="left: {{ $p['mawb'][0] }}px; top: {{ $p['mawb'][1] }}px; {{ $fieldStyle('mawb') }}">{{ $print['mawb'] }}</div>
-        <div class="bi-field print-field-hawb" style="left: {{ $p['hawb'][0] }}px; top: {{ $p['hawb'][1] }}px; {{ $fieldStyle('hawb') }}">{{ $print['hawb'] }}</div>
-        <div class="bi-field print-field-date_shipped" style="left: {{ $p['date_shipped'][0] }}px; top: {{ $p['date_shipped'][1] }}px; {{ $fieldStyle('date_shipped') }}">{{ $print['date_shipped'] }}</div>
-        <div class="bi-field header-value print-field-invoice_no" style="left: {{ $p['invoice_no'][0] }}px; top: {{ $p['invoice_no'][1] }}px; {{ $fieldStyle('invoice_no') }}">{{ $print['invoice_no'] }}</div>
-        <div class="bi-field print-field-invoice_date" style="left: {{ $p['invoice_date'][0] }}px; top: {{ $p['invoice_date'][1] }}px; {{ $fieldStyle('invoice_date') }}">{{ $print['invoice_date'] }}</div>
-        <div class="bi-field print-field-origin_dest" style="left: {{ $p['origin_dest'][0] }}px; top: {{ $p['origin_dest'][1] }}px; {{ $fieldStyle('origin_dest') }}">{{ $print['origin_dest'] }}</div>
-        <div class="bi-field print-field-commodity" style="left: {{ $p['commodity'][0] }}px; top: {{ $p['commodity'][1] }}px; {{ $fieldStyle('commodity') }}">{{ $print['commodity'] }}</div>
+        <div class="bi-field fit-multiline print-field-customer" data-fit-text style="left: {{ $p['customer'][0] }}px; top: {{ $p['customer'][1] }}px; {{ $fieldStyle('customer') }}">{{ $print['customer'] }}</div>
+        <div class="bi-field fit-multiline print-field-address" data-fit-text style="left: {{ $p['address'][0] }}px; top: {{ $p['address'][1] }}px; {{ $fieldStyle('address') }}">{{ $print['address'] }}</div>
+        <div class="bi-field fit-single-line print-field-tin" data-fit-text style="left: {{ $p['tin'][0] }}px; top: {{ $p['tin'][1] }}px; {{ $fieldStyle('tin') }}">{{ $print['tin'] }}</div>
+        <div class="bi-field fit-single-line print-field-mawb" data-fit-text style="left: {{ $p['mawb'][0] }}px; top: {{ $p['mawb'][1] }}px; {{ $fieldStyle('mawb') }}">{{ $print['mawb'] }}</div>
+        <div class="bi-field fit-single-line print-field-hawb" data-fit-text style="left: {{ $p['hawb'][0] }}px; top: {{ $p['hawb'][1] }}px; {{ $fieldStyle('hawb') }}">{{ $print['hawb'] }}</div>
+        <div class="bi-field fit-single-line print-field-date_shipped" data-fit-text style="left: {{ $p['date_shipped'][0] }}px; top: {{ $p['date_shipped'][1] }}px; {{ $fieldStyle('date_shipped') }}">{{ $print['date_shipped'] }}</div>
+        <div class="bi-field fit-single-line header-value print-field-invoice_no" data-fit-text style="left: {{ $p['invoice_no'][0] }}px; top: {{ $p['invoice_no'][1] }}px; {{ $fieldStyle('invoice_no') }}">{{ $print['invoice_no'] }}</div>
+        <div class="bi-field fit-single-line print-field-invoice_date" data-fit-text style="left: {{ $p['invoice_date'][0] }}px; top: {{ $p['invoice_date'][1] }}px; {{ $fieldStyle('invoice_date') }}">{{ $print['invoice_date'] }}</div>
+        <div class="bi-field fit-multiline print-field-origin_dest" data-fit-text style="left: {{ $p['origin_dest'][0] }}px; top: {{ $p['origin_dest'][1] }}px; {{ $fieldStyle('origin_dest') }}">{{ $print['origin_dest'] }}</div>
+        <div class="bi-field fit-multiline print-field-commodity" data-fit-text style="left: {{ $p['commodity'][0] }}px; top: {{ $p['commodity'][1] }}px; {{ $fieldStyle('commodity') }}">{{ $print['commodity'] }}</div>
 
-        <div class="bi-field print-field-line_description" style="left: {{ $p['line_description'][0] }}px; top: {{ $p['line_description'][1] }}px; {{ $fieldStyle('line_description') }}">{{ $lineDescription }}</div>
-        <div class="bi-field print-field-soa_no" style="left: {{ $p['soa_no'][0] }}px; top: {{ $p['soa_no'][1] }}px; {{ $fieldStyle('soa_no') }}">SOA# {{ $print['soa_no'] }}</div>
-        <div class="bi-field amount print-field-line_qty" style="left: {{ $p['line_qty'][0] }}px; top: {{ $p['line_qty'][1] }}px; {{ $fieldStyle('line_qty') }}">{{ $print['line_qty'] }}</div>
-        <div class="bi-field amount print-field-line_unit_price" style="left: {{ $p['line_unit_price'][0] }}px; top: {{ $p['line_unit_price'][1] }}px; {{ $fieldStyle('line_unit_price') }}">{{ $plainAmount($print['line_unit_price']) }}</div>
-        <div class="bi-field amount print-field-line_amount" style="left: {{ $p['line_amount'][0] }}px; top: {{ $p['line_amount'][1] }}px; {{ $fieldStyle('line_amount') }}">{{ $plainAmount($print['line_amount']) }}</div>
+        <div class="bi-field fit-multiline print-field-line_description" data-fit-text data-min-font="6" style="left: {{ $p['line_description'][0] }}px; top: {{ $p['line_description'][1] }}px; {{ $fieldStyle('line_description') }}">{{ $lineDescription }}</div>
+        <div class="bi-field fit-single-line print-field-soa_no" data-fit-text style="left: {{ $p['soa_no'][0] }}px; top: {{ $p['soa_no'][1] }}px; {{ $fieldStyle('soa_no') }}">SOA# {{ $print['soa_no'] }}</div>
+        <div class="bi-field fit-single-line amount print-field-line_qty" data-fit-text style="left: {{ $p['line_qty'][0] }}px; top: {{ $p['line_qty'][1] }}px; {{ $fieldStyle('line_qty') }}">{{ $print['line_qty'] }}</div>
+        <div class="bi-field fit-single-line amount print-field-line_unit_price" data-fit-text style="left: {{ $p['line_unit_price'][0] }}px; top: {{ $p['line_unit_price'][1] }}px; {{ $fieldStyle('line_unit_price') }}">{{ $plainAmount($print['line_unit_price']) }}</div>
+        <div class="bi-field fit-single-line amount print-field-line_amount" data-fit-text style="left: {{ $p['line_amount'][0] }}px; top: {{ $p['line_amount'][1] }}px; {{ $fieldStyle('line_amount') }}">{{ $plainAmount($print['line_amount']) }}</div>
 
-        <div class="bi-field amount print-field-vatable_sales" style="left: {{ $p['vatable_sales'][0] }}px; top: {{ $p['vatable_sales'][1] }}px; {{ $fieldStyle('vatable_sales') }}">{{ $money($print['vatable_sales']) }}</div>
-        <div class="bi-field amount print-field-vat" style="left: {{ $p['vat'][0] }}px; top: {{ $p['vat'][1] }}px; {{ $fieldStyle('vat') }}">{{ $money($print['vat_amount']) }}</div>
-        <div class="bi-field amount print-field-zero_rated_sales" style="left: {{ $p['zero_rated_sales'][0] }}px; top: {{ $p['zero_rated_sales'][1] }}px; {{ $fieldStyle('zero_rated_sales') }}">{{ $plainAmount($print['zero_rated_sales']) }}</div>
-        <div class="bi-field amount print-field-vat_exempt_sales" style="left: {{ $p['vat_exempt_sales'][0] }}px; top: {{ $p['vat_exempt_sales'][1] }}px; {{ $fieldStyle('vat_exempt_sales') }}">{{ $plainAmount($print['vat_exempt_sales']) }}</div>
+        <div class="bi-field fit-single-line amount print-field-vatable_sales" data-fit-text style="left: {{ $p['vatable_sales'][0] }}px; top: {{ $p['vatable_sales'][1] }}px; {{ $fieldStyle('vatable_sales') }}">{{ $money($print['vatable_sales']) }}</div>
+        <div class="bi-field fit-single-line amount print-field-vat" data-fit-text style="left: {{ $p['vat'][0] }}px; top: {{ $p['vat'][1] }}px; {{ $fieldStyle('vat') }}">{{ $money($print['vat_amount']) }}</div>
+        <div class="bi-field fit-single-line amount print-field-zero_rated_sales" data-fit-text style="left: {{ $p['zero_rated_sales'][0] }}px; top: {{ $p['zero_rated_sales'][1] }}px; {{ $fieldStyle('zero_rated_sales') }}">{{ $plainAmount($print['zero_rated_sales']) }}</div>
+        <div class="bi-field fit-single-line amount print-field-vat_exempt_sales" data-fit-text style="left: {{ $p['vat_exempt_sales'][0] }}px; top: {{ $p['vat_exempt_sales'][1] }}px; {{ $fieldStyle('vat_exempt_sales') }}">{{ $plainAmount($print['vat_exempt_sales']) }}</div>
 
-        <div class="bi-field amount print-field-total_sales" style="left: {{ $p['total_sales'][0] }}px; top: {{ $p['total_sales'][1] }}px; {{ $fieldStyle('total_sales') }}">{{ $money($print['billing_total']) }}</div>
-        <div class="bi-field amount print-field-less_vat" style="left: {{ $p['less_vat'][0] }}px; top: {{ $p['less_vat'][1] }}px; {{ $fieldStyle('less_vat') }}">{{ $money($print['vat_amount']) }}</div>
-        <div class="bi-field amount print-field-amount_net_vat" style="left: {{ $p['amount_net_vat'][0] }}px; top: {{ $p['amount_net_vat'][1] }}px; {{ $fieldStyle('amount_net_vat') }}">{{ $money($print['vatable_sales']) }}</div>
-        <div class="bi-field amount print-field-discount" style="left: {{ $p['discount'][0] }}px; top: {{ $p['discount'][1] }}px; {{ $fieldStyle('discount') }}">{{ $plainAmount($print['discount']) }}</div>
-        <div class="bi-field amount print-field-add_vat" style="left: {{ $p['add_vat'][0] }}px; top: {{ $p['add_vat'][1] }}px; {{ $fieldStyle('add_vat') }}">{{ $money($print['vat_amount']) }}</div>
-        <div class="bi-field amount print-field-withholding_tax" style="left: {{ $p['withholding_tax'][0] }}px; top: {{ $p['withholding_tax'][1] }}px; {{ $fieldStyle('withholding_tax') }}">{{ $money($print['withholding_tax']) }}</div>
-        <div class="bi-field amount header-value print-field-amount_due" style="left: {{ $p['amount_due'][0] }}px; top: {{ $p['amount_due'][1] }}px; {{ $fieldStyle('amount_due') }}">{{ $money($print['billing_total']) }}</div>
-        <div class="bi-field print-field-prepared_by" style="left: {{ $p['prepared_by'][0] }}px; top: {{ $p['prepared_by'][1] }}px; {{ $fieldStyle('prepared_by') }}">{{ $print['prepared_by'] }}</div>
+        <div class="bi-field fit-single-line amount print-field-total_sales" data-fit-text style="left: {{ $p['total_sales'][0] }}px; top: {{ $p['total_sales'][1] }}px; {{ $fieldStyle('total_sales') }}">{{ $money($print['billing_total']) }}</div>
+        <div class="bi-field fit-single-line amount print-field-less_vat" data-fit-text style="left: {{ $p['less_vat'][0] }}px; top: {{ $p['less_vat'][1] }}px; {{ $fieldStyle('less_vat') }}">{{ $money($print['vat_amount']) }}</div>
+        <div class="bi-field fit-single-line amount print-field-amount_net_vat" data-fit-text style="left: {{ $p['amount_net_vat'][0] }}px; top: {{ $p['amount_net_vat'][1] }}px; {{ $fieldStyle('amount_net_vat') }}">{{ $money($print['vatable_sales']) }}</div>
+        <div class="bi-field fit-single-line amount print-field-discount" data-fit-text style="left: {{ $p['discount'][0] }}px; top: {{ $p['discount'][1] }}px; {{ $fieldStyle('discount') }}">{{ $plainAmount($print['discount']) }}</div>
+        <div class="bi-field fit-single-line amount print-field-add_vat" data-fit-text style="left: {{ $p['add_vat'][0] }}px; top: {{ $p['add_vat'][1] }}px; {{ $fieldStyle('add_vat') }}">{{ $money($print['vat_amount']) }}</div>
+        <div class="bi-field fit-single-line amount print-field-withholding_tax" data-fit-text style="left: {{ $p['withholding_tax'][0] }}px; top: {{ $p['withholding_tax'][1] }}px; {{ $fieldStyle('withholding_tax') }}">{{ $money($print['withholding_tax']) }}</div>
+        <div class="bi-field fit-single-line amount header-value print-field-amount_due" data-fit-text style="left: {{ $p['amount_due'][0] }}px; top: {{ $p['amount_due'][1] }}px; {{ $fieldStyle('amount_due') }}">{{ $money($print['billing_total']) }}</div>
+        <div class="bi-field fit-single-line print-field-prepared_by" data-fit-text style="left: {{ $p['prepared_by'][0] }}px; top: {{ $p['prepared_by'][1] }}px; {{ $fieldStyle('prepared_by') }}">{{ $print['prepared_by'] }}</div>
 
         @foreach($customFields as $custom)
-            <div class="bi-field" style="left: {{ $custom['x'] }}px; top: {{ $custom['y'] }}px; width: {{ $custom['width'] }}px; font-size: {{ $custom['font_size'] }}px">{{ $custom['text'] }}</div>
+            <div class="bi-field fit-multiline" data-fit-text data-min-font="6" style="left: {{ $custom['x'] }}px; top: {{ $custom['y'] }}px; width: {{ $custom['width'] }}px; font-size: {{ $custom['font_size'] }}px; max-height: 120px">{{ $custom['text'] }}</div>
         @endforeach
     </div>
+    <script>
+        (function () {
+            function fitPrintableText() {
+                document.querySelectorAll('[data-fit-text]').forEach(function (field) {
+                    var base = parseFloat(field.dataset.baseFont || window.getComputedStyle(field).fontSize);
+                    var min = parseFloat(field.dataset.minFont || 7);
+                    field.dataset.baseFont = base;
+                    field.style.fontSize = base + 'px';
+                    field.style.transform = '';
+
+                    var current = base;
+                    while (current > min && (field.scrollWidth > field.clientWidth + 1 || field.scrollHeight > field.clientHeight + 1)) {
+                        current -= 0.5;
+                        field.style.fontSize = current + 'px';
+                    }
+                });
+            }
+
+            window.addEventListener('load', fitPrintableText);
+            window.addEventListener('beforeprint', fitPrintableText);
+            window.addEventListener('resize', fitPrintableText);
+        })();
+    </script>
 @endsection

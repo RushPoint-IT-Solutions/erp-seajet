@@ -25,7 +25,7 @@
                     <th>Category</th>
                     <th>Parent Account</th>
                     <th>Normal Balance</th>
-                    <th class="text-end">Balance</th>
+                    <th class="text-end">Beginning Balance</th>
                     <th>Status</th>
                 </tr>
                 </thead>

@@ -121,6 +121,8 @@
                         <div class="soa-guide-line" style="left: 66px; top: 213px; width: 690px"></div>
                         <div class="soa-guide-vline" style="left: 625px; top: 185px; height: 588px"></div>
                         <div class="soa-label" style="left: 635px; top: 137px">A No.</div>
+                        <div class="soa-label" style="left: 82px; top: 228px">Customer:</div>
+                        <div class="soa-label" style="left: 82px; top: 282px">Shipper:</div>
                         <div class="soa-label" style="left: 310px; top: 193px">Particulars</div>
                         <div class="soa-label" style="left: 666px; top: 193px">Amount</div>
                     @else

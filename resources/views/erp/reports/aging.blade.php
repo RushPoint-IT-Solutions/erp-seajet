@@ -16,37 +16,65 @@
         </div>
     </div>
 
-    <div class="erp-card p-3 mb-3">
+    <form class="erp-card p-3 mb-3" method="get" action="{{ route('erp.customer-billing.aging') }}">
         <div class="row g-3">
             <div class="col-md-3">
                 <label class="form-label">As of Date</label>
-                <input type="date" class="form-control" value="2026-05-24">
+                <input type="date" name="as_of" class="form-control" value="{{ $filters['as_of'] ?? date('Y-m-d') }}">
             </div>
             <div class="col-md-3">
                 <label class="form-label">Class</label>
-                <select class="form-select erp-select">
-                    <option>All Classes</option>
-                    <option>MANILA</option>
-                    <option>PAMPANGA</option>
-                    <option>CEBU</option>
+                <select name="class" class="form-select erp-select">
+                    @foreach(['All Classes', 'MANILA', 'PAMPANGA', 'CEBU'] as $option)
+                        <option value="{{ $option }}" {{ ($filters['class'] ?? 'All Classes') === $option ? 'selected' : '' }}>{{ $option }}</option>
+                    @endforeach
                 </select>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Currency</label>
-                <select class="form-select erp-select">
-                    <option>All Currency</option>
-                    <option>PHP</option>
-                    <option>USD</option>
+                <select name="currency" class="form-select erp-select">
+                    @foreach(['All Currency', 'PHP', 'USD'] as $option)
+                        <option value="{{ $option }}" {{ ($filters['currency'] ?? 'All Currency') === $option ? 'selected' : '' }}>{{ $option }}</option>
+                    @endforeach
                 </select>
             </div>
             <div class="col-md-3">
                 <label class="form-label">VAT</label>
-                <select class="form-select erp-select">
-                    <option>All VAT</option>
-                    <option>12%</option>
-                    <option>zero-rated</option>
-                    <option>exempt</option>
+                <select name="vat" class="form-select erp-select">
+                    @foreach(['All VAT', '12%', 'zero-rated', 'exempt'] as $option)
+                        <option value="{{ $option }}" {{ ($filters['vat'] ?? 'All VAT') === $option ? 'selected' : '' }}>{{ $option }}</option>
+                    @endforeach
                 </select>
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+                <button class="btn btn-primary"><i class="bi bi-funnel me-1"></i>Apply Filters</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-6 col-xl-3">
+            <div class="erp-card kpi-card p-3 h-100">
+                <div class="text-muted small">Current</div>
+                <div class="h4 fw-bold mb-0">PHP {{ number_format($summary['current'] ?? 0, 2) }}</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="erp-card kpi-card p-3 h-100">
+                <div class="text-muted small">30 Days</div>
+                <div class="h4 fw-bold mb-0">PHP {{ number_format($summary['thirty'] ?? 0, 2) }}</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="erp-card kpi-card p-3 h-100">
+                <div class="text-muted small">60 Days</div>
+                <div class="h4 fw-bold mb-0">PHP {{ number_format($summary['sixty'] ?? 0, 2) }}</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="erp-card kpi-card p-3 h-100">
+                <div class="text-muted small">90+ Days</div>
+                <div class="h4 fw-bold mb-0">PHP {{ number_format($summary['ninety'] ?? 0, 2) }}</div>
             </div>
         </div>
     </div>
@@ -70,14 +98,27 @@
                 </tr>
                 </thead>
                 <tbody>
-                @foreach($rows as $row)
+                @forelse($rows as $row)
                     <tr>
                         @foreach($row as $index => $cell)
                             <td class="{{ $index >= 7 ? 'text-end' : '' }}">{{ $index >= 7 ? number_format($cell, 2) : $cell }}</td>
                         @endforeach
                     </tr>
-                @endforeach
+                @empty
+                    <tr>
+                        <td colspan="11" class="text-center text-muted py-4">No unpaid active invoices found for the selected filters.</td>
+                    </tr>
+                @endforelse
                 </tbody>
+                <tfoot>
+                <tr class="fw-bold">
+                    <td colspan="7" class="text-end">Total</td>
+                    <td class="text-end">{{ number_format($summary['current'] ?? 0, 2) }}</td>
+                    <td class="text-end">{{ number_format($summary['thirty'] ?? 0, 2) }}</td>
+                    <td class="text-end">{{ number_format($summary['sixty'] ?? 0, 2) }}</td>
+                    <td class="text-end">{{ number_format($summary['ninety'] ?? 0, 2) }}</td>
+                </tr>
+                </tfoot>
             </table>
         </div>
     </div>

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title', config('erp.name'))</title>
-    <link rel="icon" type="image/png" href="{{ asset('images/image.png') }}">
+    <link rel="icon" type="image/webp" href="{{ asset('images/gen_off_seajetlogo.webp') }}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/2.0.8/css/dataTables.bootstrap5.css" rel="stylesheet">
@@ -41,9 +41,9 @@
         }
         .erp-brand {
             min-height: 62px;
-            background: #fff;
+            background: #fff36a;
             color: #2d3136;
-            border-bottom: 1px solid #d7d7d7;
+            border-bottom: 1px solid #e4d94d;
         }
         .erp-brand-mark {
             width: 42px;
@@ -57,15 +57,16 @@
             font-weight: 800;
         }
         .erp-brand-logo {
-            width: 42px;
-            height: 42px;
-            border-radius: 8px;
+            width: 100%;
+            height: 52px;
+            border-radius: 6px;
             object-fit: contain;
-            background: #fff;
-            padding: 2px;
+            background: #fff36a;
+            padding: 0;
             flex: 0 0 auto;
         }
         .erp-brand-title {
+            display: none;
             min-width: 0;
             max-width: 106px;
             font-size: 16px;
@@ -229,8 +230,8 @@
 <div class="erp-shell">
     <aside class="erp-sidebar">
         <div class="erp-brand d-flex align-items-center gap-2 px-3">
-            <img src="{{ asset('images/image.png') }}" alt="{{ config('erp.name') }} logo" class="erp-brand-logo">
-            <div class="erp-brand-title">SEA-JET I...</div>
+            <img src="{{ asset('images/gen_off_seajetlogo.webp') }}" alt="{{ config('erp.name') }} logo" class="erp-brand-logo">
+            {{-- <div class="erp-brand-title">SEA-JET I...</div> --}}
         </div>
         <nav class="erp-nav py-0 accordion" id="erpSidebarNav">
             @foreach(config('erp.sidebar') as $sectionIndex => $section)

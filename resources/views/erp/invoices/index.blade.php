@@ -100,7 +100,7 @@
     </div>
 
     <div class="row g-3 mb-4">
-        <div class="col-lg-8">
+        <div class="col-12">
             <div class="erp-card p-3 h-100">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                     <div>
@@ -120,6 +120,8 @@
                             <th>Shipment Job ID</th>
                             <th>Currency</th>
                             <th class="text-end">Amount</th>
+                            <th class="text-end">Tax</th>
+                            <th class="text-end">Total</th>
                             <th>Status</th>
                             <th>Date</th>
                             <th class="text-end">Actions</th>
@@ -133,13 +135,22 @@
                                 <td>{{ $invoice[2] }}</td>
                                 <td>{{ $invoice[3] }}</td>
                                 <td class="text-end">{{ $invoice[4] }}</td>
-                                <td><span class="badge badge-soft">{{ $invoice[5] }}</span></td>
-                                <td>{{ $invoice[6] }}</td>
+                                <td class="text-end">{{ $invoice[5] }}</td>
+                                <td class="text-end fw-semibold">{{ $invoice[6] }}</td>
+                                <td><span class="badge badge-soft">{{ $invoice[7] }}</span></td>
+                                <td>{{ $invoice[8] }}</td>
                                 <td class="text-end">
-                                    <a href="{{ route('erp.billings.print-invoice', ['invoice' => $invoice[0]]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="View"><i class="bi bi-eye"></i></a>
-                                    <a href="{{ route('erp.billings.edit', $invoice[0]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="Edit"><i class="bi bi-pencil"></i></a>
-                                    <a href="{{ route('erp.billings.delete', $invoice[0]) }}" class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" title="Cancel"><i class="bi bi-x-circle"></i></a>
-                                    <a href="{{ route('erp.payments.create', ['invoice' => $invoice[0]]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="Payment"><i class="bi bi-credit-card"></i></a>
+                                    <a href="{{ route('erp.invoices.show', $invoice[9]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="View"><i class="bi bi-eye"></i></a>
+                                    <a href="{{ route('erp.billings.edit', $invoice[9]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="Edit"><i class="bi bi-pencil"></i></a>
+                                    <a href="{{ route('erp.billings.delete', $invoice[9]) }}" class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" title="Cancel"><i class="bi bi-x-circle"></i></a>
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-secondary invoice-payment-button"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#invoicePaymentModal"
+                                            data-invoice="{{ $invoice[0] }}"
+                                            title="Payment">
+                                        <i class="bi bi-credit-card"></i>
+                                    </button>
                                 </td>
                             </tr>
                         @endforeach
@@ -148,32 +159,14 @@
                 </div>
             </div>
         </div>
-        <div class="col-lg-4">
-            <div class="erp-card p-3 h-100">
-                <h2 class="h6 fw-bold mb-3">Invoice Workflow</h2>
-                <div class="list-group list-group-flush">
-                    @foreach($workflows as $workflow)
-                        <a href="{{ $workflow['route'] }}" class="list-group-item list-group-item-action px-0 d-flex align-items-center justify-content-between">
-                            <span><i class="bi {{ $workflow['icon'] }} me-2 text-primary"></i>{{ $workflow['label'] }}</span>
-                            <i class="bi bi-arrow-right-short"></i>
-                        </a>
-                    @endforeach
-                </div>
-                <hr>
-                <h3 class="h6 fw-bold mb-3">Included</h3>
-                <div class="d-flex flex-wrap gap-2">
-                    <span class="badge badge-soft py-2 px-3">Dashboard</span>
-                    <span class="badge badge-soft py-2 px-3">Invoice list</span>
-                    <span class="badge badge-soft py-2 px-3">Create action</span>
-                    <span class="badge badge-soft py-2 px-3">Posted status</span>
-                    <span class="badge badge-soft py-2 px-3">View to print</span>
-                    <span class="badge badge-soft py-2 px-3">Payment link</span>
-                    <span class="badge badge-soft py-2 px-3">Aging report</span>
-                    <span class="badge badge-soft py-2 px-3">Export</span>
-                </div>
-            </div>
-        </div>
     </div>
+
+    @include('erp.payments._payment-modal', [
+        'customers' => $paymentCustomers,
+        'invoices' => $paymentInvoices,
+        'paymentModalId' => 'invoicePaymentModal',
+        'paymentModalTitle' => 'Receive Invoice Payment',
+    ])
 @endsection
 
 @push('scripts')
@@ -182,6 +175,43 @@
         pageLength: 10,
         lengthChange: false,
         language: { search: '', searchPlaceholder: 'Search invoices' }
+    });
+
+    $(function () {
+        function syncCustomer(form) {
+            var option = form.find('.payment-customer-select option:selected');
+            form.find('.payment-customer-name').val(option.data('name') || '');
+            if (option.data('currency')) {
+                form.find('.payment-currency-select').val(option.data('currency'));
+            }
+        }
+
+        function syncInvoice(form) {
+            var option = form.find('.payment-invoice-select option:selected');
+            if (option.data('customer-id')) {
+                form.find('.payment-customer-select').val(option.data('customer-id')).trigger('change');
+            }
+            if (option.data('currency')) {
+                form.find('.payment-currency-select').val(option.data('currency'));
+            }
+            if (option.data('balance')) {
+                form.find('.payment-amount-input').val(option.data('balance'));
+            }
+        }
+
+        $('#invoicePaymentModal .payment-customer-select').on('change', function () {
+            syncCustomer($(this).closest('form'));
+        });
+
+        $('#invoicePaymentModal .payment-invoice-select').on('change', function () {
+            syncInvoice($(this).closest('form'));
+        });
+
+        $(document).on('click', '.invoice-payment-button', function () {
+            var form = $('#invoicePaymentModal').find('form');
+            form[0].reset();
+            form.find('.payment-invoice-select').val($(this).data('invoice')).trigger('change');
+        });
     });
 </script>
 @endpush

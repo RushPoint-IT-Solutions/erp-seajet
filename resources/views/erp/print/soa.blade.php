@@ -72,6 +72,45 @@
         font-size: 12px;
         line-height: 1.35;
         white-space: pre-line;
+        box-sizing: border-box;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+    .print-field.fit-single-line {
+        min-height: 14px;
+        white-space: nowrap;
+        overflow-wrap: normal;
+        word-break: normal;
+    }
+    .print-field.fit-multiline {
+        line-height: 1.12;
+    }
+    .print-field-customer,
+    .print-field-address {
+        max-height: 42px;
+    }
+    .print-field-particulars,
+    .print-field-amounts {
+        max-height: 395px;
+    }
+    .print-field-payment_note {
+        max-height: 80px;
+    }
+    .soa-payment-note-line {
+        position: absolute;
+        box-sizing: border-box;
+        overflow: hidden;
+        white-space: nowrap;
+        line-height: 1.1;
+    }
+    .soa-payment-note-small {
+        font-size: 8px;
+        letter-spacing: 0;
+    }
+    .soa-payment-note-amount {
+        font-size: 10px;
+        font-weight: 700;
     }
     @foreach($hiddenFields as $hiddenField)
     .print-field-{{ $hiddenField }} {
@@ -131,10 +170,10 @@
         $soaAmounts = trim($print['soa_amounts'] ?? '') !== ''
             ? $print['soa_amounts']
             : number_format((float) ($print['reimbursement_total'] ?? 0), 2);
-        $paymentNote = "PLEASE PAY THIS REIMBURSEMENT CHARGES TOGETHER WITH INVOICE NUMBER ".($print['invoice_no'] ?? '')."\n"
-            ."REIMBURSEMENT CHARGES     ".$money($print['reimbursement_total'] ?? 0)."\n"
-            ."INVOICE AMOUNT            ".$money($print['billing_total'] ?? 0)."\n"
-            ."PLEASE PAY THIS AMOUNT    ".$money($print['soa_total'] ?? 0);
+        $billingInvoiceAmount = (float) ($print['billing_total'] ?? 0);
+        $paymentNoteLeft = $p['payment_note'][0];
+        $paymentNoteTop = $p['payment_note'][1];
+        $paymentNoteWidth = $s['payment_note']['width'];
     @endphp
 
     <div class="d-flex justify-content-end gap-2 mb-3 no-print">
@@ -153,7 +192,7 @@
         </div>
         <div class="template-title">STATEMENT OF ACCOUNT</div>
         <div class="template-label serial-label" style="left: 640px; top: 137px">B No.</div>
-        <div class="print-field serial print-field-serial" style="left: {{ $p['serial'][0] }}px; top: {{ $p['serial'][1] }}px; {{ $fieldStyle('serial') }}">{{ $print['soa_no'] ?? '007187' }}</div>
+        <div class="print-field fit-single-line serial print-field-serial" data-fit-text style="left: {{ $p['serial'][0] }}px; top: {{ $p['serial'][1] }}px; {{ $fieldStyle('serial') }}">{{ $print['soa_no'] ?? '007187' }}</div>
 
         <div class="template-box" style="left: 70px; top: 180px; width: 330px; height: 78px"></div>
         <div class="template-label" style="left: 82px; top: 190px; letter-spacing: 0">CUSTOMER:</div>
@@ -173,16 +212,49 @@
         <div class="template-label" style="left: 480px; top: 985px; font-size: 15px; letter-spacing: 0">SEA-JET INTERNATIONAL FORWARDERS, INC.</div>
         <div class="template-line" style="left: 505px; top: 1028px; width: 300px"></div>
 
-        <div class="print-field print-field-customer" style="left: {{ $p['customer'][0] }}px; top: {{ $p['customer'][1] }}px; {{ $fieldStyle('customer') }}">{{ $print['customer'] }}</div>
-        <div class="print-field print-field-address" style="left: {{ $p['address'][0] }}px; top: {{ $p['address'][1] }}px; {{ $fieldStyle('address') }}">{{ $print['address'] }}</div>
-        <div class="print-field print-field-date" style="left: {{ $p['date'][0] }}px; top: {{ $p['date'][1] }}px; {{ $fieldStyle('date') }}">{{ $print['invoice_date'] }}</div>
-        <div class="print-field print-field-particulars" style="left: {{ $p['particulars'][0] }}px; top: {{ $p['particulars'][1] }}px; {{ $fieldStyle('particulars') }}">{{ $soaParticulars }}</div>
-        <div class="print-field amount print-field-amounts" style="left: {{ $p['amounts'][0] }}px; top: {{ $p['amounts'][1] }}px; {{ $fieldStyle('amounts') }}">{{ $soaAmounts }}</div>
-        <div class="print-field print-field-payment_note" style="left: {{ $p['payment_note'][0] }}px; top: {{ $p['payment_note'][1] }}px; {{ $fieldStyle('payment_note') }}">{{ $paymentNote }}</div>
-        <div class="print-field amount print-field-total_reimbursement" style="left: {{ $p['total_reimbursement'][0] }}px; top: {{ $p['total_reimbursement'][1] }}px; {{ $fieldStyle('total_reimbursement') }}">{{ number_format((float) $print['soa_total'], 2) }}</div>
-        <div class="print-field print-field-prepared_by" style="left: {{ $p['prepared_by'][0] }}px; top: {{ $p['prepared_by'][1] }}px; {{ $fieldStyle('prepared_by') }}; text-align: center">{{ $print['prepared_by'] ?: 'MABEL PLATA' }}</div>
+        <div class="print-field fit-multiline print-field-customer" data-fit-text style="left: {{ $p['customer'][0] }}px; top: {{ $p['customer'][1] }}px; {{ $fieldStyle('customer') }}">{{ $print['customer'] }}</div>
+        <div class="print-field fit-multiline print-field-address" data-fit-text style="left: {{ $p['address'][0] }}px; top: {{ $p['address'][1] }}px; {{ $fieldStyle('address') }}">{{ $print['address'] }}</div>
+        <div class="print-field fit-single-line print-field-date" data-fit-text style="left: {{ $p['date'][0] }}px; top: {{ $p['date'][1] }}px; {{ $fieldStyle('date') }}">{{ $print['invoice_date'] }}</div>
+        <div class="print-field fit-multiline print-field-particulars" data-fit-text data-min-font="6" style="left: {{ $p['particulars'][0] }}px; top: {{ $p['particulars'][1] }}px; {{ $fieldStyle('particulars') }}">{{ $soaParticulars }}</div>
+        <div class="print-field fit-multiline amount print-field-amounts" data-fit-text data-min-font="6" style="left: {{ $p['amounts'][0] }}px; top: {{ $p['amounts'][1] }}px; {{ $fieldStyle('amounts') }}">{{ $soaAmounts }}</div>
+        <div class="soa-payment-note-line soa-payment-note-small print-field-payment_note" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop }}px; width: {{ $paymentNoteWidth }}px">
+            PLEASE PAY THIS REIMBURSEMENT CHARGES TOGETHER WITH INVOICE NUMBER {{ $print['invoice_no'] ?? '' }}
+        </div>
+        <div class="soa-payment-note-line soa-payment-note-amount" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + 15 }}px; width: {{ $paymentNoteWidth }}px">
+            TOTAL INVOICE AMOUNT&nbsp;&nbsp;&nbsp;&nbsp;{{ $money($billingInvoiceAmount) }}
+        </div>
+        <div class="soa-payment-note-line soa-payment-note-amount" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + 30 }}px; width: {{ $paymentNoteWidth }}px">
+            REIMBURSEMENT CHARGES&nbsp;&nbsp;&nbsp;&nbsp;{{ $money($print['reimbursement_total'] ?? 0) }}
+        </div>
+        <div class="soa-payment-note-line soa-payment-note-amount" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + 45 }}px; width: {{ $paymentNoteWidth }}px">
+            PLEASE PAY THIS AMOUNT&nbsp;&nbsp;&nbsp;&nbsp;{{ $money($print['reimbursement_total'] ?? 0) }}
+        </div>
+        <div class="print-field fit-single-line amount print-field-total_reimbursement" data-fit-text style="left: {{ $p['total_reimbursement'][0] }}px; top: {{ $p['total_reimbursement'][1] }}px; {{ $fieldStyle('total_reimbursement') }}">{{ number_format((float) ($print['reimbursement_total'] ?? 0), 2) }}</div>
+        <div class="print-field fit-single-line print-field-prepared_by" data-fit-text style="left: {{ $p['prepared_by'][0] }}px; top: {{ $p['prepared_by'][1] }}px; {{ $fieldStyle('prepared_by') }}; text-align: center">{{ $print['prepared_by'] ?: (auth()->user()->name ?? 'User') }}</div>
         @foreach($customFields as $custom)
-            <div class="print-field" style="left: {{ $custom['x'] }}px; top: {{ $custom['y'] }}px; width: {{ $custom['width'] }}px; font-size: {{ $custom['font_size'] }}px">{{ $custom['text'] }}</div>
+            <div class="print-field fit-multiline" data-fit-text data-min-font="6" style="left: {{ $custom['x'] }}px; top: {{ $custom['y'] }}px; width: {{ $custom['width'] }}px; font-size: {{ $custom['font_size'] }}px; max-height: 120px">{{ $custom['text'] }}</div>
         @endforeach
     </div>
+    <script>
+        (function () {
+            function fitPrintableText() {
+                document.querySelectorAll('[data-fit-text]').forEach(function (field) {
+                    var base = parseFloat(field.dataset.baseFont || window.getComputedStyle(field).fontSize);
+                    var min = parseFloat(field.dataset.minFont || 7);
+                    field.dataset.baseFont = base;
+                    field.style.fontSize = base + 'px';
+
+                    var current = base;
+                    while (current > min && (field.scrollWidth > field.clientWidth + 1 || field.scrollHeight > field.clientHeight + 1)) {
+                        current -= 0.5;
+                        field.style.fontSize = current + 'px';
+                    }
+                });
+            }
+
+            window.addEventListener('load', fitPrintableText);
+            window.addEventListener('beforeprint', fitPrintableText);
+            window.addEventListener('resize', fitPrintableText);
+        })();
+    </script>
 @endsection

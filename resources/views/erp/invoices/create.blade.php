@@ -3,6 +3,7 @@
 @php
     $isEdit = $isEdit ?? false;
     $editingInvoice = $editingInvoice ?? [];
+    $errors = $errors ?? new \Illuminate\Support\ViewErrorBag;
 @endphp
 
 @section('title', $isEdit ? 'Edit Invoice' : 'Create Invoice')
@@ -189,6 +190,7 @@
                             @endforeach
                         </select>
                         <input type="hidden" name="customer_name" id="customerName" value="">
+                        <input type="hidden" name="ar_account" id="arAccount" value="">
                     </div>
                     <div class="col-lg-2">
                         <label class="form-label">Class</label>
@@ -200,28 +202,12 @@
                         </select>
                     </div>
                     <div class="col-lg-3">
-                        <label class="form-label">Account</label>
-                        <select name="ar_account" id="arAccount" class="form-select">
-                            <option value=""></option>
-                            <option>A/R-Reimbursable Charges</option>
-                            <option>A/Trade-Billing Invoice</option>
-                            <option>A/R Trade-SOA A</option>
-                            <option>A/R Trade-Debit Note</option>
-                        </select>
-                    </div>
-                    <div class="col-lg-3">
                         <label class="form-label">Template</label>
                         <select name="invoice_template[]" id="invoiceTemplate" class="form-select erp-select" multiple>
                             @foreach($invoiceTemplates as $template)
                                 <option value="{{ $template['key'] }}" data-account="{{ $template['account'] }}">{{ $template['label'] }}</option>
                             @endforeach
                         </select>
-                        <div class="input-group input-group-sm mt-2">
-                            <input type="text" id="customTemplateName" class="form-control" placeholder="Add custom template">
-                            <button type="button" class="btn btn-outline-secondary" id="addInvoiceTemplate" title="Add template">
-                                <i class="bi bi-plus-lg"></i>
-                            </button>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -298,8 +284,8 @@
                                 <input name="invoice_date" type="date" class="form-control invoice-field" value="" required>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label text-muted">Invoice #</label>
-                                <input name="transaction_no" id="transactionNo" class="form-control invoice-field" value="">
+                                <label class="form-label text-muted">Document No.</label>
+                                <input name="transaction_no" id="transactionNo" class="form-control invoice-field" value="" placeholder="Auto-generated if blank">
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label text-muted">Due Date</label>
@@ -331,16 +317,20 @@
                                 </select>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label text-muted">Invoice Number</label>
-                                <input name="invoice_no" id="invoiceNo" class="form-control invoice-field" value="" required>
+                                <label class="form-label text-muted">Invoice No. #</label>
+                                <input name="invoice_no" id="invoiceNo" class="form-control invoice-field" value="" placeholder="Optional">
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-2">
                                 <label class="form-label text-muted">Currency</label>
                                 <select name="currency" id="currencySelect" class="form-select invoice-field erp-select">
                                     <option value=""></option>
                                     <option>PHP</option>
                                     <option>USD</option>
                                 </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted">Forex Rate</label>
+                                <input name="exchange_rate" id="exchangeRateInput" class="form-control invoice-field text-end" value="1.000000">
                             </div>
                         </div>
                     </div>
@@ -358,6 +348,7 @@
                         <thead>
                         <tr>
                             <th style="width: 170px">Item</th>
+                            <th style="width: 210px">Account</th>
                             <th>Description</th>
                             <th class="text-end" style="width: 130px">Rate</th>
                             <th class="text-end" style="width: 100px">Qty</th>
@@ -372,36 +363,24 @@
                             <td>
                                 <select name="item[]" class="form-select item-select">
                                     <option value=""></option>
-                                    <option value="Terminal Handling"
-                                            data-description="TERMINAL HANDLING CHARGES"
-                                            data-rate="321714.25"
-                                            data-qty="1"
-                                            data-class="MANILA"
-                                            data-tax="12%">Terminal Handling</option>
-                                    <option value="Doc Stamp VAT"
-                                            data-description="DOC STAMP / VAT STAMPS"
-                                            data-rate="20.00"
-                                            data-qty="1"
-                                            data-class="MANILA"
-                                            data-tax="12%">Doc Stamp VAT</option>
-                                    <option value="Documentation VAT"
-                                            data-description="DOC / IDENTIFICATION FEE"
-                                            data-rate="4280.60"
-                                            data-qty="1"
-                                            data-class="MANILA"
-                                            data-tax="12%">Documentation VAT</option>
-                                    <option value="Ocean Freight"
-                                            data-description="OCEAN FREIGHT SERVICE CHARGE"
-                                            data-rate="0"
-                                            data-qty="1"
-                                            data-class="MANILA"
-                                            data-tax="zero-rated">Ocean Freight</option>
-                                    <option value="Reimbursable Charges"
-                                            data-description="REIMBURSABLE CHARGES"
-                                            data-rate="0"
-                                            data-qty="1"
-                                            data-class="MANILA"
-                                            data-tax="exempt">Reimbursable Charges</option>
+                                    @foreach($items ?? [] as $item)
+                                        <option value="{{ $item->name }}"
+                                                data-description="{{ $item->description }}"
+                                                data-rate="{{ $item->rate }}"
+                                                data-qty="{{ $item->qty }}"
+                                                data-class="{{ $item->class }}"
+                                                data-account="{{ $item->account }}"
+                                                data-tax="{{ $item->tax }}">{{ $item->name }}</option>
+                                    @endforeach
+                                </select>
+                            </td>
+                            <td>
+                                <select name="line_ar_account[]" class="form-select line-account">
+                                    <option value=""></option>
+                                    <option>A/R-Reimbursable Charges</option>
+                                    <option>A/Trade-Billing Invoice</option>
+                                    <option>A/R Trade-SOA A</option>
+                                    <option>A/R Trade-Debit Note</option>
                                 </select>
                             </td>
                             <td><textarea name="item_description[]" class="form-control" rows="2"></textarea></td>
@@ -456,6 +435,10 @@
                             <span class="text-muted">SOA Total</span>
                             <strong class="text-primary" id="balanceText">PHP 0.00</strong>
                         </div>
+                        <div class="d-flex justify-content-between py-2 border-top" id="phpEquivalentRow">
+                            <span class="text-muted">PHP Equivalent</span>
+                            <strong id="phpEquivalentText">PHP 0.00</strong>
+                        </div>
                         <input type="hidden" name="amount" id="amountInput" value="0.00">
                     </div>
                 </div>
@@ -483,6 +466,21 @@
 
         function currency() {
             return $('#currencySelect').val() || 'PHP';
+        }
+
+        function syncExchangeRate(forceDefault) {
+            var rate = $('#exchangeRateInput');
+            var selectedCurrency = currency();
+
+            if (selectedCurrency === 'PHP') {
+                rate.val('1.000000').prop('readonly', true);
+                return;
+            }
+
+            rate.prop('readonly', false);
+            if (forceDefault && !numberValue(rate.val())) {
+                rate.val('1.000000');
+            }
         }
 
         function syncInvoiceNumbers(source) {
@@ -524,6 +522,7 @@
                 $('#customerName').val('');
                 $('#clientSummary').text('No customer selected');
                 $('#arAccount').val('');
+                $('.line-account').val('');
                 $('#invoiceTemplate').val(null).trigger('change.select2');
                 $('.vatable-print-action').removeClass('d-none');
                 $('.non-tax-print-action').addClass('d-none');
@@ -535,6 +534,7 @@
 
             $('#customerName').val(option.data('name') || '');
             $('#currencySelect').val(option.data('currency') || '').trigger('change.select2');
+            syncExchangeRate(true);
             $('#classCode').val(option.data('class') || '');
             $('#vatClassification').val(taxClass);
             $('#customerTin').val(option.data('tin') || '');
@@ -542,34 +542,42 @@
             $('#creditTerms').val(terms.replace(/[^0-9]/g, ''));
             $('#customerTaxCode').val(isVatable ? 'VAT12' : (taxClass === 'zero-rated' ? 'ZERO' : 'EXEMPT'));
             $('#arAccount').val(isVatable ? 'A/Trade-Billing Invoice' : 'A/R Trade-SOA A');
+            $('.line-account').each(function () {
+                if (!$(this).val()) {
+                    $(this).val($('#arAccount').val());
+                }
+            });
             $('#invoiceTemplate').val(isVatable ? ['SOA_B', 'Billing Invoice'] : ['SOA_A']).trigger('change.select2');
             $('.vatable-print-action').toggleClass('d-none', !isVatable);
             $('.non-tax-print-action').toggleClass('d-none', isVatable);
             $('#clientSummary').text((option.data('terms') || '-') + ' | ' + (option.data('currency') || '-') + ' | ' + (taxClass || '-') + ' | ' + (isVatable ? 'Print SOA B + Billing Invoice' : 'Print SOA A'));
         }
 
-        $('#addInvoiceTemplate').on('click', function () {
-            var input = $('#customTemplateName');
-            var value = input.val().trim();
-            var select = $('#invoiceTemplate');
-            var selected = select.val() || [];
+        function syncDocumentAccount() {
+            var account = '';
+            $('.line-account').each(function () {
+                if (!account && $(this).val()) {
+                    account = $(this).val();
+                }
+            });
+            $('#arAccount').val(account);
+        }
 
-            if (!value) {
-                input.focus();
-                return;
-            }
+        function initItemSelects(scope) {
+            var container = scope ? $(scope) : $('#invoiceLines');
+            container.find('.item-select').each(function () {
+                var select = $(this);
+                if (select.hasClass('select2-hidden-accessible')) {
+                    return;
+                }
 
-            if (!select.find('option').filter(function () { return this.value === value; }).length) {
-                select.append(new Option(value, value, true, true));
-            }
-
-            if (selected.indexOf(value) === -1) {
-                selected.push(value);
-            }
-
-            select.val(selected).trigger('change.select2');
-            input.val('').focus();
-        });
+                select.select2({
+                    width: '100%',
+                    placeholder: 'Search item',
+                    allowClear: true
+                });
+            });
+        }
 
         function syncItem(row) {
             var option = row.find('.item-select option:selected');
@@ -581,7 +589,9 @@
             row.find('.line-unit').val(option.data('rate') || '');
             row.find('.line-qty').val(option.data('qty') || '1');
             row.find('select[name="line_class[]"]').val(option.data('class') || $('#classCode').val() || '');
+            row.find('.line-account').val(option.data('account') || $('#arAccount').val() || '');
             row.find('.line-tax').val(option.data('tax') || '');
+            syncDocumentAccount();
             recalc();
         }
 
@@ -620,20 +630,26 @@
             $('#balanceText').text(currency() + ' ' + money(soaTotal));
             $('#amountInput').val(soaTotal.toFixed(2));
             $('#invoiceAmountInput').val(billingTotal ? money(billingTotal) : '');
+            var exchangeRate = numberValue($('#exchangeRateInput').val()) || 1;
+            var showPhpEquivalent = currency() !== 'PHP';
+            $('#phpEquivalentRow').toggleClass('d-none', !showPhpEquivalent);
+            $('#phpEquivalentText').text('PHP ' + money(soaTotal * exchangeRate));
         }
 
-        function setLine(index, item, description, rate, qty, lineClass, taxCategory) {
+        function setLine(index, item, description, rate, qty, lineClass, taxCategory, account) {
             while ($('#invoiceLines tbody tr').length <= index) {
                 $('#addLine').trigger('click');
             }
 
             var row = $('#invoiceLines tbody tr').eq(index);
-            row.find('.item-select').val(item);
+            row.find('.item-select').val(item).trigger('change.select2');
             row.find('textarea[name="item_description[]"]').val(description);
             row.find('.line-unit').val(rate);
             row.find('.line-qty').val(qty);
             row.find('select[name="line_class[]"]').val(lineClass);
             row.find('.line-tax').val(taxCategory);
+            row.find('.line-account').val(account || $('#arAccount').val() || '');
+            syncDocumentAccount();
         }
 
         function fillSampleInvoice() {
@@ -660,9 +676,9 @@
             $('#invoiceTemplate').val(['SOA_B', 'Billing Invoice']).trigger('change.select2');
 
             $('#invoiceLines tbody tr:gt(0)').remove();
-            setLine(0, 'Terminal Handling', 'TERMINAL HANDLING CHARGES', '321714.25', '1', 'MANILA', '12%');
-            setLine(1, 'Documentation VAT', 'DOC / IDENTIFICATION FEE', '4280.60', '1', 'MANILA', '12%');
-            setLine(2, 'Reimbursable Charges', 'REIMBURSABLE CHARGES - PORT ADVANCES', '753495.10', '1', 'MANILA', 'exempt');
+            setLine(0, 'Terminal Handling', 'TERMINAL HANDLING CHARGES', '321714.25', '1', 'MANILA', '12%', 'A/Trade-Billing Invoice');
+            setLine(1, 'Documentation VAT', 'DOC / IDENTIFICATION FEE', '4280.60', '1', 'MANILA', '12%', 'A/Trade-Billing Invoice');
+            setLine(2, 'Reimbursable Charges', 'REIMBURSABLE CHARGES - PORT ADVANCES', '753495.10', '1', 'MANILA', 'exempt', 'A/R-Reimbursable Charges');
 
             recalc();
         }
@@ -715,6 +731,8 @@
             $('#classCode').val(editInvoice.class_code || $('#classCode').val() || '');
             $('#arAccount').val(editInvoice.ar_account || 'A/Trade-Billing Invoice');
             $('#currencySelect').val(editInvoice.currency || 'PHP').trigger('change.select2');
+            $('#exchangeRateInput').val(editInvoice.exchange_rate || '1.000000');
+            syncExchangeRate(false);
             $('#vatClassification').val(editInvoice.vat_classification || '');
             $('#customerTaxCode').val(editInvoice.customer_tax_code || (editInvoice.vat_classification === '12%' ? 'VAT12' : ''));
             $('#customerTin').val(editInvoice.tin || '');
@@ -747,6 +765,7 @@
             var quantities = editInvoice.qty || [];
             var classes = editInvoice.line_class || [];
             var taxes = editInvoice.tax_category || [];
+            var accounts = editInvoice.line_ar_account || [];
             var count = Math.max(items.length, descriptions.length, rates.length, quantities.length, 1);
 
             for (var i = 0; i < count; i++) {
@@ -757,7 +776,8 @@
                     rates[i] || '',
                     quantities[i] || '1',
                     classes[i] || editInvoice.class_code || '',
-                    taxes[i] || editInvoice.vat_classification || ''
+                    taxes[i] || editInvoice.vat_classification || '',
+                    accounts[i] || editInvoice.ar_account || ''
                 );
             }
 
@@ -770,7 +790,10 @@
             recalc();
         });
 
-        $('#currencySelect').on('change', recalc);
+        $('#currencySelect').on('change', function () {
+            syncExchangeRate(true);
+            recalc();
+        });
         $('#invoiceNo').on('input', function () {
             syncInvoiceNumbers('invoice');
         });
@@ -778,27 +801,41 @@
             syncInvoiceNumbers('transaction');
         });
         $('#invoiceForm').on('submit', function () {
+            syncDocumentAccount();
             syncInvoiceNumbers($('#invoiceNo').val() ? 'invoice' : 'transaction');
         });
         $('#invoiceLines').on('input change', '.line-unit, .line-qty, .line-tax', recalc);
+        $('#exchangeRateInput').on('input', recalc);
+        $('#invoiceLines').on('change', '.line-account', syncDocumentAccount);
         $('#invoiceLines').on('change', '.item-select', function () {
             syncItem($(this).closest('tr'));
         });
 
         $('#addLine').on('click', function () {
             var row = $('#invoiceLines tbody tr:first').clone();
+            row.find('.select2-container').remove();
+            row.find('.item-select')
+                .removeClass('select2-hidden-accessible')
+                .removeAttr('data-select2-id')
+                .removeAttr('aria-hidden')
+                .removeAttr('tabindex');
+            row.find('.item-select option').removeAttr('data-select2-id');
             row.find('select').val('');
             row.find('textarea').val('');
             row.find('.line-unit').val('');
             row.find('.line-qty').val('');
             row.find('.line-total').val('');
+            row.find('.line-account').val($('#arAccount').val() || '');
             $('#invoiceLines tbody').append(row);
+            initItemSelects(row);
+            syncDocumentAccount();
             recalc();
         });
 
         $('#invoiceLines').on('click', '.remove-line', function () {
             if ($('#invoiceLines tbody tr').length > 1) {
                 $(this).closest('tr').remove();
+                syncDocumentAccount();
                 recalc();
             }
         });
@@ -808,8 +845,11 @@
         if (!fillEditInvoice()) {
             syncCustomer();
         }
+        initItemSelects();
+        syncExchangeRate(true);
         recalc();
         syncInvoiceActionLinks();
+        syncDocumentAccount();
     });
 </script>
 @endpush

@@ -257,7 +257,7 @@
             'add_vat' => ['label' => 'Add VAT', 'value' => 'PHP 2,326.59', 'class' => 'amount'],
             'withholding_tax' => ['label' => 'Withholding Tax', 'value' => 'PHP -387.77', 'class' => 'amount'],
             'amount_due' => ['label' => 'Amount Due', 'value' => 'PHP 21,327.07', 'class' => 'amount'],
-            'prepared_by' => ['label' => 'Prepared By', 'value' => 'MABEL PLATA', 'class' => ''],
+            'prepared_by' => ['label' => 'Prepared By', 'value' => auth()->user()->name ?? 'User', 'class' => ''],
         ];
         $tableFields = [
             ['label' => 'Invoice Table: Item', 'text' => 'Ocean Freight', 'width' => 150, 'font_size' => 12],
