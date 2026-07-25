@@ -57,12 +57,12 @@
         text-transform: uppercase;
     }
     .ar-title {
-        font-size: 18px;
+        font-size: 15px;
         font-weight: 800;
         letter-spacing: .2px;
         text-align: center;
         text-transform: uppercase;
-        white-space: nowrap;
+        line-height: 1.15;
     }
     .ar-number {
         margin: 3mm 0 6mm;

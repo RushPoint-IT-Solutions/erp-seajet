@@ -608,7 +608,8 @@
                 var category = row.find('.line-tax').val();
                 var item = String(row.find('.item-select').val() || '').toLowerCase();
                 var description = String(row.find('textarea[name="item_description[]"]').val() || '').toLowerCase();
-                var isReimbursement = item.indexOf('reimburs') !== -1 || description.indexOf('reimburs') !== -1;
+                var account = String(row.find('.line-account').val() || '').toLowerCase();
+                var isReimbursement = account.indexOf('reimburs') !== -1 || item.indexOf('reimburs') !== -1 || description.indexOf('reimburs') !== -1;
 
                 row.find('.line-total').val(line ? money(line) : '');
 

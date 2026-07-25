@@ -62,7 +62,7 @@
                             <td>{{ $line->tax_category ?? '' }}</td>
                             <td class="text-end">{{ number_format((float) ($line->amount ?? $line->line_total ?? 0), 2) }}</td>
                             <td>{{ $line->memo ?? $line->description ?? '' }}</td>
-                            <td>{{ $line->customer_job_id ?? '' }}</td>
+                            <td>{{ $line->customer_job_id ? $line->customer_job_id.' - '.($line->customer_job_name ?? '') : '' }}</td>
                             <td>{{ !empty($line->is_billable) ? 'Yes' : 'No' }}</td>
                             <td>{{ $line->class_code ?? '' }}</td>
                         </tr>

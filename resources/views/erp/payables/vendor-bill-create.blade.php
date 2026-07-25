@@ -465,8 +465,17 @@
 
         function recalc() {
             var total = 0;
-            $('.expense-amount').each(function () {
-                total += numberValue($(this).val());
+            var inputVat = 0;
+            $('#expenseLines tbody tr').each(function () {
+                var row = $(this);
+                var amount = numberValue(row.find('.expense-amount').val());
+                total += amount;
+
+                var category = String(row.find('select[name="expense_tax[]"]').val() || '').toUpperCase();
+                if (category === 'VAT12') {
+                    var net = amount / 1.12;
+                    inputVat += amount - net;
+                }
             });
 
             if (!total) {
@@ -476,7 +485,9 @@
             }
 
             var whtRate = numberValue($('#whtRate').val());
-            var whtAmount = total * (whtRate / 100);
+            // BIR EWT is computed on the income payment net of VAT, not the VAT-inclusive gross.
+            var whtBase = Math.max(0, total - inputVat);
+            var whtAmount = whtBase * (whtRate / 100);
             var net = total - whtAmount;
             var php = currency() === 'USD' ? total * numberValue($('#exchangeRate').val()) : total;
 

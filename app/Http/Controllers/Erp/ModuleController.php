@@ -985,6 +985,29 @@ class ModuleController extends Controller
             });
     }
 
+    private function glAccountOptions()
+    {
+        if (!Schema::hasTable('accounts')) {
+            return collect();
+        }
+
+        return DB::table('accounts')
+            ->leftJoin('account_categories', 'account_categories.id', '=', 'accounts.account_category_id')
+            ->select('accounts.id', 'accounts.code', 'accounts.name', 'account_categories.name as category')
+            ->where('accounts.is_active', true)
+            ->orderBy('accounts.code')
+            ->get()
+            ->map(function ($account) {
+                return (object) [
+                    'id' => $account->id,
+                    'code' => $account->code,
+                    'name' => $account->name,
+                    'label' => trim(($account->code ? $account->code.' - ' : '').$account->name),
+                    'category' => $account->category,
+                ];
+            });
+    }
+
     private function accountLabelById($accountId)
     {
         if (!$accountId || !Schema::hasTable('accounts')) {
@@ -1522,6 +1545,50 @@ class ModuleController extends Controller
             ->value('balance');
     }
 
+    private function apBillTaxSplit(array $data, $grossAmount)
+    {
+        $amounts = (array) ($data['expense_amount'] ?? []);
+        $taxes = (array) ($data['expense_tax'] ?? []);
+
+        $vatable = 0.0;
+        $zeroRated = 0.0;
+        $vatExempt = 0.0;
+        $inputVat = 0.0;
+        $hasLines = false;
+
+        foreach ($amounts as $index => $amount) {
+            $lineAmount = $this->moneyToFloat($amount);
+            if ($lineAmount <= 0) {
+                continue;
+            }
+            $hasLines = true;
+            $taxCategory = strtoupper(trim((string) ($taxes[$index] ?? '')));
+
+            if (in_array($taxCategory, ['VAT12', '12%'], true)) {
+                $net = $lineAmount / 1.12;
+                $vatable += $net;
+                $inputVat += $lineAmount - $net;
+            } elseif ($taxCategory === 'ZERO') {
+                $zeroRated += $lineAmount;
+            } elseif ($taxCategory === 'EXEMPT') {
+                $vatExempt += $lineAmount;
+            } else {
+                $vatable += $lineAmount;
+            }
+        }
+
+        if (!$hasLines) {
+            $vatable = $grossAmount;
+        }
+
+        return [
+            'vatable_amount' => round($vatable, 4),
+            'zero_rated_amount' => round($zeroRated, 4),
+            'vat_exempt_amount' => round($vatExempt, 4),
+            'input_vat' => round($inputVat, 4),
+        ];
+    }
+
     private function saveApBill(array $data)
     {
         return DB::transaction(function () use ($data) {
@@ -1538,10 +1605,13 @@ class ModuleController extends Controller
             }
 
             $grossAmount = $lineTotal > 0 ? $lineTotal : $this->moneyToFloat($data['gross_amount'] ?? 0);
+            $taxSplit = $this->apBillTaxSplit($data, $grossAmount);
             $whtRate = $this->moneyToFloat($data['withholding_tax_rate'] ?? 0);
             $whtAmount = $this->moneyToFloat($data['withholding_tax_amount'] ?? 0);
             if ($whtAmount <= 0 && $whtRate > 0) {
-                $whtAmount = $grossAmount * ($whtRate / 100);
+                // BIR EWT is computed on the income payment net of VAT, not the VAT-inclusive gross.
+                $whtBase = max(0, $grossAmount - $taxSplit['input_vat']);
+                $whtAmount = $whtBase * ($whtRate / 100);
             }
             $netAmount = max(0, $grossAmount - $whtAmount);
             $usdToPhpRate = $this->moneyToFloat($data['exchange_rate'] ?? 1) ?: 1;
@@ -1578,7 +1648,10 @@ class ModuleController extends Controller
                 'gross_amount' => $grossAmount,
                 'php_amount' => $phpAmount,
                 'subtotal' => $grossAmount,
-                'tax_total' => 0,
+                'vatable_amount' => $taxSplit['vatable_amount'],
+                'zero_rated_amount' => $taxSplit['zero_rated_amount'],
+                'vat_exempt_amount' => $taxSplit['vat_exempt_amount'],
+                'tax_total' => $taxSplit['input_vat'],
                 'withholding_tax_rate' => $whtRate,
                 'withholding_tax_amount' => $whtAmount,
                 'grand_total' => $netAmount,
@@ -2259,7 +2332,14 @@ class ModuleController extends Controller
             return [];
         }
 
-        return DB::table($table)->where('purchase_document_id', $billId)->get();
+        $query = DB::table($table)->where('purchase_document_id', $billId);
+
+        if (Schema::hasTable('customers')) {
+            $query->leftJoin('customers', 'customers.customer_id', '=', $table.'.customer_job_id')
+                ->select($table.'.*', 'customers.name as customer_job_name');
+        }
+
+        return $query->get();
     }
 
     private function apBillPrintData($bill)
@@ -2281,7 +2361,10 @@ class ModuleController extends Controller
         }
 
         $lines = $this->apBillLines($record->id);
-        $total = (float) (data_get($record, 'grand_total') ?? data_get($record, 'net_amount') ?? data_get($record, 'gross_amount') ?? 0);
+        $grossAmount = (float) (data_get($record, 'gross_amount') ?? 0);
+        $inputVat = (float) (data_get($record, 'tax_total') ?? 0);
+        $whtAmount = (float) (data_get($record, 'withholding_tax_amount') ?? 0);
+        $total = (float) (data_get($record, 'grand_total') ?? data_get($record, 'net_amount') ?? $grossAmount);
 
         return [
             'bill' => [
@@ -2295,6 +2378,10 @@ class ModuleController extends Controller
                 'terms' => data_get($record, 'terms') ?: '',
                 'memo' => data_get($record, 'memo') ?: (data_get($record, 'remarks') ?: ''),
                 'currency' => data_get($record, 'currency') ?: 'PHP',
+                'gross_amount' => $grossAmount,
+                'input_vat' => $inputVat,
+                'withholding_tax_rate' => (float) (data_get($record, 'withholding_tax_rate') ?? 0),
+                'withholding_tax_amount' => $whtAmount,
                 'total' => $total,
             ],
             'lines' => $lines,
@@ -2698,91 +2785,466 @@ class ModuleController extends Controller
 
     public function journalEntries()
     {
-        return view('erp.accounting.journal-entries');
+        return view('erp.accounting.journal-entries', [
+            'accounts' => $this->glAccountOptions(),
+            'nextJournalNo' => $this->peekNextDocumentNumber('journal_voucher', 'JV-', 5),
+            'recentEntries' => $this->recentJournalEntries(),
+        ]);
     }
 
     public function journalEntryReview()
     {
+        $accountIds = (array) request('line_account', []);
+        $debits = (array) request('line_debit', []);
+        $credits = (array) request('line_credit', []);
+        $descriptions = (array) request('line_description', []);
+
+        $lines = [];
+        $totalDebit = 0.0;
+        $totalCredit = 0.0;
+
+        foreach ($accountIds as $index => $accountId) {
+            $accountId = (int) $accountId;
+            $debit = $this->moneyToFloat($debits[$index] ?? 0);
+            $credit = $this->moneyToFloat($credits[$index] ?? 0);
+
+            if (!$accountId || ($debit <= 0 && $credit <= 0)) {
+                continue;
+            }
+            if ($debit > 0 && $credit > 0) {
+                return back()->withInput()->withErrors(['lines' => 'Each journal line must have either a debit or a credit, not both.']);
+            }
+
+            $lines[] = [
+                'account_id' => $accountId,
+                'description' => $descriptions[$index] ?? null,
+                'debit' => $debit,
+                'credit' => $credit,
+            ];
+            $totalDebit += $debit;
+            $totalCredit += $credit;
+        }
+
+        if (count($lines) < 2) {
+            return back()->withInput()->withErrors(['lines' => 'A journal entry needs at least two lines (one debit, one credit).']);
+        }
+        if (round($totalDebit, 2) !== round($totalCredit, 2)) {
+            return back()->withInput()->withErrors(['lines' => 'Total debits ('.number_format($totalDebit, 2).') must equal total credits ('.number_format($totalCredit, 2).') before this entry can post.']);
+        }
+        if (round($totalDebit, 2) <= 0) {
+            return back()->withInput()->withErrors(['lines' => 'The journal entry amount must be greater than zero.']);
+        }
+
+        $companyId = $this->defaultCompanyId();
+        $journalNo = trim((string) request('journal_no')) ?: $this->nextDocumentNumber('journal_voucher', 'JV-', 5);
+
+        $journalId = DB::transaction(function () use ($companyId, $journalNo, $lines) {
+            $id = DB::table('journal_entries')->insertGetId($this->tablePayload('journal_entries', [
+                'company_id' => $companyId,
+                'branch_id' => DB::table('branches')->where('company_id', $companyId)->orderBy('id')->value('id'),
+                'journal_no' => $journalNo,
+                'journal_date' => request('journal_date', date('Y-m-d')),
+                'source_module' => 'GL',
+                'reference_no' => request('reference_no'),
+                'shipment_job_id' => request('shipment_job_id'),
+                'memo' => request('memo'),
+                'status' => 'posted',
+                'created_by' => auth()->id(),
+                'posted_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]));
+
+            foreach ($lines as $line) {
+                DB::table('journal_entry_lines')->insert([
+                    'journal_entry_id' => $id,
+                    'account_id' => $line['account_id'],
+                    'description' => $line['description'],
+                    'debit' => $line['debit'],
+                    'credit' => $line['credit'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            return $id;
+        });
+
+        $posted = DB::table('journal_entries')->where('id', $journalId)->first();
+        $postedLines = DB::table('journal_entry_lines')
+            ->leftJoin('accounts', 'accounts.id', '=', 'journal_entry_lines.account_id')
+            ->where('journal_entry_id', $journalId)
+            ->select('journal_entry_lines.*', 'accounts.code as account_code', 'accounts.name as account_name')
+            ->get();
+
         return view('erp.accounting.journal-review', [
-            'journal' => request()->only([
-                'journal_no',
-                'journal_date',
-                'shipment_job_id',
-                'reference_no',
-                'memo',
-                'debit_account',
-                'credit_account',
-                'amount',
-            ]),
+            'journal' => $posted,
+            'lines' => $postedLines,
+            'totalDebit' => $totalDebit,
+            'totalCredit' => $totalCredit,
         ]);
+    }
+
+    private function peekNextDocumentNumber($documentType, $prefix, $padding = 5)
+    {
+        return $this->nextDocumentNumber($documentType, $prefix, $padding, false);
+    }
+
+    private function recentJournalEntries()
+    {
+        if (!Schema::hasTable('journal_entries')) {
+            return collect();
+        }
+
+        return DB::table('journal_entries')
+            ->orderBy('journal_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->limit(15)
+            ->get()
+            ->map(function ($entry) {
+                $totals = DB::table('journal_entry_lines')
+                    ->where('journal_entry_id', $entry->id)
+                    ->selectRaw('SUM(debit) as debit_total, SUM(credit) as credit_total')
+                    ->first();
+
+                return (object) [
+                    'id' => $entry->id,
+                    'journal_no' => $entry->journal_no,
+                    'journal_date' => $entry->journal_date,
+                    'memo' => $entry->memo,
+                    'status' => $entry->status,
+                    'amount' => (float) ($totals->debit_total ?? 0),
+                ];
+            });
     }
 
     public function balanceSheet()
     {
-        return $this->statement('Balance Sheet', [
-            ['Assets', 'Cash and Bank', 1268500],
-            ['Assets', 'Accounts Receivable', 238700],
-            ['Liabilities', 'Accounts Payable', -174250],
-            ['Liabilities', 'Output VAT Payable', -41280],
-            ['Equity', 'Owner Equity', -1291670],
+        $asOf = request('as_of', date('Y-m-d'));
+        $balances = $this->glAccountBalances(null, $asOf);
+        $company = $this->reportingCompany();
+
+        $assets = $this->glStatementRows($balances, 'Assets');
+        $liabilities = $this->glStatementRows($balances, 'Liabilities');
+        $equity = $this->glStatementRows($balances, 'Equity');
+        $netIncome = $this->glNetIncome(null, $asOf);
+
+        $rows = [];
+        foreach ($assets as $row) {
+            $rows[] = ['Assets', $row['label'], $row['amount']];
+        }
+        $totalAssets = array_sum(array_column($assets, 'amount'));
+        $rows[] = ['Assets', 'Total Assets', $totalAssets];
+
+        foreach ($liabilities as $row) {
+            $rows[] = ['Liabilities', $row['label'], $row['amount']];
+        }
+        $totalLiabilities = array_sum(array_column($liabilities, 'amount'));
+        $rows[] = ['Liabilities', 'Total Liabilities', $totalLiabilities];
+
+        foreach ($equity as $row) {
+            $rows[] = ['Equity', $row['label'], $row['amount']];
+        }
+        $rows[] = ['Equity', 'Current Year Earnings', $netIncome];
+        $totalEquity = array_sum(array_column($equity, 'amount')) + $netIncome;
+        $rows[] = ['Equity', 'Total Liabilities and Equity', $totalLiabilities + $totalEquity];
+
+        return $this->statement('Balance Sheet', $rows, [
+            'company' => $company,
+            'periodLabel' => 'As of '.date('F d, Y', strtotime($asOf)),
+            'tieOut' => [
+                'label' => 'Assets vs. Liabilities + Equity',
+                'left' => $totalAssets,
+                'right' => $totalLiabilities + $totalEquity,
+                'balanced' => round($totalAssets, 2) === round($totalLiabilities + $totalEquity, 2),
+            ],
         ]);
     }
 
     public function profitLoss()
     {
-        return $this->statement('Profit and Loss', [
-            ['Revenue', 'Service Revenue', 845230],
-            ['Cost', 'Cost of Services', -240300],
-            ['Expense', 'Operating Expenses', -142110],
-        ]);
+        return $this->incomeStatementLike('Profit and Loss');
     }
 
     public function incomeStatement()
     {
-        return $this->statement('Income Statement', [
-            ['Revenue', 'Service Revenue', 845230],
-            ['Less', 'Direct Costs', -240300],
-            ['Less', 'Operating Expenses', -142110],
-            ['Net Income', 'Net Income Before Tax', 462820],
+        return $this->incomeStatementLike('Income Statement');
+    }
+
+    private function incomeStatementLike($title)
+    {
+        $period = request('period', date('Y-m'));
+        list($start, $end) = $this->trialBalanceDateRange($period);
+        $balances = $this->glAccountBalances($start, $end);
+        $company = $this->reportingCompany();
+
+        $revenue = $this->glStatementRows($balances, 'Revenue', 'period');
+        $expenses = $this->glStatementRows($balances, 'Expenses', 'period');
+
+        $rows = [];
+        foreach ($revenue as $row) {
+            $rows[] = ['Revenue', $row['label'], $row['amount']];
+        }
+        $totalRevenue = array_sum(array_column($revenue, 'amount'));
+        $rows[] = ['Revenue', 'Total Revenue', $totalRevenue];
+
+        foreach ($expenses as $row) {
+            $rows[] = ['Expenses', $row['label'], -$row['amount']];
+        }
+        $totalExpenses = array_sum(array_column($expenses, 'amount'));
+        $rows[] = ['Expenses', 'Total Expenses', -$totalExpenses];
+
+        $rows[] = ['Net Income', 'Net Income Before Tax', $totalRevenue - $totalExpenses];
+
+        return $this->statement($title, $rows, [
+            'company' => $company,
+            'periodLabel' => 'For the period '.date('F d, Y', strtotime($start ?: date('Y-m-01'))).' to '.date('F d, Y', strtotime($end ?: date('Y-m-t'))),
         ]);
     }
 
     public function cashFlow()
     {
-        return $this->statement('Cash Flow Statement', [
-            ['Operating', 'Collections from Customers', 328900],
-            ['Operating', 'Payments to Suppliers', -174250],
-            ['Financing', 'Owner Contributions', 250000],
-            ['Ending Cash', 'Cash and Bank Balance', 1268500],
+        $period = request('period', date('Y-m'));
+        list($start, $end) = $this->trialBalanceDateRange($period);
+        $company = $this->reportingCompany();
+
+        $cashAccounts = $this->trialBalanceAccounts()->filter(function ($account) {
+            return strtolower((string) $account->type) === 'bank';
+        });
+        $accountIds = $cashAccounts->pluck('id')->all();
+
+        $beginningBalances = $this->glAccountBalances(null, $start ? date('Y-m-d', strtotime($start.' -1 day')) : date('Y-m-d'));
+        $endingBalances = $this->glAccountBalances(null, $end ?: date('Y-m-d'));
+
+        $beginningCash = 0.0;
+        $endingCash = 0.0;
+        foreach ($accountIds as $id) {
+            $beginningCash += (float) ($beginningBalances[$id]['ending'] ?? 0);
+            $endingCash += (float) ($endingBalances[$id]['ending'] ?? 0);
+        }
+
+        $netMovement = $endingCash - $beginningCash;
+        $receipts = Schema::hasTable('receipts')
+            ? (float) DB::table('receipts')
+                ->whereNotIn('status', ['cancelled', 'voided'])
+                ->when($start, function ($q) use ($start) { $q->where('receipt_date', '>=', $start); })
+                ->when($end, function ($q) use ($end) { $q->where('receipt_date', '<=', $end); })
+                ->sum('amount')
+            : 0.0;
+        $disbursements = Schema::hasTable('payments')
+            ? (float) DB::table('payments')
+                ->whereNotIn('status', ['cancelled', 'voided'])
+                ->when($start, function ($q) use ($start) { $q->where('payment_date', '>=', $start); })
+                ->when($end, function ($q) use ($end) { $q->where('payment_date', '<=', $end); })
+                ->sum('amount')
+            : 0.0;
+        $otherMovement = $netMovement - $receipts + $disbursements;
+
+        $rows = [
+            ['Beginning', 'Beginning Cash and Bank Balance', $beginningCash],
+            ['Operating', 'Cash Receipts from Customers', $receipts],
+            ['Operating', 'Cash Payments to Suppliers', -$disbursements],
+        ];
+        if (abs($otherMovement) >= 0.01) {
+            $rows[] = ['Operating', 'Other Journal Cash Movement', $otherMovement];
+        }
+        $rows[] = ['Ending', 'Ending Cash and Bank Balance', $endingCash];
+
+        return $this->statement('Cash Flow Statement', $rows, [
+            'company' => $company,
+            'periodLabel' => 'For the period '.date('F d, Y', strtotime($start ?: date('Y-m-01'))).' to '.date('F d, Y', strtotime($end ?: date('Y-m-t'))).' (direct method, cash and bank accounts only)',
         ]);
     }
 
-    private function statement($title, $rows)
+    private function reportingCompany()
     {
-        return view('erp.statements.show', compact('title', 'rows'));
+        return Schema::hasTable('companies') ? DB::table('companies')->where('id', $this->defaultCompanyId())->first() : null;
+    }
+
+    private function glStatementRows(array $balances, $categoryName, $field = 'ending')
+    {
+        $rows = [];
+        foreach ($balances as $balance) {
+            if ($balance['account']->category_name !== $categoryName) {
+                continue;
+            }
+            if (abs($balance[$field]) < 0.005) {
+                continue;
+            }
+            $rows[] = [
+                'label' => trim(($balance['account']->code ? $balance['account']->code.' - ' : '').$balance['account']->name),
+                'amount' => $balance[$field],
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function glNetIncome($startDate, $endDate)
+    {
+        $balances = $this->glAccountBalances($startDate, $endDate);
+        $field = $startDate ? 'period' : 'ending';
+        $revenue = array_sum(array_column($this->glStatementRows($balances, 'Revenue', $field), 'amount'));
+        $expenses = array_sum(array_column($this->glStatementRows($balances, 'Expenses', $field), 'amount'));
+
+        return $revenue - $expenses;
+    }
+
+    private function glAccountBalances($startDate, $endDate)
+    {
+        if (!Schema::hasTable('accounts')) {
+            return [];
+        }
+
+        $accounts = $this->trialBalanceAccounts();
+        $normals = [];
+        foreach ($accounts as $account) {
+            $normals[$account->id] = $this->trialBalanceNormalBalance($account);
+        }
+
+        $beginningJournal = $startDate
+            ? $this->trialBalanceJournalMovements(null, date('Y-m-d', strtotime($startDate.' -1 day')), $normals, true)
+            : [];
+        $beginningDocuments = $startDate
+            ? $this->trialBalanceDocumentMovements(null, date('Y-m-d', strtotime($startDate.' -1 day')), $accounts, $normals)
+            : $this->trialBalanceDocumentMovements(null, $endDate, $accounts, $normals);
+        $beginningMovements = $this->mergeMovementMaps($beginningJournal, $this->flattenMovementsToTotal($beginningDocuments));
+
+        $periodJournal = $this->trialBalanceJournalMovements($startDate, $endDate, $normals, true);
+        $periodDocuments = $startDate ? $this->trialBalanceDocumentMovements($startDate, $endDate, $accounts, $normals) : [];
+        $periodMovements = $this->mergeMovementMaps($periodJournal, $this->flattenMovementsToTotal($periodDocuments));
+
+        $balances = [];
+        foreach ($accounts as $account) {
+            $opening = (float) ($account->opening_balance ?? 0) + $this->sumMovementColumns($beginningMovements[$account->id] ?? []);
+            $period = $this->sumMovementColumns($periodMovements[$account->id] ?? []);
+            $balances[$account->id] = [
+                'account' => $account,
+                'normal' => $normals[$account->id],
+                'opening' => $opening,
+                'period' => $period,
+                'ending' => $opening + $period,
+            ];
+        }
+
+        return $balances;
+    }
+
+    private function sumMovementColumns(array $columns)
+    {
+        return array_sum($columns);
+    }
+
+    private function statement($title, $rows, array $meta = [])
+    {
+        return view('erp.statements.show', array_merge([
+            'title' => $title,
+            'rows' => $rows,
+            'company' => null,
+            'periodLabel' => null,
+            'tieOut' => null,
+        ], $meta));
     }
 
     public function vatSummary()
     {
-        $sales = $this->salesTaxRows();
-        $purchases = $this->purchaseTaxRows();
+        list($start, $end) = $this->taxDateRange();
+        $sales = $this->salesTaxRows($start, $end);
+        $purchases = $this->purchaseTaxRows($start, $end);
+        $outputVat = array_sum(array_column($sales, 7));
+        $inputVat = array_sum(array_column($purchases, 7));
 
         return view('erp.tax.vat-summary', [
             'sales' => $sales,
             'purchases' => $purchases,
-            'outputVat' => 41280,
-            'inputVat' => 15348,
-            'vatPayable' => 25932,
+            'outputVat' => $outputVat,
+            'inputVat' => $inputVat,
+            'vatPayable' => $outputVat - $inputVat,
         ]);
+    }
+
+    private function taxDateRange()
+    {
+        $period = request('period');
+        if ($period) {
+            return $this->trialBalanceDateRange($period);
+        }
+
+        return [request('start_date'), request('end_date')];
     }
 
     public function withholdingTax()
     {
-        $rows = [
-            ['2026-05-24', 'BILL-4902', 'Expanded Withholding Tax', 'Metro Industrial Supply', 'JOB-SEA-2026-0423', 'PHP', 127900, '5%', 6395, 'For Remittance'],
-            ['2026-05-23', 'BI-2026-01042', 'Creditable Withholding Tax', 'North Harbor Trading', 'JOB-SEA-2026-0422', 'PHP', 98500, '2%', 1970, 'Creditable'],
-            ['2026-05-21', 'BILL-7710', 'Expanded Withholding Tax', 'Pacific Fuel Services', 'JOB-SEA-2026-0398', 'USD', 1325, '2%', 26.50, 'For Remittance'],
-        ];
+        $rows = [];
+
+        if (Schema::hasTable('purchase_documents')) {
+            foreach (DB::table('purchase_documents')
+                ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_documents.supplier_id')
+                ->whereNotIn('purchase_documents.status', ['cancelled', 'voided'])
+                ->where('purchase_documents.withholding_tax_amount', '>', 0)
+                ->orderBy('purchase_documents.document_date', 'desc')
+                ->select(
+                    'purchase_documents.document_date',
+                    'purchase_documents.document_no',
+                    'suppliers.name as party',
+                    'purchase_documents.shipment_job_id',
+                    'purchase_documents.currency',
+                    'purchase_documents.gross_amount',
+                    'purchase_documents.withholding_tax_rate',
+                    'purchase_documents.withholding_tax_amount',
+                    'purchase_documents.status'
+                )
+                ->get() as $bill) {
+                $rows[] = [
+                    $bill->document_date,
+                    $bill->document_no,
+                    'Expanded Withholding Tax',
+                    $bill->party ?: 'Unknown Supplier',
+                    $bill->shipment_job_id ?: '-',
+                    $bill->currency ?: 'PHP',
+                    (float) $bill->gross_amount,
+                    number_format((float) $bill->withholding_tax_rate, 0).'%',
+                    (float) $bill->withholding_tax_amount,
+                    $bill->status === 'paid' ? 'Remitted' : 'For Remittance',
+                ];
+            }
+        }
+
+        if (Schema::hasTable('sales_documents')) {
+            foreach (DB::table('sales_documents')
+                ->leftJoin('customers', 'customers.id', '=', 'sales_documents.customer_id')
+                ->whereNotIn('sales_documents.status', ['cancelled', 'voided'])
+                ->where('sales_documents.withholding_tax_amount', '>', 0)
+                ->orderBy('sales_documents.document_date', 'desc')
+                ->select(
+                    'sales_documents.document_date',
+                    'sales_documents.document_no',
+                    'customers.name as party',
+                    'sales_documents.shipment_reference',
+                    'sales_documents.currency',
+                    'sales_documents.grand_total',
+                    'sales_documents.withholding_tax_rate',
+                    'sales_documents.withholding_tax_amount'
+                )
+                ->get() as $invoice) {
+                $rows[] = [
+                    $invoice->document_date,
+                    $invoice->document_no,
+                    'Creditable Withholding Tax',
+                    $invoice->party ?: 'Unknown Customer',
+                    $invoice->shipment_reference ?: '-',
+                    $invoice->currency ?: 'PHP',
+                    (float) $invoice->grand_total,
+                    number_format((float) $invoice->withholding_tax_rate, 0).'%',
+                    (float) $invoice->withholding_tax_amount,
+                    'Creditable',
+                ];
+            }
+        }
+
+        usort($rows, function ($a, $b) {
+            return strcmp((string) $b[0], (string) $a[0]);
+        });
 
         return view('erp.tax.withholding', compact('rows'));
     }
@@ -2839,22 +3301,123 @@ class ModuleController extends Controller
         return view('erp.tax.audit-trail', compact('logs'));
     }
 
-    private function salesTaxRows()
+    private function salesTaxRows($startDate = null, $endDate = null)
     {
-        return [
-            ['2026-05-24', 'BI-2026-01042', 'North Harbor Trading', 'JOB-SEA-2026-0422', '12% VAT', 'PHP', 87946.43, 10553.57, 1970.00],
-            ['2026-05-23', 'SOAA-2026-00211', 'Blue Anchor Logistics', 'JOB-SEA-2026-0398', 'Zero-rated export services', 'USD', 1840.00, 0.00, 0.00],
-            ['2026-05-22', 'DN-2026-00042', 'Island Prime Foods', 'JOB-SEA-2026-0365', 'VAT-exempt', 'PHP', 48900.00, 0.00, 0.00],
-        ];
+        if (!Schema::hasTable('sales_documents')) {
+            return [];
+        }
+
+        $query = DB::table('sales_documents')
+            ->leftJoin('customers', 'customers.id', '=', 'sales_documents.customer_id')
+            ->whereNotIn('sales_documents.status', ['cancelled', 'voided']);
+
+        if ($startDate) {
+            $query->where('sales_documents.document_date', '>=', $startDate);
+        }
+        if ($endDate) {
+            $query->where('sales_documents.document_date', '<=', $endDate);
+        }
+
+        return $query
+            ->orderBy('sales_documents.document_date', 'desc')
+            ->select(
+                'sales_documents.document_date',
+                'sales_documents.document_no',
+                'customers.name as customer_name',
+                'sales_documents.shipment_reference',
+                'sales_documents.vat_classification',
+                'sales_documents.currency',
+                'sales_documents.vatable_amount',
+                'sales_documents.zero_rated_amount',
+                'sales_documents.vat_exempt_amount',
+                'sales_documents.tax_total'
+            )
+            ->get()
+            ->map(function ($document) {
+                $classification = strtolower(str_replace('_', '-', (string) $document->vat_classification));
+                if ($classification === 'zero-rated') {
+                    $label = 'Zero-rated';
+                    $base = (float) $document->zero_rated_amount;
+                } elseif ($classification === 'exempt') {
+                    $label = 'VAT-exempt';
+                    $base = (float) $document->vat_exempt_amount;
+                } else {
+                    $label = '12% VAT';
+                    $base = (float) $document->vatable_amount;
+                }
+
+                return [
+                    $document->document_date,
+                    $document->document_no,
+                    $document->customer_name ?: 'Walk-in / Guest',
+                    $document->shipment_reference ?: '-',
+                    $label,
+                    $document->currency ?: 'PHP',
+                    $base,
+                    (float) $document->tax_total,
+                ];
+            })
+            ->all();
     }
 
-    private function purchaseTaxRows()
+    private function purchaseTaxRows($startDate = null, $endDate = null)
     {
-        return [
-            ['2026-05-24', 'BILL-4902', 'Metro Industrial Supply', 'JOB-SEA-2026-0423', '12% VAT', 'PHP', 114196.43, 13703.57, 6395.00],
-            ['2026-05-21', 'BILL-7710', 'Pacific Fuel Services', 'JOB-SEA-2026-0398', '12% VAT', 'USD', 1183.04, 141.96, 26.50],
-            ['2026-05-20', 'BILL-2420', 'Harbor Office Center', 'JOB-SEA-2026-0365', 'VAT-exempt', 'PHP', 18000.00, 0.00, 0.00],
-        ];
+        if (!Schema::hasTable('purchase_documents')) {
+            return [];
+        }
+
+        $query = DB::table('purchase_documents')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_documents.supplier_id')
+            ->whereNotIn('purchase_documents.status', ['cancelled', 'voided']);
+
+        if ($startDate) {
+            $query->where('purchase_documents.document_date', '>=', $startDate);
+        }
+        if ($endDate) {
+            $query->where('purchase_documents.document_date', '<=', $endDate);
+        }
+
+        return $query
+            ->orderBy('purchase_documents.document_date', 'desc')
+            ->select(
+                'purchase_documents.document_date',
+                'purchase_documents.document_no',
+                'suppliers.name as supplier_name',
+                'purchase_documents.shipment_job_id',
+                'purchase_documents.currency',
+                'purchase_documents.vatable_amount',
+                'purchase_documents.zero_rated_amount',
+                'purchase_documents.vat_exempt_amount',
+                'purchase_documents.tax_total'
+            )
+            ->get()
+            ->map(function ($document) {
+                if ((float) $document->vatable_amount > 0) {
+                    $label = '12% VAT';
+                    $base = (float) $document->vatable_amount;
+                } elseif ((float) $document->zero_rated_amount > 0) {
+                    $label = 'Zero-rated';
+                    $base = (float) $document->zero_rated_amount;
+                } elseif ((float) $document->vat_exempt_amount > 0) {
+                    $label = 'VAT-exempt';
+                    $base = (float) $document->vat_exempt_amount;
+                } else {
+                    $label = 'Untagged';
+                    $base = 0.0;
+                }
+
+                return [
+                    $document->document_date,
+                    $document->document_no,
+                    $document->supplier_name ?: 'Unknown Supplier',
+                    $document->shipment_job_id ?: '-',
+                    $label,
+                    $document->currency ?: 'PHP',
+                    $base,
+                    (float) $document->tax_total,
+                ];
+            })
+            ->all();
     }
 
     public function invoiceCreate()
@@ -3254,6 +3817,7 @@ class ModuleController extends Controller
             'date' => [618, 235],
             'particulars' => [115, 370],
             'amounts' => [640, 370],
+            'remarks' => [115, 620],
             'payment_note' => [60, 735],
             'total_reimbursement' => [640, 899],
             'prepared_by' => [545, 1005],
@@ -3284,7 +3848,7 @@ class ModuleController extends Controller
         foreach ($this->soaPrintPositions($type) as $key => $point) {
             $savedStyle = $saved['field_styles'][$key] ?? [];
             $defaultWidth = in_array($key, ['amounts', 'total_reimbursement']) ? 115 : 180;
-            if (in_array($key, ['particulars', 'payment_note'])) {
+            if (in_array($key, ['particulars', 'payment_note', 'remarks'])) {
                 $defaultWidth = $key === 'payment_note' ? 510 : 455;
             }
             if (in_array($key, ['customer', 'address'])) {
@@ -3337,7 +3901,7 @@ class ModuleController extends Controller
     private function soaPrintHiddenFields($type)
     {
         $saved = $this->savedSoaPrintLayout($type);
-        $hidden = request()->has('hidden_fields_present') ? (array) request('hidden_field', []) : ($saved['hidden_fields'] ?? []);
+        $hidden = request()->has('hidden_fields_present') ? (array) request('hidden_field', []) : ($saved['hidden_fields'] ?? ['serial']);
 
         return array_values(array_unique(array_filter(array_map(function ($field) {
             return preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) $field);
@@ -3364,6 +3928,7 @@ class ModuleController extends Controller
             'date' => ['label' => 'Date', 'value' => '05/19/2026', 'class' => ''],
             'particulars' => ['label' => 'Particulars', 'value' => "OCEAN FREIGHT (95% OF FREIGHT CHARGES)\nBUNKER SURCHARGE\nSOLAS ADMIN\n5% COLLECT FEE", 'class' => ''],
             'amounts' => ['label' => 'Amounts', 'value' => "368,376.75\n120,022.50\n20,311.50\n9,232.50\n19,388.25", 'class' => 'amount'],
+            'remarks' => ['label' => 'Remarks', 'value' => 'Remarks: none', 'class' => 'small'],
             'payment_note' => ['label' => 'Payment Note', 'value' => "PLEASE PAY THIS REIMBURSEMENT CHARGES TOGETHER WITH INVOICE NUMBER 0001031\nREIMBURSEMENT CHARGES PHP 753,495.10", 'class' => ''],
             'total_reimbursement' => ['label' => 'Total Amount Due', 'value' => '774,822.17', 'class' => 'amount'],
             'prepared_by' => ['label' => 'Prepared By', 'value' => auth()->user()->name ?? 'User', 'class' => ''],
@@ -3500,6 +4065,7 @@ class ModuleController extends Controller
             'invoice_date' => [682, 170],
             'line_description' => [65, 384],
             'soa_no' => [65, 450],
+            'remarks' => [65, 490],
             'line_qty' => [450, 384],
             'line_unit_price' => [565, 384],
             'line_amount' => [705, 384],
@@ -3543,7 +4109,7 @@ class ModuleController extends Controller
         $styles = [];
         foreach ($positions as $key => $point) {
             $defaultWidth = in_array($key, $amountFields) ? 92 : 160;
-            if ($key === 'line_description') {
+            if ($key === 'line_description' || $key === 'remarks') {
                 $defaultWidth = 350;
             }
             if ($key === 'address') {
@@ -3602,7 +4168,7 @@ class ModuleController extends Controller
         $saved = $this->savedInvoicePrintLayout();
         $hidden = request()->has('hidden_fields_present')
             ? (array) request('hidden_field', [])
-            : ($saved['hidden_fields'] ?? []);
+            : ($saved['hidden_fields'] ?? ['invoice_no']);
 
         return array_values(array_unique(array_filter(array_map(function ($field) {
             return preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) $field);
@@ -3749,11 +4315,16 @@ class ModuleController extends Controller
                     $tax = $tax === '12%' ? '12%' : 'exempt';
                 }
 
+                $description = trim((string) preg_replace('/\s+(RE|VAT|ZERO|SOA\s*A)$/i', '', $name));
+                if ($description === '') {
+                    $description = $name;
+                }
+
                 return (object) [
                     'id' => $item->id,
                     'sku' => $item->sku,
                     'name' => $name,
-                    'description' => $name,
+                    'description' => $description,
                     'rate' => (float) ($item->selling_price ?? 0),
                     'qty' => 1,
                     'class' => 'MANILA',
@@ -4223,7 +4794,7 @@ class ModuleController extends Controller
 
                 if ($invoice) {
                     $column = function ($key, $default = null) use ($invoice) {
-                        return property_exists($invoice, $key) ? $invoice->$key : $default;
+                        return property_exists($invoice, $key) && $invoice->$key !== null ? $invoice->$key : $default;
                     };
                     $subtotal = (float) ($invoice->subtotal ?? 0);
                     $taxTotal = (float) ($invoice->tax_total ?? 0);
@@ -4489,7 +5060,8 @@ class ModuleController extends Controller
             }
 
             $billingSubtotal += $lineAmount;
-            if (($data['tax_category'][$index] ?? '') === '12%') {
+            $taxCategory = strtolower(trim((string) ($data['tax_category'][$index] ?? '')));
+            if ($taxCategory === '12%' || $taxCategory === 'vatable') {
                 $vatAmount += $lineAmount * 0.12;
             }
         }
@@ -4578,8 +5150,8 @@ class ModuleController extends Controller
             return is_array($values) ? ($values[$index] ?? $default) : $default;
         };
 
-        $billingTotal = $this->moneyToFloat($read('billing_total', '21327.07'));
-        $reimbursementTotal = $this->moneyToFloat($read('reimbursement_total', '753495.10'));
+        $billingTotal = $this->moneyToFloat($read('billing_total', '0'));
+        $reimbursementTotal = $this->moneyToFloat($read('reimbursement_total', '0'));
         $soaTotal = request()->has('soa_total') || array_key_exists('soa_total', $invoiceData)
             ? $this->moneyToFloat($read('soa_total'))
             : $billingTotal + $reimbursementTotal;
@@ -4595,6 +5167,7 @@ class ModuleController extends Controller
         $reimbursementLineIndexes = [];
         $zeroRatedSales = 0.0;
         $vatExemptSales = 0.0;
+        $vatableSales = 0.0;
 
         for ($index = 0; $index < $lineCount; $index++) {
             $isReimbursement = $this->isReimbursableInvoiceLine([
@@ -4607,15 +5180,19 @@ class ModuleController extends Controller
 
             if ($isReimbursement) {
                 $reimbursementLineIndexes[] = $index;
-            } elseif (trim((string) $lineValue($descriptions, $index)) !== '' || $amount !== '') {
+                continue;
+            }
+
+            if (trim((string) $lineValue($descriptions, $index)) !== '' || $amount !== '') {
                 $billingLineIndexes[] = $index;
             }
 
             if (strpos($taxCategory, 'zero') !== false) {
                 $zeroRatedSales += $this->moneyToFloat($amount);
-            }
-            if (strpos($taxCategory, 'exempt') !== false) {
+            } elseif (strpos($taxCategory, 'exempt') !== false) {
                 $vatExemptSales += $this->moneyToFloat($amount);
+            } else {
+                $vatableSales += $this->moneyToFloat($amount);
             }
         }
 
@@ -4661,29 +5238,29 @@ class ModuleController extends Controller
         }
 
         return [
-            'customer' => $read('customer', 'PHILUSA CORPORATION'),
-            'invoice_no' => $read('invoice_no', $read('invoice', '0001031')),
-            'invoice_date' => $this->displayPrintDate($read('invoice_date'), '05/19/2026'),
-            'soa_no' => $read('soa_no', '7187'),
-            'address' => $read('invoice_to', "28 SHAW BLVD, KAPITOLYO 1603\nCITY OF PASIG"),
-            'tin' => $read('tin', '000-281-014-00000'),
+            'customer' => $read('customer', ''),
+            'invoice_no' => $read('invoice_no', $read('invoice', '')),
+            'invoice_date' => $this->displayPrintDate($read('invoice_date'), ''),
+            'soa_no' => $read('soa_no', ''),
+            'address' => $read('invoice_to', ''),
+            'tin' => $read('tin', ''),
             'currency' => $read('currency', 'PHP'),
             'exchange_rate' => $read('exchange_rate', 1),
-            'mawb' => $read('mawb_no', 'OOLU32322350120'),
-            'hawb' => $read('hawb_no', '2GJXM412-G1'),
-            'date_shipped' => $this->displayPrintDate($read('date_shipped'), '05/19/2026'),
-            'origin_dest' => $read('origin_dest', 'ROTTERDAM/MNL'),
-            'commodity' => $read('commodity', "3 X 40'HC"),
-            'line_description' => $lineDescription !== '' ? $lineDescription : "OCEAN FREIGHT (5% OF FREIGHT CHARGES)\n(2,100 x 3 CNTRS = \$6,300 x 61.55 = 387,765 x 5%)\n\nSHIPPER: LEMOINE HOLLAND B.V.",
+            'mawb' => $read('mawb_no', ''),
+            'hawb' => $read('hawb_no', ''),
+            'date_shipped' => $this->displayPrintDate($read('date_shipped'), ''),
+            'origin_dest' => $read('origin_dest', ''),
+            'commodity' => $read('commodity', ''),
+            'line_description' => $lineDescription,
             'shipper' => $shipper,
-            'line_qty' => $lineValue($quantities, $billingLineIndex, $firstLineValue('qty', '1')),
-            'line_unit_price' => $this->moneyToFloat($lineValue($unitPrices, $billingLineIndex, $firstLineValue('unit_price', '19388.25'))),
-            'line_amount' => $this->moneyToFloat($lineValue($lineAmounts, $billingLineIndex, $firstLineValue('line_amount', '19388.25'))),
+            'line_qty' => $lineValue($quantities, $billingLineIndex, $firstLineValue('qty', '')),
+            'line_unit_price' => $this->moneyToFloat($lineValue($unitPrices, $billingLineIndex, $firstLineValue('unit_price', '0'))),
+            'line_amount' => $this->moneyToFloat($lineValue($lineAmounts, $billingLineIndex, $firstLineValue('line_amount', '0'))),
             'billing_amounts' => implode("\n", $billingAmounts),
             'soa_particulars' => implode("\n", $soaParticulars),
             'soa_amounts' => implode("\n", $soaAmounts),
-            'vatable_sales' => $this->moneyToFloat($read('vatable_sales', '19388.25')),
-            'vat_amount' => $this->moneyToFloat($read('vat_amount', '2326.59')),
+            'vatable_sales' => request()->has('vatable_sales') ? $this->moneyToFloat($read('vatable_sales', '0')) : $vatableSales,
+            'vat_amount' => $this->moneyToFloat($read('vat_amount', '0')),
             'zero_rated_sales' => request()->has('zero_rated_sales') || array_key_exists('zero_rated_sales', $invoiceData) ? $this->moneyToFloat($read('zero_rated_sales')) : $zeroRatedSales,
             'vat_exempt_sales' => request()->has('vat_exempt_sales') || array_key_exists('vat_exempt_sales', $invoiceData) ? $this->moneyToFloat($read('vat_exempt_sales')) : $vatExemptSales,
             'discount' => $this->moneyToFloat($read('discount', '0')),
@@ -4695,6 +5272,7 @@ class ModuleController extends Controller
             'memo' => $read('memo', ''),
             'customer_message' => $read('customer_message', ''),
             'description' => $read('description', ''),
+            'remarks' => trim((string) $read('memo', '')) !== '' ? $read('memo', '') : $read('description', ''),
             'job_shipment_id' => $read('job_shipment_id', $read('shipment_job_id', '')),
         ];
     }
@@ -4925,64 +5503,72 @@ class ModuleController extends Controller
             'amount',
         ]);
 
-        if (Schema::hasTable('receipts') && ctype_digit((string) request('customer_id'))) {
-            $customer = DB::table('customers')->where('id', request('customer_id'))->first();
-            $companyId = $customer ? $customer->company_id : DB::table('companies')->value('id');
-            $invoice = null;
+        if (!Schema::hasTable('receipts') || !Schema::hasTable('customers')) {
+            return back()->withInput()->withErrors(['customer_id' => 'Payments cannot be recorded right now: the receipts ledger is not set up.']);
+        }
 
-            if (Schema::hasTable('sales_documents') && request('invoice_no')) {
-                $invoice = DB::table('sales_documents')
-                    ->where('document_no', request('invoice_no'))
-                    ->when($customer, function ($query) use ($customer) {
-                        return $query->where('customer_id', $customer->id);
-                    })
-                    ->first();
-            }
+        $customer = $this->resolveArCustomerForPayment(request('customer_id'), request('customer_name'));
+        if (!$customer) {
+            return back()->withInput()->withErrors(['customer_id' => 'Select a valid client before recording this payment. The receipt was not saved.']);
+        }
 
-            $receiptNo = request('receipt_no') ?: $this->nextReceiptNumber($companyId);
-            $amount = (float) str_replace(',', '', request('amount', 0));
+        $amount = $this->moneyToFloat(request('amount', 0));
+        if ($amount <= 0) {
+            return back()->withInput()->withErrors(['amount' => 'Enter a payment amount greater than zero. The receipt was not saved.']);
+        }
 
-            DB::transaction(function () use ($customer, $companyId, $invoice, $receiptNo, $amount) {
-                $receiptId = DB::table('receipts')->insertGetId([
-                    'company_id' => $companyId,
-                    'customer_id' => $customer ? $customer->id : request('customer_id'),
-                    'receipt_no' => $receiptNo,
-                    'receipt_type' => request('receipt_type', 'official_receipt'),
-                    'customer_id_text' => $customer ? ($customer->customer_id ?: $customer->code) : null,
-                    'job_shipment_id' => request('job_shipment_id'),
-                    'class_code' => request('class_code', 'MANILA'),
-                    'currency' => request('currency', 'PHP'),
-                    'receipt_date' => request('payment_date', date('Y-m-d')),
-                    'payment_method' => request('payment_method', 'Check'),
-                    'reference_no' => request('reference_no'),
-                    'amount' => $amount,
-                    'status' => 'posted',
-                    'template_code' => request('template_code'),
-                    'uses_pre_printed_form' => true,
+        $companyId = $customer->company_id;
+        $invoice = null;
+
+        if (Schema::hasTable('sales_documents') && request('invoice_no')) {
+            $invoice = DB::table('sales_documents')
+                ->where('document_no', request('invoice_no'))
+                ->where('customer_id', $customer->id)
+                ->first();
+        }
+
+        $receiptNo = request('receipt_no') ?: $this->nextReceiptNumber($companyId);
+
+        DB::transaction(function () use ($customer, $companyId, $invoice, $receiptNo, $amount) {
+            $receiptId = DB::table('receipts')->insertGetId([
+                'company_id' => $companyId,
+                'customer_id' => $customer->id,
+                'receipt_no' => $receiptNo,
+                'receipt_type' => request('receipt_type', 'official_receipt'),
+                'customer_id_text' => $customer->customer_id ?: $customer->code,
+                'job_shipment_id' => request('job_shipment_id'),
+                'class_code' => request('class_code', 'MANILA'),
+                'currency' => request('currency', 'PHP'),
+                'receipt_date' => request('payment_date', date('Y-m-d')),
+                'payment_method' => request('payment_method', 'Check'),
+                'reference_no' => request('reference_no'),
+                'amount' => $amount,
+                'status' => 'posted',
+                'template_code' => request('template_code'),
+                'uses_pre_printed_form' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            if ($invoice && Schema::hasTable('receipt_applications')) {
+                DB::table('receipt_applications')->insert([
+                    'receipt_id' => $receiptId,
+                    'sales_document_id' => $invoice->id,
+                    'amount_applied' => min($amount, max(0, (float) $invoice->grand_total - (float) $invoice->paid_total)),
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
 
-                if ($invoice && Schema::hasTable('receipt_applications')) {
-                    DB::table('receipt_applications')->insert([
-                        'receipt_id' => $receiptId,
-                        'sales_document_id' => $invoice->id,
-                        'amount_applied' => min($amount, max(0, (float) $invoice->grand_total - (float) $invoice->paid_total)),
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
+                DB::table('sales_documents')->where('id', $invoice->id)->update([
+                    'paid_total' => min((float) $invoice->grand_total, (float) $invoice->paid_total + $amount),
+                    'status' => ((float) $invoice->paid_total + $amount) >= (float) $invoice->grand_total ? 'paid' : 'partial',
+                    'updated_at' => now(),
+                ]);
+            }
+        });
 
-                    DB::table('sales_documents')->where('id', $invoice->id)->update([
-                        'paid_total' => min((float) $invoice->grand_total, (float) $invoice->paid_total + $amount),
-                        'status' => ((float) $invoice->paid_total + $amount) >= (float) $invoice->grand_total ? 'paid' : 'partial',
-                        'updated_at' => now(),
-                    ]);
-                }
-            });
-
-            $payment['receipt_no'] = $receiptNo;
-            $payment['customer_name'] = $customer ? $customer->name : request('customer_name');
-        }
+        $payment['receipt_no'] = $receiptNo;
+        $payment['customer_name'] = $customer->name;
 
         $receiptQuery = array_filter([
             'receipt_no' => $payment['receipt_no'] ?? null,
@@ -5004,6 +5590,31 @@ class ModuleController extends Controller
                 ['label' => 'Print Acknowledgement Receipt', 'route' => route('erp.acknowledgement-receipt.preview', $receiptQuery), 'icon' => 'bi-receipt-cutoff'],
             ],
         ]);
+    }
+
+    private function resolveArCustomerForPayment($customerIdOrCode, $customerName = null)
+    {
+        $customerIdOrCode = trim((string) $customerIdOrCode);
+        $customerName = trim((string) $customerName);
+
+        if ($customerIdOrCode === '' && $customerName === '') {
+            return null;
+        }
+
+        return DB::table('customers')
+            ->where(function ($query) use ($customerIdOrCode, $customerName) {
+                if ($customerIdOrCode !== '') {
+                    $query->orWhere('code', $customerIdOrCode)
+                        ->orWhere('customer_id', $customerIdOrCode);
+                    if (ctype_digit($customerIdOrCode)) {
+                        $query->orWhere('id', $customerIdOrCode);
+                    }
+                }
+                if ($customerName !== '') {
+                    $query->orWhere('name', $customerName);
+                }
+            })
+            ->first();
     }
 
     private function nextReceiptNumber($companyId)
@@ -5100,6 +5711,7 @@ class ModuleController extends Controller
                 'customers.tin as customer_tin',
                 'customers.billing_address',
                 DB::raw('GROUP_CONCAT(DISTINCT sales_documents.document_no ORDER BY sales_documents.document_no SEPARATOR ", ") as invoice_numbers'),
+                DB::raw('GROUP_CONCAT(DISTINCT NULLIF(sales_documents.soa_no, \'\') ORDER BY sales_documents.document_no SEPARATOR ", ") as soa_numbers'),
                 DB::raw('GROUP_CONCAT(DISTINCT sales_documents.remarks ORDER BY sales_documents.document_no SEPARATOR "\n") as invoice_remarks')
             );
 
@@ -5160,9 +5772,10 @@ class ModuleController extends Controller
         $numericReceiptNo = preg_replace('/\D/', '', $dbReceipt->receipt_no);
         $defaultDescription = $isAcknowledgement ? 'PAYMENT FOR REIMBURSABLE CHARGES' : 'PAYMENT FOR LOCAL CHARGES';
         $documentPrefix = $isAcknowledgement ? 'SOA#' : 'BI#';
+        $documentNumbers = $isAcknowledgement && !empty($dbReceipt->soa_numbers) ? $dbReceipt->soa_numbers : $dbReceipt->invoice_numbers;
         $descriptionParts = array_filter([
             $dbReceipt->invoice_remarks ? trim($dbReceipt->invoice_remarks) : $defaultDescription,
-            $dbReceipt->invoice_numbers ? $documentPrefix . ' ' . $dbReceipt->invoice_numbers : null,
+            $documentNumbers ? $documentPrefix . ' ' . $documentNumbers : null,
             property_exists($dbReceipt, 'job_shipment_id') && $dbReceipt->job_shipment_id ? 'JOB ' . $dbReceipt->job_shipment_id : null,
         ]);
 
@@ -5611,14 +6224,17 @@ class ModuleController extends Controller
             $normals[$account->id] = $this->trialBalanceNormalBalance($account);
         }
 
-        $beginningMovements = $startDate
+        $beginningJournal = $startDate
             ? $this->trialBalanceJournalMovements(null, date('Y-m-d', strtotime($startDate.' -1 day')), $normals, true)
             : [];
-        $periodMovements = $this->trialBalanceJournalMovements($startDate, $endDate, $normals, false);
+        $beginningDocuments = $startDate
+            ? $this->trialBalanceDocumentMovements(null, date('Y-m-d', strtotime($startDate.' -1 day')), $accounts, $normals)
+            : [];
+        $beginningMovements = $this->mergeMovementMaps($beginningJournal, $this->flattenMovementsToTotal($beginningDocuments));
 
-        if (!$this->trialBalanceHasPeriodMovements($periodMovements)) {
-            $periodMovements = $this->trialBalanceDocumentMovements($startDate, $endDate, $accounts, $normals);
-        }
+        $periodJournal = $this->trialBalanceJournalMovements($startDate, $endDate, $normals, false);
+        $periodDocuments = $this->trialBalanceDocumentMovements($startDate, $endDate, $accounts, $normals);
+        $periodMovements = $this->mergeMovementMaps($periodJournal, $periodDocuments);
 
         return $accounts->map(function ($account) use ($beginningMovements, $periodMovements) {
             $opening = (float) ($account->opening_balance ?? 0) + (float) ($beginningMovements[$account->id]['TOTAL'] ?? 0);
@@ -5767,17 +6383,25 @@ class ModuleController extends Controller
         return 'JOURNAL BOOK';
     }
 
-    private function trialBalanceHasPeriodMovements(array $movements)
+    private function mergeMovementMaps(array $a, array $b)
     {
-        foreach ($movements as $columns) {
-            foreach ($columns as $amount) {
-                if (abs((float) $amount) >= 0.005) {
-                    return true;
-                }
+        foreach ($b as $accountId => $columns) {
+            foreach ($columns as $column => $amount) {
+                $a[$accountId][$column] = ($a[$accountId][$column] ?? 0) + $amount;
             }
         }
 
-        return false;
+        return $a;
+    }
+
+    private function flattenMovementsToTotal(array $movements)
+    {
+        $flat = [];
+        foreach ($movements as $accountId => $columns) {
+            $flat[$accountId]['TOTAL'] = array_sum($columns);
+        }
+
+        return $flat;
     }
 
     private function trialBalanceDocumentMovements($startDate, $endDate, $accounts, array $normals)
@@ -5797,15 +6421,16 @@ class ModuleController extends Controller
     {
         return [
             'cash' => $this->trialBalanceFindAccountId($accounts, ['cash in bank', 'cash on hand', 'cash']),
-            'ar_trade' => $this->trialBalanceFindAccountId($accounts, ['a/trade-billing invoice', 'accounts receivable', 'a/r trade']),
-            'ar_soa' => $this->trialBalanceFindAccountId($accounts, ['a/r trade-soa a', 'soa a', 'statement of account']),
+            'ar_trade' => $this->trialBalanceFindAccountId($accounts, ['a/r-trade', 'a/trade-billing invoice', 'a/r trade']),
+            'ar_soa' => $this->trialBalanceFindAccountId($accounts, ['a/r trade-soa a', 'a/r-soa', 'a/r soa']),
             'ar_reimbursable' => $this->trialBalanceFindAccountId($accounts, ['a/r-reimbursable charges', 'a/r reimbursable charges', 'reimbursable']),
             'revenue' => $this->trialBalanceFindAccountId($accounts, ['service income', 'service revenue', 'revenue', 'income']),
-            'reimbursable_revenue' => $this->trialBalanceFindAccountId($accounts, ['reimbursable charges (cr)', 'reimbursable charges', 'reimbursable income']),
+            'reimbursable_revenue' => $this->trialBalanceFindAccountId($accounts, ['reimbursable charges (cr)', 'reimbursable income', 'reimbursable revenue']),
             'expense' => $this->trialBalanceFindAccountId($accounts, ['expense', 'cost of services', 'cost']),
             'output_vat' => $this->trialBalanceFindAccountId($accounts, ['output vat', 'vat payable']),
             'input_vat' => $this->trialBalanceFindAccountId($accounts, ['input vat', 'vat input']),
             'ap_trade' => $this->trialBalanceFindAccountId($accounts, ['accounts payable', 'a/p trade', 'payable']),
+            'wht_payable' => $this->trialBalanceFindAccountId($accounts, ['expanded withholding tax payable', 'withholding tax payable']),
         ];
     }
 
@@ -5923,21 +6548,26 @@ class ModuleController extends Controller
             $query->where('document_date', '<=', $endDate);
         }
 
-        foreach ($query->get(['id', 'grand_total', 'tax_total']) as $bill) {
-            $lineTotal = $this->trialBalancePurchaseLineMovements($movements, $bill->id, $normals);
+        foreach ($query->get(['id', 'grand_total', 'gross_amount', 'tax_total', 'withholding_tax_amount']) as $bill) {
+            $lineTotal = $this->trialBalancePurchaseLineMovements($movements, $bill->id, $normals, $ids);
             $tax = (float) ($bill->tax_total ?? 0);
-            $expenseTotal = max(0, (float) $bill->grand_total - $tax);
+            $wht = (float) ($bill->withholding_tax_amount ?? 0);
+            $gross = (float) ($bill->gross_amount ?: ($bill->grand_total + $wht));
+            $expenseTotal = max(0, $gross - $tax);
 
             if ($lineTotal <= 0) {
                 $this->trialBalanceAddMovement($movements, $ids['expense'], 'JOURNAL BOOK', $expenseTotal, 0, $normals);
+                $this->trialBalanceAddMovement($movements, $ids['input_vat'], 'JOURNAL BOOK', $tax, 0, $normals);
             }
 
-            $this->trialBalanceAddMovement($movements, $ids['input_vat'], 'JOURNAL BOOK', $tax, 0, $normals);
             $this->trialBalanceAddMovement($movements, $ids['ap_trade'], 'JOURNAL BOOK', 0, (float) $bill->grand_total, $normals);
+            if ($wht > 0) {
+                $this->trialBalanceAddMovement($movements, $ids['wht_payable'] ?: $ids['ap_trade'], 'JOURNAL BOOK', 0, $wht, $normals);
+            }
         }
     }
 
-    private function trialBalancePurchaseLineMovements(array &$movements, $billId, array $normals)
+    private function trialBalancePurchaseLineMovements(array &$movements, $billId, array $normals, array $ids = [])
     {
         $table = Schema::hasTable('vendor_bill_lines') ? 'vendor_bill_lines' : (Schema::hasTable('purchase_document_lines') ? 'purchase_document_lines' : null);
         if (!$table) {
@@ -5946,15 +6576,26 @@ class ModuleController extends Controller
 
         $columns = Schema::getColumnListing($table);
         $amountColumn = in_array('amount', $columns, true) ? 'amount' : 'line_total';
+        $selectColumns = ['account_id', $amountColumn.' as amount'];
+        if (in_array('tax_category', $columns, true)) {
+            $selectColumns[] = 'tax_category';
+        }
         $lines = DB::table($table)
             ->where('purchase_document_id', $billId)
-            ->get(['account_id', $amountColumn.' as amount']);
+            ->get($selectColumns);
 
         $lineTotal = 0.0;
         foreach ($lines as $line) {
             $amount = (float) $line->amount;
+            $taxCategory = strtoupper(trim((string) ($line->tax_category ?? '')));
+            $vatAmount = in_array($taxCategory, ['VAT12', '12%'], true) ? round($amount - ($amount / 1.12), 4) : 0.0;
+            $netAmount = $amount - $vatAmount;
+
+            $this->trialBalanceAddMovement($movements, $line->account_id, 'JOURNAL BOOK', $netAmount, 0, $normals);
+            if ($vatAmount > 0) {
+                $this->trialBalanceAddMovement($movements, $ids['input_vat'] ?? null, 'JOURNAL BOOK', $vatAmount, 0, $normals);
+            }
             $lineTotal += $amount;
-            $this->trialBalanceAddMovement($movements, $line->account_id, 'JOURNAL BOOK', $amount, 0, $normals);
         }
 
         return $lineTotal;

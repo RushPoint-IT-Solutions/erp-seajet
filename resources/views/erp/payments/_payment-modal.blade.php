@@ -74,6 +74,9 @@
                         <label class="form-label">Amount</label>
                         <input name="amount" class="form-control text-end payment-amount-input" value="" required>
                     </div>
+                    <div class="col-12">
+                        <div class="alert alert-warning d-none mb-0 payment-balance-alert" role="alert"></div>
+                    </div>
                     <div class="col-md-4">
                         <label class="form-label">Shipment Job ID</label>
                         <input name="job_shipment_id" class="form-control" value="">
@@ -110,4 +113,48 @@
         </form>
     </div>
 </div>
+
+@push('scripts')
+<script>
+    (function () {
+        function money(value) {
+            return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function checkPaymentBalance(form) {
+            var option = form.find('.payment-invoice-select option:selected');
+            var alertBox = form.find('.payment-balance-alert');
+            var balance = parseFloat(option.data('balance'));
+            var amount = parseFloat(String(form.find('.payment-amount-input').val() || '').replace(/,/g, ''));
+            var currency = option.data('currency') || form.find('.payment-currency-select').val() || 'PHP';
+
+            if (!option.val() || isNaN(balance) || isNaN(amount) || amount <= 0) {
+                alertBox.addClass('d-none').removeClass('alert-warning alert-success').text('');
+                return;
+            }
+
+            var diff = amount - balance;
+
+            if (Math.abs(diff) < 0.005) {
+                alertBox.removeClass('d-none alert-warning').addClass('alert-success')
+                    .text('This matches the outstanding balance of ' + currency + ' ' + money(balance) + '.');
+            } else if (diff > 0) {
+                alertBox.removeClass('d-none alert-success').addClass('alert-warning')
+                    .text('This overpays the invoice by ' + currency + ' ' + money(diff) + ' — outstanding balance is ' + currency + ' ' + money(balance) + '.');
+            } else {
+                alertBox.removeClass('d-none alert-success').addClass('alert-warning')
+                    .text('This is short by ' + currency + ' ' + money(Math.abs(diff)) + ' of the outstanding balance (' + currency + ' ' + money(balance) + ').');
+            }
+        }
+
+        $(document).on('input change', '.payment-modal-form .payment-amount-input, .payment-modal-form .payment-invoice-select', function () {
+            checkPaymentBalance($(this).closest('.payment-modal-form'));
+        });
+
+        $(document).on('shown.bs.modal', '.payment-modal', function () {
+            checkPaymentBalance($(this).find('.payment-modal-form'));
+        });
+    })();
+</script>
+@endpush
 

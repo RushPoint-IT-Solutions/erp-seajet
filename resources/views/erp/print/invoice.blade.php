@@ -245,6 +245,7 @@
 
         <div class="bi-field fit-multiline print-field-line_description" data-fit-text data-min-font="6" style="left: {{ $p['line_description'][0] }}px; top: {{ $p['line_description'][1] }}px; {{ $fieldStyle('line_description') }}">{{ $lineDescription }}</div>
         <div class="bi-field fit-single-line print-field-soa_no" data-fit-text style="left: {{ $p['soa_no'][0] }}px; top: {{ $p['soa_no'][1] }}px; {{ $fieldStyle('soa_no') }}">SOA# {{ $print['soa_no'] }}</div>
+        <div class="bi-field fit-multiline print-field-remarks" data-fit-text data-min-font="6" style="left: {{ $p['remarks'][0] }}px; top: {{ $p['remarks'][1] }}px; {{ $fieldStyle('remarks') }}">{{ $print['remarks'] ?? '' }}</div>
         <div class="bi-field fit-single-line amount print-field-line_qty" data-fit-text style="left: {{ $p['line_qty'][0] }}px; top: {{ $p['line_qty'][1] }}px; {{ $fieldStyle('line_qty') }}">{{ $print['line_qty'] }}</div>
         <div class="bi-field fit-single-line amount print-field-line_unit_price" data-fit-text style="left: {{ $p['line_unit_price'][0] }}px; top: {{ $p['line_unit_price'][1] }}px; {{ $fieldStyle('line_unit_price') }}">{{ $plainAmount($print['line_unit_price']) }}</div>
         <div class="bi-field fit-single-line amount print-field-line_amount" data-fit-text style="left: {{ $p['line_amount'][0] }}px; top: {{ $p['line_amount'][1] }}px; {{ $fieldStyle('line_amount') }}">{{ $plainAmount($print['line_amount']) }}</div>
@@ -256,7 +257,7 @@
 
         <div class="bi-field fit-single-line amount print-field-total_sales" data-fit-text style="left: {{ $p['total_sales'][0] }}px; top: {{ $p['total_sales'][1] }}px; {{ $fieldStyle('total_sales') }}">{{ $money($print['billing_total']) }}</div>
         <div class="bi-field fit-single-line amount print-field-less_vat" data-fit-text style="left: {{ $p['less_vat'][0] }}px; top: {{ $p['less_vat'][1] }}px; {{ $fieldStyle('less_vat') }}">{{ $money($print['vat_amount']) }}</div>
-        <div class="bi-field fit-single-line amount print-field-amount_net_vat" data-fit-text style="left: {{ $p['amount_net_vat'][0] }}px; top: {{ $p['amount_net_vat'][1] }}px; {{ $fieldStyle('amount_net_vat') }}">{{ $money($print['vatable_sales']) }}</div>
+        <div class="bi-field fit-single-line amount print-field-amount_net_vat" data-fit-text style="left: {{ $p['amount_net_vat'][0] }}px; top: {{ $p['amount_net_vat'][1] }}px; {{ $fieldStyle('amount_net_vat') }}">{{ $money($print['billing_total'] - $print['vat_amount']) }}</div>
         <div class="bi-field fit-single-line amount print-field-discount" data-fit-text style="left: {{ $p['discount'][0] }}px; top: {{ $p['discount'][1] }}px; {{ $fieldStyle('discount') }}">{{ $plainAmount($print['discount']) }}</div>
         <div class="bi-field fit-single-line amount print-field-add_vat" data-fit-text style="left: {{ $p['add_vat'][0] }}px; top: {{ $p['add_vat'][1] }}px; {{ $fieldStyle('add_vat') }}">{{ $money($print['vat_amount']) }}</div>
         <div class="bi-field fit-single-line amount print-field-withholding_tax" data-fit-text style="left: {{ $p['withholding_tax'][0] }}px; top: {{ $p['withholding_tax'][1] }}px; {{ $fieldStyle('withholding_tax') }}">{{ $money($print['withholding_tax']) }}</div>

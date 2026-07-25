@@ -126,7 +126,19 @@
                 </thead>
                 <tbody>
                 @foreach($payments as $payment)
-                    @php $statusClass = 'is-'.strtolower($payment['status']); @endphp
+                    @php
+                        $statusClass = 'is-'.strtolower($payment['status']);
+                        $receiptQuery = [
+                            'receipt_no' => $payment['number'],
+                            'customer' => $payment['client'],
+                            'invoice_no' => $payment['invoice_number'],
+                            'currency' => $payment['currency'],
+                            'amount' => str_replace(',', '', $payment['amount']),
+                            'payment_date' => $payment['date'],
+                            'payment_method' => $payment['payment_method'],
+                            'reference_no' => $payment['reference_no'],
+                        ];
+                    @endphp
                     <tr data-status="{{ $payment['status'] }}"
                         data-method="{{ $payment['payment_method'] }}"
                         data-client="{{ $payment['client'] }}"
@@ -144,9 +156,17 @@
                         <td>{{ $payment['date'] ? \Carbon\Carbon::parse($payment['date'])->format('d/M/Y') : '-' }}</td>
                         <td class="text-end">{{ $payment['currency'] === 'PHP' ? 'PHP' : $payment['currency'] }} {{ $payment['amount'] }}</td>
                         <td class="text-end">
-                            <button type="button" class="btn btn-sm btn-outline-primary edit-payment" data-bs-toggle="modal" data-bs-target="#paymentModal">
-                                <i class="bi bi-pencil-square me-1"></i> Use
-                            </button>
+                            <div class="d-inline-flex gap-1">
+                                <button type="button" class="btn btn-sm btn-outline-primary edit-payment" data-bs-toggle="modal" data-bs-target="#paymentModal">
+                                    <i class="bi bi-pencil-square"></i>
+                                </button>
+                                <a href="{{ route('erp.official-receipt.preview', $receiptQuery) }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Print Official Receipt">
+                                    <i class="bi bi-receipt"></i>
+                                </a>
+                                <a href="{{ route('erp.acknowledgement-receipt.preview', $receiptQuery) }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Print Acknowledgement Receipt">
+                                    <i class="bi bi-receipt-cutoff"></i>
+                                </a>
+                            </div>
                         </td>
                     </tr>
                 @endforeach

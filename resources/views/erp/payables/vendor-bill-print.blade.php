@@ -337,11 +337,12 @@
             <table class="bill-expense-table">
                 <thead>
                     <tr>
-                        <th style="width: 24%;">Account</th>
-                        <th style="width: 24%;">Memo</th>
-                        <th style="width: 15%;">Amount</th>
-                        <th style="width: 24%;">Customer:Job</th>
-                        <th style="width: 13%;">Class</th>
+                        <th style="width: 20%;">Account</th>
+                        <th style="width: 19%;">Memo</th>
+                        <th style="width: 10%;">Tax</th>
+                        <th style="width: 13%;">Amount</th>
+                        <th style="width: 20%;">Customer:Job</th>
+                        <th style="width: 11%;">Class</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -349,14 +350,16 @@
                         <tr>
                             <td>{{ $line->account_name ?? '' }}</td>
                             <td>{{ $line->memo ?? $line->description ?? '' }}</td>
+                            <td>{{ $line->tax_category ?? '' }}</td>
                             <td class="bill-num">{{ $money($line->amount ?? $line->line_total ?? 0) }}</td>
-                            <td>{{ $line->customer_job_id ?? '' }}</td>
+                            <td>{{ $line->customer_job_id ? $line->customer_job_id.' - '.($line->customer_job_name ?? '') : '' }}</td>
                             <td>{{ $line->class_code ?? '' }}</td>
                         </tr>
                     @empty
                         <tr>
                             <td>Reimbursable charges</td>
                             <td>{{ $bill['memo'] }}</td>
+                            <td></td>
                             <td class="bill-num">{{ $money($bill['total']) }}</td>
                             <td></td>
                             <td></td>
@@ -368,11 +371,18 @@
                         <td></td>
                         <td></td>
                         <td></td>
+                        <td></td>
                     </tr>
                 </tbody>
             </table>
 
-            <div class="bill-total-line">Expense Total : {{ $money($bill['total']) }}</div>
+            <div class="bill-total-line">Gross Amount (VAT Inclusive) : {{ $money($bill['gross_amount']) }}</div>
+            @if($bill['input_vat'] > 0)
+                <div class="bill-total-line">Input VAT (included above) : {{ $money($bill['input_vat']) }}</div>
+            @endif
+            @if($bill['withholding_tax_amount'] > 0)
+                <div class="bill-total-line">Less: Withholding Tax ({{ rtrim(rtrim(number_format($bill['withholding_tax_rate'], 2), '0'), '.') }}%) : ({{ $money($bill['withholding_tax_amount']) }})</div>
+            @endif
             <div class="bill-total">Bill Total :{{ $bill['currency'] }} {{ $money($bill['total']) }}</div>
         </div>
     </div>

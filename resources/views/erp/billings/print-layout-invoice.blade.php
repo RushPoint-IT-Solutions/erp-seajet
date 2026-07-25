@@ -243,6 +243,7 @@
             'invoice_date' => ['label' => 'Invoice Date', 'value' => '05/19/2026', 'class' => ''],
             'line_description' => ['label' => 'Line Description', 'value' => "OCEAN FREIGHT (5% OF FREIGHT CHARGES)\n(2,100 x 3 CNTRS = \$6,300 x 61.55 = 387,765 x 5%)\n\nSHIPPER: LEMOINE HOLLAND B.V.", 'class' => ''],
             'soa_no' => ['label' => 'SOA No.', 'value' => 'SOA# 7187', 'class' => ''],
+            'remarks' => ['label' => 'Remarks', 'value' => 'Remarks: none', 'class' => 'small'],
             'line_qty' => ['label' => 'Line Qty', 'value' => '1', 'class' => 'amount'],
             'line_unit_price' => ['label' => 'Line Unit Price', 'value' => '19,388.25', 'class' => 'amount'],
             'line_amount' => ['label' => 'Line Amount', 'value' => '19,388.25', 'class' => 'amount'],

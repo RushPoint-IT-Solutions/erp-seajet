@@ -341,7 +341,53 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
     $(function () {
-        $('.erp-select').select2({ width: 'resolve' });
+        function initErpSelect(scope) {
+            $(scope).find('.erp-select').each(function () {
+                var $el = $(this);
+                var modal = $el.closest('.modal');
+
+                if ($el.hasClass('select2-hidden-accessible')) {
+                    $el.select2('destroy');
+                }
+
+                $el.select2({
+                    width: 'resolve',
+                    dropdownParent: modal.length ? modal : $(document.body)
+                });
+            });
+        }
+
+        initErpSelect(document);
+
+        // Select2 miscalculates width/renders no options when initialized while
+        // its modal is still display:none, so re-init once the modal is actually shown.
+        $(document).on('shown.bs.modal', '.modal', function () {
+            initErpSelect(this);
+        });
+
+        // Escape is meant to close an open Select2 dropdown, but the keydown bubbles
+        // up into the Bootstrap modal and closes the whole modal too. Intercept it in
+        // the capture phase (before Bootstrap's own listener sees it), close the
+        // dropdown ourselves, and stop it from propagating any further.
+        document.addEventListener('keydown', function (event) {
+            if (event.key !== 'Escape') {
+                return;
+            }
+
+            var openDropdown = document.querySelector('.select2-container--open');
+            if (!openDropdown) {
+                return;
+            }
+
+            event.stopPropagation();
+            $('.erp-select.select2-hidden-accessible').each(function () {
+                var instance = $(this).data('select2');
+                if (instance && instance.isOpen()) {
+                    $(this).select2('close');
+                }
+            });
+        }, true);
+
         $('[data-bs-toggle="tooltip"]').each(function () {
             new bootstrap.Tooltip(this);
         });
