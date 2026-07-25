@@ -184,7 +184,8 @@
                                         data-currency="{{ $customer['currency'] }}"
                                         data-class="{{ $customer['class'] }}"
                                         data-tax="{{ $customer['vat_classification'] }}"
-                                        data-tin="{{ $customer['tin'] }}">
+                                        data-tin="{{ $customer['tin'] }}"
+                                        data-address="{{ $customer['address'] }}">
                                     {{ $customer['customer_id'] }} - {{ $customer['name'] }}
                                 </option>
                             @endforeach
@@ -538,6 +539,7 @@
             $('#classCode').val(option.data('class') || '');
             $('#vatClassification').val(taxClass);
             $('#customerTin').val(option.data('tin') || '');
+            $('textarea[name="invoice_to"]').val(option.data('address') || '');
             var terms = String(option.data('terms') || '');
             $('#creditTerms').val(terms.replace(/[^0-9]/g, ''));
             $('#customerTaxCode').val(isVatable ? 'VAT12' : (taxClass === 'zero-rated' ? 'ZERO' : 'EXEMPT'));

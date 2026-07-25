@@ -77,6 +77,11 @@ Route::middleware(['auth', 'user.access:administrator,admin,accounting,finance']
     Route::get('/erp/fx/gains-losses', 'Erp\ModuleController@fxGainsLosses')->name('erp.fx.gains-losses');
 
     Route::get('/erp/accounting/chart-of-accounts', 'Erp\ModuleController@chartOfAccounts')->name('erp.accounting.coa');
+    Route::get('/erp/accounting/chart-of-accounts/create', 'Erp\ModuleController@chartOfAccountsCreate')->name('erp.accounting.coa.create');
+    Route::post('/erp/accounting/chart-of-accounts', 'Erp\ModuleController@chartOfAccountsStore')->name('erp.accounting.coa.store');
+    Route::get('/erp/accounting/chart-of-accounts/{account}/edit', 'Erp\ModuleController@chartOfAccountsEdit')->name('erp.accounting.coa.edit');
+    Route::put('/erp/accounting/chart-of-accounts/{account}', 'Erp\ModuleController@chartOfAccountsUpdate')->name('erp.accounting.coa.update');
+    Route::post('/erp/accounting/chart-of-accounts/{account}/toggle-status', 'Erp\ModuleController@chartOfAccountsToggleStatus')->name('erp.accounting.coa.toggle-status');
     Route::get('/erp/accounting/journal-entries', 'Erp\ModuleController@journalEntries')->name('erp.accounting.journals');
     Route::post('/erp/accounting/journal-entries/review', 'Erp\ModuleController@journalEntryReview')->name('erp.accounting.journals.review');
 

@@ -2756,6 +2756,7 @@ class ModuleController extends Controller
                 ->leftJoin('account_categories', 'account_categories.id', '=', 'accounts.account_category_id')
                 ->leftJoin('accounts as parent_accounts', 'parent_accounts.id', '=', 'accounts.parent_id')
                 ->select(
+                    'accounts.id',
                     'accounts.code',
                     'accounts.name',
                     'account_categories.name as category',
@@ -2768,19 +2769,182 @@ class ModuleController extends Controller
                 ->get()
                 ->map(function ($account) {
                     return [
-                        $account->code,
-                        $account->name,
-                        $account->category ?: '-',
-                        $account->parent_code ?: '-',
-                        ucfirst($account->normal_balance ?: '-'),
-                        number_format((float) $account->opening_balance, 2),
-                        $account->is_active ? 'Active' : 'Inactive',
+                        'id' => $account->id,
+                        'code' => $account->code,
+                        'name' => $account->name,
+                        'category' => $account->category ?: '-',
+                        'parent_code' => $account->parent_code ?: '-',
+                        'normal_balance' => ucfirst($account->normal_balance ?: '-'),
+                        'opening_balance' => number_format((float) $account->opening_balance, 2),
+                        'is_active' => (bool) $account->is_active,
                     ];
                 })
                 ->all();
         }
 
         return view('erp.accounting.chart-of-accounts', compact('accounts'));
+    }
+
+    private function accountCategoryOptions()
+    {
+        if (!Schema::hasTable('account_categories')) {
+            return [];
+        }
+
+        return DB::table('account_categories')->orderBy('name')->get();
+    }
+
+    private function accountParentOptions($excludeId = null)
+    {
+        if (!Schema::hasTable('accounts')) {
+            return [];
+        }
+
+        return DB::table('accounts')
+            ->when($excludeId, function ($query) use ($excludeId) {
+                $query->where('id', '<>', $excludeId);
+            })
+            ->orderBy('code')
+            ->get(['id', 'code', 'name']);
+    }
+
+    private function accountTypeOptions()
+    {
+        return [
+            'Bank', 'Accounts Receivable', 'Other Current Asset', 'Fixed Asset', 'Other Asset',
+            'Accounts Payable', 'Credit Card', 'Other Current Liability', 'Long Term Liability',
+            'Equity', 'Income', 'Cost of Services', 'Cost of Goods Sold', 'Expense', 'Other Expense',
+        ];
+    }
+
+    public function chartOfAccountsCreate()
+    {
+        return view('erp.accounting.chart-of-accounts-create', [
+            'categories' => $this->accountCategoryOptions(),
+            'parentAccounts' => $this->accountParentOptions(),
+            'typeOptions' => $this->accountTypeOptions(),
+        ]);
+    }
+
+    private function validateAccountData($accountId = null)
+    {
+        return request()->validate([
+            'code' => 'required|string|max:50',
+            'name' => 'required|string|max:255',
+            'account_category_id' => 'required|exists:account_categories,id',
+            'parent_id' => 'nullable|exists:accounts,id',
+            'type' => 'required|string|max:100',
+            'opening_balance' => 'nullable|numeric',
+        ]);
+    }
+
+    public function chartOfAccountsStore()
+    {
+        $data = $this->validateAccountData();
+        $companyId = $this->defaultCompanyId();
+        $code = trim($data['code']);
+
+        $exists = DB::table('accounts')
+            ->where('company_id', $companyId)
+            ->where('code', $code)
+            ->exists();
+
+        if ($exists) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->withErrors(['code' => 'This account code already exists.']);
+        }
+
+        DB::table('accounts')->insert([
+            'company_id' => $companyId,
+            'account_category_id' => $data['account_category_id'],
+            'parent_id' => $data['parent_id'] ?? null,
+            'code' => $code,
+            'name' => trim($data['name']),
+            'type' => $data['type'],
+            'opening_balance' => $this->moneyToFloat($data['opening_balance'] ?? 0),
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return redirect()
+            ->route('erp.accounting.coa')
+            ->with('status', 'Account '.$code.' was created.');
+    }
+
+    public function chartOfAccountsEdit($account)
+    {
+        $record = DB::table('accounts')->where('id', $account)->first();
+        abort_unless($record, 404);
+
+        return view('erp.accounting.chart-of-accounts-create', [
+            'account' => $record,
+            'isEdit' => true,
+            'categories' => $this->accountCategoryOptions(),
+            'parentAccounts' => $this->accountParentOptions($record->id),
+            'typeOptions' => $this->accountTypeOptions(),
+        ]);
+    }
+
+    public function chartOfAccountsUpdate($account)
+    {
+        $record = DB::table('accounts')->where('id', $account)->first();
+        abort_unless($record, 404);
+
+        $data = $this->validateAccountData($record->id);
+        $companyId = $this->defaultCompanyId();
+        $code = trim($data['code']);
+
+        $exists = DB::table('accounts')
+            ->where('company_id', $companyId)
+            ->where('id', '<>', $record->id)
+            ->where('code', $code)
+            ->exists();
+
+        if ($exists) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->withErrors(['code' => 'This account code already exists.']);
+        }
+
+        if ((int) ($data['parent_id'] ?? 0) === (int) $record->id) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->withErrors(['parent_id' => 'An account cannot be its own parent.']);
+        }
+
+        DB::table('accounts')->where('id', $record->id)->update([
+            'account_category_id' => $data['account_category_id'],
+            'parent_id' => $data['parent_id'] ?? null,
+            'code' => $code,
+            'name' => trim($data['name']),
+            'type' => $data['type'],
+            'opening_balance' => $this->moneyToFloat($data['opening_balance'] ?? 0),
+            'updated_at' => now(),
+        ]);
+
+        return redirect()
+            ->route('erp.accounting.coa')
+            ->with('status', 'Account '.$code.' was updated.');
+    }
+
+    public function chartOfAccountsToggleStatus($account)
+    {
+        $record = DB::table('accounts')->where('id', $account)->first();
+        abort_unless($record, 404);
+
+        DB::table('accounts')->where('id', $record->id)->update([
+            'is_active' => !$record->is_active,
+            'updated_at' => now(),
+        ]);
+
+        return redirect()
+            ->route('erp.accounting.coa')
+            ->with('status', 'Account '.$record->code.' was '.($record->is_active ? 'deactivated' : 'activated').'.');
     }
 
     public function journalEntries()
@@ -4278,6 +4442,7 @@ class ModuleController extends Controller
                     'customer_id' => $customer->customer_id ?: $customer->code,
                     'name' => $customer->name,
                     'tin' => $customer->tin,
+                    'address' => $customer->billing_address,
                     'terms' => $customer->payment_terms,
                     'currency' => $customer->currency ?: 'PHP',
                     'class' => $customer->default_class_code ?: 'MANILA',
