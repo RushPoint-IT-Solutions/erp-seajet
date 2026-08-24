@@ -160,7 +160,7 @@
                                 <button type="button" class="btn btn-sm btn-outline-primary edit-payment" data-bs-toggle="modal" data-bs-target="#paymentModal">
                                     <i class="bi bi-pencil-square"></i>
                                 </button>
-                                <a href="{{ route('erp.official-receipt.preview', $receiptQuery) }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Print Official Receipt">
+                                <a href="{{ route('erp.official-receipt.preview', $receiptQuery) }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Print Collection Receipt">
                                     <i class="bi bi-receipt"></i>
                                 </a>
                                 <a href="{{ route('erp.acknowledgement-receipt.preview', $receiptQuery) }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Print Acknowledgement Receipt">

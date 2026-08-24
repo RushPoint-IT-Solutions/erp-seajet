@@ -84,6 +84,7 @@ class DashboardController extends Controller
     private function recentTransactions($limit = 10)
     {
         $transactions = collect();
+        $companyId = $this->companyId();
 
         if (Schema::hasTable('sales_documents')) {
             $transactions = $transactions->merge(DB::table('sales_documents')
@@ -96,6 +97,7 @@ class DashboardController extends Controller
                     'sales_documents.grand_total as amount',
                     'sales_documents.status'
                 )
+                ->where('sales_documents.company_id', $companyId)
                 ->orderBy('sales_documents.document_date', 'desc')
                 ->orderBy('sales_documents.id', 'desc')
                 ->limit($limit)
@@ -109,10 +111,11 @@ class DashboardController extends Controller
                     'receipts.receipt_date as date',
                     'receipts.receipt_no as ref',
                     'customers.name as party',
-                    DB::raw("'Official Receipt' as type"),
+                    DB::raw("'Collection Receipt' as type"),
                     'receipts.amount',
                     'receipts.status'
                 )
+                ->where('receipts.company_id', $companyId)
                 ->orderBy('receipts.receipt_date', 'desc')
                 ->orderBy('receipts.id', 'desc')
                 ->limit($limit)
@@ -130,6 +133,7 @@ class DashboardController extends Controller
                     'purchase_documents.grand_total as amount',
                     'purchase_documents.status'
                 )
+                ->where('purchase_documents.company_id', $companyId)
                 ->orderBy('purchase_documents.document_date', 'desc')
                 ->orderBy('purchase_documents.id', 'desc')
                 ->limit($limit)
@@ -147,6 +151,7 @@ class DashboardController extends Controller
                     'payments.amount',
                     'payments.status'
                 )
+                ->where('payments.company_id', $companyId)
                 ->orderBy('payments.payment_date', 'desc')
                 ->orderBy('payments.id', 'desc')
                 ->limit($limit)
@@ -167,6 +172,7 @@ class DashboardController extends Controller
                     DB::raw('0 as amount'),
                     'status'
                 )
+                ->where('company_id', $companyId)
                 ->orderBy('journal_date', 'desc')
                 ->orderBy('id', 'desc')
                 ->limit($limit)
@@ -208,6 +214,7 @@ class DashboardController extends Controller
 
         DB::table('sales_documents')
             ->select('due_date', 'grand_total', 'paid_total')
+            ->where('company_id', $this->companyId())
             ->whereNotIn('status', ['cancelled', 'voided', 'paid'])
             ->get()
             ->each(function ($invoice) use (&$buckets) {
@@ -276,6 +283,7 @@ class DashboardController extends Controller
         }
 
         $query = DB::table($table);
+        $this->scopeCompany($query, $table);
         if ($scope) {
             $scope($query);
         }
@@ -290,10 +298,36 @@ class DashboardController extends Controller
         }
 
         $query = DB::table($table);
+        $this->scopeCompany($query, $table);
         if ($scope) {
             $scope($query);
         }
 
         return (int) $query->count();
+    }
+
+    private function scopeCompany($query, $table)
+    {
+        $companyId = $this->companyId();
+        if (!$companyId) {
+            return;
+        }
+        if (Schema::hasColumn($table, 'company_id')) {
+            $query->where($table.'.company_id', $companyId);
+        } elseif ($table === 'bank_transactions' && Schema::hasTable('bank_accounts')) {
+            $query->whereIn('bank_account_id', DB::table('bank_accounts')
+                ->where('company_id', $companyId)
+                ->select('id'));
+        }
+    }
+
+    private function companyId()
+    {
+        $user = auth()->user();
+        if ($user && !empty($user->company_id)) {
+            return $user->company_id;
+        }
+
+        return Schema::hasTable('companies') ? DB::table('companies')->orderBy('id')->value('id') : null;
     }
 }

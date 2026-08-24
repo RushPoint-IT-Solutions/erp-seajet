@@ -1,7 +1,7 @@
 @extends('erp.layout')
 
-@section('title', 'Official Receipt Preview')
-@section('page-title', 'Official Receipt')
+@section('title', 'Collection Receipt Preview')
+@section('page-title', 'Collection Receipt')
 
 @push('styles')
 <style>
@@ -268,7 +268,7 @@
 @endphp
 
     <div class="receipt-toolbar d-flex justify-content-end gap-2 no-print">
-        <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print Official Receipt</button>
+        <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print Collection Receipt</button>
         <a href="{{ route('erp.payments.create') }}" class="btn btn-primary"><i class="bi bi-arrow-left me-1"></i> Back to Payments</a>
     </div>
 
@@ -289,7 +289,7 @@
                 </div>
             </div>
             <div>
-                <div class="or-title">Official Receipt</div>
+                <div class="or-title">Collection Receipt</div>
                 <div class="or-number"><span>No.</span>{{ $receipt['receipt_no'] ?? '0046043' }}</div>
                 <table class="or-meta">
                     <tr>

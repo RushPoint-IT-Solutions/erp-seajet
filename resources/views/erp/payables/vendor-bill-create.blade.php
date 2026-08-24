@@ -384,6 +384,9 @@
                         <a href="{{ route('erp.expenses.index') }}" class="btn btn-outline-secondary">Clear</a>
                         <button class="btn btn-outline-secondary" name="save_mode" value="close"><i class="bi bi-save me-1"></i>Save & Close</button>
                         <button class="btn btn-primary" name="save_mode" value="new"><i class="bi bi-save2 me-1"></i>Save & New</button>
+                        @if(in_array(strtolower(auth()->user()->role ?? ''), ['administrator', 'admin', 'finance'], true))
+                            <button class="btn btn-success" name="save_mode" value="post"><i class="bi bi-journal-check me-1"></i>Approve & Post</button>
+                        @endif
                     </div>
                 </div>
                 @if($attachments->count())

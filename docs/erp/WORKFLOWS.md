@@ -7,7 +7,7 @@
 3. Enter customer ID, job/shipment ID, invoice number, VAT classification, class, credit terms, currency, AR account, and billing lines.
 4. Review invoice.
 5. Proceed to payment.
-6. Receive payment using Official Receipt, Acknowledgement Receipt, or SOA A collection.
+6. Receive payment using a supplementary Collection Receipt, Acknowledgement Receipt, or SOA A collection.
 7. Print or email receipt.
 8. Deposit collection and reconcile bank.
 
@@ -20,6 +20,8 @@
 5. Bucket unpaid balances into Current, 30, 60, and 90+ days.
 
 ## Purchase to Payment
+
+Supplier payments follow a controlled lifecycle: prepare as For Approval, approve by a different authorized user, print and record the cheque where applicable, release and post, then clear through the check register. Approved payments do not affect the ledger until release. Spoiled checks may be replaced before release; released payments require a reversal-based void, and cleared checks require a bank-correction workflow.
 
 1. Create purchase request.
 2. Approve request through approval workflow.

@@ -14,6 +14,8 @@
 Route::get('/login', 'Auth\LoginController@showLoginForm')->name('login');
 Route::post('/login', 'Auth\LoginController@login');
 Route::post('/logout', 'Auth\LoginController@logout')->name('logout');
+Route::get('/password/change', 'Auth\ChangePasswordController@show')->middleware('auth')->name('password.change');
+Route::post('/password/change', 'Auth\ChangePasswordController@update')->middleware('auth')->name('password.update');
 
 Route::get('/client/invoices/{token}', 'Erp\ModuleController@publicInvoice')->name('erp.public.invoice');
 Route::get('/client/invoices/{token}/checkout', 'Erp\ModuleController@publicCheckout')->name('erp.public.checkout');
@@ -56,10 +58,18 @@ Route::middleware(['auth', 'user.access:administrator,admin,accounting,finance']
     Route::get('/erp/payables/payments/create', 'Erp\ModuleController@apPaymentCreate')->name('erp.payables.payments.create');
     Route::post('/erp/payables/payments/review', 'Erp\ModuleController@apPaymentReview')->name('erp.payables.payments.review');
     Route::get('/erp/payables/payment-approvals', 'Erp\ModuleController@paymentApprovals')->name('erp.payables.approvals');
+    Route::post('/erp/payables/payments/{payment}/approve', 'Erp\ModuleController@approveApPayment')->name('erp.payables.payments.approve');
+    Route::post('/erp/payables/payments/{payment}/release', 'Erp\ModuleController@releaseApPayment')->name('erp.payables.payments.release');
+    Route::post('/erp/payables/payments/{payment}/void', 'Erp\ModuleController@voidApPayment')->name('erp.payables.payments.void');
+    Route::get('/erp/payables/check-register', 'Erp\ModuleController@checkRegister')->name('erp.payables.check-register');
+    Route::post('/erp/payables/checks/{check}/replace', 'Erp\ModuleController@replaceCheck')->name('erp.payables.checks.replace');
+    Route::post('/erp/payables/checks/{check}/clear', 'Erp\ModuleController@clearCheck')->name('erp.payables.checks.clear');
     Route::get('/erp/payables/check-voucher/print-layout', 'Erp\ModuleController@checkVoucherPrintLayout')->name('erp.payables.check-voucher.layout');
     Route::post('/erp/payables/check-voucher/print-layout/save', 'Erp\ModuleController@saveCheckVoucherPrintLayout')->name('erp.payables.check-voucher.layout.save');
     Route::get('/erp/payables/check-voucher/bill/{bill}', 'Erp\ModuleController@checkVoucherForBill')->name('erp.payables.check-voucher.bill');
     Route::get('/erp/payables/check-voucher/preview/{payment?}', 'Erp\ModuleController@checkVoucherPreview')->name('erp.payables.check-voucher');
+    Route::post('/erp/payables/check/print-layout/save', 'Erp\ModuleController@saveCheckPrintLayout')->name('erp.payables.check-print.layout.save');
+    Route::post('/erp/payables/check/print/{payment}/event', 'Erp\ModuleController@recordCheckPrint')->name('erp.payables.check-print.event');
     Route::get('/erp/payables/check/print/{payment?}', 'Erp\ModuleController@checkPrint')->name('erp.payables.check-print');
     Route::get('/erp/payables/aging', 'Erp\ModuleController@apAging')->name('erp.payables.aging');
 
@@ -115,6 +125,7 @@ Route::middleware(['auth', 'user.access:administrator,admin,accounting,finance']
     Route::get('/erp/invoices', 'Erp\ModuleController@invoiceIndex')->name('erp.invoices.index');
     Route::get('/erp/invoices/create', 'Erp\ModuleController@invoiceCreate')->name('erp.invoices.create');
     Route::get('/erp/invoices/{invoice}', 'Erp\ModuleController@invoiceShow')->name('erp.invoices.show');
+    Route::post('/erp/invoices/{invoice}/portal-link', 'Erp\ModuleController@createInvoicePortalLink')->name('erp.invoices.portal-link');
     Route::post('/erp/invoices/review', 'Erp\ModuleController@invoiceReview')->name('erp.invoices.review');
     Route::get('/erp/payments', 'Erp\ModuleController@paymentCreate')->name('erp.payments.index');
     Route::get('/erp/payments/create', 'Erp\ModuleController@paymentCreate')->name('erp.payments.create');

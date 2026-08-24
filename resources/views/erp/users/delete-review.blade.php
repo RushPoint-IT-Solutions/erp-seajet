@@ -13,8 +13,7 @@
             @endforeach
         </div>
         <div class="d-flex justify-content-end gap-2 mt-4">
-            <a href="{{ route('erp.users.delete', $delete['user_id'] ?? 'USR-001') }}" class="btn btn-outline-secondary">Edit</a>
-            <a href="{{ route('erp.users.index') }}" class="btn btn-danger">Deactivate User</a>
+            <a href="{{ route('erp.users.index') }}" class="btn btn-danger">Done</a>
         </div>
     </div>
 @endsection

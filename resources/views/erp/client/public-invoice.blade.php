@@ -34,7 +34,7 @@
     <div class="portal-card p-4">
         <div class="row g-3 mb-3">
             <div class="col-md-4"><div class="text-muted small">Due Date</div><div class="fw-semibold">{{ $invoice['due_date'] }}</div></div>
-            <div class="col-md-4"><div class="text-muted small">Access Token</div><div class="fw-semibold">{{ $invoice['token'] }}</div></div>
+            <div class="col-md-4"><div class="text-muted small">Access</div><div class="fw-semibold">Secure link verified</div></div>
             <div class="col-md-4"><div class="text-muted small">Payment Security</div><div class="fw-semibold">Hosted checkout, no raw card storage</div></div>
         </div>
         <div class="table-responsive">
@@ -53,7 +53,7 @@
             </table>
         </div>
         <div class="d-flex flex-wrap justify-content-end gap-2">
-            <a href="{{ route('erp.billings.print-invoice') }}" class="btn btn-outline-secondary">Download PDF</a>
+            <button type="button" class="btn btn-outline-secondary" onclick="window.print()">Print Invoice</button>
             <a href="{{ route('erp.public.checkout', $invoice['token']) }}" class="btn btn-primary">Pay Now</a>
         </div>
     </div>

@@ -43,6 +43,12 @@
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif
+    @if(session('portal_url'))
+        <div class="alert alert-success">
+            Secure client link (expires in 30 days):
+            <a href="{{ session('portal_url') }}" target="_blank" rel="noopener">{{ session('portal_url') }}</a>
+        </div>
+    @endif
 
     <div class="row g-3 mb-4">
         <div class="col-md-3">
@@ -176,6 +182,14 @@
             <div class="erp-card p-4">
                 <h2 class="h6 fw-bold mb-3">More Actions</h2>
                 <div class="d-grid gap-2">
+                    @if($record)
+                        <form method="post" action="{{ route('erp.invoices.portal-link', $record->id) }}">
+                            @csrf
+                            <button type="submit" class="btn btn-outline-primary text-start w-100">
+                                <i class="bi bi-link-45deg me-1"></i>Create Secure Client Link
+                            </button>
+                        </form>
+                    @endif
                     <a href="{{ route('erp.billings.status') }}" class="btn btn-outline-secondary text-start">
                         <i class="bi bi-toggle-on me-1"></i>Update Status
                     </a>

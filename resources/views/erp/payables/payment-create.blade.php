@@ -67,7 +67,12 @@
             </div>
             <div class="col-md-3">
                 <label class="form-label">Bank Account</label>
-                <select name="bank_account" class="form-select erp-select"><option>BPI Operating - PHP</option><option>Metrobank USD Collections - USD</option><option>BDO Payroll - PHP</option></select>
+                <select name="bank_account" class="form-select erp-select">
+                    <option value="">Select account...</option>
+                    @foreach($bankAccounts as $bank)
+                        <option value="{{ $bank['account_no'] }}">{{ $bank['bank'] }} - {{ $bank['name'] }} ({{ $bank['currency'] }})</option>
+                    @endforeach
+                </select>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Check No</label>
@@ -81,9 +86,15 @@
                 <label class="form-label">Amount</label>
                 <input name="amount" id="amountInput" class="form-control" value="{{ $selectedBill ? str_replace(',', '', $selectedBill['net_amount']) : '' }}" required>
             </div>
+            <div class="col-md-3" id="exchangeRateGroup">
+                <label class="form-label">USD to PHP Rate</label>
+                <input name="exchange_rate" id="exchangeRateInput" type="number" min="0.000001" step="0.000001" class="form-control" value="{{ old('exchange_rate', '1') }}">
+                <div class="form-text">Required for USD payments; PHP payments use 1.000000.</div>
+            </div>
             <div class="col-md-3">
-                <label class="form-label">Approval Status</label>
-                <select name="approval_status" class="form-select erp-select"><option>For Approval</option><option>Approved</option><option>Released</option></select>
+                <label class="form-label">Workflow Status</label>
+                <input class="form-control" value="For Approval" readonly>
+                <div class="form-text">The preparer cannot approve or release this payment.</div>
             </div>
             <div class="col-md-6">
                 <label class="form-label">Attach Documents</label>
@@ -111,10 +122,21 @@
             $('#supplierName').val(option.data('supplier-name') || '');
             $('#currencySelect').val(option.data('currency') || 'PHP');
             $('#amountInput').val(option.data('amount') || '');
+            syncCurrency();
+        }
+
+        function syncCurrency() {
+            var isPhp = $('#currencySelect').val() === 'PHP';
+            $('#exchangeRateInput').prop('readonly', isPhp);
+            if (isPhp) {
+                $('#exchangeRateInput').val('1');
+            }
         }
 
         $('#billSelect').on('change', syncBill);
+        $('#currencySelect').on('change', syncCurrency);
         syncBill();
+        syncCurrency();
     });
 </script>
 @endpush

@@ -161,6 +161,34 @@
         </div>
     </div>
 
+    <div class="erp-card mb-4">
+        <div class="p-3 border-bottom"><h2 class="h5 mb-0">User Accounts</h2></div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Branch</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+                <tbody>
+                @forelse($users as $user)
+                    <tr>
+                        <td class="fw-semibold">{{ $user['name'] }}</td>
+                        <td>{{ $user['email'] }}</td>
+                        <td>{{ $user['role'] }}</td>
+                        <td>{{ $user['branch'] }}</td>
+                        <td><span class="badge {{ $user['status'] === 'Active' ? 'bg-success' : 'bg-secondary' }}">{{ $user['status'] }}</span></td>
+                        <td class="text-end">
+                            <a href="{{ route('erp.users.edit', $user['id']) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                            @if((int) $user['id'] !== (int) auth()->id() && $user['status'] === 'Active')
+                                <a href="{{ route('erp.users.delete', $user['id']) }}" class="btn btn-sm btn-outline-danger">Deactivate</a>
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr><td colspan="6" class="text-center text-muted py-4">No users found for this company.</td></tr>
+                @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <div class="erp-card">
         <div class="role-radio-row px-3">
             @foreach($roles as $index => $role)

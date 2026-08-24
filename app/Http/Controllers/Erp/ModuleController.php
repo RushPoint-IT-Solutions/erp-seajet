@@ -3,7 +3,11 @@
 namespace App\Http\Controllers\Erp;
 
 use App\Http\Controllers\Controller;
+use App\Services\Accounting\PeriodLockService;
+use App\Services\Accounting\PostingService;
+use App\Services\Audit\ActivityLogger;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
@@ -444,11 +448,11 @@ class ModuleController extends Controller
                 ],
             ],
             'email-official-receipt' => [
-                'title' => 'Email Official Receipt',
-                'subtitle' => 'Prepare Official Receipt email with PDF attachment and delivery audit trail.',
-                'primary' => ['label' => 'Official Receipt', 'route' => route('erp.official-receipt.preview'), 'icon' => 'bi-receipt'],
+                'title' => 'Email Collection Receipt',
+                'subtitle' => 'Prepare a supplementary collection receipt email with PDF attachment and delivery audit trail.',
+                'primary' => ['label' => 'Collection Receipt', 'route' => route('erp.official-receipt.preview'), 'icon' => 'bi-receipt'],
                 'cards' => [['Queued Emails', '2'], ['Sent Today', '9'], ['PDF Attached', 'Yes'], ['Audit Trail', 'Enabled']],
-                'steps' => ['Review customer email', 'Attach Official Receipt PDF', 'Add email message', 'Send and log delivery status'],
+                'steps' => ['Review customer email', 'Attach Collection Receipt PDF', 'Add email message', 'Send and log delivery status'],
                 'columns' => ['Receipt No.', 'Customer', 'Email', 'Amount', 'Status'],
                 'rows' => [
                     ['OR-2026-00618', 'North Harbor Trading', 'billing@northharbor.test', '43,200.00', 'Ready'],
@@ -500,6 +504,7 @@ class ModuleController extends Controller
         ];
 
         $customers = DB::table('customers')
+            ->where('company_id', $this->defaultCompanyId())
             ->orderBy('name')
             ->get()
             ->map(function ($customer) use ($arAccounts) {
@@ -553,7 +558,7 @@ class ModuleController extends Controller
 
     public function customerCreate()
     {
-        $nextCustomerNumber = ((int) DB::table('customers')->max('id')) + 1;
+        $nextCustomerNumber = ((int) DB::table('customers')->where('company_id', $this->defaultCompanyId())->max('id')) + 1;
 
         return view('erp.customers.create', [
             'nextCustomerCode' => 'CUST-'.str_pad($nextCustomerNumber, 3, '0', STR_PAD_LEFT),
@@ -655,6 +660,7 @@ class ModuleController extends Controller
         }
 
         $record = DB::table('customers')
+            ->where('company_id', $this->defaultCompanyId())
             ->where(function ($query) use ($customer) {
                 $query->where('id', $customer)
                     ->orWhere('code', $customer)
@@ -676,6 +682,7 @@ class ModuleController extends Controller
         }
 
         return DB::table('sales_documents')
+            ->where('company_id', $this->defaultCompanyId())
             ->where('customer_id', $customerId)
             ->whereIn('document_type', ['invoice', 'billing_invoice', 'statement_of_account_a', 'soa_a', 'debit_note'])
             ->orderBy('document_date', 'desc')
@@ -793,6 +800,11 @@ class ModuleController extends Controller
 
     private function defaultCompanyId()
     {
+        $userCompanyId = auth()->check() ? auth()->user()->company_id : null;
+        if ($userCompanyId && DB::table('companies')->where('id', $userCompanyId)->where('is_active', true)->exists()) {
+            return $userCompanyId;
+        }
+
         $companyId = DB::table('companies')->orderBy('id')->value('id');
 
         if ($companyId) {
@@ -905,6 +917,7 @@ class ModuleController extends Controller
         }
 
         return DB::table('suppliers')
+            ->where('company_id', $this->defaultCompanyId())
             ->where('is_active', true)
             ->orderBy('name')
             ->get()
@@ -964,6 +977,7 @@ class ModuleController extends Controller
             ->leftJoin('account_categories', 'account_categories.id', '=', 'accounts.account_category_id')
             ->select('accounts.id', 'accounts.code', 'accounts.name', 'account_categories.name as category')
             ->where('accounts.is_active', true)
+            ->where('accounts.company_id', $this->defaultCompanyId())
             ->where(function ($query) {
                 $query->where('account_categories.name', 'like', '%Expense%')
                     ->orWhere('account_categories.name', 'like', '%Cost%')
@@ -995,6 +1009,7 @@ class ModuleController extends Controller
             ->leftJoin('account_categories', 'account_categories.id', '=', 'accounts.account_category_id')
             ->select('accounts.id', 'accounts.code', 'accounts.name', 'account_categories.name as category')
             ->where('accounts.is_active', true)
+            ->where('accounts.company_id', $this->defaultCompanyId())
             ->orderBy('accounts.code')
             ->get()
             ->map(function ($account) {
@@ -1014,7 +1029,7 @@ class ModuleController extends Controller
             return '';
         }
 
-        $account = DB::table('accounts')->where('id', $accountId)->first();
+        $account = DB::table('accounts')->where('company_id', $this->defaultCompanyId())->where('id', $accountId)->first();
         if (!$account) {
             return '';
         }
@@ -1030,7 +1045,7 @@ class ModuleController extends Controller
         }
 
         $code = trim(strtok($label, '-'));
-        $query = DB::table('accounts');
+        $query = DB::table('accounts')->where('company_id', $this->defaultCompanyId());
         if ($code !== '') {
             $query->where('code', $code);
         }
@@ -1043,8 +1058,11 @@ class ModuleController extends Controller
         $name = trim(preg_replace('/^[^-]+-\s*/', '', $label));
 
         return DB::table('accounts')
-            ->where('name', $name)
-            ->orWhere(DB::raw("concat(code, ' - ', name)"), $label)
+            ->where('company_id', $this->defaultCompanyId())
+            ->where(function ($query) use ($name, $label) {
+                $query->where('name', $name)
+                    ->orWhere(DB::raw("concat(code, ' - ', name)"), $label);
+            })
             ->value('id');
     }
 
@@ -1066,6 +1084,7 @@ class ModuleController extends Controller
                 'purchase_documents.status',
                 'purchase_documents.document_date'
             )
+            ->where('purchase_documents.company_id', $this->defaultCompanyId())
             ->orderBy('purchase_documents.document_date', 'desc')
             ->orderBy('purchase_documents.id', 'desc')
             ->limit(6)
@@ -1143,7 +1162,7 @@ class ModuleController extends Controller
     public function usersIndex()
     {
         return view('erp.users.index', [
-            'users' => $this->users,
+            'users' => $this->userRows(),
             'roles' => $this->rolePermissionRoles(),
             'permissionGroups' => $this->rolePermissionGroups(),
         ]);
@@ -1156,56 +1175,173 @@ class ModuleController extends Controller
 
     public function userEdit($user)
     {
+        $record = DB::table('users')->where('company_id', $this->defaultCompanyId())->where('id', $user)->first();
+        abort_unless($record, 404);
+
         return view('erp.users.edit', [
             'userId' => $user,
-            'users' => $this->users,
+            'record' => $record,
         ]);
     }
 
     public function userDelete($user)
     {
-        return view('erp.users.delete', ['userId' => $user]);
+        $record = DB::table('users')->where('company_id', $this->defaultCompanyId())->where('id', $user)->first();
+        abort_unless($record, 404);
+
+        return view('erp.users.delete', ['userId' => $user, 'record' => $record]);
     }
 
     public function userDeleteReview()
     {
+        $data = request()->validate([
+            'user_id' => 'required|integer',
+            'name' => 'nullable|string|max:255',
+            'delete_action' => 'required|string|max:100',
+            'reason' => 'required|string|max:1000',
+        ]);
+        abort_if((int) $data['user_id'] === (int) auth()->id(), 422, 'You cannot deactivate your own account.');
+        $record = DB::table('users')->where('company_id', $this->defaultCompanyId())->where('id', $data['user_id'])->first();
+        abort_unless($record, 404);
+        DB::table('users')->where('id', $record->id)->update(['is_active' => false, 'updated_at' => now()]);
+        app(ActivityLogger::class)->log('deactivated', 'user', $record->id, ['is_active' => $record->is_active], [
+            'is_active' => false,
+            'reason' => $data['reason'],
+        ], $record->company_id);
+
         return view('erp.users.delete-review', [
-            'delete' => request()->only(['user_id', 'name', 'delete_action', 'reason']),
+            'delete' => $data,
         ]);
     }
 
     public function userReview()
     {
+        $data = request()->validate([
+            'user_id' => 'nullable|string|max:50',
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
+            'role' => 'required|in:Admin,Accounting,Finance,admin,accounting,finance',
+            'department' => 'nullable|string|max:100',
+            'branch' => 'nullable|string|max:100',
+            'status' => 'required|in:Active,Inactive,Locked,Pending Invite',
+            'access_scope' => 'nullable|string|max:2000',
+            'password' => 'nullable|string|min:12|confirmed',
+        ]);
+        $companyId = $this->defaultCompanyId();
+        $userId = ctype_digit((string) ($data['user_id'] ?? '')) ? (int) $data['user_id'] : null;
+        $existing = $userId ? DB::table('users')->where('company_id', $companyId)->where('id', $userId)->first() : null;
+        if (!$existing && empty($data['password'])) {
+            return back()->withInput()->withErrors(['password' => 'A temporary password of at least 12 characters is required for a new user.']);
+        }
+        $duplicate = DB::table('users')->where('email', strtolower($data['email']))
+            ->when($existing, function ($query) use ($existing) { $query->where('id', '<>', $existing->id); })
+            ->exists();
+        if ($duplicate) {
+            return back()->withInput()->withErrors(['email' => 'That email address is already assigned to another user.']);
+        }
+
+        $branchId = null;
+        if (!empty($data['branch']) && strtolower($data['branch']) !== 'all') {
+            $branchId = DB::table('branches')->where('company_id', $companyId)
+                ->where(function ($query) use ($data) {
+                    $query->where('code', $data['branch'])->orWhere('name', $data['branch']);
+                })->value('id');
+        }
+        $payload = [
+            'company_id' => $companyId,
+            'branch_id' => $branchId,
+            'name' => trim($data['name']),
+            'email' => strtolower(trim($data['email'])),
+            'role' => strtolower($data['role']),
+            'department' => $data['department'] ?? null,
+            'is_active' => $data['status'] === 'Active',
+            'updated_at' => now(),
+        ];
+        if (!empty($data['password'])) {
+            $payload['password'] = Hash::make($data['password']);
+            $payload['must_change_password'] = true;
+        }
+
+        if ($existing) {
+            DB::table('users')->where('id', $existing->id)->update($payload);
+            $savedId = $existing->id;
+            $action = 'updated';
+        } else {
+            $payload['created_at'] = now();
+            $savedId = DB::table('users')->insertGetId($payload);
+            $action = 'created';
+        }
+        app(ActivityLogger::class)->log($action, 'user', $savedId, $existing ? (array) $existing : [], [
+            'name' => $payload['name'],
+            'email' => $payload['email'],
+            'role' => $payload['role'],
+            'is_active' => $payload['is_active'],
+        ], $companyId);
+
         return view('erp.users.review', [
-            'user' => request()->only([
-                'user_id',
-                'name',
-                'email',
-                'role',
-                'department',
-                'branch',
-                'status',
-                'access_scope',
+            'user' => array_merge(request()->only(['name', 'email', 'role', 'department', 'branch', 'status', 'access_scope']), [
+                'user_id' => $savedId,
+                'result' => ucfirst($action),
             ]),
         ]);
     }
 
     public function userStatus()
     {
-        return view('erp.users.status', ['users' => $this->users]);
+        return view('erp.users.status', ['users' => $this->userRows()]);
     }
 
     public function userStatusReview()
     {
-        return view('erp.users.status-review', [
-            'status' => request()->only([
-                'user_id',
-                'name',
-                'current_status',
-                'new_status',
-                'reason',
-            ]),
+        $data = request()->validate([
+            'user_id' => 'required|integer',
+            'name' => 'nullable|string|max:255',
+            'current_status' => 'nullable|string|max:100',
+            'new_status' => 'required|in:Active,Inactive,Locked,Pending Invite',
+            'reason' => 'required|string|max:1000',
         ]);
+        if ((int) $data['user_id'] === (int) auth()->id() && $data['new_status'] !== 'Active') {
+            abort(422, 'You cannot deactivate your own account.');
+        }
+        $record = DB::table('users')->where('company_id', $this->defaultCompanyId())->where('id', $data['user_id'])->first();
+        abort_unless($record, 404);
+        $isActive = $data['new_status'] === 'Active';
+        DB::table('users')->where('id', $record->id)->update(['is_active' => $isActive, 'updated_at' => now()]);
+        app(ActivityLogger::class)->log('status_changed', 'user', $record->id, ['is_active' => $record->is_active], [
+            'is_active' => $isActive,
+            'status' => $data['new_status'],
+            'reason' => $data['reason'],
+        ], $record->company_id);
+
+        return view('erp.users.status-review', [
+            'status' => $data,
+        ]);
+    }
+
+    private function userRows()
+    {
+        if (!Schema::hasTable('users')) {
+            return [];
+        }
+
+        return DB::table('users')
+            ->leftJoin('branches', 'branches.id', '=', 'users.branch_id')
+            ->where('users.company_id', $this->defaultCompanyId())
+            ->select('users.*', 'branches.name as branch_name')
+            ->orderBy('users.name')
+            ->get()
+            ->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'user_id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => ucfirst($user->role ?: 'viewer'),
+                    'department' => $user->department ?: '-',
+                    'branch' => $user->branch_name ?: 'All',
+                    'status' => $user->is_active ? 'Active' : 'Inactive',
+                ];
+            })->all();
     }
 
     public function vendorBillCreate()
@@ -1300,7 +1436,20 @@ class ModuleController extends Controller
             'attachments.*' => 'file|max:10240',
         ]);
 
-        $bill = $this->saveApBill($data);
+        if (request('save_mode') === 'post') {
+            $this->authorizeAccountingPosting();
+        }
+
+        $shouldPost = request('save_mode') === 'post';
+        $bill = DB::transaction(function () use ($data, $shouldPost) {
+            $bill = $this->saveApBill($data);
+            if ($shouldPost) {
+                app(PostingService::class)->postPurchaseDocument($bill['id']);
+                $bill = $this->apBillById($bill['id']);
+            }
+
+            return $bill;
+        });
 
         if (request('save_mode') === 'close') {
             return redirect()
@@ -1366,11 +1515,16 @@ class ModuleController extends Controller
             'openBills' => $this->openApBills(),
             'selectedBill' => $selectedBill,
             'nextPaymentNo' => $this->nextDocumentNumber('payment_voucher', 'PV-', 5, false),
+            'bankAccounts' => $this->bankAccounts(),
         ]);
     }
 
     public function apPaymentReview()
     {
+        request()->merge([
+            'amount' => str_replace(',', '', (string) request('amount')),
+        ]);
+
         $data = request()->validate([
             'payment_no' => 'nullable|string|max:100',
             'payment_date' => 'required|date',
@@ -1378,15 +1532,70 @@ class ModuleController extends Controller
             'shipment_job_id' => 'nullable|string|max:100',
             'supplier_id' => 'required|string|max:100',
             'supplier_name' => 'nullable|string|max:255',
-            'payment_method' => 'required|string|max:100',
-            'bank_account' => 'nullable|string|max:255',
-            'check_no' => 'nullable|string|max:100',
+            'payment_method' => 'required|in:Cheque,Bank Transfer,Online Transfer,Bank',
+            'bank_account' => 'required|string|max:255',
+            'check_no' => 'required_if:payment_method,Cheque|nullable|string|max:100',
             'currency' => 'required|string|max:3',
-            'amount' => 'required',
-            'approval_status' => 'required|string|max:100',
+            'exchange_rate' => 'nullable|numeric|min:0.000001',
+            'amount' => 'required|numeric|min:0.01',
             'attachments.*' => 'file|max:10240',
         ]);
 
+        $companyId = $this->defaultCompanyId();
+        $bill = $this->apBillRecordByNumber($data['bill_no']);
+        if (!$bill) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['bill_no' => 'The selected supplier bill was not found for this company.']);
+        }
+
+        $amount = $this->moneyToFloat($data['amount']);
+        if (abs($amount - round($amount, 2)) > 0.00001) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'amount' => 'Payment amounts may have no more than two decimal places.',
+            ]);
+        }
+        $balance = max(0, (float) $bill->grand_total - (float) $bill->paid_total);
+        if ($amount > $balance + 0.0049) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'amount' => 'Payment cannot exceed the outstanding bill balance of '.number_format($balance, 2).'.',
+            ]);
+        }
+
+        $openPaymentExists = DB::table('payments')
+            ->where('company_id', $companyId)
+            ->where('bill_no', $bill->document_no)
+            ->whereNotIn('status', ['released', 'cancelled', 'voided'])
+            ->exists();
+        if ($openPaymentExists) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'bill_no' => 'This bill already has an unreleased payment. Approve, release, or void it before preparing another.',
+            ]);
+        }
+
+        $bank = DB::table('bank_accounts')
+            ->where('company_id', $companyId)
+            ->where('is_active', true)
+            ->where(function ($query) use ($data) {
+                $query->where('account_no', $data['bank_account'])
+                    ->orWhere('account_name', $data['bank_account']);
+            })
+            ->first();
+        if (!$bank) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['bank_account' => 'Select an active company bank account.']);
+        }
+        if (strtoupper($bank->currency) !== strtoupper($data['currency'])) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'currency' => 'Payment currency must match the selected bank account currency ('.$bank->currency.').',
+            ]);
+        }
+        if (strtoupper($bill->currency ?: 'PHP') !== strtoupper($data['currency'])) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'currency' => 'Payment currency must match the supplier bill currency ('.$bill->currency.').',
+            ]);
+        }
+
+        $data['bank_account_id'] = $bank->id;
+        $data['check_no'] = isset($data['check_no']) ? trim($data['check_no']) : null;
+        $data['approval_status'] = 'For Approval';
         $payment = $this->saveApPayment($data);
 
         return view('erp.payables.payment-review', [
@@ -1400,6 +1609,280 @@ class ModuleController extends Controller
         $approvals = $this->apPaymentRows();
 
         return view('erp.payables.approvals', compact('approvals'));
+    }
+
+    public function approveApPayment($payment)
+    {
+        $this->authorizeAccountingPosting();
+        $companyId = $this->defaultCompanyId();
+
+        DB::transaction(function () use ($payment, $companyId) {
+            $record = DB::table('payments')->where('company_id', $companyId)
+                ->where('id', $payment)->lockForUpdate()->first();
+            abort_unless($record, 404);
+
+            if (!in_array(strtolower((string) $record->approval_status), ['for approval', 'pending'], true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'approval_status' => 'Only a payment awaiting approval can be approved.',
+                ]);
+            }
+            if ($record->created_by && (int) $record->created_by === (int) auth()->id()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'approval_status' => 'Maker-checker control: the preparer cannot approve this payment.',
+                ]);
+            }
+            if ($record->payment_date > date('Y-m-d')) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'payment_date' => 'A post-dated payment cannot be released before '.date('M d, Y', strtotime($record->payment_date)).'.',
+                ]);
+            }
+
+            DB::table('payments')->where('id', $record->id)->update([
+                'status' => 'approved',
+                'approval_status' => 'Approved',
+                'approved_by' => auth()->id(),
+                'approved_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            app(ActivityLogger::class)->log('approved', 'payment', $record->id, [
+                'approval_status' => $record->approval_status,
+            ], [
+                'approval_status' => 'Approved',
+                'approved_by' => auth()->id(),
+            ], $companyId);
+        });
+
+        return redirect()->route('erp.payables.approvals')->with('status', 'Payment approved. It has not been posted or released yet.');
+    }
+
+    public function releaseApPayment($payment)
+    {
+        $this->authorizeAccountingPosting();
+        $companyId = $this->defaultCompanyId();
+
+        DB::transaction(function () use ($payment, $companyId) {
+            $record = DB::table('payments')->where('company_id', $companyId)
+                ->where('id', $payment)->lockForUpdate()->first();
+            abort_unless($record, 404);
+
+            if (strtolower((string) $record->approval_status) !== 'approved') {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'approval_status' => 'The payment must be independently approved before release.',
+                ]);
+            }
+            if ($record->created_by && (int) $record->created_by === (int) auth()->id()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'approval_status' => 'Maker-checker control: the preparer cannot release this payment.',
+                ]);
+            }
+
+            $bill = $this->apBillRecordByNumber($record->bill_no);
+            abort_unless($bill, 422, 'The supplier bill linked to this payment no longer exists.');
+            $balance = max(0, (float) $bill->grand_total - (float) $bill->paid_total);
+            if ((float) $record->amount > $balance + 0.0049) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'amount' => 'Release blocked because the payment exceeds the current bill balance of '.number_format($balance, 2).'.',
+                ]);
+            }
+
+            $issuance = null;
+            if (strcasecmp((string) $record->payment_method, 'Cheque') === 0) {
+                $issuance = $this->activeCheckIssuance($record->id, true);
+                if (!$issuance || (int) $issuance->print_count < 1) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'check' => 'The approved check must be printed and recorded before release.',
+                    ]);
+                }
+            }
+
+            DB::table('payments')->where('id', $record->id)->update([
+                'status' => 'released',
+                'approval_status' => 'Released',
+                'released_by' => auth()->id(),
+                'released_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            if ($issuance) {
+                DB::table('check_issuances')->where('id', $issuance->id)->update([
+                    'status' => 'released',
+                    'released_by' => auth()->id(),
+                    'released_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            app(PostingService::class)->postSupplierPayment($record->id);
+            $this->applyReleasedPaymentToBill($record, $bill);
+
+            app(ActivityLogger::class)->log('released', 'payment', $record->id, [
+                'approval_status' => $record->approval_status,
+            ], [
+                'approval_status' => 'Released',
+                'released_by' => auth()->id(),
+            ], $companyId);
+        });
+
+        return redirect()->route('erp.payables.approvals')->with('status', 'Payment released and posted to the ledger.');
+    }
+
+    public function voidApPayment($payment)
+    {
+        $this->authorizeAccountingPosting();
+        $data = request()->validate(['reason' => 'required|string|min:5|max:1000']);
+        $companyId = $this->defaultCompanyId();
+
+        DB::transaction(function () use ($payment, $companyId, $data) {
+            $record = DB::table('payments')->where('company_id', $companyId)
+                ->where('id', $payment)->lockForUpdate()->first();
+            abort_unless($record, 404);
+            if (in_array(strtolower((string) $record->status), ['voided', 'cancelled'], true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['reason' => 'This payment is already voided.']);
+            }
+
+            $wasReleased = strtolower((string) $record->approval_status) === 'released';
+            $activeCheck = $this->activeCheckIssuance($record->id);
+            if ($activeCheck && $activeCheck->status === 'cleared') {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'reason' => 'A cleared check cannot be voided through the payment screen. Process a documented bank correction instead.',
+                ]);
+            }
+            if ($wasReleased && $record->posting_status === 'posted') {
+                app(PostingService::class)->reverseSource('payment', $record->id, $data['reason']);
+                $this->reverseReleasedPaymentFromBill($record);
+            }
+
+            DB::table('payments')->where('id', $record->id)->update([
+                'status' => 'voided',
+                'approval_status' => 'Voided',
+                'posting_status' => $wasReleased ? 'reversed' : $record->posting_status,
+                'voided_by' => auth()->id(),
+                'voided_at' => now(),
+                'void_reason' => $data['reason'],
+                'updated_at' => now(),
+            ]);
+
+            $issuance = $activeCheck;
+            if ($issuance) {
+                DB::table('check_issuances')->where('id', $issuance->id)->update([
+                    'status' => 'voided',
+                    'voided_by' => auth()->id(),
+                    'voided_at' => now(),
+                    'void_reason' => $data['reason'],
+                    'updated_at' => now(),
+                ]);
+            }
+
+            app(ActivityLogger::class)->log('voided', 'payment', $record->id, [
+                'approval_status' => $record->approval_status,
+            ], [
+                'approval_status' => 'Voided',
+                'reason' => $data['reason'],
+            ], $companyId);
+        });
+
+        return redirect()->route('erp.payables.approvals')->with('status', 'Payment and associated check were voided.');
+    }
+
+    public function replaceCheck($check)
+    {
+        $this->authorizeAccountingPosting();
+        $data = request()->validate([
+            'new_check_no' => 'required|string|max:100',
+            'reason' => 'required|string|min:5|max:1000',
+        ]);
+        $companyId = $this->defaultCompanyId();
+
+        DB::transaction(function () use ($check, $data, $companyId) {
+            $issuance = DB::table('check_issuances')->where('company_id', $companyId)
+                ->where('id', $check)->lockForUpdate()->first();
+            abort_unless($issuance, 404);
+            $payment = DB::table('payments')->where('company_id', $companyId)
+                ->where('id', $issuance->payment_id)->lockForUpdate()->first();
+            abort_unless($payment, 404);
+
+            if ($payment->posting_status === 'posted' || strtolower((string) $payment->approval_status) === 'released') {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'new_check_no' => 'A released check cannot be replaced in place. Void the payment and prepare a new replacement payment.',
+                ]);
+            }
+            if (in_array($issuance->status, ['replaced', 'cleared'], true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['new_check_no' => 'This check can no longer be replaced.']);
+            }
+
+            DB::table('check_issuances')->where('id', $issuance->id)->update([
+                'status' => 'voided',
+                'voided_by' => auth()->id(),
+                'voided_at' => now(),
+                'void_reason' => $data['reason'],
+                'updated_at' => now(),
+            ]);
+            DB::table('payments')->where('id', $payment->id)->update([
+                'check_no' => trim($data['new_check_no']),
+                'updated_at' => now(),
+            ]);
+            $replacement = $this->createCheckIssuanceForPayment($payment->id, $issuance->id);
+
+            app(ActivityLogger::class)->log('replaced', 'check_issuance', $issuance->id, [
+                'check_no' => $issuance->check_no,
+            ], [
+                'check_no' => $replacement->check_no,
+                'replacement_id' => $replacement->id,
+                'reason' => $data['reason'],
+            ], $companyId);
+        });
+
+        return redirect()->route('erp.payables.check-register')->with('status', 'Spoiled check replaced with the new check number.');
+    }
+
+    public function clearCheck($check)
+    {
+        $this->authorizeAccountingPosting();
+        $data = request()->validate([
+            'cleared_at' => 'required|date|before_or_equal:today',
+            'clearing_reference' => 'required|string|max:255',
+        ]);
+        $companyId = $this->defaultCompanyId();
+        $issuance = DB::table('check_issuances')->where('company_id', $companyId)->where('id', $check)->first();
+        abort_unless($issuance, 404);
+        if ($issuance->status !== 'released') {
+            throw \Illuminate\Validation\ValidationException::withMessages(['cleared_at' => 'Only a released check may be marked cleared.']);
+        }
+        if ($data['cleared_at'] < $issuance->check_date) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['cleared_at' => 'Clearing date cannot be earlier than the check date.']);
+        }
+
+        DB::table('check_issuances')->where('id', $issuance->id)->update([
+            'status' => 'cleared',
+            'cleared_at' => $data['cleared_at'].' 00:00:00',
+            'cleared_by' => auth()->id(),
+            'clearing_reference' => $data['clearing_reference'],
+            'updated_at' => now(),
+        ]);
+        app(ActivityLogger::class)->log('cleared', 'check_issuance', $issuance->id, ['status' => 'released'], [
+            'status' => 'cleared',
+            'clearing_reference' => $data['clearing_reference'],
+        ], $companyId);
+
+        return redirect()->route('erp.payables.check-register')->with('status', 'Check marked as cleared.');
+    }
+
+    public function checkRegister()
+    {
+        $checks = DB::table('check_issuances')
+            ->leftJoin('payments', 'payments.id', '=', 'check_issuances.payment_id')
+            ->leftJoin('bank_accounts', 'bank_accounts.id', '=', 'check_issuances.bank_account_id')
+            ->select(
+                'check_issuances.*', 'payments.payment_no', 'payments.voucher_no',
+                'payments.approval_status', 'bank_accounts.bank_name', 'bank_accounts.account_name'
+            )
+            ->where('check_issuances.company_id', $this->defaultCompanyId())
+            ->orderBy('check_issuances.check_date', 'desc')
+            ->orderBy('check_issuances.id', 'desc')
+            ->get();
+
+        return view('erp.payables.check-register', compact('checks'));
     }
 
     public function checkVoucherPrintLayout()
@@ -1478,9 +1961,229 @@ class ModuleController extends Controller
 
     public function checkPrint($payment = null)
     {
+        if (!$payment) {
+            return redirect()->route('erp.payables.approvals')->withErrors([
+                'check' => 'Select a specific approved cheque payment before opening the check printer.',
+            ]);
+        }
+
+        $paymentRecord = $this->paymentRecordForCompany($payment);
+        abort_unless($paymentRecord, 404);
+        $paymentRecord = $this->resolveLegacyPaymentBankAccount($paymentRecord);
+        $errors = $this->checkPrintEligibilityErrors($paymentRecord);
+        if (!empty($errors)) {
+            return redirect()->route('erp.payables.approvals')->withErrors(['check' => reset($errors)]);
+        }
+
+        $issuance = $this->activeCheckIssuance($paymentRecord->id);
+        if (!$issuance) {
+            $issuance = $this->createCheckIssuanceForPayment($paymentRecord->id);
+        }
+        if (trim((string) $issuance->amount_words) === '' || trim((string) $issuance->payee_name) === '') {
+            $payee = trim((string) ($paymentRecord->payee_snapshot ?: $paymentRecord->supplier_name));
+            $amountWords = $this->amountToWords($paymentRecord->amount, $paymentRecord->currency);
+            DB::table('check_issuances')->where('id', $issuance->id)->update([
+                'payee_name' => $payee,
+                'amount_words' => $amountWords,
+                'updated_at' => now(),
+            ]);
+            DB::table('payments')->where('id', $paymentRecord->id)->update([
+                'payee_snapshot' => $payee,
+                'amount_words_snapshot' => $amountWords,
+                'updated_at' => now(),
+            ]);
+            $issuance = DB::table('check_issuances')->where('id', $issuance->id)->first();
+        }
+        if (!in_array($issuance->status, ['assigned', 'printed', 'released'], true)) {
+            return redirect()->route('erp.payables.check-register')->withErrors([
+                'check' => 'A '.strtolower($issuance->status).' check cannot be printed or reprinted.',
+            ]);
+        }
+        $profile = $this->bankCheckLayoutProfile($paymentRecord->bank_account_id, request('profile'));
+
         return view('erp.payables.check-print', [
             'voucher' => $this->paymentPrintData($payment),
+            'checkLayout' => $this->bankCheckPrintLayout($paymentRecord->bank_account_id, request('profile')),
+            'checkLayoutDefaults' => $this->defaultBankCheckPrintLayout(),
+            'checkProfile' => $profile,
+            'checkProfiles' => $this->bankCheckLayoutProfiles($paymentRecord->bank_account_id),
+            'checkIssuance' => $issuance,
+            'canSaveLayout' => $this->canSaveCheckPrintLayout(),
+            'canPrintCheck' => $this->canOperateChecks(),
         ]);
+    }
+
+    public function saveCheckPrintLayout()
+    {
+        abort_unless($this->canSaveCheckPrintLayout(), 403, 'Only an Administrator may save the check print layout.');
+
+        $defaults = $this->defaultBankCheckPrintLayout();
+        $rules = [
+            'layout' => 'required|array',
+            'layout.font_sizes' => 'required|array',
+            'bank_account_id' => 'required|integer',
+            'profile_name' => 'nullable|string|max:100',
+            'printer_name' => 'nullable|string|max:255',
+            'paper_width_mm' => 'required|numeric|between:150,260',
+            'paper_height_mm' => 'required|numeric|between:50,150',
+            'feed_orientation' => 'required|in:top,left,right',
+            'offset_x_mm' => 'required|numeric|between:-50,50',
+            'offset_y_mm' => 'required|numeric|between:-50,50',
+        ];
+
+        foreach (array_keys($defaults['font_sizes']) as $field) {
+            $rules['layout.'.$field] = 'required|array';
+            $rules['layout.'.$field.'.top'] = 'required|numeric|between:-20,120';
+            $rules['layout.'.$field.'.left'] = 'required|numeric|between:-50,260';
+            $rules['layout.font_sizes.'.$field] = 'required|numeric|between:8,24';
+        }
+
+        $validated = request()->validate($rules);
+        $layout = $this->sanitizeBankCheckPrintLayout($validated['layout']);
+        $companyId = $this->defaultCompanyId();
+        $bank = DB::table('bank_accounts')->where('company_id', $companyId)
+            ->where('id', $validated['bank_account_id'])->first();
+        abort_unless($bank, 422, 'The selected bank account is invalid for this company.');
+
+        $profileName = trim((string) ($validated['profile_name'] ?? '')) ?: 'Default';
+        $profileId = DB::transaction(function () use ($validated, $layout, $companyId, $profileName) {
+            $current = DB::table('check_layout_profiles')
+                ->where('company_id', $companyId)
+                ->where('bank_account_id', $validated['bank_account_id'])
+                ->where('profile_name', $profileName)
+                ->where('is_active', true)
+                ->lockForUpdate()
+                ->first();
+            $version = ((int) DB::table('check_layout_profiles')
+                ->where('company_id', $companyId)
+                ->where('bank_account_id', $validated['bank_account_id'])
+                ->where('profile_name', $profileName)
+                ->max('version')) + 1;
+
+            DB::table('check_layout_profiles')
+                ->where('company_id', $companyId)
+                ->where('bank_account_id', $validated['bank_account_id'])
+                ->where('profile_name', $profileName)
+                ->update(['is_active' => false, 'updated_at' => now()]);
+
+            $id = DB::table('check_layout_profiles')->insertGetId([
+                'company_id' => $companyId,
+                'bank_account_id' => $validated['bank_account_id'],
+                'profile_name' => $profileName,
+                'printer_name' => $validated['printer_name'] ?? null,
+                'paper_width_mm' => $validated['paper_width_mm'],
+                'paper_height_mm' => $validated['paper_height_mm'],
+                'feed_orientation' => $validated['feed_orientation'],
+                'offset_x_mm' => $validated['offset_x_mm'],
+                'offset_y_mm' => $validated['offset_y_mm'],
+                'positions' => json_encode(array_diff_key($layout, ['font_sizes' => true])),
+                'field_styles' => json_encode(['font_sizes' => $layout['font_sizes']]),
+                'version' => $version,
+                'is_active' => true,
+                'created_by' => auth()->id(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            app(ActivityLogger::class)->log('versioned', 'check_layout_profile', $id, $current ? (array) $current : [], [
+                'profile_name' => $profileName,
+                'version' => $version,
+                'bank_account_id' => $validated['bank_account_id'],
+            ], $companyId);
+
+            return $id;
+        });
+
+        return response()->json([
+            'status' => 'Layout saved as a new bank/printer profile version.',
+            'layout' => $layout,
+            'profile' => $this->checkLayoutProfileArray(DB::table('check_layout_profiles')->where('id', $profileId)->first()),
+        ]);
+    }
+
+    public function recordCheckPrint($payment)
+    {
+        abort_unless($this->canOperateChecks(), 403, 'Only Finance or an Administrator may print checks.');
+        $data = request()->validate(['reason' => 'nullable|string|max:1000']);
+        $companyId = $this->defaultCompanyId();
+
+        $event = DB::transaction(function () use ($payment, $data, $companyId) {
+            $record = DB::table('payments')->where('company_id', $companyId)
+                ->where('id', $payment)->lockForUpdate()->first();
+            abort_unless($record, 404);
+            $errors = $this->checkPrintEligibilityErrors($record);
+            if (!empty($errors)) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['check' => reset($errors)]);
+            }
+
+            $issuance = $this->activeCheckIssuance($record->id, true);
+            abort_unless($issuance, 422, 'No active check issuance exists for this payment.');
+            if (!in_array($issuance->status, ['assigned', 'printed', 'released'], true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'check' => 'A '.strtolower($issuance->status).' check cannot be printed or reprinted.',
+                ]);
+            }
+            $isReprint = (int) $issuance->print_count > 0;
+            $reason = trim((string) ($data['reason'] ?? ''));
+            if ($isReprint && strlen($reason) < 5) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'reason' => 'A reason of at least five characters is required for every reprint.',
+                ]);
+            }
+
+            $profile = $this->bankCheckLayoutProfile($record->bank_account_id, request('profile_id'));
+            $layout = $this->bankCheckPrintLayout($record->bank_account_id, request('profile_id'));
+            $payload = [
+                'payment_id' => $record->id,
+                'payment_no' => $record->payment_no,
+                'voucher_no' => $record->voucher_no,
+                'check_no' => $issuance->check_no,
+                'check_date' => $issuance->check_date,
+                'payee' => $issuance->payee_name,
+                'currency' => $issuance->currency,
+                'amount' => (float) $issuance->amount,
+                'amount_words' => $issuance->amount_words,
+            ];
+            $layoutSnapshot = ['profile' => $profile, 'layout' => $layout];
+            $hash = hash('sha256', json_encode([$payload, $layoutSnapshot]));
+
+            $eventId = DB::table('check_print_events')->insertGetId([
+                'company_id' => $companyId,
+                'check_issuance_id' => $issuance->id,
+                'payment_id' => $record->id,
+                'layout_profile_id' => $profile['id'],
+                'event_type' => $isReprint ? 'reprint_requested' : 'original_print_requested',
+                'reason' => $reason ?: null,
+                'layout_snapshot' => json_encode($layoutSnapshot),
+                'payload_snapshot' => json_encode($payload),
+                'payload_hash' => $hash,
+                'printed_by' => auth()->id(),
+                'ip_address' => request()->ip(),
+                'user_agent' => substr((string) request()->userAgent(), 0, 1000),
+                'created_at' => now(),
+            ]);
+
+            DB::table('check_issuances')->where('id', $issuance->id)->update([
+                'status' => in_array($issuance->status, ['released', 'cleared'], true) ? $issuance->status : 'printed',
+                'print_count' => (int) $issuance->print_count + 1,
+                'first_printed_at' => $issuance->first_printed_at ?: now(),
+                'first_printed_by' => $issuance->first_printed_by ?: auth()->id(),
+                'last_printed_at' => now(),
+                'last_printed_by' => auth()->id(),
+                'updated_at' => now(),
+            ]);
+
+            app(ActivityLogger::class)->log($isReprint ? 'reprint_requested' : 'print_requested', 'check_issuance', $issuance->id, [], [
+                'check_no' => $issuance->check_no,
+                'event_id' => $eventId,
+                'reason' => $reason ?: null,
+                'payload_hash' => $hash,
+            ], $companyId);
+
+            return ['id' => $eventId, 'is_reprint' => $isReprint, 'print_count' => (int) $issuance->print_count + 1];
+        });
+
+        return response()->json(['status' => 'Print request recorded.', 'event' => $event]);
     }
 
     public function apAging()
@@ -1787,6 +2490,7 @@ class ModuleController extends Controller
                 'suppliers.code as supplier_code',
                 'suppliers.name as supplier_name'
             )
+            ->where('purchase_documents.company_id', $this->defaultCompanyId())
             ->whereNotIn('purchase_documents.status', ['paid', 'cancelled', 'voided'])
             ->orderBy('purchase_documents.document_date', 'desc')
             ->get()
@@ -1814,11 +2518,25 @@ class ModuleController extends Controller
             $bill = $this->apBillRecordByNumber($data['bill_no']);
             $supplierId = $bill ? $bill->supplier_id : $this->supplierIdForAp($companyId, $data);
             $amount = $this->moneyToFloat($data['amount']);
+            $currency = strtoupper($data['currency']);
+            $exchangeRate = $currency === 'PHP' ? 1 : max(0.000001, $this->moneyToFloat($data['exchange_rate'] ?? 1));
             $paymentNo = trim((string) ($data['payment_no'] ?? ''));
             if ($paymentNo === '') {
                 $paymentNo = $this->nextDocumentNumber('payment_voucher', 'PV-', 5);
             }
             $voucherNo = $this->nextDocumentNumber('check_voucher', 'CV-', 5);
+            $bankAccountId = null;
+            if (!empty($data['bank_account_id'])) {
+                $bankAccountId = (int) $data['bank_account_id'];
+            } elseif (!empty($data['bank_account']) && Schema::hasTable('bank_accounts')) {
+                $bankAccountId = DB::table('bank_accounts')
+                    ->where('company_id', $companyId)
+                    ->where(function ($query) use ($data) {
+                        $query->where('account_no', $data['bank_account'])
+                            ->orWhere('account_name', $data['bank_account']);
+                    })
+                    ->value('id');
+            }
 
             $paymentId = DB::table('payments')->insertGetId($this->tablePayload('payments', [
                 'company_id' => $companyId,
@@ -1829,18 +2547,21 @@ class ModuleController extends Controller
                 'voucher_no' => $voucherNo,
                 'payment_date' => $data['payment_date'],
                 'payment_method' => $data['payment_method'],
+                'bank_account_id' => $bankAccountId,
                 'bank_account' => $data['bank_account'] ?? null,
                 'check_no' => $data['check_no'] ?? null,
-                'currency' => strtoupper($data['currency']),
-                'exchange_rate' => 1,
+                'currency' => $currency,
+                'exchange_rate' => $exchangeRate,
                 'amount' => $amount,
-                'status' => strtolower(str_replace(' ', '_', $data['approval_status'])),
-                'approval_status' => $data['approval_status'],
+                'status' => 'for_approval',
+                'approval_status' => 'For Approval',
+                'created_by' => auth()->id(),
+                'submitted_at' => now(),
+                'payee_snapshot' => $bill->supplier_name ?: ($data['supplier_name'] ?? 'Unknown Payee'),
+                'amount_words_snapshot' => $this->amountToWords($amount, $currency),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]));
-
-            $isReleasedPayment = in_array($data['approval_status'], ['Approved', 'Released']);
 
             if ($bill && Schema::hasTable('payment_applications')) {
                 DB::table('payment_applications')->insert($this->tablePayload('payment_applications', [
@@ -1852,20 +2573,143 @@ class ModuleController extends Controller
                 ]));
             }
 
-            if ($bill && $isReleasedPayment) {
-                $paidTotal = min((float) $bill->grand_total, (float) $bill->paid_total + $amount);
-                DB::table('purchase_documents')->where('id', $bill->id)->update([
-                    'paid_total' => $paidTotal,
-                    'status' => $paidTotal >= (float) $bill->grand_total ? 'paid' : 'partially_paid',
-                    'approval_status' => $data['approval_status'],
-                    'updated_at' => now(),
-                ]);
+            if (strcasecmp($data['payment_method'], 'Cheque') === 0) {
+                $this->createCheckIssuanceForPayment($paymentId);
             }
 
             $this->storeDocumentAttachments('payment', $paymentId, request()->file('attachments', []));
 
+            app(ActivityLogger::class)->log('submitted', 'payment', $paymentId, [], [
+                'payment_no' => $paymentNo,
+                'bill_no' => $data['bill_no'],
+                'amount' => $amount,
+                'status' => 'For Approval',
+            ], $companyId);
+
             return $this->paymentArrayById($paymentId);
         });
+    }
+
+    private function createCheckIssuanceForPayment($paymentId, $replacementFor = null)
+    {
+        $payment = DB::table('payments')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'payments.supplier_id')
+            ->select('payments.*', 'suppliers.name as supplier_name')
+            ->where('payments.company_id', $this->defaultCompanyId())
+            ->where('payments.id', $paymentId)
+            ->first();
+
+        if (!$payment || strcasecmp((string) $payment->payment_method, 'Cheque') !== 0) {
+            return null;
+        }
+        if (empty($payment->bank_account_id) || trim((string) $payment->check_no) === '') {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'check_no' => 'A cheque requires both a bank account and check number.',
+            ]);
+        }
+
+        $existing = DB::table('check_issuances')->where('payment_id', $payment->id)
+            ->whereNotIn('status', ['voided', 'replaced'])->orderBy('id', 'desc')->first();
+        if ($existing && !$replacementFor) {
+            return $existing;
+        }
+
+        $bankKey = 'ID:'.(int) $payment->bank_account_id;
+        $duplicate = DB::table('check_issuances')
+            ->where('company_id', $payment->company_id)
+            ->where('bank_account_key', $bankKey)
+            ->where('check_no', trim($payment->check_no))
+            ->exists();
+        if ($duplicate) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'check_no' => 'Check number '.trim($payment->check_no).' is already assigned to this bank account.',
+            ]);
+        }
+
+        $payee = trim((string) ($payment->payee_snapshot ?: $payment->supplier_name));
+        $amountWords = $payment->amount_words_snapshot ?: $this->amountToWords($payment->amount, $payment->currency);
+        DB::table('payments')->where('id', $payment->id)->update([
+            'payee_snapshot' => $payee,
+            'amount_words_snapshot' => $amountWords,
+            'updated_at' => now(),
+        ]);
+
+        $issuanceId = DB::table('check_issuances')->insertGetId([
+            'company_id' => $payment->company_id,
+            'payment_id' => $payment->id,
+            'bank_account_id' => $payment->bank_account_id,
+            'bank_account_key' => $bankKey,
+            'check_no' => trim($payment->check_no),
+            'check_date' => $payment->payment_date,
+            'payee_name' => $payee,
+            'currency' => strtoupper($payment->currency ?: 'PHP'),
+            'amount' => $payment->amount,
+            'amount_words' => $amountWords,
+            'status' => 'assigned',
+            'print_count' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        if ($replacementFor) {
+            DB::table('check_issuances')->where('id', $replacementFor)->update([
+                'status' => 'replaced',
+                'replaced_by_check_issuance_id' => $issuanceId,
+                'updated_at' => now(),
+            ]);
+        }
+
+        return DB::table('check_issuances')->where('id', $issuanceId)->first();
+    }
+
+    private function activeCheckIssuance($paymentId, $lock = false)
+    {
+        if (!Schema::hasTable('check_issuances')) {
+            return null;
+        }
+
+        $query = DB::table('check_issuances')
+            ->where('company_id', $this->defaultCompanyId())
+            ->where('payment_id', $paymentId)
+            ->whereNotIn('status', ['voided', 'replaced'])
+            ->orderBy('id', 'desc');
+
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        return $query->first();
+    }
+
+    private function applyReleasedPaymentToBill($payment, $bill = null)
+    {
+        $bill = $bill ?: $this->apBillRecordByNumber($payment->bill_no);
+        if (!$bill) {
+            return;
+        }
+
+        $paidTotal = min((float) $bill->grand_total, (float) $bill->paid_total + (float) $payment->amount);
+        DB::table('purchase_documents')->where('company_id', $payment->company_id)->where('id', $bill->id)->update([
+            'paid_total' => $paidTotal,
+            'status' => $paidTotal >= (float) $bill->grand_total ? 'paid' : 'partially_paid',
+            'approval_status' => 'Released',
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function reverseReleasedPaymentFromBill($payment)
+    {
+        $bill = $this->apBillRecordByNumber($payment->bill_no);
+        if (!$bill) {
+            return;
+        }
+
+        $paidTotal = max(0, (float) $bill->paid_total - (float) $payment->amount);
+        DB::table('purchase_documents')->where('company_id', $payment->company_id)->where('id', $bill->id)->update([
+            'paid_total' => $paidTotal,
+            'status' => $paidTotal <= 0 ? 'for_payment' : 'partially_paid',
+            'updated_at' => now(),
+        ]);
     }
 
     private function apPaymentRows()
@@ -1877,19 +2721,39 @@ class ModuleController extends Controller
         return DB::table('payments')
             ->leftJoin('suppliers', 'suppliers.id', '=', 'payments.supplier_id')
             ->select('payments.*', 'suppliers.name as supplier_name')
+            ->where('payments.company_id', $this->defaultCompanyId())
             ->orderBy('payments.payment_date', 'desc')
             ->orderBy('payments.id', 'desc')
             ->get()
             ->map(function ($payment) {
+                $issuance = $this->activeCheckIssuance($payment->id);
+                $status = $payment->approval_status ?: ucwords(str_replace('_', ' ', $payment->status));
+                $isCheque = strcasecmp((string) $payment->payment_method, 'Cheque') === 0;
+                $roleCanControl = $this->canOperateChecks();
+
                 return [
                     'id' => $payment->id,
                     'payment_no' => $payment->payment_no,
-                    'supplier' => $payment->supplier_name ?: '-',
+                    'supplier' => $payment->payee_snapshot ?: ($payment->supplier_name ?: '-'),
                     'shipment_job_id' => $payment->shipment_job_id ?: '-',
                     'check_no' => $payment->check_no ?: '-',
                     'currency' => $payment->currency ?: 'PHP',
                     'amount' => number_format((float) $payment->amount, 2),
-                    'status' => $payment->approval_status ?: ucwords(str_replace('_', ' ', $payment->status)),
+                    'status' => $status,
+                    'payment_method' => $payment->payment_method,
+                    'check_status' => $issuance ? $issuance->status : null,
+                    'print_count' => $issuance ? (int) $issuance->print_count : 0,
+                    'can_approve' => $roleCanControl
+                        && in_array(strtolower((string) $status), ['for approval', 'pending'], true)
+                        && (!$payment->created_by || (int) $payment->created_by !== (int) auth()->id()),
+                    'can_release' => $roleCanControl
+                        && strtolower((string) $status) === 'approved'
+                        && (!$payment->created_by || (int) $payment->created_by !== (int) auth()->id())
+                        && (!$isCheque || ($issuance && (int) $issuance->print_count > 0)),
+                    'can_print' => $roleCanControl && $isCheque
+                        && in_array(strtolower((string) $status), ['approved', 'released'], true),
+                    'can_void' => $roleCanControl
+                        && !in_array(strtolower((string) $status), ['voided', 'cancelled'], true),
                 ];
             })
             ->all();
@@ -1908,6 +2772,7 @@ class ModuleController extends Controller
                 'suppliers.code as supplier_code',
                 'suppliers.name as supplier_name'
             )
+            ->where('purchase_documents.company_id', $this->defaultCompanyId())
             ->whereNotIn('purchase_documents.status', ['paid', 'cancelled', 'voided'])
             ->orderBy('purchase_documents.due_date')
             ->get()
@@ -1944,7 +2809,8 @@ class ModuleController extends Controller
 
         $query = DB::table('payments')
             ->leftJoin('suppliers', 'suppliers.id', '=', 'payments.supplier_id')
-            ->select('payments.*', 'suppliers.name as supplier_name');
+            ->select('payments.*', 'suppliers.name as supplier_name')
+            ->where('payments.company_id', $this->defaultCompanyId());
 
         $payment = $paymentId
             ? $query->where('payments.id', $paymentId)->first()
@@ -1959,7 +2825,9 @@ class ModuleController extends Controller
         $wht = $bill ? (float) $bill->withholding_tax_amount : 0;
         $net = (float) $payment->amount;
 
-        $documentDate = now()->format('m/d/Y');
+        $documentDate = !empty($payment->payment_date)
+            ? date('m/d/Y', strtotime($payment->payment_date))
+            : now()->format('m/d/Y');
         $accountNo = '-';
         if (!empty($payment->bank_account) && preg_match('/(?:CA#|SA#|Acct#|Account#)\s*([A-Za-z0-9\-]+)/i', $payment->bank_account, $matches)) {
             $accountNo = $matches[1];
@@ -1972,11 +2840,11 @@ class ModuleController extends Controller
             'document_date' => $documentDate,
             'payment_no' => $payment->payment_no,
             'company' => DB::table('companies')->where('id', $payment->company_id)->value('name') ?: 'SeaJet Holdings Inc.',
-            'supplier' => $payment->supplier_name ?: '-',
+            'supplier' => $payment->payee_snapshot ?: ($payment->supplier_name ?: '-'),
             'shipment_job_id' => $payment->shipment_job_id ?: '-',
             'payment_method' => $payment->payment_method,
             'bank_account' => $payment->bank_account ?: '-',
-            'account_name' => $payment->supplier_name ?: '-',
+            'account_name' => $payment->payee_snapshot ?: ($payment->supplier_name ?: '-'),
             'account_no' => $accountNo,
             'check_no' => $payment->check_no ?: '-',
             'bill_no' => $payment->bill_no,
@@ -1987,8 +2855,242 @@ class ModuleController extends Controller
             'net' => $net,
             'debit_account_title' => 'A/P-Trade ('.($payment->bank_account ?: ($payment->currency ?: 'PHP')).')',
             'credit_account_title' => 'Cash in Bank-'.$payment->bank_account,
-            'amount_words' => $this->amountToWords($net, $payment->currency ?: 'PHP'),
+            'amount_words' => $payment->amount_words_snapshot ?: $this->amountToWords($net, $payment->currency ?: 'PHP'),
         ];
+    }
+
+    private function paymentRecordForCompany($paymentId)
+    {
+        return DB::table('payments')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'payments.supplier_id')
+            ->select('payments.*', 'suppliers.name as supplier_name')
+            ->where('payments.company_id', $this->defaultCompanyId())
+            ->where('payments.id', $paymentId)
+            ->first();
+    }
+
+    private function resolveLegacyPaymentBankAccount($payment)
+    {
+        if (!$payment || !empty($payment->bank_account_id) || !Schema::hasTable('bank_accounts')) {
+            return $payment;
+        }
+
+        $label = strtoupper(trim((string) $payment->bank_account));
+        $currency = strtoupper((string) ($payment->currency ?: 'PHP'));
+        $banks = DB::table('bank_accounts')->where('company_id', $payment->company_id)
+            ->where('currency', $currency)->where('is_active', true)->get();
+        $match = $banks->first(function ($bank) use ($label) {
+            return $label === strtoupper((string) $bank->account_no)
+                || $label === strtoupper((string) $bank->account_name)
+                || strpos($label, strtoupper((string) $bank->account_no)) !== false
+                || (strpos($label, strtoupper((string) $bank->bank_name)) !== false
+                    && strpos($label, 'USD') !== false);
+        });
+
+        if ($match) {
+            DB::table('payments')->where('id', $payment->id)->update([
+                'bank_account_id' => $match->id,
+                'updated_at' => now(),
+            ]);
+            $payment->bank_account_id = $match->id;
+        }
+
+        return $payment;
+    }
+
+    private function checkPrintEligibilityErrors($payment)
+    {
+        $errors = [];
+        if (!$payment) {
+            return ['payment' => 'Payment not found.'];
+        }
+        if (strcasecmp((string) $payment->payment_method, 'Cheque') !== 0) {
+            $errors['payment_method'] = 'Only payments using the Cheque method can be printed on check stock.';
+        }
+        if (!in_array(strtolower((string) $payment->approval_status), ['approved', 'released'], true)) {
+            $errors['approval_status'] = 'The payment must be approved before check printing.';
+        }
+        if (empty($payment->bank_account_id)) {
+            $errors['bank_account'] = 'A valid company bank account is required before check printing.';
+        }
+        if (trim((string) $payment->check_no) === '') {
+            $errors['check_no'] = 'A check number is required before printing.';
+        }
+        if ((float) $payment->amount <= 0) {
+            $errors['amount'] = 'The check amount must be greater than zero.';
+        }
+        if (trim((string) ($payment->payee_snapshot ?: $payment->supplier_name)) === '') {
+            $errors['payee'] = 'A payee is required before printing.';
+        }
+        if (in_array(strtolower((string) $payment->status), ['voided', 'cancelled'], true)) {
+            $errors['status'] = 'A voided or cancelled payment cannot be printed.';
+        }
+
+        return $errors;
+    }
+
+    private function canOperateChecks()
+    {
+        $role = strtolower((string) (auth()->user()->role ?? 'viewer'));
+
+        return in_array($role, ['administrator', 'admin', 'finance'], true);
+    }
+
+    private function bankCheckPrintLayout($bankAccountId = null, $profileId = null)
+    {
+        $defaults = $this->defaultBankCheckPrintLayout();
+
+        if (Schema::hasTable('check_layout_profiles') && $bankAccountId) {
+            $profile = $this->bankCheckLayoutProfile($bankAccountId, $profileId);
+            if (!empty($profile['id'])) {
+                $saved = DB::table('check_layout_profiles')->where('id', $profile['id'])->first();
+                $positions = json_decode($saved->positions ?: '{}', true) ?: [];
+                $styles = json_decode($saved->field_styles ?: '{}', true) ?: [];
+                $positions['font_sizes'] = isset($styles['font_sizes']) && is_array($styles['font_sizes'])
+                    ? $styles['font_sizes']
+                    : [];
+
+                return $this->sanitizeBankCheckPrintLayout($positions);
+            }
+        }
+
+        if (!Schema::hasTable('print_layouts')) {
+            return $defaults;
+        }
+
+        $saved = DB::table('print_layouts')
+            ->where('company_id', $this->defaultCompanyId())
+            ->where('document_type', 'bank_check')
+            ->where('layout_name', 'Default')
+            ->first();
+
+        if (!$saved) {
+            return $defaults;
+        }
+
+        $positions = json_decode($saved->positions ?: '{}', true) ?: [];
+        $styles = json_decode($saved->field_styles ?: '{}', true) ?: [];
+        $positions['font_sizes'] = isset($styles['font_sizes']) && is_array($styles['font_sizes'])
+            ? $styles['font_sizes']
+            : [];
+
+        return $this->sanitizeBankCheckPrintLayout($positions);
+    }
+
+    private function bankCheckLayoutProfile($bankAccountId, $profileId = null)
+    {
+        $profile = null;
+        if (Schema::hasTable('check_layout_profiles') && $bankAccountId) {
+            $query = DB::table('check_layout_profiles')
+                ->where('company_id', $this->defaultCompanyId())
+                ->where('bank_account_id', $bankAccountId);
+            if ($profileId) {
+                $profile = $query->where('id', $profileId)->first();
+            } else {
+                $profile = $query->where('is_active', true)->orderBy('version', 'desc')->orderBy('id', 'desc')->first();
+            }
+        }
+
+        if ($profile) {
+            return $this->checkLayoutProfileArray($profile);
+        }
+
+        return [
+            'id' => null,
+            'bank_account_id' => $bankAccountId ? (int) $bankAccountId : null,
+            'profile_name' => 'Default',
+            'printer_name' => '',
+            'paper_width_mm' => 210,
+            'paper_height_mm' => 88.9,
+            'feed_orientation' => 'top',
+            'offset_x_mm' => 0,
+            'offset_y_mm' => 0,
+            'version' => 0,
+        ];
+    }
+
+    private function bankCheckLayoutProfiles($bankAccountId)
+    {
+        if (!Schema::hasTable('check_layout_profiles') || !$bankAccountId) {
+            return [];
+        }
+
+        return DB::table('check_layout_profiles')
+            ->where('company_id', $this->defaultCompanyId())
+            ->where('bank_account_id', $bankAccountId)
+            ->where('is_active', true)
+            ->orderBy('profile_name')
+            ->get()
+            ->map(function ($profile) {
+                return $this->checkLayoutProfileArray($profile);
+            })
+            ->all();
+    }
+
+    private function checkLayoutProfileArray($profile)
+    {
+        return [
+            'id' => $profile ? (int) $profile->id : null,
+            'bank_account_id' => $profile && $profile->bank_account_id ? (int) $profile->bank_account_id : null,
+            'profile_name' => $profile ? $profile->profile_name : 'Default',
+            'printer_name' => $profile ? ($profile->printer_name ?: '') : '',
+            'paper_width_mm' => $profile ? (float) $profile->paper_width_mm : 210,
+            'paper_height_mm' => $profile ? (float) $profile->paper_height_mm : 88.9,
+            'feed_orientation' => $profile ? $profile->feed_orientation : 'top',
+            'offset_x_mm' => $profile ? (float) $profile->offset_x_mm : 0,
+            'offset_y_mm' => $profile ? (float) $profile->offset_y_mm : 0,
+            'version' => $profile ? (int) $profile->version : 0,
+        ];
+    }
+
+    private function defaultBankCheckPrintLayout()
+    {
+        return [
+            'font_sizes' => [
+                'date_m1' => 12, 'date_m2' => 12, 'date_d1' => 12, 'date_d2' => 12,
+                'date_y1' => 12, 'date_y2' => 12, 'date_y3' => 12, 'date_y4' => 12,
+                'payee' => 12, 'amount_words' => 12, 'amount_figures' => 12,
+            ],
+            'date_m1' => ['top' => 12, 'left' => 175],
+            'date_m2' => ['top' => 12, 'left' => 179],
+            'date_d1' => ['top' => 12, 'left' => 185],
+            'date_d2' => ['top' => 12, 'left' => 189],
+            'date_y1' => ['top' => 12, 'left' => 195],
+            'date_y2' => ['top' => 12, 'left' => 199],
+            'date_y3' => ['top' => 12, 'left' => 203],
+            'date_y4' => ['top' => 12, 'left' => 207],
+            'payee' => ['top' => 28, 'left' => 22],
+            'amount_words' => ['top' => 36, 'left' => 22],
+            'amount_figures' => ['top' => 28, 'left' => 178],
+        ];
+    }
+
+    private function sanitizeBankCheckPrintLayout($layout)
+    {
+        $defaults = $this->defaultBankCheckPrintLayout();
+        $clean = ['font_sizes' => []];
+        $layout = is_array($layout) ? $layout : [];
+        $fontSizes = isset($layout['font_sizes']) && is_array($layout['font_sizes'])
+            ? $layout['font_sizes']
+            : [];
+
+        foreach ($defaults['font_sizes'] as $field => $defaultFontSize) {
+            $point = isset($layout[$field]) && is_array($layout[$field]) ? $layout[$field] : [];
+            $clean[$field] = [
+                'top' => round(max(-20, min(120, (float) ($point['top'] ?? $defaults[$field]['top']))), 1),
+                'left' => round(max(-50, min(260, (float) ($point['left'] ?? $defaults[$field]['left']))), 1),
+            ];
+            $clean['font_sizes'][$field] = round(max(8, min(24, (float) ($fontSizes[$field] ?? $defaultFontSize))), 1);
+        }
+
+        return $clean;
+    }
+
+    private function canSaveCheckPrintLayout()
+    {
+        $role = strtolower((string) (auth()->user()->role ?? 'viewer'));
+
+        return in_array($role, ['administrator', 'admin'], true);
     }
 
     private function checkVoucherPrintLayoutPayload($fromRequest = false)
@@ -2291,6 +3393,7 @@ class ModuleController extends Controller
         return DB::table('purchase_documents')
             ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_documents.supplier_id')
             ->select('purchase_documents.*', 'suppliers.code as supplier_code', 'suppliers.name as supplier_name')
+            ->where('purchase_documents.company_id', $this->defaultCompanyId())
             ->where('purchase_documents.document_no', $documentNo)
             ->first();
     }
@@ -2395,6 +3498,7 @@ class ModuleController extends Controller
         }
 
         return DB::table('payments')
+            ->where('company_id', $this->defaultCompanyId())
             ->where('bill_no', $billNo)
             ->orderBy('payment_date', 'desc')
             ->orderBy('id', 'desc')
@@ -2406,6 +3510,7 @@ class ModuleController extends Controller
         $payment = DB::table('payments')
             ->leftJoin('suppliers', 'suppliers.id', '=', 'payments.supplier_id')
             ->select('payments.*', 'suppliers.code as supplier_code', 'suppliers.name as supplier_name')
+            ->where('payments.company_id', $this->defaultCompanyId())
             ->where('payments.id', $id)
             ->first();
 
@@ -2518,16 +3623,17 @@ class ModuleController extends Controller
 
     private function amountToWords($amount, $currency)
     {
-        $whole = (int) floor((float) $amount);
-        $cents = (int) round(((float) $amount - $whole) * 100);
+        $rounded = round(max(0, (float) $amount), 2);
+        $whole = (int) floor($rounded);
+        $cents = (int) round(($rounded - $whole) * 100);
+        if ($cents >= 100) {
+            $whole++;
+            $cents = 0;
+        }
         $major = strtoupper($currency) === 'USD' ? 'Dollars' : 'Pesos';
         $words = $this->numberToWords($whole).' '.$major;
 
-        if ($cents > 0) {
-            $words .= ' and '.$this->numberToWords($cents).'/100';
-        }
-
-        return $words.' Only';
+        return $words.' and '.str_pad((string) $cents, 2, '0', STR_PAD_LEFT).'/100 Only';
     }
 
     private function numberToWords($number)
@@ -2539,7 +3645,7 @@ class ModuleController extends Controller
 
         $ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
         $tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-        $scales = ['', 'Thousand', 'Million', 'Billion'];
+        $scales = ['', 'Thousand', 'Million', 'Billion', 'Trillion', 'Quadrillion'];
         $parts = [];
         $scale = 0;
 
@@ -2570,12 +3676,7 @@ class ModuleController extends Controller
     public function cashbook()
     {
         $accounts = $this->bankAccounts();
-        $transactions = [
-            ['2026-05-24', 'BPI Operating - PHP', 'Deposit', 'OR-2026-00618', 'PHP', 43200, 0, 1066700, 'Matched'],
-            ['2026-05-24', 'BPI Operating - PHP', 'Withdrawal', 'PV-2026-00313', 'PHP', 0, 121505, 945195, 'For Reconciliation'],
-            ['2026-05-23', 'Metrobank USD Collections - USD', 'Deposit', 'SOAA-2026-00211', 'USD', 1840, 0, 20260, 'Matched'],
-            ['2026-05-23', 'BDO Payroll - PHP', 'Withdrawal', 'PAY-2026-00112', 'PHP', 0, 76000, 200000, 'Cleared'],
-        ];
+        $transactions = $this->cashbookRows();
 
         return view('erp.banking.cashbook', compact('accounts', 'transactions'));
     }
@@ -2608,11 +3709,11 @@ class ModuleController extends Controller
 
     public function bankReconciliation()
     {
-        $rows = [
-            ['2026-05-24', 'OR-2026-00618', 'Deposit', 'PHP', '43,200.00', 'Books and bank matched'],
-            ['2026-05-24', 'PV-2026-00313', 'Withdrawal', 'PHP', '121,505.00', 'Outstanding check'],
-            ['2026-05-23', 'SOAA-2026-00211', 'Deposit', 'USD', '1,840.00', 'FX deposit matched'],
-        ];
+        $rows = collect($this->cashbookRows())
+            ->filter(function ($row) { return $row[8] !== 'Reconciled'; })
+            ->map(function ($row) {
+                return [$row[0], $row[3], $row[2], $row[4], number_format($row[5] > 0 ? $row[5] : $row[6], 2), 'Outstanding in bank reconciliation'];
+            })->values()->all();
 
         return view('erp.banking.reconciliation', [
             'accounts' => $this->bankAccounts(),
@@ -2726,25 +3827,83 @@ class ModuleController extends Controller
     public function dailyCashPosition()
     {
         $accounts = $this->bankAccounts();
-        $summary = [
-            ['PHP', 'Opening Cash', 1219500],
-            ['PHP', 'Deposits', 43200],
-            ['PHP', 'Withdrawals', -197505],
-            ['USD', 'Opening Cash', 18420],
-            ['USD', 'Deposits', 1840],
-            ['USD', 'Withdrawals', 0],
-        ];
+        $summary = [];
+        $today = date('Y-m-d');
+        foreach (collect($accounts)->groupBy('currency') as $currency => $currencyAccounts) {
+            $bankIds = $currencyAccounts->pluck('id')->all();
+            $deposits = (float) DB::table('bank_transactions')->whereIn('bank_account_id', $bankIds)->where('transaction_date', $today)->sum('debit');
+            $withdrawals = (float) DB::table('bank_transactions')->whereIn('bank_account_id', $bankIds)->where('transaction_date', $today)->sum('credit');
+            $ending = $currencyAccounts->sum(function ($account) { return (float) str_replace(',', '', $account['book_balance']); });
+            $summary[] = [$currency, 'Opening Cash', $ending - $deposits + $withdrawals];
+            $summary[] = [$currency, 'Deposits', $deposits];
+            $summary[] = [$currency, 'Withdrawals', -$withdrawals];
+            $summary[] = [$currency, 'Ending Cash', $ending];
+        }
 
         return view('erp.banking.daily-cash-position', compact('accounts', 'summary'));
     }
 
     private function bankAccounts()
     {
-        return [
-            ['code' => 'BPI-PHP-001', 'name' => 'BPI Operating - PHP', 'bank' => 'BPI', 'account_no' => '0012-3456-78', 'currency' => 'PHP', 'book_balance' => '945,195.00', 'bank_balance' => '1,066,700.00'],
-            ['code' => 'MBTC-USD-001', 'name' => 'Metrobank USD Collections - USD', 'bank' => 'Metrobank', 'account_no' => '9988-1200-45', 'currency' => 'USD', 'book_balance' => '20,260.00', 'bank_balance' => '20,260.00'],
-            ['code' => 'BDO-PHP-002', 'name' => 'BDO Payroll - PHP', 'bank' => 'BDO', 'account_no' => '7755-3001-22', 'currency' => 'PHP', 'book_balance' => '200,000.00', 'bank_balance' => '200,000.00'],
-        ];
+        if (!Schema::hasTable('bank_accounts')) {
+            return [];
+        }
+
+        return DB::table('bank_accounts')
+            ->where('company_id', $this->defaultCompanyId())
+            ->where('is_active', true)
+            ->orderBy('bank_name')
+            ->orderBy('account_name')
+            ->get()
+            ->map(function ($bank) {
+                return [
+                    'id' => $bank->id,
+                    'code' => $bank->account_no,
+                    'name' => $bank->account_name,
+                    'bank' => $bank->bank_name,
+                    'account_no' => $bank->account_no,
+                    'currency' => $bank->currency ?: 'PHP',
+                    'book_balance' => number_format((float) $bank->book_balance, 2),
+                    'bank_balance' => number_format((float) ($bank->bank_balance ?? $bank->book_balance), 2),
+                ];
+            })
+            ->all();
+    }
+
+    private function cashbookRows()
+    {
+        if (!Schema::hasTable('bank_transactions')) {
+            return [];
+        }
+
+        $records = DB::table('bank_transactions')
+            ->join('bank_accounts', 'bank_accounts.id', '=', 'bank_transactions.bank_account_id')
+            ->where('bank_accounts.company_id', $this->defaultCompanyId())
+            ->select('bank_transactions.*', 'bank_accounts.account_name', 'bank_accounts.book_balance')
+            ->orderBy('bank_transactions.transaction_date', 'desc')
+            ->orderBy('bank_transactions.id', 'desc')
+            ->get();
+        $running = [];
+        $rows = [];
+        foreach ($records as $record) {
+            if (!array_key_exists($record->bank_account_id, $running)) {
+                $running[$record->bank_account_id] = (float) $record->book_balance;
+            }
+            $rows[] = [
+                $record->transaction_date,
+                $record->account_name,
+                ucfirst($record->transaction_type),
+                $record->reference_no ?: $record->transaction_no,
+                $record->currency ?: 'PHP',
+                (float) $record->debit,
+                (float) $record->credit,
+                $running[$record->bank_account_id],
+                $record->is_reconciled ? 'Reconciled' : 'For Reconciliation',
+            ];
+            $running[$record->bank_account_id] -= (float) $record->debit - (float) $record->credit;
+        }
+
+        return $rows;
     }
 
     public function chartOfAccounts()
@@ -3000,6 +4159,8 @@ class ModuleController extends Controller
         }
 
         $companyId = $this->defaultCompanyId();
+        $this->authorizeAccountingPosting();
+        app(PeriodLockService::class)->assertOpen($companyId, request('journal_date', date('Y-m-d')));
         $journalNo = trim((string) request('journal_no')) ?: $this->nextDocumentNumber('journal_voucher', 'JV-', 5);
 
         $journalId = DB::transaction(function () use ($companyId, $journalNo, $lines) {
@@ -3041,6 +4202,13 @@ class ModuleController extends Controller
             ->select('journal_entry_lines.*', 'accounts.code as account_code', 'accounts.name as account_name')
             ->get();
 
+        app(ActivityLogger::class)->log('posted', 'journal_entry', $journalId, [], [
+            'journal_no' => $journalNo,
+            'source_module' => 'GL',
+            'total_debit' => $totalDebit,
+            'total_credit' => $totalCredit,
+        ], $companyId);
+
         return view('erp.accounting.journal-review', [
             'journal' => $posted,
             'lines' => $postedLines,
@@ -3061,6 +4229,7 @@ class ModuleController extends Controller
         }
 
         return DB::table('journal_entries')
+            ->where('company_id', $this->defaultCompanyId())
             ->orderBy('journal_date', 'desc')
             ->orderBy('id', 'desc')
             ->limit(15)
@@ -3190,6 +4359,7 @@ class ModuleController extends Controller
         $netMovement = $endingCash - $beginningCash;
         $receipts = Schema::hasTable('receipts')
             ? (float) DB::table('receipts')
+                ->where('company_id', $this->defaultCompanyId())
                 ->whereNotIn('status', ['cancelled', 'voided'])
                 ->when($start, function ($q) use ($start) { $q->where('receipt_date', '>=', $start); })
                 ->when($end, function ($q) use ($end) { $q->where('receipt_date', '<=', $end); })
@@ -3197,6 +4367,7 @@ class ModuleController extends Controller
             : 0.0;
         $disbursements = Schema::hasTable('payments')
             ? (float) DB::table('payments')
+                ->where('company_id', $this->defaultCompanyId())
                 ->whereNotIn('status', ['cancelled', 'voided'])
                 ->when($start, function ($q) use ($start) { $q->where('payment_date', '>=', $start); })
                 ->when($end, function ($q) use ($end) { $q->where('payment_date', '<=', $end); })
@@ -3344,6 +4515,7 @@ class ModuleController extends Controller
         if (Schema::hasTable('purchase_documents')) {
             foreach (DB::table('purchase_documents')
                 ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_documents.supplier_id')
+                ->where('purchase_documents.company_id', $this->defaultCompanyId())
                 ->whereNotIn('purchase_documents.status', ['cancelled', 'voided'])
                 ->where('purchase_documents.withholding_tax_amount', '>', 0)
                 ->orderBy('purchase_documents.document_date', 'desc')
@@ -3377,6 +4549,7 @@ class ModuleController extends Controller
         if (Schema::hasTable('sales_documents')) {
             foreach (DB::table('sales_documents')
                 ->leftJoin('customers', 'customers.id', '=', 'sales_documents.customer_id')
+                ->where('sales_documents.company_id', $this->defaultCompanyId())
                 ->whereNotIn('sales_documents.status', ['cancelled', 'voided'])
                 ->where('sales_documents.withholding_tax_amount', '>', 0)
                 ->orderBy('sales_documents.document_date', 'desc')
@@ -3473,6 +4646,8 @@ class ModuleController extends Controller
 
         $query = DB::table('sales_documents')
             ->leftJoin('customers', 'customers.id', '=', 'sales_documents.customer_id')
+            ->where('sales_documents.company_id', $this->defaultCompanyId())
+            ->where('sales_documents.posting_status', 'posted')
             ->whereNotIn('sales_documents.status', ['cancelled', 'voided']);
 
         if ($startDate) {
@@ -3532,6 +4707,8 @@ class ModuleController extends Controller
 
         $query = DB::table('purchase_documents')
             ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_documents.supplier_id')
+            ->where('purchase_documents.company_id', $this->defaultCompanyId())
+            ->where('purchase_documents.posting_status', 'posted')
             ->whereNotIn('purchase_documents.status', ['cancelled', 'voided']);
 
         if ($startDate) {
@@ -3647,6 +4824,7 @@ class ModuleController extends Controller
                     'customers.customer_id as customer_code',
                     'customers.billing_address as customer_billing_address'
                 )
+                ->where('sales_documents.company_id', $this->defaultCompanyId())
                 ->where(function ($query) use ($invoice) {
                     $this->applySalesDocumentReference($query, $invoice);
                 })
@@ -3698,13 +4876,36 @@ class ModuleController extends Controller
         $newStatus = stripos((string) ($data['delete_action'] ?? ''), 'cancel') !== false ? 'cancelled' : 'voided';
 
         if ($invoiceNo !== '' && Schema::hasTable('sales_documents')) {
-            DB::table('sales_documents')
+            $this->authorizeAccountingPosting();
+            $record = DB::table('sales_documents')
+                ->where('company_id', $this->defaultCompanyId())
                 ->where('document_no', $invoiceNo)
+                ->first();
+            abort_unless($record, 404);
+
+            if (($record->posting_status ?? 'unposted') === 'posted') {
+                app(PostingService::class)->reverseSource(
+                    'sales_document',
+                    $record->id,
+                    trim((string) ($data['reason'] ?? 'Invoice voided'))
+                );
+            }
+
+            DB::table('sales_documents')
+                ->where('id', $record->id)
                 ->update([
                     'status' => $newStatus,
+                    'posting_status' => 'reversed',
                     'remarks' => trim((string) ($data['reason'] ?? '')),
                     'updated_at' => now(),
                 ]);
+
+            app(ActivityLogger::class)->log('voided', 'sales_document', $record->id, [
+                'status' => $record->status,
+            ], [
+                'status' => $newStatus,
+                'reason' => trim((string) ($data['reason'] ?? '')),
+            ], $record->company_id);
         }
 
         return view('erp.billings.delete-review', [
@@ -3719,15 +4920,46 @@ class ModuleController extends Controller
 
     public function billingStatusReview()
     {
+        $data = request()->only([
+            'invoice_no',
+            'customer',
+            'shipment_job_id',
+            'current_status',
+            'new_status',
+            'remarks',
+        ]);
+        $record = DB::table('sales_documents')
+            ->where('company_id', $this->defaultCompanyId())
+            ->where('document_no', trim((string) ($data['invoice_no'] ?? '')))
+            ->first();
+        abort_unless($record, 404);
+
+        $newStatus = strtolower(str_replace(' ', '_', trim((string) ($data['new_status'] ?? ''))));
+        if (in_array($newStatus, ['posted', 'approved'], true)) {
+            $this->authorizeAccountingPosting();
+            app(PostingService::class)->postSalesDocument($record->id);
+            $newStatus = 'posted';
+        } elseif (!in_array($newStatus, ['draft', 'submitted', 'for_approval'], true)) {
+            return back()->withInput()->withErrors(['new_status' => 'Use the void/cancel workflow for final or posted invoices.']);
+        } else {
+            if (($record->posting_status ?? 'unposted') === 'posted') {
+                return back()->withInput()->withErrors(['new_status' => 'A posted invoice cannot return to draft. Reverse it instead.']);
+            }
+            DB::table('sales_documents')->where('id', $record->id)->update([
+                'status' => $newStatus,
+                'updated_at' => now(),
+            ]);
+        }
+
+        app(ActivityLogger::class)->log('status_changed', 'sales_document', $record->id, [
+            'status' => $record->status,
+        ], [
+            'status' => $newStatus,
+            'remarks' => $data['remarks'] ?? null,
+        ], $record->company_id);
+
         return view('erp.billings.status-review', [
-            'status' => request()->only([
-                'invoice_no',
-                'customer',
-                'shipment_job_id',
-                'current_status',
-                'new_status',
-                'remarks',
-            ]),
+            'status' => array_merge($data, ['new_status' => $newStatus]),
         ]);
     }
 
@@ -4391,6 +5623,7 @@ class ModuleController extends Controller
                 'sales_documents.document_date',
                 'customers.name as customer_name'
             )
+            ->where('sales_documents.company_id', $this->defaultCompanyId())
             ->whereIn('sales_documents.document_type', ['invoice', 'billing_invoice', 'statement_of_account_a', 'soa_a', 'debit_note'])
             ->orderBy('sales_documents.document_date', 'desc')
             ->orderBy('sales_documents.id', 'desc')
@@ -4425,6 +5658,7 @@ class ModuleController extends Controller
         }
 
         return DB::table('customers')
+            ->where('company_id', $this->defaultCompanyId())
             ->where('is_active', true)
             ->orderBy('name')
             ->get()
@@ -4459,6 +5693,7 @@ class ModuleController extends Controller
         }
 
         return DB::table('items')
+            ->where('company_id', $this->defaultCompanyId())
             ->where('is_active', true)
             ->orderBy('name')
             ->get()
@@ -4588,7 +5823,7 @@ class ModuleController extends Controller
             $paidTotal = $this->moneyToFloat($data['total_payment'] ?? 0);
             $exchangeRate = $this->moneyToFloat($data['exchange_rate'] ?? 1);
             $exchangeRate = strtoupper((string) ($data['currency'] ?? 'PHP')) === 'USD' ? max($exchangeRate, 0.000001) : 1;
-            $status = $paidTotal > 0 && $paidTotal >= $totals['soa_total'] ? 'paid' : 'posted';
+            $status = 'draft';
 
             $payload = [
                 'company_id' => $companyId,
@@ -4640,10 +5875,22 @@ class ModuleController extends Controller
 
             $existing = null;
             if ($originalDocumentNo !== '') {
-                $existing = DB::table('sales_documents')->where('document_no', $originalDocumentNo)->first();
+                $existing = DB::table('sales_documents')
+                    ->where('company_id', $companyId)
+                    ->where('document_no', $originalDocumentNo)
+                    ->first();
             }
             if (!$existing) {
-                $existing = DB::table('sales_documents')->where('document_no', $documentNo)->first();
+                $existing = DB::table('sales_documents')
+                    ->where('company_id', $companyId)
+                    ->where('document_no', $documentNo)
+                    ->first();
+            }
+
+            if ($existing && ($existing->posting_status ?? 'unposted') === 'posted') {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'invoice_no' => 'A posted invoice is immutable. Reverse it and create a correcting document instead.',
+                ]);
             }
 
             if ($existing) {
@@ -4938,6 +6185,10 @@ class ModuleController extends Controller
                         );
                 } else {
                     $query->select('sales_documents.*');
+                }
+
+                if (auth()->check()) {
+                    $query->where('sales_documents.company_id', $this->defaultCompanyId());
                 }
 
                 if ($reference !== '') {
@@ -5495,7 +6746,9 @@ class ModuleController extends Controller
             : ($transactionNo !== '' ? $transactionNo : ($originalInvoiceNo !== '' ? $originalInvoiceNo : $this->nextSalesDocumentNumber($selectedTemplates)));
         $data['transaction_no'] = $data['invoice_no'];
 
-        $duplicateQuery = DB::table('sales_documents')->where('document_no', $data['invoice_no']);
+        $duplicateQuery = DB::table('sales_documents')
+            ->where('company_id', $this->defaultCompanyId())
+            ->where('document_no', $data['invoice_no']);
         if ($originalInvoiceNo !== '') {
             $duplicateQuery->where('document_no', '<>', $originalInvoiceNo);
         }
@@ -5510,14 +6763,34 @@ class ModuleController extends Controller
         $data['soa_total'] = number_format($totals['soa_total'], 2);
         $data['invoice_template'] = $selectedTemplates;
         $data['invoice_templates_display'] = implode(', ', $selectedTemplates);
-        $savedInvoice = $this->saveInvoiceData($data, $totals);
+        if (request('save_mode') === 'post') {
+            $this->authorizeAccountingPosting();
+        }
+
+        $shouldPost = request('save_mode') === 'post';
+        $savedInvoice = DB::transaction(function () use ($data, $totals, $shouldPost) {
+            $savedInvoice = $this->saveInvoiceData($data, $totals);
+            if ($shouldPost) {
+                app(PostingService::class)->postSalesDocument($savedInvoice->id);
+                $savedInvoice = DB::table('sales_documents')
+                    ->where('company_id', $this->defaultCompanyId())
+                    ->where('id', $savedInvoice->id)
+                    ->first();
+            }
+
+            return $savedInvoice;
+        });
         $data['id'] = $savedInvoice->id;
         $data['status'] = $savedInvoice->status;
-        $data['saved_message'] = 'Invoice '.$data['invoice_no'].' was saved to the database.';
+        $data['saved_message'] = request('save_mode') === 'post'
+            ? 'Invoice '.$data['invoice_no'].' was posted to the general ledger.'
+            : 'Invoice '.$data['invoice_no'].' was saved as a draft.';
 
         $message = $originalInvoiceNo !== ''
             ? 'Invoice '.$data['invoice_no'].' was updated.'
-            : 'Invoice '.$data['invoice_no'].' was created.';
+            : (request('save_mode') === 'post'
+                ? 'Invoice '.$data['invoice_no'].' was created and posted.'
+                : 'Invoice '.$data['invoice_no'].' was saved as a draft.');
 
         return redirect()
             ->route('erp.invoices.show', $savedInvoice->id)
@@ -5530,7 +6803,9 @@ class ModuleController extends Controller
         $invoices = $this->paymentInvoiceOptions();
         $payments = $this->paymentRows();
 
-        return view('erp.payments.create', compact('customers', 'invoices', 'payments'));
+        $bankAccounts = $this->bankAccounts();
+
+        return view('erp.payments.create', compact('customers', 'invoices', 'payments', 'bankAccounts'));
     }
 
     private function paymentRows()
@@ -5552,6 +6827,7 @@ class ModuleController extends Controller
                     'customers.name as customer_name',
                     DB::raw('GROUP_CONCAT(sales_documents.document_no ORDER BY sales_documents.document_no SEPARATOR ", ") as invoice_numbers')
                 )
+                ->where('receipts.company_id', $this->defaultCompanyId())
                 ->groupBy(
                     'receipts.id',
                     'receipts.status',
@@ -5595,6 +6871,7 @@ class ModuleController extends Controller
 
         return DB::table('customers')
             ->select('id', 'code', 'customer_id', 'name', 'currency')
+            ->where('company_id', $this->defaultCompanyId())
             ->where('is_active', true)
             ->orderBy('name')
             ->get()
@@ -5627,6 +6904,7 @@ class ModuleController extends Controller
                 'sales_documents.customer_id',
                 'customers.name as customer_name'
             )
+            ->where('sales_documents.company_id', $this->defaultCompanyId())
             ->whereIn('sales_documents.document_type', ['invoice', 'billing_invoice', 'soa', 'soa_a', 'statement_of_account_a', 'debit_note'])
             ->whereRaw('(sales_documents.grand_total - sales_documents.paid_total) > 0')
             ->orderBy('sales_documents.document_date', 'desc')
@@ -5649,6 +6927,25 @@ class ModuleController extends Controller
 
     public function paymentReceipt()
     {
+        $data = request()->validate([
+            'receipt_type' => 'nullable|string|max:100',
+            'receipt_no' => 'nullable|string|max:100',
+            'customer_id' => 'required|string|max:100',
+            'customer_name' => 'nullable|string|max:255',
+            'job_shipment_id' => 'nullable|string|max:100',
+            'invoice_no' => 'nullable|string|max:100',
+            'payment_date' => 'required|date',
+            'payment_method' => 'required|string|max:100',
+            'bank_account_id' => 'nullable|integer',
+            'reference_no' => 'nullable|string|max:100',
+            'currency' => 'required|string|size:3',
+            'exchange_rate' => 'nullable|numeric|min:0.000001',
+            'amount' => 'required',
+            'cwt_amount' => 'nullable',
+            'cwt_certificate_no' => 'nullable|string|max:100',
+        ]);
+        $this->authorizeAccountingPosting();
+
         $payment = request()->only([
             'receipt_type',
             'receipt_no',
@@ -5666,6 +6963,8 @@ class ModuleController extends Controller
             'convert_currency',
             'currency',
             'amount',
+            'cwt_amount',
+            'cwt_certificate_no',
         ]);
 
         if (!Schema::hasTable('receipts') || !Schema::hasTable('customers')) {
@@ -5677,7 +6976,8 @@ class ModuleController extends Controller
             return back()->withInput()->withErrors(['customer_id' => 'Select a valid client before recording this payment. The receipt was not saved.']);
         }
 
-        $amount = $this->moneyToFloat(request('amount', 0));
+        $amount = $this->moneyToFloat($data['amount']);
+        $cwtAmount = max(0, $this->moneyToFloat($data['cwt_amount'] ?? 0));
         if ($amount <= 0) {
             return back()->withInput()->withErrors(['amount' => 'Enter a payment amount greater than zero. The receipt was not saved.']);
         }
@@ -5687,6 +6987,7 @@ class ModuleController extends Controller
 
         if (Schema::hasTable('sales_documents') && request('invoice_no')) {
             $invoice = DB::table('sales_documents')
+                ->where('company_id', $companyId)
                 ->where('document_no', request('invoice_no'))
                 ->where('customer_id', $customer->id)
                 ->first();
@@ -5694,20 +6995,35 @@ class ModuleController extends Controller
 
         $receiptNo = request('receipt_no') ?: $this->nextReceiptNumber($companyId);
 
-        DB::transaction(function () use ($customer, $companyId, $invoice, $receiptNo, $amount) {
+        $settlementAmount = $amount + $cwtAmount;
+        if ($invoice) {
+            $outstanding = max(0, (float) $invoice->grand_total - (float) $invoice->paid_total);
+            if ($settlementAmount - $outstanding > 0.005) {
+                return back()->withInput()->withErrors(['amount' => 'Cash plus CWT cannot exceed the selected invoice balance.']);
+            }
+        }
+
+        $currency = strtoupper($data['currency']);
+        $exchangeRate = $currency === 'PHP' ? 1 : max(0.000001, $this->moneyToFloat($data['exchange_rate'] ?? 1));
+
+        $receiptId = DB::transaction(function () use ($customer, $companyId, $invoice, $receiptNo, $amount, $cwtAmount, $settlementAmount, $currency, $exchangeRate, $data) {
             $receiptId = DB::table('receipts')->insertGetId([
                 'company_id' => $companyId,
                 'customer_id' => $customer->id,
                 'receipt_no' => $receiptNo,
-                'receipt_type' => request('receipt_type', 'official_receipt'),
+                'receipt_type' => $data['receipt_type'] ?? 'collection_receipt',
                 'customer_id_text' => $customer->customer_id ?: $customer->code,
                 'job_shipment_id' => request('job_shipment_id'),
                 'class_code' => request('class_code', 'MANILA'),
-                'currency' => request('currency', 'PHP'),
-                'receipt_date' => request('payment_date', date('Y-m-d')),
-                'payment_method' => request('payment_method', 'Check'),
-                'reference_no' => request('reference_no'),
+                'currency' => $currency,
+                'exchange_rate' => $exchangeRate,
+                'receipt_date' => $data['payment_date'],
+                'payment_method' => $data['payment_method'],
+                'bank_account_id' => $data['bank_account_id'] ?? null,
+                'reference_no' => $data['reference_no'] ?? null,
                 'amount' => $amount,
+                'cwt_amount' => $cwtAmount,
+                'cwt_certificate_no' => $data['cwt_certificate_no'] ?? null,
                 'status' => 'posted',
                 'template_code' => request('template_code'),
                 'uses_pre_printed_form' => true,
@@ -5719,17 +7035,21 @@ class ModuleController extends Controller
                 DB::table('receipt_applications')->insert([
                     'receipt_id' => $receiptId,
                     'sales_document_id' => $invoice->id,
-                    'amount_applied' => min($amount, max(0, (float) $invoice->grand_total - (float) $invoice->paid_total)),
+                    'amount_applied' => min($settlementAmount, max(0, (float) $invoice->grand_total - (float) $invoice->paid_total)),
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
 
                 DB::table('sales_documents')->where('id', $invoice->id)->update([
-                    'paid_total' => min((float) $invoice->grand_total, (float) $invoice->paid_total + $amount),
-                    'status' => ((float) $invoice->paid_total + $amount) >= (float) $invoice->grand_total ? 'paid' : 'partial',
+                    'paid_total' => min((float) $invoice->grand_total, (float) $invoice->paid_total + $settlementAmount),
+                    'status' => ((float) $invoice->paid_total + $settlementAmount) >= (float) $invoice->grand_total ? 'paid' : 'partial',
                     'updated_at' => now(),
                 ]);
             }
+
+            app(PostingService::class)->postReceipt($receiptId);
+
+            return $receiptId;
         });
 
         $payment['receipt_no'] = $receiptNo;
@@ -5751,7 +7071,7 @@ class ModuleController extends Controller
         return view('erp.payments.receipt', [
             'payment' => $payment,
             'receiptDocuments' => [
-                ['label' => 'Print Official Receipt', 'route' => route('erp.official-receipt.preview', $receiptQuery), 'icon' => 'bi-receipt'],
+                ['label' => 'Print Collection Receipt', 'route' => route('erp.official-receipt.preview', $receiptQuery), 'icon' => 'bi-receipt'],
                 ['label' => 'Print Acknowledgement Receipt', 'route' => route('erp.acknowledgement-receipt.preview', $receiptQuery), 'icon' => 'bi-receipt-cutoff'],
             ],
         ]);
@@ -5767,6 +7087,7 @@ class ModuleController extends Controller
         }
 
         return DB::table('customers')
+            ->where('company_id', $this->defaultCompanyId())
             ->where(function ($query) use ($customerIdOrCode, $customerName) {
                 if ($customerIdOrCode !== '') {
                     $query->orWhere('code', $customerIdOrCode)
@@ -5797,6 +7118,12 @@ class ModuleController extends Controller
         $number = $lastReceipt ? (int) preg_replace('/\D/', '', $lastReceipt) : 0;
 
         return 'OR-' . str_pad($number + 1, 5, '0', STR_PAD_LEFT);
+    }
+
+    private function authorizeAccountingPosting()
+    {
+        $role = strtolower((string) (auth()->user()->role ?? 'viewer'));
+        abort_unless(in_array($role, ['administrator', 'admin', 'finance'], true), 403, 'Only Finance or an Administrator may approve, post, reverse, or void accounting transactions.');
     }
 
     public function soaPreview()
@@ -5969,32 +7296,20 @@ class ModuleController extends Controller
 
     public function publicInvoice($token)
     {
-        $invoice = [
-            'token' => $token,
-            'invoice_no' => 'BI-2026-01043',
-            'customer' => 'Philusa Corporation',
-            'status' => 'Sent',
-            'currency' => 'PHP',
-            'amount_due' => '21,327.07',
-            'due_date' => '2026-06-23',
-            'items' => [
-                ['Ocean Freight Service Charge', '1', '19,388.25', '19,388.25'],
-                ['Output VAT', '1', '2,326.59', '2,326.59'],
-                ['Creditable Withholding Tax', '1', '-387.77', '-387.77'],
-            ],
-        ];
+        $invoice = $this->portalInvoiceData($token);
 
         return view('erp.client.public-invoice', compact('invoice'));
     }
 
     public function publicCheckout($token)
     {
+        $invoice = $this->portalInvoiceData($token);
         $checkout = [
             'token' => $token,
-            'invoice_no' => 'BI-2026-01043',
-            'customer' => 'Philusa Corporation',
-            'amount_due' => '21,327.07',
-            'currency' => 'PHP',
+            'invoice_no' => $invoice['invoice_no'],
+            'customer' => $invoice['customer'],
+            'amount_due' => $invoice['amount_due'],
+            'currency' => $invoice['currency'],
             'gateway' => config('services.stripe.key') ? 'Stripe ready' : 'Stripe test keys not configured',
         ];
 
@@ -6003,17 +7318,152 @@ class ModuleController extends Controller
 
     public function stripeWebhook()
     {
-        return response()->json([
-            'received' => true,
-            'handler' => 'stripe_webhook_placeholder',
-            'rules' => [
-                'verify_signature',
-                'check_event_id_idempotency',
-                'create_payment_record',
-                'update_invoice_balance',
-                'write_activity_log',
-            ],
+        $secret = (string) config('services.stripe.webhook.secret');
+        if ($secret === '') {
+            return response()->json(['error' => 'Stripe webhook is not configured.'], 503);
+        }
+
+        $payload = request()->getContent();
+        $signatureHeader = (string) request()->header('Stripe-Signature');
+        $parts = [];
+        foreach (explode(',', $signatureHeader) as $part) {
+            $pair = explode('=', trim($part), 2);
+            if (count($pair) === 2) {
+                $parts[$pair[0]][] = $pair[1];
+            }
+        }
+
+        $timestamp = isset($parts['t'][0]) ? (int) $parts['t'][0] : 0;
+        $tolerance = (int) config('services.stripe.webhook.tolerance', 300);
+        $expected = hash_hmac('sha256', $timestamp.'.'.$payload, $secret);
+        $validSignature = $timestamp > 0
+            && abs(time() - $timestamp) <= $tolerance
+            && !empty($parts['v1'])
+            && collect($parts['v1'])->contains(function ($signature) use ($expected) {
+                return hash_equals($expected, $signature);
+            });
+
+        if (!$validSignature) {
+            return response()->json(['error' => 'Invalid Stripe signature.'], 400);
+        }
+
+        $event = json_decode($payload, true);
+        if (!is_array($event) || empty($event['id']) || empty($event['type'])) {
+            return response()->json(['error' => 'Invalid Stripe event payload.'], 400);
+        }
+
+        if (DB::table('online_payment_events')->where('event_id', $event['id'])->exists()) {
+            return response()->json(['received' => true, 'duplicate' => true]);
+        }
+
+        $object = $event['data']['object'] ?? [];
+        $reference = $object['metadata']['invoice_no'] ?? ($object['payment_intent'] ?? null);
+        $document = $reference
+            ? DB::table('sales_documents')->where('document_no', $reference)->first()
+            : null;
+
+        $paymentEventId = DB::table('online_payment_events')->insertGetId([
+            'company_id' => $document->company_id ?? null,
+            'gateway' => 'stripe',
+            'event_id' => $event['id'],
+            'event_type' => $event['type'],
+            'reference_no' => $reference,
+            'amount' => isset($object['amount_received']) ? ((float) $object['amount_received'] / 100) : 0,
+            'currency' => isset($object['currency']) ? strtoupper($object['currency']) : null,
+            'status' => 'verified',
+            'payload' => json_encode($event),
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
+
+        app(ActivityLogger::class)->log('webhook_verified', 'online_payment_event', $paymentEventId, [], [
+            'event_id' => $event['id'],
+            'event_type' => $event['type'],
+            'reference_no' => $reference,
+        ], $document->company_id ?? null);
+
+        return response()->json(['received' => true]);
+    }
+
+    public function createInvoicePortalLink($invoice)
+    {
+        $document = DB::table('sales_documents')
+            ->where('company_id', $this->defaultCompanyId())
+            ->where(function ($query) use ($invoice) {
+                $query->where('id', $invoice)->orWhere('document_no', $invoice);
+            })
+            ->first();
+        abort_unless($document, 404);
+
+        $token = bin2hex(random_bytes(32));
+        DB::table('client_portal_tokens')->where('sales_document_id', $document->id)->delete();
+        DB::table('client_portal_tokens')->insert([
+            'company_id' => $document->company_id,
+            'customer_id' => $document->customer_id,
+            'sales_document_id' => $document->id,
+            'token' => $token,
+            'purpose' => 'invoice_view',
+            'expires_at' => now()->addDays(30),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        app(ActivityLogger::class)->log('portal_link_created', 'sales_document', $document->id, [], [
+            'expires_at' => now()->addDays(30)->toDateTimeString(),
+        ], $document->company_id);
+
+        return redirect()->route('erp.invoices.show', $document->id)
+            ->with('portal_url', route('erp.public.invoice', $token));
+    }
+
+    private function portalInvoiceData($token)
+    {
+        $portalToken = DB::table('client_portal_tokens')
+            ->where('token', (string) $token)
+            ->where('purpose', 'invoice_view')
+            ->where(function ($query) {
+                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->first();
+        abort_unless($portalToken && $portalToken->sales_document_id, 404);
+
+        $document = DB::table('sales_documents')
+            ->join('customers', 'customers.id', '=', 'sales_documents.customer_id')
+            ->where('sales_documents.id', $portalToken->sales_document_id)
+            ->where('sales_documents.customer_id', $portalToken->customer_id)
+            ->select('sales_documents.*', 'customers.name as customer_name')
+            ->first();
+        abort_unless($document, 404);
+
+        DB::table('client_portal_tokens')->where('id', $portalToken->id)->update([
+            'last_used_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $items = DB::table('sales_document_lines')
+            ->where('sales_document_id', $document->id)
+            ->orderBy('id')
+            ->get()
+            ->map(function ($line) {
+                return [
+                    $line->description,
+                    number_format((float) $line->quantity, 2),
+                    number_format((float) $line->unit_price, 2),
+                    number_format((float) $line->line_total, 2),
+                ];
+            })
+            ->all();
+
+        return [
+            'token' => $token,
+            'invoice_no' => $document->document_no,
+            'customer' => $document->customer_name,
+            'status' => ucwords(str_replace('_', ' ', $document->status)),
+            'currency' => $document->currency,
+            'amount_due' => number_format(max(0, (float) $document->grand_total - (float) $document->paid_total), 2),
+            'due_date' => $document->due_date ?: '-',
+            'items' => $items,
+        ];
     }
 
     public function customerBillingTemplates()
@@ -6023,7 +7473,7 @@ class ModuleController extends Controller
             ['Statement of Account', 'SOA-PREPRINT', 'A4', 'Yes', 'A/R Trade-SOA', 'PHP / USD'],
             ['Statement of Account A', 'SOAA-PLAIN', 'A4', 'No', 'A/R Trade-SOA A', 'PHP / USD'],
             ['Debit Note', 'DN-PREPRINT', 'A4', 'Yes', 'A/R Trade-Debit Note', 'PHP / USD'],
-            ['Official Receipt', 'OR-PREPRINT', 'A4 / Official Form', 'Yes', 'A/Trade-Billing Invoice', 'PHP / USD'],
+            ['Collection Receipt (Supplementary)', 'CR-PREPRINT', 'A4 / Approved Form', 'Yes', 'A/Trade-Billing Invoice', 'PHP / USD'],
             ['Acknowledgement Receipt', 'AR-PREPRINT', 'A4 / Official Form', 'Yes', 'A/R Reimbursable Charges', 'PHP / USD'],
         ];
 
@@ -6032,11 +7482,32 @@ class ModuleController extends Controller
 
     public function reportsIndex()
     {
+        $companyId = $this->defaultCompanyId();
+        $openAr = (float) DB::table('sales_documents')->where('company_id', $companyId)
+            ->whereNotIn('status', ['cancelled', 'voided', 'paid'])
+            ->selectRaw('COALESCE(SUM(grand_total - paid_total), 0) as balance')->value('balance');
+        $openAp = (float) DB::table('purchase_documents')->where('company_id', $companyId)
+            ->whereNotIn('status', ['cancelled', 'voided', 'paid'])
+            ->selectRaw('COALESCE(SUM(grand_total - paid_total), 0) as balance')->value('balance');
+        $monthStart = date('Y-m-01');
+        $monthEnd = date('Y-m-t');
+        $monthBalances = $this->glAccountBalances($monthStart, $monthEnd);
+        $revenueMtd = array_sum(array_column($this->glStatementRows($monthBalances, 'Revenue', 'period'), 'amount'));
+        $endingBalances = $this->glAccountBalances(null, date('Y-m-d'));
+        $outputVat = 0.0;
+        $inputVat = 0.0;
+        foreach ($endingBalances as $balance) {
+            if ($balance['account']->code === '2200') {
+                $outputVat += $balance['ending'];
+            } elseif ($balance['account']->code === '1250') {
+                $inputVat += $balance['ending'];
+            }
+        }
         $reportStats = [
-            ['label' => 'Open AR', 'value' => 'PHP 238,700.00', 'icon' => 'bi-hourglass-split', 'tone' => 'primary'],
-            ['label' => 'Revenue MTD', 'value' => 'PHP 845,230.00', 'icon' => 'bi-graph-up-arrow', 'tone' => 'success'],
-            ['label' => 'VAT Payable', 'value' => 'PHP 25,932.00', 'icon' => 'bi-percent', 'tone' => 'warning'],
-            ['label' => 'AP Exposure', 'value' => 'PHP 174,250.00', 'icon' => 'bi-credit-card-2-front', 'tone' => 'danger'],
+            ['label' => 'Open AR', 'value' => 'PHP '.number_format($openAr, 2), 'icon' => 'bi-hourglass-split', 'tone' => 'primary'],
+            ['label' => 'Revenue MTD', 'value' => 'PHP '.number_format($revenueMtd, 2), 'icon' => 'bi-graph-up-arrow', 'tone' => 'success'],
+            ['label' => 'VAT Payable', 'value' => 'PHP '.number_format($outputVat - $inputVat, 2), 'icon' => 'bi-percent', 'tone' => 'warning'],
+            ['label' => 'AP Exposure', 'value' => 'PHP '.number_format($openAp, 2), 'icon' => 'bi-credit-card-2-front', 'tone' => 'danger'],
         ];
 
         $reportGroups = [
@@ -6249,7 +7720,7 @@ class ModuleController extends Controller
                 'title' => 'TRIAL BALANCE',
                 'subtitle' => 'Workbook layout from REPORTS.xlsx',
                 'icon' => 'bi-columns-gap',
-                'columns' => ['ACCOUNT TITLES', 'BEGINNING BALANCE', 'SALES BOOK', 'SOA', 'OFFICIAL RECEIPT', 'CASH DISBURSEMENT BOOK', 'JOURNAL BOOK', 'ENDING TRIAL BALANCE'],
+                'columns' => ['ACCOUNT TITLES', 'BEGINNING BALANCE', 'SALES BOOK', 'SOA', 'CASH RECEIPTS BOOK', 'CASH DISBURSEMENT BOOK', 'JOURNAL BOOK', 'ENDING TRIAL BALANCE'],
             ],
             'general-ledger' => [
                 'label' => 'GENERAL LEDGER',
@@ -6285,7 +7756,7 @@ class ModuleController extends Controller
                 'subtitle' => 'MANILA',
                 'icon' => 'bi-receipt',
                 'branch' => 'MANILA',
-                'columns' => ['DATE', 'OFFICIAL RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
+                'columns' => ['DATE', 'COLLECTION RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
             ],
             'crb-pampanga' => [
                 'label' => 'CRB-PAMPANGA',
@@ -6293,7 +7764,7 @@ class ModuleController extends Controller
                 'subtitle' => 'PAMPANGA',
                 'icon' => 'bi-receipt',
                 'branch' => 'PAMPANGA',
-                'columns' => ['DATE', 'OFFICIAL RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
+                'columns' => ['DATE', 'COLLECTION RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
             ],
             'crb-cebu' => [
                 'label' => 'CRB-CEBU',
@@ -6301,7 +7772,7 @@ class ModuleController extends Controller
                 'subtitle' => 'CEBU',
                 'icon' => 'bi-receipt',
                 'branch' => 'CEBU',
-                'columns' => ['DATE', 'OFFICIAL RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
+                'columns' => ['DATE', 'COLLECTION RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
             ],
             'sales-manila' => [
                 'label' => 'SALES-MANILA',
@@ -6369,7 +7840,7 @@ class ModuleController extends Controller
 
         return [
             ['label' => 'Sales Book', 'value' => 'PHP '.number_format($sales, 2), 'icon' => 'bi-graph-up-arrow', 'tone' => 'success'],
-            ['label' => 'Official Receipts', 'value' => 'PHP '.number_format($receipts, 2), 'icon' => 'bi-receipt', 'tone' => 'primary'],
+            ['label' => 'Collection Receipts', 'value' => 'PHP '.number_format($receipts, 2), 'icon' => 'bi-receipt', 'tone' => 'primary'],
             ['label' => 'Disbursements', 'value' => 'PHP '.number_format($payments, 2), 'icon' => 'bi-credit-card', 'tone' => 'danger'],
             ['label' => 'Journal Entries', 'value' => number_format($journals), 'icon' => 'bi-journal-check', 'tone' => 'warning'],
         ];
@@ -6405,7 +7876,7 @@ class ModuleController extends Controller
             $opening = (float) ($account->opening_balance ?? 0) + (float) ($beginningMovements[$account->id]['TOTAL'] ?? 0);
             $sales = (float) ($periodMovements[$account->id]['SALES BOOK'] ?? 0);
             $soa = (float) ($periodMovements[$account->id]['SOA'] ?? 0);
-            $receipts = (float) ($periodMovements[$account->id]['OFFICIAL RECEIPT'] ?? 0);
+            $receipts = (float) ($periodMovements[$account->id]['CASH RECEIPTS BOOK'] ?? 0);
             $disbursements = (float) ($periodMovements[$account->id]['CASH DISBURSEMENT BOOK'] ?? 0);
             $journal = (float) ($periodMovements[$account->id]['JOURNAL BOOK'] ?? 0);
             $ending = $opening + $sales + $soa + $receipts + $disbursements + $journal;
@@ -6416,7 +7887,7 @@ class ModuleController extends Controller
                 'BEGINNING BALANCE' => $opening,
                 'SALES BOOK' => $sales,
                 'SOA' => $soa,
-                'OFFICIAL RECEIPT' => $receipts,
+                'CASH RECEIPTS BOOK' => $receipts,
                 'CASH DISBURSEMENT BOOK' => $disbursements,
                 'JOURNAL BOOK' => $journal,
                 'ENDING TRIAL BALANCE' => $ending,
@@ -6465,6 +7936,7 @@ class ModuleController extends Controller
                 'account_categories.normal_balance',
                 'account_categories.name as category_name'
             )
+            ->where('accounts.company_id', $this->defaultCompanyId())
             ->orderBy('accounts.type')
             ->orderBy('accounts.code');
 
@@ -6508,6 +7980,7 @@ class ModuleController extends Controller
                 DB::raw('SUM(journal_entry_lines.debit) as debit_total'),
                 DB::raw('SUM(journal_entry_lines.credit) as credit_total')
             )
+            ->where('journal_entries.company_id', $this->defaultCompanyId())
             ->groupBy('journal_entry_lines.account_id', 'journal_entries.source_module');
 
         if ($startDate) {
@@ -6539,7 +8012,7 @@ class ModuleController extends Controller
             return 'SALES BOOK';
         }
         if (strpos($source, 'receipt') !== false || strpos($source, 'collection') !== false || $source === 'or') {
-            return 'OFFICIAL RECEIPT';
+            return 'CASH RECEIPTS BOOK';
         }
         if (strpos($source, 'disbursement') !== false || strpos($source, 'payment') !== false || strpos($source, 'payable') !== false || $source === 'ap') {
             return 'CASH DISBURSEMENT BOOK';
@@ -6571,15 +8044,9 @@ class ModuleController extends Controller
 
     private function trialBalanceDocumentMovements($startDate, $endDate, $accounts, array $normals)
     {
-        $movements = [];
-        $ids = $this->trialBalanceAccountIds($accounts);
-
-        $this->trialBalanceSalesDocumentMovements($movements, $ids, $normals, $startDate, $endDate);
-        $this->trialBalanceReceiptMovements($movements, $ids, $normals, $startDate, $endDate);
-        $this->trialBalancePurchaseDocumentMovements($movements, $ids, $normals, $startDate, $endDate);
-        $this->trialBalancePaymentMovements($movements, $ids, $normals, $startDate, $endDate);
-
-        return $movements;
+        // Source documents affect financial statements only through posted journals.
+        // This prevents invoices, receipts, bills, and payments from being counted twice.
+        return [];
     }
 
     private function trialBalanceAccountIds($accounts)
@@ -6694,8 +8161,8 @@ class ModuleController extends Controller
 
         foreach ($query->get(['amount']) as $receipt) {
             $amount = (float) $receipt->amount;
-            $this->trialBalanceAddMovement($movements, $ids['cash'], 'OFFICIAL RECEIPT', $amount, 0, $normals);
-            $this->trialBalanceAddMovement($movements, $ids['ar_trade'] ?: $ids['ar_soa'], 'OFFICIAL RECEIPT', 0, $amount, $normals);
+            $this->trialBalanceAddMovement($movements, $ids['cash'], 'CASH RECEIPTS BOOK', $amount, 0, $normals);
+            $this->trialBalanceAddMovement($movements, $ids['ar_trade'] ?: $ids['ar_soa'], 'CASH RECEIPTS BOOK', 0, $amount, $normals);
         }
     }
 
@@ -6994,7 +8461,7 @@ class ModuleController extends Controller
                 $isAcknowledgement = $receipt->receipt_type === 'acknowledgement_receipt';
                 return [
                     'DATE' => $receipt->receipt_date,
-                    'OFFICIAL RECEIPT NUMBER' => $isAcknowledgement ? '' : $receipt->receipt_no,
+                    'COLLECTION RECEIPT NUMBER' => $isAcknowledgement ? '' : $receipt->receipt_no,
                     'ACKNOWLEDGEMENT RECEIPT NUMBER' => $isAcknowledgement ? $receipt->receipt_no : '',
                     'CUSTOMER NAME' => $receipt->customer_name,
                     'A/R TRADE' => (float) $receipt->amount,
@@ -7308,7 +8775,7 @@ class ModuleController extends Controller
             ],
             'Billing & Item Setup' => [
                 ['name' => 'Item List', 'description' => 'Service, freight, documentation, terminal handling, reimbursable, and tax treatment defaults.', 'route' => route('erp.settings.index').'#item-list', 'icon' => 'bi-box-seam', 'status' => 'Required'],
-                ['name' => 'Invoice Templates', 'description' => 'Billing Invoice, SOA B, SOA A, Debit Note, Official Receipt, and custom templates.', 'route' => route('erp.customer-billing.templates'), 'icon' => 'bi-file-earmark-text', 'status' => 'Active'],
+                ['name' => 'Invoice Templates', 'description' => 'Billing Invoice, SOA B, SOA A, Debit Note, Collection Receipt, and custom templates.', 'route' => route('erp.customer-billing.templates'), 'icon' => 'bi-file-earmark-text', 'status' => 'Active'],
                 ['name' => 'Print Layouts', 'description' => 'Pre-printed form alignment, paper size, field positions, and custom printable fields.', 'route' => route('erp.billings.print-layout.invoice'), 'icon' => 'bi-sliders', 'status' => 'Active'],
             ],
             'Tax, Currency & Banking' => [
@@ -7840,12 +9307,12 @@ class ModuleController extends Controller
             ],
             'collections' => [
                 'title' => 'Collections / Receive Payment',
-                'subtitle' => 'Official Receipts, Acknowledgement Receipts, SOA A collections, and payment allocation.',
-                'actions' => ['Official Receipt', 'Acknowledgement Receipt', 'SOA A Collection', 'Deposit Collection'],
+                'subtitle' => 'Collection Receipts, Acknowledgement Receipts, SOA A collections, and payment allocation.',
+                'actions' => ['Collection Receipt', 'Acknowledgement Receipt', 'SOA A Collection', 'Deposit Collection'],
                 'features' => ['OR Pre-printed', 'AR Pre-printed', 'SOA A No Pre-printed Form', 'Cash', 'Check', 'Bank Transfer', 'Partial Payment', 'Multiple Invoice Payment'],
                 'columns' => ['Receipt Type', 'Receipt No.', 'Customer ID', 'Job/Shipment ID', 'Currency', 'Amount'],
                 'rows' => [
-                    ['Official Receipt', 'OR-2026-00618', 'CUST-001', 'JOB-SEA-2026-0422', 'PHP', '43,200.00'],
+                    ['Collection Receipt', 'OR-2026-00618', 'CUST-001', 'JOB-SEA-2026-0422', 'PHP', '43,200.00'],
                     ['Acknowledgement Receipt', 'AR-2026-00109', 'CUST-003', 'JOB-SEA-2026-0365', 'PHP', '12,800.00'],
                     ['SOA A Collection', 'COLA-2026-00031', 'CUST-002', 'JOB-SEA-2026-0398', 'USD', '1,840.00'],
                 ],

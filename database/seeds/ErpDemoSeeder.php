@@ -34,16 +34,16 @@ class ErpDemoSeeder extends Seeder
             DB::table('currencies')->updateOrInsert(['code' => $currency['code']], $currency + ['updated_at' => now()]);
         }
 
-        DB::table('users')->updateOrInsert(['email' => 'admin@seajet.test'], [
+        DB::table('users')->updateOrInsert(['email' => 'admin@seajet.test'], array_merge([
             'company_id' => $companyId,
             'branch_id' => $branchId,
             'name' => 'ERP Admin',
             'email' => 'admin@seajet.test',
-            'password' => Hash::make('password'),
+            'password' => Hash::make(env('SEAJET_INITIAL_ADMIN_PASSWORD', 'password')),
             'role' => 'admin',
             'department' => 'Accounting',
             'updated_at' => now(),
-        ]);
+        ], Schema::hasColumn('users', 'must_change_password') ? ['must_change_password' => true] : []));
 
         $categories = [
             'Assets' => ['name' => 'Assets', 'normal_balance' => 'debit'],

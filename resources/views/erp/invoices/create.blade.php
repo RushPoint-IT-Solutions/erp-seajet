@@ -149,7 +149,10 @@
                     @unless($isEdit)
                         <button class="btn btn-sm btn-outline-light" type="button" id="sampleInvoiceButton"><i class="bi bi-magic me-1"></i>Sample Invoice</button>
                     @endunless
-                    <button class="btn btn-sm btn-success" type="submit"><i class="bi bi-cloud-arrow-up-fill me-1"></i>{{ $isEdit ? 'Update' : 'Save' }}</button>
+                    <button class="btn btn-sm btn-outline-light" type="submit" name="save_mode" value="draft"><i class="bi bi-save me-1"></i>{{ $isEdit ? 'Update Draft' : 'Save Draft' }}</button>
+                    @if(in_array(strtolower(auth()->user()->role ?? ''), ['administrator', 'admin', 'finance'], true))
+                        <button class="btn btn-sm btn-success" type="submit" name="save_mode" value="post"><i class="bi bi-journal-check me-1"></i>{{ $isEdit ? 'Update & Post' : 'Save & Post' }}</button>
+                    @endif
                 </div>
                 <div class="d-flex flex-wrap gap-2">
                     <a href="{{ route('erp.billings.print-invoice', $isEdit && !empty($editingInvoice['invoice_no']) ? ['invoice' => $editingInvoice['invoice_no']] : []) }}" class="btn btn-sm btn-outline-light vatable-print-action invoice-linked-action" data-base-url="{{ route('erp.billings.print-invoice') }}"><i class="bi bi-filetype-pdf me-1"></i>Billing Invoice</a>

@@ -11,7 +11,11 @@
         </div>
         <div class="d-flex gap-2">
             <a href="{{ route('erp.payables.check-voucher', $payment['id'] ?? null) }}" class="btn btn-outline-secondary"><i class="bi bi-printer me-1"></i> Check Voucher</a>
-            <a href="{{ route('erp.payables.check-print', $payment['id'] ?? null) }}" class="btn btn-primary"><i class="bi bi-bank me-1"></i> Print Check</a>
+            @if(strcasecmp($payment['payment_method'] ?? '', 'Cheque') === 0 && in_array(strtolower($payment['approval_status'] ?? ''), ['approved', 'released'], true))
+                <a href="{{ route('erp.payables.check-print', $payment['id']) }}" class="btn btn-primary"><i class="bi bi-bank me-1"></i> Print Check</a>
+            @else
+                <a href="{{ route('erp.payables.approvals') }}" class="btn btn-primary"><i class="bi bi-shield-check me-1"></i> Approval Queue</a>
+            @endif
         </div>
     </div>
     <div class="erp-card p-4">

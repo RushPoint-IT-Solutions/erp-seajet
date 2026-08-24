@@ -1,0 +1,274 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\User;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
+use Tests\TestCase;
+
+class ControlledCheckLifecycleTest extends TestCase
+{
+    protected function setUp()
+    {
+        parent::setUp();
+
+        config([
+            'database.default' => 'sqlite',
+            'database.connections.sqlite.database' => ':memory:',
+        ]);
+        DB::purge('sqlite');
+        Artisan::call('migrate:fresh', ['--seed' => true]);
+        $this->actingAsAdmin();
+    }
+
+    public function test_maker_checker_print_release_and_clear_lifecycle()
+    {
+        list($bill, $bank) = $this->billAndBank();
+        $balanceBefore = (float) $bill->grand_total - (float) $bill->paid_total;
+
+        $response = $this->post(route('erp.payables.payments.review'), $this->paymentPayload($bill, $bank, [
+            'amount' => '10.50',
+            'check_no' => 'CONTROL-1001',
+        ]));
+        $response->assertOk();
+
+        $payment = DB::table('payments')->where('payment_no', 'PV-CONTROL-1001')->first();
+        $this->assertSame('For Approval', $payment->approval_status);
+        $this->assertSame('unposted', $payment->posting_status);
+        $this->assertSame(1, (int) $payment->created_by);
+        $this->assertSame('Ten Pesos and 50/100 Only', $payment->amount_words_snapshot);
+        $this->assertDatabaseHas('check_issuances', [
+            'payment_id' => $payment->id,
+            'check_no' => 'CONTROL-1001',
+            'status' => 'assigned',
+        ]);
+
+        $this->get(route('erp.payables.check-print', $payment->id))
+            ->assertRedirect(route('erp.payables.approvals'))
+            ->assertSessionHasErrors('check');
+
+        $this->post(route('erp.payables.payments.approve', $payment->id))
+            ->assertSessionHasErrors('approval_status');
+
+        $this->actingAsFinance($bill->company_id);
+        $this->post(route('erp.payables.payments.approve', $payment->id))
+            ->assertRedirect(route('erp.payables.approvals'));
+        $this->assertDatabaseHas('payments', [
+            'id' => $payment->id,
+            'approval_status' => 'Approved',
+            'posting_status' => 'unposted',
+        ]);
+
+        $this->get(route('erp.payables.check-print', $payment->id))->assertOk();
+        $this->postJson(route('erp.payables.check-print.event', $payment->id), [])->assertOk();
+        $this->assertDatabaseHas('check_print_events', [
+            'payment_id' => $payment->id,
+            'event_type' => 'original_print_requested',
+        ]);
+
+        $this->postJson(route('erp.payables.check-print.event', $payment->id), [])
+            ->assertStatus(422)->assertJsonValidationErrors('reason');
+        $this->postJson(route('erp.payables.check-print.event', $payment->id), ['reason' => 'Printer paper jam'])
+            ->assertOk()->assertJson(['event' => ['is_reprint' => true, 'print_count' => 2]]);
+
+        $this->post(route('erp.payables.payments.release', $payment->id))
+            ->assertRedirect(route('erp.payables.approvals'));
+        $released = DB::table('payments')->where('id', $payment->id)->first();
+        $this->assertSame('Released', $released->approval_status);
+        $this->assertSame('posted', $released->posting_status);
+        $this->assertNotNull($released->journal_entry_id);
+        $this->assertEquals($balanceBefore - 10.50, (float) DB::table('purchase_documents')->where('id', $bill->id)->value(DB::raw('grand_total - paid_total')));
+
+        $check = DB::table('check_issuances')->where('payment_id', $payment->id)->where('status', 'released')->first();
+        $this->post(route('erp.payables.checks.clear', $check->id), [
+            'cleared_at' => date('Y-m-d'),
+            'clearing_reference' => 'BANK-STMT-1001',
+        ])->assertRedirect(route('erp.payables.check-register'));
+        $this->assertDatabaseHas('check_issuances', [
+            'id' => $check->id,
+            'status' => 'cleared',
+            'clearing_reference' => 'BANK-STMT-1001',
+        ]);
+    }
+
+    public function test_overpayment_and_duplicate_bank_check_number_are_rejected()
+    {
+        list($bill, $bank) = $this->billAndBank();
+        $balance = (float) $bill->grand_total - (float) $bill->paid_total;
+
+        $this->from(route('erp.payables.payments.create'))->post(route('erp.payables.payments.review'), $this->paymentPayload($bill, $bank, [
+            'amount' => (string) ($balance + 1),
+            'check_no' => 'CONTROL-OVERPAY',
+        ]))->assertRedirect(route('erp.payables.payments.create'))->assertSessionHasErrors('amount');
+
+        $this->post(route('erp.payables.payments.review'), $this->paymentPayload($bill, $bank, [
+            'amount' => '5.00',
+            'check_no' => 'CONTROL-DUPLICATE',
+        ]))->assertOk();
+
+        DB::table('payments')->where('payment_no', 'PV-CONTROL-1001')->update([
+            'status' => 'released',
+            'approval_status' => 'Released',
+        ]);
+
+        $duplicatePayload = $this->paymentPayload($bill, $bank, [
+            'payment_no' => 'PV-CONTROL-1002',
+            'amount' => '5.00',
+            'check_no' => 'CONTROL-DUPLICATE',
+        ]);
+        $this->from(route('erp.payables.payments.create'))->post(route('erp.payables.payments.review'), $duplicatePayload)
+            ->assertRedirect(route('erp.payables.payments.create'))->assertSessionHasErrors('check_no');
+        $this->assertDatabaseMissing('payments', ['payment_no' => 'PV-CONTROL-1002']);
+    }
+
+    public function test_layout_saves_new_versions_and_keeps_only_latest_active()
+    {
+        $bank = DB::table('bank_accounts')->orderBy('id')->first();
+        $payload = $this->layoutPayload($bank->id);
+
+        $this->postJson(route('erp.payables.check-print.layout.save'), $payload)
+            ->assertOk()->assertJson(['profile' => ['version' => 1]]);
+        $payload['offset_x_mm'] = 2.5;
+        $this->postJson(route('erp.payables.check-print.layout.save'), $payload)
+            ->assertOk()->assertJson(['profile' => ['version' => 2, 'offset_x_mm' => 2.5]]);
+
+        $this->assertSame(2, DB::table('check_layout_profiles')->where('profile_name', 'QA Printer')->count());
+        $this->assertSame(1, DB::table('check_layout_profiles')->where('profile_name', 'QA Printer')->where('is_active', true)->count());
+    }
+
+    public function test_spoiled_check_replacement_and_released_payment_void_are_auditable()
+    {
+        list($bill, $bank) = $this->billAndBank();
+        $paidBefore = (float) $bill->paid_total;
+        $this->post(route('erp.payables.payments.review'), $this->paymentPayload($bill, $bank, [
+            'amount' => '7.25',
+            'check_no' => 'CONTROL-SPOILED',
+        ]))->assertOk();
+        $payment = DB::table('payments')->where('payment_no', 'PV-CONTROL-1001')->first();
+
+        $this->actingAsFinance($bill->company_id);
+        $this->post(route('erp.payables.payments.approve', $payment->id));
+        $this->postJson(route('erp.payables.check-print.event', $payment->id), [])->assertOk();
+        $spoiled = DB::table('check_issuances')->where('payment_id', $payment->id)->first();
+
+        $this->post(route('erp.payables.checks.replace', $spoiled->id), [
+            'new_check_no' => 'CONTROL-REPLACEMENT',
+            'reason' => 'Check stock jammed during printing',
+        ])->assertRedirect(route('erp.payables.check-register'));
+        $this->assertDatabaseHas('check_issuances', [
+            'id' => $spoiled->id,
+            'status' => 'replaced',
+        ]);
+        $replacement = DB::table('check_issuances')->where('payment_id', $payment->id)
+            ->where('check_no', 'CONTROL-REPLACEMENT')->first();
+        $this->assertNotNull($replacement);
+        $this->assertSame('assigned', $replacement->status);
+        $this->assertSame('CONTROL-REPLACEMENT', DB::table('payments')->where('id', $payment->id)->value('check_no'));
+
+        $this->postJson(route('erp.payables.check-print.event', $payment->id), [])->assertOk();
+        $this->post(route('erp.payables.payments.release', $payment->id));
+        $this->assertEquals($paidBefore + 7.25, (float) DB::table('purchase_documents')->where('id', $bill->id)->value('paid_total'));
+
+        $this->post(route('erp.payables.payments.void', $payment->id), [
+            'reason' => 'Supplier requested cancellation',
+        ])->assertRedirect(route('erp.payables.approvals'));
+        $this->assertDatabaseHas('payments', [
+            'id' => $payment->id,
+            'status' => 'voided',
+            'approval_status' => 'Voided',
+            'posting_status' => 'reversed',
+        ]);
+        $this->assertDatabaseHas('check_issuances', [
+            'id' => $replacement->id,
+            'status' => 'voided',
+        ]);
+        $this->assertEquals($paidBefore, (float) DB::table('purchase_documents')->where('id', $bill->id)->value('paid_total'));
+        $this->assertSame(1, DB::table('journal_entries')->where('source_type', 'payment')
+            ->where('source_id', $payment->id)->where('posting_type', 'reversal')->count());
+    }
+
+    private function actingAsFinance($companyId)
+    {
+        $user = new User();
+        $user->id = 900;
+        $user->company_id = $companyId;
+        $user->name = 'QA Finance Approver';
+        $user->email = 'finance-approver@seajet.test';
+        $user->role = 'finance';
+        $this->actingAs($user);
+    }
+
+    private function billAndBank()
+    {
+        $bill = DB::table('purchase_documents')
+            ->whereRaw('grand_total > paid_total + 20')
+            ->where('currency', 'PHP')
+            ->whereNotIn('status', ['cancelled', 'voided'])
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))->from('payments')
+                    ->whereColumn('payments.bill_no', 'purchase_documents.document_no')
+                    ->whereNotIn('payments.status', ['released', 'cancelled', 'voided']);
+            })
+            ->orderBy('id')
+            ->first();
+        $bank = DB::table('bank_accounts')
+            ->where('company_id', $bill->company_id)
+            ->where('currency', $bill->currency)
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->first();
+
+        $this->assertNotNull($bill);
+        $this->assertNotNull($bank);
+
+        return [$bill, $bank];
+    }
+
+    private function paymentPayload($bill, $bank, array $overrides = [])
+    {
+        return array_merge([
+            'payment_no' => 'PV-CONTROL-1001',
+            'payment_date' => date('Y-m-d'),
+            'bill_no' => $bill->document_no,
+            'shipment_job_id' => $bill->shipment_job_id,
+            'supplier_id' => (string) $bill->supplier_id,
+            'supplier_name' => 'Snapshot Payee',
+            'payment_method' => 'Cheque',
+            'bank_account' => $bank->account_no,
+            'check_no' => 'CONTROL-1001',
+            'currency' => $bill->currency,
+            'exchange_rate' => $bill->currency === 'PHP' ? 1 : 58.25,
+            'amount' => '10.50',
+        ], $overrides);
+    }
+
+    private function layoutPayload($bankAccountId)
+    {
+        $layout = [
+            'font_sizes' => [
+                'date_m1' => 12, 'date_m2' => 12, 'date_d1' => 12, 'date_d2' => 12,
+                'date_y1' => 12, 'date_y2' => 12, 'date_y3' => 12, 'date_y4' => 12,
+                'payee' => 12, 'amount_words' => 12, 'amount_figures' => 12,
+            ],
+            'date_m1' => ['top' => 12, 'left' => 175], 'date_m2' => ['top' => 12, 'left' => 179],
+            'date_d1' => ['top' => 12, 'left' => 185], 'date_d2' => ['top' => 12, 'left' => 189],
+            'date_y1' => ['top' => 12, 'left' => 195], 'date_y2' => ['top' => 12, 'left' => 199],
+            'date_y3' => ['top' => 12, 'left' => 203], 'date_y4' => ['top' => 12, 'left' => 207],
+            'payee' => ['top' => 28, 'left' => 22], 'amount_words' => ['top' => 36, 'left' => 22],
+            'amount_figures' => ['top' => 28, 'left' => 178],
+        ];
+
+        return [
+            'layout' => $layout,
+            'bank_account_id' => $bankAccountId,
+            'profile_name' => 'QA Printer',
+            'printer_name' => 'QA Device',
+            'paper_width_mm' => 210,
+            'paper_height_mm' => 88.9,
+            'feed_orientation' => 'top',
+            'offset_x_mm' => 0,
+            'offset_y_mm' => 0,
+        ];
+    }
+}

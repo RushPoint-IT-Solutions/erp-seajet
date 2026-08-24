@@ -13,8 +13,7 @@
             @endforeach
         </div>
         <div class="d-flex justify-content-end gap-2 mt-4">
-            <a href="{{ route('erp.users.status') }}" class="btn btn-outline-secondary">Edit</a>
-            <a href="{{ route('erp.users.index') }}" class="btn btn-primary">Update Status</a>
+            <a href="{{ route('erp.users.index') }}" class="btn btn-primary">Done</a>
         </div>
     </div>
 @endsection

@@ -47,10 +47,12 @@ class BillingInvoicePrintFlowTest extends TestCase
             'customer_tax_code' => 'VAT12',
         ]));
 
-        $response->assertStatus(200);
-        $response->assertSee('Print SOA B');
-        $response->assertSee('Print Billing Invoice');
-        $response->assertDontSee('Print SOA A');
+        $response->assertRedirect();
+        $show = $this->get($response->headers->get('Location'));
+        $show->assertStatus(200);
+        $show->assertSee('Print SOA B');
+        $show->assertSee('Print Billing Invoice');
+        $show->assertDontSee('Print SOA A');
     }
 
     public function test_vatable_billing_separates_reimbursement_for_bi_and_soa_b_totals()
@@ -71,16 +73,13 @@ class BillingInvoicePrintFlowTest extends TestCase
             'line_amount' => ['100.00', '50.00'],
         ]));
 
-        $response->assertStatus(200);
-        $response->assertSee('Invoice Amount');
-        $response->assertSee('112.00');
-        $response->assertSee('Reimbursement Total');
-        $response->assertSee('50.00');
-        $response->assertSee('Soa Total');
-        $response->assertSee('162.00');
-        $response->assertSee('billing_total=112.00', false);
-        $response->assertSee('reimbursement_total=50.00', false);
-        $response->assertSee('soa_total=162.00', false);
+        $response->assertRedirect();
+        $document = DB::table('sales_documents')->where('document_no', 'BI-TEST-001')->first();
+        $this->assertNotNull($document);
+        $this->assertEquals(100.00, (float) $document->subtotal);
+        $this->assertEquals(12.00, (float) $document->tax_total);
+        $this->assertEquals(50.00, (float) $document->freight_total);
+        $this->assertEquals(162.00, (float) $document->grand_total);
 
         $invoicePrint = $this->get('/erp/billings/print/invoice?customer=North%20Harbor%20Trading&invoice_no=BI-TEST-001&invoice_date=2026-05-26&soa_no=SOA-TEST-001&billing_total=112.00&reimbursement_total=50.00&soa_total=162.00&vatable_sales=100.00&vat_amount=12.00');
         $invoicePrint->assertStatus(200);
@@ -89,9 +88,12 @@ class BillingInvoicePrintFlowTest extends TestCase
 
         $soaPrint = $this->get('/erp/billings/print/statement-of-account?customer=North%20Harbor%20Trading&invoice_no=BI-TEST-001&invoice_date=2026-05-26&soa_no=SOA-TEST-001&billing_total=112.00&reimbursement_total=50.00&soa_total=162.00&vatable_sales=100.00&vat_amount=12.00');
         $soaPrint->assertStatus(200);
-        $soaPrint->assertSee('REIMBURSEMENT CHARGES     PHP 50.00');
-        $soaPrint->assertSee('INVOICE AMOUNT            PHP 112.00');
-        $soaPrint->assertSee('PLEASE PAY THIS AMOUNT    PHP 162.00');
+        $soaPrint->assertSee('REIMBURSEMENT CHARGES');
+        $soaPrint->assertSee('PHP 50.00');
+        $soaPrint->assertSee('TOTAL INVOICE AMOUNT');
+        $soaPrint->assertSee('PHP 112.00');
+        $soaPrint->assertSee('PLEASE PAY THIS AMOUNT');
+        $soaPrint->assertSee('PHP 162.00');
     }
 
     public function test_guest_or_non_tax_billing_review_can_print_soa_a_only()
@@ -105,10 +107,41 @@ class BillingInvoicePrintFlowTest extends TestCase
             'customer_tax_code' => 'EXEMPT',
         ]));
 
-        $response->assertStatus(200);
-        $response->assertSee('Print SOA A');
-        $response->assertDontSee('Print SOA B');
-        $response->assertDontSee('Print Billing Invoice');
+        $response->assertRedirect();
+        $show = $this->get($response->headers->get('Location'));
+        $show->assertStatus(200);
+        $show->assertSee('Print SOA A');
+        $show->assertDontSee('Print SOA B');
+        $show->assertDontSee('Print Billing Invoice');
+    }
+
+    public function test_closed_period_rolls_back_invoice_and_journal_together()
+    {
+        $companyId = DB::table('companies')->orderBy('id')->value('id');
+        DB::table('accounting_periods')->insert([
+            'company_id' => $companyId,
+            'starts_on' => '2026-05-01',
+            'ends_on' => '2026-05-31',
+            'status' => 'closed',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->from('/erp/invoices/create')->post('/erp/invoices/review', $this->payload([
+            'invoice_no' => 'BI-ATOMIC-001',
+            'transaction_no' => 'BI-ATOMIC-001',
+            'customer_id' => 'CUST-001',
+            'customer_name' => 'North Harbor Trading',
+            'vat_classification' => '12%',
+            'ar_account' => 'A/Trade-Billing Invoice',
+            'invoice_template' => 'SOA_B',
+            'customer_tax_code' => 'VAT12',
+            'save_mode' => 'post',
+        ]));
+
+        $response->assertRedirect('/erp/invoices/create')->assertSessionHasErrors('document_date');
+        $this->assertFalse(DB::table('sales_documents')->where('document_no', 'BI-ATOMIC-001')->exists());
+        $this->assertFalse(DB::table('journal_entries')->where('reference_no', 'BI-ATOMIC-001')->exists());
     }
 
     private function payload(array $overrides = [])

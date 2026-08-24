@@ -1,23 +1,23 @@
 <div class="row g-3">
     <div class="col-md-3">
         <label class="form-label">User ID</label>
-        <input name="user_id" class="form-control" value="{{ isset($userId) ? $userId : 'USR-005' }}" required>
+        <input name="user_id" class="form-control" value="{{ old('user_id', isset($record) ? $record->id : '') }}" placeholder="Assigned automatically" {{ $mode === 'edit' ? 'readonly' : '' }}>
     </div>
     <div class="col-md-5">
         <label class="form-label">Full Name</label>
-        <input name="name" class="form-control" value="{{ $mode === 'edit' ? 'Maria Santos' : '' }}" placeholder="User full name" required>
+        <input name="name" class="form-control" value="{{ old('name', isset($record) ? $record->name : '') }}" placeholder="User full name" required>
     </div>
     <div class="col-md-4">
         <label class="form-label">Email</label>
-        <input type="email" name="email" class="form-control" value="{{ $mode === 'edit' ? 'maria.santos@seajet.test' : '' }}" placeholder="user@company.com" required>
+        <input type="email" name="email" class="form-control" value="{{ old('email', isset($record) ? $record->email : '') }}" placeholder="user@company.com" required>
     </div>
     <div class="col-md-3">
         <label class="form-label">Role</label>
-        <select name="role" class="form-select erp-select"><option>Admin</option><option>Accounting</option><option>Finance</option><option>Sales</option><option>Payables</option><option>Warehouse</option><option>Viewer</option></select>
+        <select name="role" class="form-select erp-select">@foreach(['Admin', 'Accounting', 'Finance'] as $role)<option {{ strtolower(old('role', isset($record) ? $record->role : 'accounting')) === strtolower($role) ? 'selected' : '' }}>{{ $role }}</option>@endforeach</select>
     </div>
     <div class="col-md-3">
         <label class="form-label">Department</label>
-        <select name="department" class="form-select erp-select"><option>Accounting</option><option>Finance</option><option>Sales</option><option>Payables</option><option>Operations</option><option>Management</option></select>
+        <select name="department" class="form-select erp-select">@foreach(['Accounting', 'Finance', 'Operations', 'Management'] as $department)<option {{ old('department', isset($record) ? $record->department : '') === $department ? 'selected' : '' }}>{{ $department }}</option>@endforeach</select>
     </div>
     <div class="col-md-3">
         <label class="form-label">Branch</label>
@@ -25,7 +25,15 @@
     </div>
     <div class="col-md-3">
         <label class="form-label">Status</label>
-        <select name="status" class="form-select erp-select"><option>Active</option><option>Pending Invite</option><option>Inactive</option><option>Locked</option></select>
+        <select name="status" class="form-select erp-select"><option>Active</option><option {{ isset($record) && !$record->is_active ? 'selected' : '' }}>Inactive</option><option>Pending Invite</option><option>Locked</option></select>
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">{{ $mode === 'edit' ? 'New Temporary Password (optional)' : 'Temporary Password' }}</label>
+        <input type="password" name="password" class="form-control" minlength="12" {{ $mode === 'create' ? 'required' : '' }} autocomplete="new-password">
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Confirm Temporary Password</label>
+        <input type="password" name="password_confirmation" class="form-control" minlength="12" {{ $mode === 'create' ? 'required' : '' }} autocomplete="new-password">
     </div>
     <div class="col-12">
         <label class="form-label">Access Scope</label>

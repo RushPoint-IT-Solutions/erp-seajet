@@ -45,7 +45,7 @@ flowchart LR
     SO --> Delivery[Delivery]
     Delivery --> Invoice[Billing Invoice]
     Invoice --> AR[Accounts Receivable]
-    AR --> Receipt[Official Receipt]
+    AR --> Receipt[Collection Receipt]
     Receipt --> Bank[Banking]
     PR[Purchase Request] --> PO[Purchase Order]
     PO --> Receiving[Receive Goods / Services]
@@ -161,7 +161,7 @@ Route::prefix('erp')->middleware(['auth'])->group(function () {
 - SOA: date range filters, outstanding balance card, invoice listing, aging bucket cards.
 - SOA A: plain printable form without pre-printed alignment, USD/PHP handling, customer and shipment references.
 - Debit Note: pre-printed layout with customer ID, job/shipment ID, VAT classification, class, and A/R Trade-Debit Note account.
-- Collections: pre-printed Official Receipt and Acknowledgement Receipt layouts, plus SOA A collection without a pre-printed form.
+- Collections: pre-printed supplementary Collection Receipt and Acknowledgement Receipt layouts, plus SOA A collection without a pre-printed form.
 - Accounting forms: debit/credit grid with live balance check and posting status badge.
 - Banking: multi-bank cashbook, deposit and withdrawal entry, FX tracking table, reconciliation worksheet, and daily cash position report.
 - Multi-Currency & FX: USD/PHP rate table, conversion worksheet, realized and unrealized FX gains/losses, and shipment-linked revaluation register.
@@ -207,7 +207,7 @@ Customer billing document templates:
 | Statement of Account | `SOA-PREPRINT` | Yes |
 | Statement of Account A | `SOAA-PLAIN` | No |
 | Debit Note | `DN-PREPRINT` | Yes |
-| Official Receipt | `OR-PREPRINT` | Yes |
+| Collection Receipt | `CR-PREPRINT` | Yes |
 | Acknowledgement Receipt | `AR-PREPRINT` | Yes |
 
 AR account mapping by currency:

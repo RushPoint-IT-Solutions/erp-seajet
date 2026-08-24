@@ -64,6 +64,15 @@
                         <input name="reference_no" class="form-control" value="">
                     </div>
                     <div class="col-md-4">
+                        <label class="form-label">Deposit Bank Account</label>
+                        <select name="bank_account_id" class="form-select">
+                            <option value="">Select account...</option>
+                            @foreach(($bankAccounts ?? []) as $bank)
+                                <option value="{{ $bank['id'] }}">{{ $bank['bank'] }} - {{ $bank['name'] }} ({{ $bank['currency'] }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-4">
                         <label class="form-label">Currency</label>
                         <select name="currency" class="form-select payment-currency-select">
                             <option>PHP</option>
@@ -73,6 +82,20 @@
                     <div class="col-md-4">
                         <label class="form-label">Amount</label>
                         <input name="amount" class="form-control text-end payment-amount-input" value="" required>
+                        <div class="form-text">Cash or bank amount actually received.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Exchange Rate to PHP</label>
+                        <input name="exchange_rate" type="number" min="0.000001" step="0.000001" class="form-control text-end payment-rate-input" value="1">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">CWT Amount</label>
+                        <input name="cwt_amount" class="form-control text-end payment-cwt-input" value="0">
+                        <div class="form-text">Creditable tax withheld by the customer (BIR Form 2307).</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">BIR Form 2307 Reference</label>
+                        <input name="cwt_certificate_no" class="form-control" value="">
                     </div>
                     <div class="col-12">
                         <div class="alert alert-warning d-none mb-0 payment-balance-alert" role="alert"></div>
@@ -103,7 +126,7 @@
                     </div>
                 </div>
                 <input type="hidden" name="payment_type" value="Customer Payment">
-                <input type="hidden" name="receipt_type" value="Official Receipt">
+                <input type="hidden" name="receipt_type" value="Collection Receipt">
                 <input type="hidden" name="receipt_no" value="">
             </div>
             <div class="modal-footer">
@@ -157,4 +180,3 @@
     })();
 </script>
 @endpush
-
