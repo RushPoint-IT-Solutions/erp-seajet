@@ -5,11 +5,20 @@ namespace App\Http\Controllers\Erp;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use App\Services\Security\RbacService;
 
 class DashboardController extends Controller
 {
     public function index()
     {
+        $rbac = app(RbacService::class);
+        $user = auth()->user();
+        $dashboardAccess = [
+            'ar' => $rbac->allows($user, 'invoices', 'view') || $rbac->allows($user, 'payments', 'view'),
+            'ap' => $rbac->allows($user, 'payables', 'view'),
+            'banking' => $rbac->allows($user, 'banking', 'view'),
+            'accounting' => $rbac->allows($user, 'accounting', 'view'),
+        ];
         $salesTotal = $this->sumTable('sales_documents', 'grand_total', function ($query) {
             $query->whereNotIn('status', ['cancelled', 'voided']);
         });
@@ -42,27 +51,53 @@ class DashboardController extends Controller
             $query->where('is_reconciled', false);
         });
 
-        $kpis = [
-            ['label' => 'Revenue', 'value' => $salesTotal, 'trend' => $this->countTable('sales_documents').' sales docs', 'tone' => 'success', 'icon' => 'bi-graph-up-arrow'],
-            ['label' => 'Expenses', 'value' => $purchaseTotal, 'trend' => $this->countTable('purchase_documents').' AP docs', 'tone' => 'warning', 'icon' => 'bi-wallet2'],
-            ['label' => 'Profit', 'value' => $salesTotal - $purchaseTotal, 'trend' => 'Revenue less AP', 'tone' => 'primary', 'icon' => 'bi-piggy-bank'],
-            ['label' => 'Cash Balance', 'value' => $cashBalance, 'trend' => $this->countTable('bank_accounts', function ($query) { $query->where('is_active', true); }).' active banks', 'tone' => 'info', 'icon' => 'bi-bank'],
-            ['label' => 'Accounts Receivable', 'value' => $arBalance, 'trend' => $openInvoiceCount.' open invoices', 'tone' => 'danger', 'icon' => 'bi-receipt-cutoff'],
-            ['label' => 'Accounts Payable', 'value' => $apBalance, 'trend' => $openBillCount.' open bills', 'tone' => 'secondary', 'icon' => 'bi-credit-card'],
-            ['label' => 'Bank Deposits', 'value' => $unreconciledDeposits, 'trend' => $this->countTable('bank_transactions', function ($query) { $query->where('is_reconciled', false); }).' unreconciled', 'tone' => 'dark', 'icon' => 'bi-bank'],
-            ['label' => 'Current VAT Due', 'value' => $vatDue, 'trend' => 'Output less input VAT', 'tone' => 'muted', 'icon' => 'bi-percent'],
-        ];
+        $kpis = [];
+        if ($dashboardAccess['ar']) {
+            $kpis[] = ['label' => 'Revenue', 'value' => $salesTotal, 'trend' => $this->countTable('sales_documents').' sales docs', 'tone' => 'success', 'icon' => 'bi-graph-up-arrow'];
+            $kpis[] = ['label' => 'Accounts Receivable', 'value' => $arBalance, 'trend' => $openInvoiceCount.' open invoices', 'tone' => 'danger', 'icon' => 'bi-receipt-cutoff'];
+        }
+        if ($dashboardAccess['ap']) {
+            $kpis[] = ['label' => 'Expenses', 'value' => $purchaseTotal, 'trend' => $this->countTable('purchase_documents').' AP docs', 'tone' => 'warning', 'icon' => 'bi-wallet2'];
+            $kpis[] = ['label' => 'Accounts Payable', 'value' => $apBalance, 'trend' => $openBillCount.' open bills', 'tone' => 'secondary', 'icon' => 'bi-credit-card'];
+        }
+        if ($dashboardAccess['ar'] && $dashboardAccess['ap']) {
+            $kpis[] = ['label' => 'Profit', 'value' => $salesTotal - $purchaseTotal, 'trend' => 'Revenue less AP', 'tone' => 'primary', 'icon' => 'bi-piggy-bank'];
+        }
+        if ($dashboardAccess['banking']) {
+            $kpis[] = ['label' => 'Cash Balance', 'value' => $cashBalance, 'trend' => $this->countTable('bank_accounts', function ($query) { $query->where('is_active', true); }).' active banks', 'tone' => 'info', 'icon' => 'bi-bank'];
+            $kpis[] = ['label' => 'Bank Deposits', 'value' => $unreconciledDeposits, 'trend' => $this->countTable('bank_transactions', function ($query) { $query->where('is_reconciled', false); }).' unreconciled', 'tone' => 'dark', 'icon' => 'bi-bank'];
+        }
+        if ($dashboardAccess['accounting']) {
+            $kpis[] = ['label' => 'Current VAT Due', 'value' => $vatDue, 'trend' => 'Output less input VAT', 'tone' => 'muted', 'icon' => 'bi-percent'];
+        }
 
         $transactions = $this->recentTransactions();
-        $aging = $this->arAging();
-        $chart = $this->financialTrend();
-        $approvalQueue = [
-            ['label' => 'Purchase Orders', 'count' => $this->countTable('purchase_documents', function ($query) { $query->whereIn('status', ['draft', 'pending', 'for approval', 'approved']); })],
-            ['label' => 'Supplier Bills', 'count' => $this->countTable('purchase_documents', function ($query) { $query->whereNotIn('status', ['paid', 'cancelled', 'voided']); })],
-            ['label' => 'Journal Entries', 'count' => $this->countTable('journal_entries', function ($query) { $query->where('status', 'draft'); })],
-        ];
+        $aging = $dashboardAccess['ar'] ? $this->arAging() : [];
+        $chart = $this->financialTrend($dashboardAccess['ar'], $dashboardAccess['ap']);
+        $approvalQueue = [];
+        if ($dashboardAccess['ap']) {
+            $approvalQueue[] = ['label' => 'Purchase Orders', 'count' => $this->countTable('purchase_documents', function ($query) { $query->whereIn('status', ['draft', 'pending', 'for approval', 'approved']); })];
+            $approvalQueue[] = ['label' => 'Supplier Bills', 'count' => $this->countTable('purchase_documents', function ($query) { $query->whereNotIn('status', ['paid', 'cancelled', 'voided']); })];
+        }
+        if ($dashboardAccess['accounting']) {
+            $approvalQueue[] = ['label' => 'Journal Entries', 'count' => $this->countTable('journal_entries', function ($query) { $query->where('status', 'draft'); })];
+        }
 
-        return view('erp.dashboard', compact('kpis', 'transactions', 'aging', 'chart', 'approvalQueue'));
+        $quickActions = [];
+        foreach ([
+            ['module' => 'invoices', 'action' => 'create', 'label' => 'Create Invoice', 'icon' => 'bi-file-earmark-plus', 'route' => route('erp.invoices.create')],
+            ['module' => 'clients', 'action' => 'view', 'label' => 'Customer Masterlist', 'icon' => 'bi-people', 'route' => route('erp.customers.index')],
+            ['module' => 'payments', 'action' => 'create', 'label' => 'Receive Payment', 'icon' => 'bi-cash', 'route' => route('erp.payments.create')],
+            ['module' => 'ar_reports', 'action' => 'view', 'label' => 'Aging Report', 'icon' => 'bi-hourglass-split', 'route' => route('erp.customer-billing.aging')],
+            ['module' => 'accounting', 'action' => 'create', 'label' => 'Journal Entry', 'icon' => 'bi-journal-plus', 'route' => route('erp.action', 'journal-entry')],
+            ['module' => 'banking', 'action' => 'create', 'label' => 'Bank Transfer', 'icon' => 'bi-arrow-left-right', 'route' => route('erp.action', 'bank-transfer')],
+        ] as $item) {
+            if ($rbac->allows($user, $item['module'], $item['action'])) {
+                $quickActions[] = $item;
+            }
+        }
+
+        return view('erp.dashboard', compact('kpis', 'transactions', 'aging', 'chart', 'approvalQueue', 'dashboardAccess', 'quickActions'));
     }
 
     public function transactions()
@@ -86,7 +121,10 @@ class DashboardController extends Controller
         $transactions = collect();
         $companyId = $this->companyId();
 
-        if (Schema::hasTable('sales_documents')) {
+        $rbac = app(RbacService::class);
+        $user = auth()->user();
+
+        if ($rbac->allows($user, 'invoices', 'view') && Schema::hasTable('sales_documents')) {
             $transactions = $transactions->merge(DB::table('sales_documents')
                 ->leftJoin('customers', 'customers.id', '=', 'sales_documents.customer_id')
                 ->select(
@@ -104,7 +142,7 @@ class DashboardController extends Controller
                 ->get());
         }
 
-        if (Schema::hasTable('receipts')) {
+        if ($rbac->allows($user, 'payments', 'view') && Schema::hasTable('receipts')) {
             $transactions = $transactions->merge(DB::table('receipts')
                 ->leftJoin('customers', 'customers.id', '=', 'receipts.customer_id')
                 ->select(
@@ -122,7 +160,7 @@ class DashboardController extends Controller
                 ->get());
         }
 
-        if (Schema::hasTable('purchase_documents')) {
+        if ($rbac->allows($user, 'payables', 'view') && Schema::hasTable('purchase_documents')) {
             $transactions = $transactions->merge(DB::table('purchase_documents')
                 ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_documents.supplier_id')
                 ->select(
@@ -140,7 +178,7 @@ class DashboardController extends Controller
                 ->get());
         }
 
-        if (Schema::hasTable('payments')) {
+        if ($rbac->allows($user, 'payables', 'view') && Schema::hasTable('payments')) {
             $transactions = $transactions->merge(DB::table('payments')
                 ->leftJoin('suppliers', 'suppliers.id', '=', 'payments.supplier_id')
                 ->select(
@@ -158,7 +196,7 @@ class DashboardController extends Controller
                 ->get());
         }
 
-        if (Schema::hasTable('journal_entries')) {
+        if ($rbac->allows($user, 'accounting', 'view') && Schema::hasTable('journal_entries')) {
             $journalParty = Schema::hasColumn('journal_entries', 'memo')
                 ? DB::raw("COALESCE(memo, 'Journal Entry') as party")
                 : DB::raw("'Journal Entry' as party");
@@ -240,7 +278,7 @@ class DashboardController extends Controller
         return $this->bucketRows($buckets);
     }
 
-    private function financialTrend()
+    private function financialTrend($includeAr = true, $includeAp = true)
     {
         $labels = [];
         $revenue = [];
@@ -251,14 +289,14 @@ class DashboardController extends Controller
             $month = now()->copy()->subMonths($offset);
             $start = $month->copy()->startOfMonth()->toDateString();
             $end = $month->copy()->endOfMonth()->toDateString();
-            $monthRevenue = $this->sumTable('sales_documents', 'grand_total', function ($query) use ($start, $end) {
+            $monthRevenue = $includeAr ? $this->sumTable('sales_documents', 'grand_total', function ($query) use ($start, $end) {
                 $query->whereBetween('document_date', [$start, $end])->whereNotIn('status', ['cancelled', 'voided']);
-            });
-            $monthExpenses = $this->sumTable('purchase_documents', 'grand_total', function ($query) use ($start, $end) {
+            }) : 0;
+            $monthExpenses = $includeAp ? $this->sumTable('purchase_documents', 'grand_total', function ($query) use ($start, $end) {
                 $query->whereBetween('document_date', [$start, $end])->whereNotIn('status', ['cancelled', 'voided']);
             }) + $this->sumTable('payments', 'amount', function ($query) use ($start, $end) {
                 $query->whereBetween('payment_date', [$start, $end])->whereNotIn('status', ['cancelled', 'voided']);
-            });
+            }) : 0;
 
             $labels[] = $month->format('M');
             $revenue[] = round($monthRevenue, 2);

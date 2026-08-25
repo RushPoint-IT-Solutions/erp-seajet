@@ -242,9 +242,18 @@
         <nav class="erp-nav py-0 accordion" id="erpSidebarNav">
             @foreach(config('erp.sidebar') as $sectionIndex => $section)
                 @php
+                    $rbac = app(\App\Services\Security\RbacService::class);
+                    $allowedItems = isset($section['items']) ? array_values(array_filter($section['items'], function ($item) use ($rbac) {
+                        $permission = isset($item['permission']) ? explode('.', $item['permission'], 2) : ['dashboard', 'view'];
+                        return $rbac->allows(auth()->user(), $permission[0], isset($permission[1]) ? $permission[1] : 'view');
+                    })) : [];
+                    $sectionPermission = isset($section['permission']) ? explode('.', $section['permission'], 2) : null;
+                    $sectionAllowed = isset($section['items'])
+                        ? count($allowedItems) > 0
+                        : (!$sectionPermission || $rbac->allows(auth()->user(), $sectionPermission[0], isset($sectionPermission[1]) ? $sectionPermission[1] : 'view'));
                     $sectionActive = false;
                     if (isset($section['items'])) {
-                        foreach ($section['items'] as $item) {
+                        foreach ($allowedItems as $item) {
                             foreach ($item['patterns'] as $pattern) {
                                 if (($pattern === '/' && request()->is('/')) || request()->is($pattern)) {
                                     $sectionActive = true;
@@ -260,6 +269,7 @@
                     }
                     $collapseId = 'sidebarSection'.$sectionIndex;
                 @endphp
+                @if($sectionAllowed)
                 <div class="mb-1 {{ isset($section['items']) ? 'nav-group' : '' }}">
                     @if(isset($section['items']))
                         <button class="{{ $sectionActive ? 'active' : '' }}" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}" aria-expanded="{{ $sectionActive ? 'true' : 'false' }}" aria-controls="{{ $collapseId }}">
@@ -268,7 +278,7 @@
                             <i class="bi bi-chevron-down nav-caret"></i>
                         </button>
                         <div id="{{ $collapseId }}" class="collapse {{ $sectionActive ? 'show' : '' }}" data-bs-parent="#erpSidebarNav">
-                            @foreach($section['items'] as $item)
+                            @foreach($allowedItems as $item)
                                 @php
                                     $active = false;
                                     foreach ($item['patterns'] as $pattern) {
@@ -296,6 +306,7 @@
                         </a>
                     @endif
                 </div>
+                @endif
             @endforeach
         </nav>
     </aside>
@@ -306,8 +317,15 @@
                 <small class="text-muted">Multi-company | Multi-branch | Multi-currency ready</small>
             </div>
             <div class="d-flex align-items-center gap-2">
-                <a href="{{ route('erp.notifications') }}" class="btn btn-outline-secondary btn-sm" title="Notifications"><i class="bi bi-bell"></i></a>
-                <a href="{{ route('erp.invoices.create') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i> Quick Entry</a>
+                @if(auth()->user()->canAccess('system_updates', 'view'))
+                    <a href="{{ route('erp.system-update.index') }}" class="btn btn-outline-secondary btn-sm" title="System version and updates"><i class="bi bi-cloud-arrow-down me-1"></i><span class="d-none d-xl-inline">System Update</span></a>
+                @endif
+                @if(auth()->user()->canAccess('dashboard', 'view'))
+                    <a href="{{ route('erp.notifications') }}" class="btn btn-outline-secondary btn-sm" title="Notifications"><i class="bi bi-bell"></i></a>
+                @endif
+                @if(auth()->user()->canAccess('invoices', 'create'))
+                    <a href="{{ route('erp.invoices.create') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i> Quick Entry</a>
+                @endif
                 <div class="dropdown">
                     <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="bi bi-person-circle me-1"></i>{{ auth()->user()->name ?? 'User' }}

@@ -36,5 +36,11 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'must_change_password' => 'boolean',
+        'is_active' => 'boolean',
     ];
+
+    public function canAccess($module, $action = 'view')
+    {
+        return app(\App\Services\Security\RbacService::class)->allows($this, $module, $action);
+    }
 }

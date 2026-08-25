@@ -84,6 +84,8 @@
     .permission-create { background: #00a99d; }
     .permission-edit { background: #f6b23f; }
     .permission-delete { background: #f15b45; }
+    .permission-approve { background: #7c3aed; }
+    .permission-release { background: #0f766e; }
     .permission-choice {
         display: inline-grid;
         grid-template-columns: 1fr 1fr;
@@ -141,12 +143,30 @@
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
         <div>
             <h1 class="h3 fw-bold mb-1">Role & Permission Management</h1>
-            <p class="text-muted mb-0">Control what each role can view, create, edit, or delete per module.</p>
+            <p class="text-muted mb-0">Control CRUD access plus approval and release duties per module.</p>
         </div>
         <div class="d-flex flex-wrap gap-2 no-print">
-            <span class="btn btn-sm btn-outline-success disabled"><i class="bi bi-shield-check me-1"></i>Permission draft</span>
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#newRoleForm"><i class="bi bi-shield-plus me-1"></i>New Role</button>
             <a href="{{ route('erp.users.create') }}" class="btn btn-primary"><i class="bi bi-person-plus me-1"></i>New User</a>
         </div>
+    </div>
+
+    @if(session('status'))
+        <div class="alert alert-success">{{ session('status') }}</div>
+    @endif
+    @if($errors->any())
+        <div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
+    @endif
+
+    <div class="collapse mb-4" id="newRoleForm">
+        <form method="post" action="{{ route('erp.users.roles.store') }}" class="erp-card p-3">
+            @csrf
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4"><label class="form-label">Role name</label><input name="name" class="form-control" required maxlength="100" placeholder="e.g. AP Supervisor"></div>
+                <div class="col-md-6"><label class="form-label">Description</label><input name="description" class="form-control" maxlength="500" placeholder="Describe the role's responsibility"></div>
+                <div class="col-md-2"><button class="btn btn-primary w-100" type="submit">Create Role</button></div>
+            </div>
+        </form>
     </div>
 
     <div class="permission-toolbar p-3 mb-4">
@@ -156,6 +176,8 @@
             <span class="permission-badge permission-create">Create</span>
             <span class="permission-badge permission-edit">Edit</span>
             <span class="permission-badge permission-delete">Delete</span>
+            <span class="permission-badge permission-approve">Approve</span>
+            <span class="permission-badge permission-release">Release</span>
             <span class="vr d-none d-md-inline-block"></span>
             <span>Administrator always has full access and cannot be restricted.</span>
         </div>
@@ -206,8 +228,14 @@
         @foreach($roles as $roleIndex => $role)
             @php
                 $isAdmin = $role['locked'];
+                $permissionActions = ['view', 'create', 'edit', 'delete', 'approve', 'release'];
             @endphp
             <div class="permission-panel p-3 {{ $roleIndex === 0 ? 'active' : '' }}" data-role-panel="{{ $role['key'] }}">
+                @if(!$isAdmin && $role['id'])
+                    <form method="post" action="{{ route('erp.users.roles.permissions.update', $role['id']) }}">
+                        @csrf
+                        @method('PUT')
+                @endif
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
                     <div class="d-flex align-items-center gap-2">
                         <span class="permission-role-chip" style="background: {{ $role['color'] }}">{{ $role['label'] }}</span>
@@ -220,6 +248,9 @@
                         <button type="button" class="btn btn-sm btn-outline-danger permission-reset-all" {{ $isAdmin ? 'disabled' : '' }}>
                             <i class="bi bi-arrow-counterclockwise me-1"></i>Reset All
                         </button>
+                        @if(!$isAdmin && $role['id'])
+                            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-save me-1"></i>Save Permissions</button>
+                        @endif
                     </div>
                 </div>
 
@@ -233,24 +264,20 @@
                                 <thead>
                                 <tr>
                                     <th>Module</th>
-                                    <th class="text-center"><span class="permission-badge permission-view">View</span></th>
-                                    <th class="text-center"><span class="permission-badge permission-create">Create</span></th>
-                                    <th class="text-center"><span class="permission-badge permission-edit">Edit</span></th>
-                                    <th class="text-center"><span class="permission-badge permission-delete">Delete</span></th>
+                                    @foreach($permissionActions as $permissionAction)
+                                        <th class="text-center"><span class="permission-badge permission-{{ $permissionAction }}">{{ $permissionAction }}</span></th>
+                                    @endforeach
                                 </tr>
                                 </thead>
                                 <tbody>
                                 @foreach($modules as $module)
                                     <tr>
                                         <td class="fw-semibold">{{ $module['label'] }}</td>
-                                        @foreach(['view', 'create', 'edit', 'delete'] as $permission)
+                                        @foreach($permissionActions as $permission)
                                             @php
                                                 $available = in_array($permission, $module['permissions']);
-                                                $defaultOn = $isAdmin
-                                                    || ($role['key'] === 'accounting' && in_array($module['key'], ['dashboard', 'clients', 'invoices', 'payments', 'reports']))
-                                                    || ($role['key'] === 'finance' && in_array($module['key'], ['dashboard', 'invoices', 'payments', 'reports']));
-                                                $checkedOn = $available && $defaultOn;
-                                                $fieldName = 'permissions['.$role['key'].']['.$module['key'].']['.$permission.']';
+                                                $checkedOn = $available && ($isAdmin || in_array($module['key'].'.'.$permission, $role['enabled'], true));
+                                                $fieldName = 'permissions['.$module['key'].']['.$permission.']';
                                             @endphp
                                             <td class="text-center">
                                                 @if($available)
@@ -276,6 +303,9 @@
                         </div>
                     </div>
                 @endforeach
+                @if(!$isAdmin && $role['id'])
+                    </form>
+                @endif
             </div>
         @endforeach
     </div>

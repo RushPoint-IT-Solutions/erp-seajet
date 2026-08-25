@@ -13,7 +13,12 @@
     </div>
     <div class="col-md-3">
         <label class="form-label">Role</label>
-        <select name="role" class="form-select erp-select">@foreach(['Admin', 'Accounting', 'Finance'] as $role)<option {{ strtolower(old('role', isset($record) ? $record->role : 'accounting')) === strtolower($role) ? 'selected' : '' }}>{{ $role }}</option>@endforeach</select>
+        <select name="role" class="form-select erp-select" required>
+            @php($selectedRole = app(\App\Services\Security\RbacService::class)->normalizeRole(old('role', isset($record) ? $record->role : 'accounting')))
+            @foreach($roles as $role)
+                <option value="{{ $role['key'] }}" {{ $selectedRole === $role['key'] ? 'selected' : '' }}>{{ $role['label'] }}</option>
+            @endforeach
+        </select>
     </div>
     <div class="col-md-3">
         <label class="form-label">Department</label>

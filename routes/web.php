@@ -21,7 +21,7 @@ Route::get('/client/invoices/{token}', 'Erp\ModuleController@publicInvoice')->na
 Route::get('/client/invoices/{token}/checkout', 'Erp\ModuleController@publicCheckout')->name('erp.public.checkout');
 Route::post('/webhooks/stripe', 'Erp\ModuleController@stripeWebhook')->name('erp.webhooks.stripe');
 
-Route::middleware(['auth', 'user.access:administrator,admin,accounting,finance'])->group(function () {
+Route::middleware(['auth', 'permission.access'])->group(function () {
     Route::get('/', 'Erp\DashboardController@index')->name('erp.dashboard');
     Route::get('/erp/transactions/data', 'Erp\DashboardController@transactions')->name('erp.transactions.data');
     Route::get('/erp/notifications', 'Erp\ModuleController@notifications')->name('erp.notifications');
@@ -38,7 +38,7 @@ Route::middleware(['auth', 'user.access:administrator,admin,accounting,finance']
     Route::get('/erp/suppliers/create', 'Erp\ModuleController@supplierCreate')->name('erp.suppliers.create');
     Route::post('/erp/suppliers', 'Erp\ModuleController@supplierStore')->name('erp.suppliers.store');
 });
-Route::prefix('/erp/users')->name('erp.users.')->middleware(['auth', 'user.access:administrator,admin'])->group(function () {
+Route::prefix('/erp/users')->name('erp.users.')->middleware(['auth', 'permission.access'])->group(function () {
     Route::get('/', 'Erp\ModuleController@usersIndex')->name('index');
     Route::get('/create', 'Erp\ModuleController@userCreate')->name('create');
     Route::post('/review', 'Erp\ModuleController@userReview')->name('review');
@@ -47,8 +47,10 @@ Route::prefix('/erp/users')->name('erp.users.')->middleware(['auth', 'user.acces
     Route::post('/delete/review', 'Erp\ModuleController@userDeleteReview')->name('delete.review');
     Route::get('/status/update', 'Erp\ModuleController@userStatus')->name('status');
     Route::post('/status/review', 'Erp\ModuleController@userStatusReview')->name('status.review');
+    Route::post('/roles', 'Erp\ModuleController@roleStore')->name('roles.store');
+    Route::put('/roles/{role}/permissions', 'Erp\ModuleController@rolePermissionsUpdate')->name('roles.permissions.update');
 });
-Route::middleware(['auth', 'user.access:administrator,admin,accounting,finance'])->group(function () {
+Route::middleware(['auth', 'permission.access'])->group(function () {
     Route::get('/erp/payables/vendor-bills/create', 'Erp\ModuleController@vendorBillCreate')->name('erp.payables.vendor-bills.create');
     Route::get('/erp/payables/vendor-bills/view/{bill}', 'Erp\ModuleController@vendorBillView')->name('erp.payables.vendor-bills.view');
     Route::get('/erp/payables/vendor-bills/print/{bill}', 'Erp\ModuleController@vendorBillPrint')->name('erp.payables.vendor-bills.print');
@@ -146,13 +148,16 @@ Route::middleware(['auth', 'user.access:administrator,admin,accounting,finance']
     Route::get('/erp/customer-billing/templates', 'Erp\ModuleController@customerBillingTemplates')->name('erp.customer-billing.templates');
     Route::get('/erp/customer-billing/aging', 'Erp\ModuleController@agingReport')->name('erp.customer-billing.aging');
 });
-Route::get('/erp/settings', 'Erp\ModuleController@financeSettings')->name('erp.settings.index')->middleware(['auth', 'user.access:administrator,admin,accounting']);
-Route::post('/erp/settings/company', 'Erp\ModuleController@saveFinanceCompanySettings')->name('erp.settings.company.save')->middleware(['auth', 'user.access:administrator,admin,accounting']);
-Route::post('/erp/settings/branches', 'Erp\ModuleController@saveFinanceBranch')->name('erp.settings.branches.save')->middleware(['auth', 'user.access:administrator,admin,accounting']);
-Route::post('/erp/settings/cost-centers', 'Erp\ModuleController@saveFinanceCostCenter')->name('erp.settings.cost-centers.save')->middleware(['auth', 'user.access:administrator,admin,accounting']);
-Route::post('/erp/settings/items', 'Erp\ModuleController@saveFinanceItem')->name('erp.settings.items.save')->middleware(['auth', 'user.access:administrator,admin,accounting']);
-Route::post('/erp/settings/number-series', 'Erp\ModuleController@saveFinanceNumberSeries')->name('erp.settings.number-series.save')->middleware(['auth', 'user.access:administrator,admin,accounting']);
-Route::post('/erp/settings/tax-codes', 'Erp\ModuleController@saveFinanceTaxCode')->name('erp.settings.tax-codes.save')->middleware(['auth', 'user.access:administrator,admin,accounting']);
-Route::post('/erp/settings/currency-rates', 'Erp\ModuleController@saveFinanceCurrencyRate')->name('erp.settings.currency-rates.save')->middleware(['auth', 'user.access:administrator,admin,accounting']);
-Route::post('/erp/settings/bank-accounts', 'Erp\ModuleController@saveFinanceBankAccount')->name('erp.settings.bank-accounts.save')->middleware(['auth', 'user.access:administrator,admin,accounting']);
-Route::get('/erp/{module}', 'Erp\ModuleController@show')->name('erp.modules.show')->middleware(['auth', 'user.access:administrator,admin,accounting,finance']);
+Route::get('/erp/settings', 'Erp\ModuleController@financeSettings')->name('erp.settings.index')->middleware(['auth', 'permission.access']);
+Route::post('/erp/settings/company', 'Erp\ModuleController@saveFinanceCompanySettings')->name('erp.settings.company.save')->middleware(['auth', 'permission.access']);
+Route::post('/erp/settings/branches', 'Erp\ModuleController@saveFinanceBranch')->name('erp.settings.branches.save')->middleware(['auth', 'permission.access']);
+Route::post('/erp/settings/cost-centers', 'Erp\ModuleController@saveFinanceCostCenter')->name('erp.settings.cost-centers.save')->middleware(['auth', 'permission.access']);
+Route::post('/erp/settings/items', 'Erp\ModuleController@saveFinanceItem')->name('erp.settings.items.save')->middleware(['auth', 'permission.access']);
+Route::post('/erp/settings/number-series', 'Erp\ModuleController@saveFinanceNumberSeries')->name('erp.settings.number-series.save')->middleware(['auth', 'permission.access']);
+Route::post('/erp/settings/tax-codes', 'Erp\ModuleController@saveFinanceTaxCode')->name('erp.settings.tax-codes.save')->middleware(['auth', 'permission.access']);
+Route::post('/erp/settings/currency-rates', 'Erp\ModuleController@saveFinanceCurrencyRate')->name('erp.settings.currency-rates.save')->middleware(['auth', 'permission.access']);
+Route::post('/erp/settings/bank-accounts', 'Erp\ModuleController@saveFinanceBankAccount')->name('erp.settings.bank-accounts.save')->middleware(['auth', 'permission.access']);
+Route::get('/erp/system-update', 'Erp\SystemUpdateController@index')->name('erp.system-update.index')->middleware(['auth', 'permission.access:system_updates,view']);
+Route::get('/erp/system-update/status', 'Erp\SystemUpdateController@status')->name('erp.system-update.status')->middleware(['auth', 'permission.access:system_updates,view']);
+Route::post('/erp/system-update/run', 'Erp\SystemUpdateController@run')->name('erp.system-update.run')->middleware(['auth', 'permission.access:system_updates,edit']);
+Route::get('/erp/{module}', 'Erp\ModuleController@show')->name('erp.modules.show')->middleware(['auth', 'permission.access']);

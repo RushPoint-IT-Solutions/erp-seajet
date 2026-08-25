@@ -6,10 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Services\Accounting\PeriodLockService;
 use App\Services\Accounting\PostingService;
 use App\Services\Audit\ActivityLogger;
+use App\Models\Permission;
+use App\Models\Role;
+use App\Services\Security\RbacService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ModuleController extends Controller
 {
@@ -185,14 +189,21 @@ class ModuleController extends Controller
             ['User Access', 'Role and permission changes', 'Admin', 'Admin', 'Owner', 'All changes', 'Login and activity logs retained'],
         ];
 
-        $rolePermissions = [
-            ['Admin', 'Full access', 'Approve all', 'Manage users, roles, company, branch, and posting controls'],
-            ['Accounting', 'AR, AP, GL, Tax', 'Prepare only', 'Create invoices, journals, bills, receipts, tax summaries'],
-            ['Finance', 'Banking, payments, reports', 'Level 1 approval', 'Approve payments, bank reconciliation, cash position'],
-            ['Sales', 'Customers, billing requests', 'Prepare only', 'Create customer records and billing drafts'],
-            ['Payables', 'Vendors and vendor bills', 'Prepare only', 'Create suppliers and vendor bill drafts'],
-            ['Viewer', 'Read-only reports', 'No approval', 'Dashboard, reports, printable forms'],
-        ];
+        $rolePermissions = collect($this->rolePermissionRoles())->map(function ($role) {
+            $enabled = collect($role['enabled']);
+            $modules = $role['locked']
+                ? 'Full ERP access'
+                : $enabled->map(function ($permission) { return explode('.', $permission, 2)[0]; })->unique()->map(function ($module) {
+                    return ucwords(str_replace('_', ' ', $module));
+                })->implode(', ');
+            $approvals = $role['locked'] ? 'Approve all' : $enabled->filter(function ($permission) {
+                return substr($permission, -8) === '.approve' || substr($permission, -8) === '.release';
+            })->map(function ($permission) {
+                return ucwords(str_replace(['.', '_'], ' ', $permission));
+            })->implode(', ');
+
+            return [$role['label'], $modules ?: 'No module access', $approvals ?: 'No approval', $role['note']];
+        })->all();
 
         $pendingApprovals = [
             ['AP Payment', 'PV-2026-00312', 'Metro Industrial Supply', 'JOB-SEA-2026-0423', '127,900.00', 'Finance Manager'],
@@ -1168,9 +1179,81 @@ class ModuleController extends Controller
         ]);
     }
 
+    public function roleStore()
+    {
+        $data = request()->validate([
+            'name' => 'required|string|max:100',
+            'description' => 'nullable|string|max:500',
+        ]);
+        $companyId = $this->defaultCompanyId();
+        $slug = str_replace('-', '_', Str::slug($data['name']));
+        if ($slug === '' || in_array($slug, ['admin', 'administrator'], true)) {
+            return back()->withErrors(['name' => 'Please choose a different role name.']);
+        }
+        $exists = DB::table('roles')->where('slug', $slug)
+            ->where(function ($query) use ($companyId) {
+                $query->whereNull('company_id')->orWhere('company_id', $companyId);
+            })->exists();
+        if ($exists) {
+            return back()->withInput()->withErrors(['name' => 'A role with this name already exists.']);
+        }
+
+        $roleId = DB::table('roles')->insertGetId([
+            'company_id' => $companyId,
+            'name' => trim($data['name']),
+            'slug' => $slug,
+            'description' => $data['description'] ?? 'Custom company role',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        app(ActivityLogger::class)->log('created', 'role', $roleId, [], ['name' => $data['name'], 'slug' => $slug], $companyId);
+
+        return redirect()->route('erp.users.index')->with('status', 'Role created. Assign its permissions below.');
+    }
+
+    public function rolePermissionsUpdate($role)
+    {
+        $companyId = $this->defaultCompanyId();
+        $recordQuery = Role::where('id', $role);
+        $companyId === null ? $recordQuery->whereNull('company_id') : $recordQuery->where('company_id', $companyId);
+        $record = $recordQuery->first();
+        abort_unless($record, 404);
+        abort_if($record->slug === 'admin', 422, 'Administrator permissions cannot be restricted.');
+
+        $submitted = (array) request('permissions', []);
+        $allowedSlugs = [];
+        foreach (app(RbacService::class)->moduleDefinitions() as $modules) {
+            foreach ($modules as $module => $definition) {
+                $moduleValues = (array) ($submitted[$module] ?? []);
+                $hasWrite = false;
+                foreach ($definition['actions'] as $action) {
+                    if ($action !== 'view' && (string) ($moduleValues[$action] ?? '0') === '1') {
+                        $hasWrite = true;
+                    }
+                    if ((string) ($moduleValues[$action] ?? '0') === '1') {
+                        $allowedSlugs[] = $module.'.'.$action;
+                    }
+                }
+                if ($hasWrite) {
+                    $allowedSlugs[] = $module.'.view';
+                }
+            }
+        }
+        $allowedSlugs = array_values(array_unique($allowedSlugs));
+        $permissionIds = Permission::whereIn('slug', $allowedSlugs)->pluck('id')->all();
+        $before = $record->permissions()->pluck('permissions.slug')->all();
+        $record->permissions()->sync($permissionIds);
+        app(ActivityLogger::class)->log('permissions_updated', 'role', $record->id, ['permissions' => $before], [
+            'permissions' => $allowedSlugs,
+        ], $companyId);
+
+        return redirect()->route('erp.users.index')->with('status', $record->name.' permissions saved.');
+    }
+
     public function userCreate()
     {
-        return view('erp.users.create');
+        return view('erp.users.create', ['roles' => $this->rolePermissionRoles()]);
     }
 
     public function userEdit($user)
@@ -1181,6 +1264,7 @@ class ModuleController extends Controller
         return view('erp.users.edit', [
             'userId' => $user,
             'record' => $record,
+            'roles' => $this->rolePermissionRoles(),
         ]);
     }
 
@@ -1220,7 +1304,7 @@ class ModuleController extends Controller
             'user_id' => 'nullable|string|max:50',
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255',
-            'role' => 'required|in:Admin,Accounting,Finance,admin,accounting,finance',
+            'role' => 'required|string|max:100',
             'department' => 'nullable|string|max:100',
             'branch' => 'nullable|string|max:100',
             'status' => 'required|in:Active,Inactive,Locked,Pending Invite',
@@ -1228,6 +1312,16 @@ class ModuleController extends Controller
             'password' => 'nullable|string|min:12|confirmed',
         ]);
         $companyId = $this->defaultCompanyId();
+        $roleSlug = app(RbacService::class)->normalizeRole($data['role']);
+        $roleExists = Schema::hasTable('roles') && DB::table('roles')
+            ->where('slug', $roleSlug)
+            ->where('is_active', true)
+            ->where(function ($query) use ($companyId) {
+                $query->whereNull('company_id')->orWhere('company_id', $companyId);
+            })->exists();
+        if (!$roleExists && !array_key_exists($roleSlug, config('rbac.roles', []))) {
+            return back()->withInput()->withErrors(['role' => 'The selected role is not active for this company.']);
+        }
         $userId = ctype_digit((string) ($data['user_id'] ?? '')) ? (int) $data['user_id'] : null;
         $existing = $userId ? DB::table('users')->where('company_id', $companyId)->where('id', $userId)->first() : null;
         if (!$existing && empty($data['password'])) {
@@ -1252,7 +1346,7 @@ class ModuleController extends Controller
             'branch_id' => $branchId,
             'name' => trim($data['name']),
             'email' => strtolower(trim($data['email'])),
-            'role' => strtolower($data['role']),
+            'role' => $roleSlug,
             'department' => $data['department'] ?? null,
             'is_active' => $data['status'] === 'Active',
             'updated_at' => now(),
@@ -1324,19 +1418,25 @@ class ModuleController extends Controller
             return [];
         }
 
+        $companyId = $this->defaultCompanyId();
+        $roleNames = Schema::hasTable('roles')
+            ? DB::table('roles')->where('company_id', $companyId)->pluck('name', 'slug')
+            : collect();
+
         return DB::table('users')
             ->leftJoin('branches', 'branches.id', '=', 'users.branch_id')
-            ->where('users.company_id', $this->defaultCompanyId())
+            ->where('users.company_id', $companyId)
             ->select('users.*', 'branches.name as branch_name')
             ->orderBy('users.name')
             ->get()
-            ->map(function ($user) {
+            ->map(function ($user) use ($roleNames) {
+                $roleSlug = app(RbacService::class)->normalizeRole($user->role ?: 'viewer');
                 return [
                     'id' => $user->id,
                     'user_id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
-                    'role' => ucfirst($user->role ?: 'viewer'),
+                    'role' => $roleNames->get($roleSlug, config('rbac.roles.'.$roleSlug.'.name', ucwords(str_replace('_', ' ', $roleSlug)))),
                     'department' => $user->department ?: '-',
                     'branch' => $user->branch_name ?: 'All',
                     'status' => $user->is_active ? 'Active' : 'Inactive',
@@ -1437,7 +1537,7 @@ class ModuleController extends Controller
         ]);
 
         if (request('save_mode') === 'post') {
-            $this->authorizeAccountingPosting();
+            $this->authorizeAccountingPosting('payables', 'approve');
         }
 
         $shouldPost = request('save_mode') === 'post';
@@ -1613,7 +1713,7 @@ class ModuleController extends Controller
 
     public function approveApPayment($payment)
     {
-        $this->authorizeAccountingPosting();
+        $this->authorizeAccountingPosting('payables', 'approve');
         $companyId = $this->defaultCompanyId();
 
         DB::transaction(function () use ($payment, $companyId) {
@@ -1658,7 +1758,7 @@ class ModuleController extends Controller
 
     public function releaseApPayment($payment)
     {
-        $this->authorizeAccountingPosting();
+        $this->authorizeAccountingPosting('payables', 'release');
         $companyId = $this->defaultCompanyId();
 
         DB::transaction(function () use ($payment, $companyId) {
@@ -1729,7 +1829,7 @@ class ModuleController extends Controller
 
     public function voidApPayment($payment)
     {
-        $this->authorizeAccountingPosting();
+        $this->authorizeAccountingPosting('payables', 'delete');
         $data = request()->validate(['reason' => 'required|string|min:5|max:1000']);
         $companyId = $this->defaultCompanyId();
 
@@ -1787,7 +1887,7 @@ class ModuleController extends Controller
 
     public function replaceCheck($check)
     {
-        $this->authorizeAccountingPosting();
+        $this->authorizeAccountingPosting('payables', 'release');
         $data = request()->validate([
             'new_check_no' => 'required|string|max:100',
             'reason' => 'required|string|min:5|max:1000',
@@ -1838,7 +1938,7 @@ class ModuleController extends Controller
 
     public function clearCheck($check)
     {
-        $this->authorizeAccountingPosting();
+        $this->authorizeAccountingPosting('banking', 'edit');
         $data = request()->validate([
             'cleared_at' => 'required|date|before_or_equal:today',
             'clearing_reference' => 'required|string|max:255',
@@ -2931,9 +3031,7 @@ class ModuleController extends Controller
 
     private function canOperateChecks()
     {
-        $role = strtolower((string) (auth()->user()->role ?? 'viewer'));
-
-        return in_array($role, ['administrator', 'admin', 'finance'], true);
+        return app(RbacService::class)->allows(auth()->user(), 'payables', 'release');
     }
 
     private function bankCheckPrintLayout($bankAccountId = null, $profileId = null)
@@ -3088,9 +3186,7 @@ class ModuleController extends Controller
 
     private function canSaveCheckPrintLayout()
     {
-        $role = strtolower((string) (auth()->user()->role ?? 'viewer'));
-
-        return in_array($role, ['administrator', 'admin'], true);
+        return app(RbacService::class)->allows(auth()->user(), 'finance_settings', 'edit');
     }
 
     private function checkVoucherPrintLayoutPayload($fromRequest = false)
@@ -4159,7 +4255,7 @@ class ModuleController extends Controller
         }
 
         $companyId = $this->defaultCompanyId();
-        $this->authorizeAccountingPosting();
+        $this->authorizeAccountingPosting('accounting', 'approve');
         app(PeriodLockService::class)->assertOpen($companyId, request('journal_date', date('Y-m-d')));
         $journalNo = trim((string) request('journal_no')) ?: $this->nextDocumentNumber('journal_voucher', 'JV-', 5);
 
@@ -4876,7 +4972,7 @@ class ModuleController extends Controller
         $newStatus = stripos((string) ($data['delete_action'] ?? ''), 'cancel') !== false ? 'cancelled' : 'voided';
 
         if ($invoiceNo !== '' && Schema::hasTable('sales_documents')) {
-            $this->authorizeAccountingPosting();
+            $this->authorizeAccountingPosting('invoices', 'delete');
             $record = DB::table('sales_documents')
                 ->where('company_id', $this->defaultCompanyId())
                 ->where('document_no', $invoiceNo)
@@ -4936,7 +5032,7 @@ class ModuleController extends Controller
 
         $newStatus = strtolower(str_replace(' ', '_', trim((string) ($data['new_status'] ?? ''))));
         if (in_array($newStatus, ['posted', 'approved'], true)) {
-            $this->authorizeAccountingPosting();
+            $this->authorizeAccountingPosting('invoices', 'approve');
             app(PostingService::class)->postSalesDocument($record->id);
             $newStatus = 'posted';
         } elseif (!in_array($newStatus, ['draft', 'submitted', 'for_approval'], true)) {
@@ -6358,32 +6454,45 @@ class ModuleController extends Controller
 
     private function rolePermissionRoles()
     {
-        return [
-            ['key' => 'administrator', 'label' => 'Administrator', 'color' => '#f15b45', 'locked' => true, 'note' => 'Full ERP access'],
-            ['key' => 'accounting', 'label' => 'Accounting Staff', 'color' => '#2f5597', 'locked' => false, 'note' => 'Billing, payments, reports'],
-            ['key' => 'finance', 'label' => 'Finance Staff', 'color' => '#00a99d', 'locked' => false, 'note' => 'Collections and cash controls'],
-        ];
+        $defaults = config('rbac.roles', []);
+        if (!Schema::hasTable('roles')) {
+            return collect($defaults)->map(function ($role, $slug) {
+                return [
+                    'id' => null, 'key' => $slug, 'label' => $role['name'],
+                    'color' => $role['color'], 'locked' => !empty($role['locked']),
+                    'note' => $role['description'], 'enabled' => [],
+                ];
+            })->values()->all();
+        }
+
+        $companyId = $this->defaultCompanyId();
+        $roles = Role::with('permissions')->where('is_active', true);
+        $companyId === null ? $roles->whereNull('company_id') : $roles->where('company_id', $companyId);
+        return $roles
+            ->orderBy('id')
+            ->get()
+            ->map(function ($role, $index) use ($defaults) {
+                $default = $defaults[$role->slug] ?? [];
+                $palette = ['#64748b', '#0f766e', '#7c3aed', '#b45309', '#be123c'];
+                return [
+                    'id' => $role->id,
+                    'key' => $role->slug,
+                    'label' => $role->name,
+                    'color' => $default['color'] ?? $palette[$index % count($palette)],
+                    'locked' => $role->slug === 'admin' || !empty($default['locked']),
+                    'note' => $role->description ?: 'Custom company role',
+                    'enabled' => $role->permissions->pluck('slug')->all(),
+                ];
+            })->all();
     }
 
     private function rolePermissionGroups()
     {
-        return [
-            'Core Modules' => [
-                ['key' => 'dashboard', 'label' => 'Dashboard', 'permissions' => ['view']],
-                ['key' => 'clients', 'label' => 'Clients', 'permissions' => ['view', 'create', 'edit', 'delete']],
-                ['key' => 'invoices', 'label' => 'Invoices', 'permissions' => ['view', 'create', 'edit', 'delete']],
-                ['key' => 'payments', 'label' => 'Payments', 'permissions' => ['view', 'create', 'edit', 'delete']],
-            ],
-            'Finance & Operations' => [
-                ['key' => 'vendors', 'label' => 'Vendors', 'permissions' => ['view', 'create', 'edit', 'delete']],
-                ['key' => 'expenses', 'label' => 'Accounts Payable (AP)', 'permissions' => ['view', 'create', 'edit', 'delete']],
-                ['key' => 'reports', 'label' => 'Reports', 'permissions' => ['view', 'create', 'edit', 'delete']],
-            ],
-            'Administration' => [
-                ['key' => 'user_access_control', 'label' => 'User Access Control', 'permissions' => ['view', 'create', 'edit', 'delete']],
-                ['key' => 'finance_settings', 'label' => 'Finance Settings', 'permissions' => ['view', 'create', 'edit', 'delete']],
-            ],
-        ];
+        return collect(app(RbacService::class)->moduleDefinitions())->map(function ($modules) {
+            return collect($modules)->map(function ($module, $key) {
+                return ['key' => $key, 'label' => $module['label'], 'permissions' => $module['actions']];
+            })->values()->all();
+        })->all();
     }
 
     private function billingPrintDocuments($vatClassification, array $totals = [], array $selectedTemplates = [], array $invoiceData = [])
@@ -6764,7 +6873,7 @@ class ModuleController extends Controller
         $data['invoice_template'] = $selectedTemplates;
         $data['invoice_templates_display'] = implode(', ', $selectedTemplates);
         if (request('save_mode') === 'post') {
-            $this->authorizeAccountingPosting();
+            $this->authorizeAccountingPosting('invoices', 'approve');
         }
 
         $shouldPost = request('save_mode') === 'post';
@@ -6811,6 +6920,10 @@ class ModuleController extends Controller
     private function paymentRows()
     {
         if (Schema::hasTable('receipts')) {
+            $invoiceNumbers = DB::connection()->getDriverName() === 'sqlite'
+                ? DB::raw('GROUP_CONCAT(sales_documents.document_no, ", ") as invoice_numbers')
+                : DB::raw('GROUP_CONCAT(sales_documents.document_no ORDER BY sales_documents.document_no SEPARATOR ", ") as invoice_numbers');
+
             return DB::table('receipts')
                 ->leftJoin('customers', 'customers.id', '=', 'receipts.customer_id')
                 ->leftJoin('receipt_applications', 'receipt_applications.receipt_id', '=', 'receipts.id')
@@ -6825,7 +6938,7 @@ class ModuleController extends Controller
                     'receipts.payment_method',
                     'receipts.reference_no',
                     'customers.name as customer_name',
-                    DB::raw('GROUP_CONCAT(sales_documents.document_no ORDER BY sales_documents.document_no SEPARATOR ", ") as invoice_numbers')
+                    $invoiceNumbers
                 )
                 ->where('receipts.company_id', $this->defaultCompanyId())
                 ->groupBy(
@@ -6944,7 +7057,7 @@ class ModuleController extends Controller
             'cwt_amount' => 'nullable',
             'cwt_certificate_no' => 'nullable|string|max:100',
         ]);
-        $this->authorizeAccountingPosting();
+        $this->authorizeAccountingPosting('payments', 'create');
 
         $payment = request()->only([
             'receipt_type',
@@ -7120,10 +7233,13 @@ class ModuleController extends Controller
         return 'OR-' . str_pad($number + 1, 5, '0', STR_PAD_LEFT);
     }
 
-    private function authorizeAccountingPosting()
+    private function authorizeAccountingPosting($module = 'accounting', $action = 'approve')
     {
-        $role = strtolower((string) (auth()->user()->role ?? 'viewer'));
-        abort_unless(in_array($role, ['administrator', 'admin', 'finance'], true), 403, 'Only Finance or an Administrator may approve, post, reverse, or void accounting transactions.');
+        abort_unless(
+            app(RbacService::class)->allows(auth()->user(), $module, $action),
+            403,
+            'Your role does not have the required '.$module.'.'.$action.' permission.'
+        );
     }
 
     public function soaPreview()

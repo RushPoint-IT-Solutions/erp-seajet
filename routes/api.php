@@ -25,7 +25,7 @@ Route::prefix('v1')->middleware('auth:api')->group(function () {
                 ['id' => 'CUST-002', 'name' => 'Blue Anchor Logistics', 'currency' => 'USD', 'payment_terms' => '60 Days'],
             ],
         ]);
-    });
+    })->middleware('permission.access:clients,view');
 
     Route::get('/invoices', function () {
         return response()->json([
@@ -34,7 +34,7 @@ Route::prefix('v1')->middleware('auth:api')->group(function () {
                 ['invoice_no' => 'BI-2026-01042', 'status' => 'partial', 'balance' => 55300.00, 'currency' => 'PHP'],
             ],
         ]);
-    });
+    })->middleware('permission.access:invoices,view');
 
     Route::get('/payments', function () {
         return response()->json([
@@ -42,7 +42,7 @@ Route::prefix('v1')->middleware('auth:api')->group(function () {
                 ['payment_no' => 'OR-2026-00618', 'invoice_no' => 'BI-2026-01042', 'method' => 'bank_transfer', 'amount' => 43200.00],
             ],
         ]);
-    });
+    })->middleware('permission.access:payments,view');
 
     Route::get('/expenses', function () {
         return response()->json([
@@ -50,7 +50,7 @@ Route::prefix('v1')->middleware('auth:api')->group(function () {
                 ['expense_no' => 'EXP-2026-00871', 'vendor' => 'Pacific Fuel Services', 'amount' => 1325.00, 'currency' => 'USD'],
             ],
         ]);
-    });
+    })->middleware('permission.access:payables,view');
 
     Route::get('/projects', function () {
         return response()->json([
@@ -58,7 +58,7 @@ Route::prefix('v1')->middleware('auth:api')->group(function () {
                 ['project_no' => 'JOB-SEA-2026-0423', 'client' => 'Metro Manila Forwarders', 'status' => 'active'],
             ],
         ]);
-    });
+    })->middleware('permission.access:clients,view');
 
     Route::get('/reports/revenue', function () {
         return response()->json([
@@ -68,11 +68,11 @@ Route::prefix('v1')->middleware('auth:api')->group(function () {
             'unpaid' => 55300.00,
             'overdue' => 12400.00,
         ]);
-    });
+    })->middleware('permission.access:reports,view');
 
     Route::get('/webhook-events', function () {
         return response()->json([
             'events' => ['invoice.created', 'invoice.sent', 'invoice.viewed', 'invoice.paid', 'quote.approved', 'payment.failed'],
         ]);
-    });
+    })->middleware('permission.access:invoices,view');
 });
