@@ -11,7 +11,7 @@
     <div class="card shadow-sm border-0">
         <div class="card-body p-4 p-md-5">
             <h1 class="h3 mb-2">Set a secure password</h1>
-            <p class="text-muted">The account is using a temporary password. Use at least 12 characters.</p>
+            <p class="text-muted">Update your account password. Use at least 12 characters.</p>
             @if(session('warning'))
                 <div class="alert alert-warning">{{ session('warning') }}</div>
             @endif

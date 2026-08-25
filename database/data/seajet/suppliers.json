@@ -1,0 +1,812 @@
+[
+    {
+        "name": "1988 GOLDEN CHEF CORPORATION",
+        "address": "NO. 8278 DR. A SANTOS AVE. BRGY. SAN ISIDRO, PARANAQUE CITY",
+        "tin": "008-932-256-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "ABACUS BOOK AND CARD CORP.",
+        "address": "QUAD ALPHA CENTRUM 125 PIONEER ST MANDALUYONG CITY",
+        "tin": "000-299-299-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "ABENSON VENTURES INC",
+        "address": "SANTOLAN PASIG",
+        "tin": "004-149-434-083",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "ACE HARWARE PHILIPPINES, INC.",
+        "address": "3F SM CITY BF PARANAQUE DR A SANTOS AVE COR PRES AVE BRGY BF HOMES PARANAQUE CITY",
+        "tin": "200-035-311-078",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "AGTANG GEN. MERCHANDISING",
+        "address": "149 MC ARTHUR HI-WAY, STO. DOMINGO, ANGELES CITY",
+        "tin": "233-454-130-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "AKL FUEL ACCESS, INC",
+        "address": "NATIONAL HIGHWAY LABOGON 6014 MANDAUE CITY CEBU",
+        "tin": "427536-692-00002",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "ALDRIN A. AGUILA",
+        "address": "UNIT 315-316 #17 BLDG BF RESORT VILLAGE TALOS DOS LAS PINAS CITY",
+        "tin": "408-304-310-000",
+        "tax_type": "NON-VAT"
+    },
+    {
+        "name": "ALEXANDER V. AYAG PETRON BULILIT STATION",
+        "address": "TIMBAO BINAN LAGUNA",
+        "tin": "214-657-033-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "AMARE SERVICE STATION",
+        "address": "S. OSMENIA BLVD COR 13TH AVE TEJERO CEBU CITY",
+        "tin": "119-215-971-006",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "ANGELES ELECTRIC CORPORATION",
+        "address": "DON JUAN NEPOMUCENO COR DONA TERESA AVE NEPO MART ANGELES",
+        "tin": "000-088-802-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "ARIANNA GAS STATION INC.",
+        "address": "8106 DR. A SANTOS AVE. SAN DIONISIO PARANAQUE CITY",
+        "tin": "009-470-317-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "ARX COMPUTER CENTER",
+        "address": "LEVEL 1 EAST WING ROBINSONS GALLERIA ORTIGAS AVE COR EDSA DIST III QUEZON CITY",
+        "tin": "000-406-230-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "ASIA OVERSEAS TRANSPORT CO., INC.",
+        "address": "GEDCOR SQUARE BLDG., UNITS S1-S3 NAIA IRASAN ST. SAN DIONISIO PARANAQUE CITY",
+        "tin": "000-305-016-0000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "AYVEN GENERAL ENTERPRISES CORP.",
+        "address": "MC ARTHUR HIGHWAY TELABASTAGAN CITY OF SAN FERNANDO",
+        "tin": "010-239-497-00001",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "BELL PETRON FUEL EXPRESS",
+        "address": "BORBAJO ST HIGHWAY 77 TALAMBAN 6000 CEBU CITY",
+        "tin": "244-048-891-00001",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "BOHOL JL DISTRIBUTION SYSTEM INC",
+        "address": "A BARBAJO ST TALAMBAN CEBU CITY",
+        "tin": "266-994-958-00009",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "BRIGHTPOINT LOGISTICS CORPORATION",
+        "address": "ROAD 10 MANILA HARBOUR CENTER VISTAS ST. BRGY 128 ZONE 10, 1031 TONDO MANILA",
+        "tin": "009-670-813-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "BTDT REALTY CORPORATION",
+        "address": "A C CORTES AVE MANDAUE",
+        "tin": "000-256-539",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "BURGOS MARTIN REALTY INC",
+        "address": "MERVILLE SUBD PARANAQUE CITY",
+        "tin": "237-797-663",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "CALL 'N HAUL SERVICES CORP.",
+        "address": "EC QUANO COMP LOOC MANDAUE CITY",
+        "tin": "221-356-453-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "CARGO 2KONEK LOGISTICS INC",
+        "address": "UNIT 4A &4B 4/F OSMENA BLDG 1991 A MABINI ST BRGY 701 ZONE 077 MALATE MANILA",
+        "tin": "240-290-577-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "CAVITEX INFRASTRUCTURE",
+        "address": "PEA TOLLWAYS COMPOUND AGUINALDO BLVD COSTAL ROAD SA DIONISIO 1700 CITY OF PARANAQUE",
+        "tin": "004-672-924-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "CEBU AIR, INC.",
+        "address": "LEVEL 4, UNIT 4030-4031, ROBINSONS GALLERIA CEBU, GENERAL MAXILOM AVENUE COR SERGIO OSMENA BLVD, TEJERO CEBU CITY",
+        "tin": "000-948-229-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "CERTIPEST APPLICATOR",
+        "address": "NO. 1 RUE DE PAREE ST L&S SUBD ATO DOMINGO ANGELES CITY",
+        "tin": "209-043-195-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "CHRISSAN AUTO SUPPLY AND CAR ACCESSORIES",
+        "address": "COR MAGALANG ROAD MCARTHUR HIWAY STO CRISTO 2009 ANGELES CITY",
+        "tin": "912-064-933-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "CIRBET FREIGHT & BROKERAGE, INC.",
+        "address": "3/F CASA STO. NINO, 398 SOLANA ST. COR. BEATERIO ST., BRG, 654 ZONE 069 INTRAMUROS, MANILA",
+        "tin": "200-603-740-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "CIRCUIT MOTOR SALES",
+        "address": "116 HENSON ST TERESITA ANGELES CITY",
+        "tin": "102-686-442",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "CITIMOTORS LAS PIÑAS CORP.",
+        "address": "LAS PINAS CITY",
+        "tin": "007-993-732-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "COCOGEN INSURANCE, INC.",
+        "address": "GF OPL BUILDING 100 C PALANCA ST. LEGASPI VILLAGE BEL-AIR 1209 MAKATI CITY",
+        "tin": "000-432-798-00021",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "COMPUTER LAND IT SOLUTIONS INCORPORATED",
+        "address": "CMS BLDG. 339 MC ARTHUR HIGHWAY BRGY. NINOY AQUINO, ANGELES CITY",
+        "tin": "010-568-877-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "CONVERGE INFORMATION AND COMMUNICATIONS",
+        "address": "NEW STREET BLDG., MC ARTHUR HI-WAY, BALIBAGO, ANGELES CITY",
+        "tin": "006-895-049-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "COPY PASTE LIMITED COMPANY",
+        "address": "UNIT 2 8195 DR A SANTOS AVE.,SAN ISIDRO PARANAQUE CITY",
+        "tin": "252-976-556-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "COPY TECH ENTERPRISES",
+        "address": "UNIT2 LA BREA BLD., JP RIZAL TAGAPO CITY OF SNTA ROSA LAGUNA",
+        "tin": "197-384-869-00002",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "COPYPASTE CORPORATION",
+        "address": "8155 ANDREMAR BUILDING DR.A. SANTOS AVE. SAN DIONISIO 1700 CITY OF PARANAQUE",
+        "tin": "010-601-939-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "COSCO SHIPPING LINES (PHILIPPINES) INC.",
+        "address": "6/F CAROLINA BLDG 2106 MADRE IGNACIA ST. ZONE 77 BRGY 701 MALATE MANILA",
+        "tin": "297-529-696-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "CP WORLD PHILIPPINES, INC",
+        "address": "UNIT 802 ANTEL CORPORATE CENTER 121 VALERO ST. SALCEDO VILLAGE BEL-AIR 1227 CITY OF MAKATI",
+        "tin": "006-528-297-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "DAN'S PETRON SERVICE STATION",
+        "address": "IASA ROAD DOLORES CITY OF SAN FERNANDO PAMPANGA",
+        "tin": "259-190-228-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "DCFM GENERAL MERCHANDISE",
+        "address": "SAN DIONISIO PARANAQUE CITY",
+        "tin": "269-541-742-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "DIADEM TERMINAL MARITIME SERVICES",
+        "address": "OPASCOR TRUCK SCALE CPA CMPD NORTH RECLAMATION AREA MABOLO 6000 CEBU CITY",
+        "tin": "252-976-556-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "DMRA ENTERPRISES",
+        "address": "38D CARISSA ST. RIVERA VILLAGE PASAY CITY",
+        "tin": "201-502-204-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "DOUBLE'J CRDI CALIBRATION SERVICES",
+        "address": "#14 MATIMBUBONG 3010 SAN IDEFONSO BULACAN",
+        "tin": "321-643-507-00001",
+        "tax_type": "NON-VAT"
+    },
+    {
+        "name": "DP WORLD PHILIPPINES LOGISTICS, INC.",
+        "address": "2ND FLOOR ATI HEAD OFFICE BLDG, A BONIFACIO DRIVE ZONE 68 BARANGAY 652 1018 PORT AREA NCR CITY OF MANILA",
+        "tin": "202-086-098-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "EASTERN TELECOMMUNICATIONS PHILIPPINES",
+        "address": "TELECOM PLAZA, 316 SEN. GIL PUYAT AVE.,SALCEDO VILLAGE, MAKATI CITY",
+        "tin": "000-451-549-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "ECG BROKEERAGE INC.",
+        "address": "SUITE 1507 WORLD TRADE EXCHANGE BLDG 215 JUAN LUNA ST BRGY 1006 BINONDO MANILA",
+        "tin": "001-964-610-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "E-SAFE LOGISTICS SERVICES",
+        "address": "BLK 10 LOT 01,10,11 AND 12 MANILA HARBOUR CENTER ROAD 10 VITAS ST. BARANGAY 128 ZONE 10 1013 TONDO MANILA",
+        "tin": "407-393-300-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "ESPRUTINGKLE GAS AND SERVICE INC",
+        "address": "OUANO AVENUE NORTH RECLAMATION SUBANGDAKU MANDAUE CITY",
+        "tin": "412-647-857-00002",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "EXXTRA GAS STATION",
+        "address": "IBABOA ESTANCIA 6014 MANDAUE CITY CEBU",
+        "tin": "276-207-913-0000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "F1RSTENERGY CORP.",
+        "address": "M.L QUEZON AVE MAGUIKAY 6014 CITY OF MANDAUE CEBU",
+        "tin": "748-737-968-00039",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "FAST FORWARD FUELS CO., INC.",
+        "address": "PANDAN COR TABUN ROAD PANDAN 2009 CITY OF ANGELES PAMPANGA",
+        "tin": "637-243-232-00011",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "FEDERAL EXPRESS PACIFIC LLC",
+        "address": "11/FL ZUELLIG BLDG MAKATI AVE COR PASEO DE ROXAS MAKATI CITY",
+        "tin": "275-540-614-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "FIRST AUTO-LPG GAS HOLDINGS CORPORATION",
+        "address": "HIWAY 77 TALAMBAN CEBU CITY",
+        "tin": "244-935-042-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "FREIGHTWORKS GSA, INC._PHP",
+        "address": "RM 211 MIASCOR CARGO CENTER STO NIÑO PARAÑAQUE",
+        "tin": "006-661-642",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "FUEL KING SERVICE CENTER",
+        "address": "133 NINOY AQUINO AVE BRGY. STO NINO PARANAQUE CITY",
+        "tin": "110-005-602-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "GAS POD FUEL STATION",
+        "address": "LOT 2 DR. A SANTOS AVENUE SAN ANTONIO 1707 PARANAQUE CITY",
+        "tin": "176-453-644-00001",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "GATEWAY MOTORS (CEBU), INC.",
+        "address": "8280 DR. A . SANTOS AVENUE, SAN ISIDRO, 1700, CITY OF PARANAQUE",
+        "tin": "246-713-828-0000015",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "GAZZ UP INC",
+        "address": "MAC ARTHUR HIGHWAY SINDALAN CITY OF SAN FERNANDO PAMPANGA",
+        "tin": "218-157-626-095",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "G-LAN'S ENTERPRISES",
+        "address": "B9 L6 CORDILLERA ST. COUNTRY HOMES PUTATAN MUNTINLUPA CITY",
+        "tin": "422-263-760-000",
+        "tax_type": "NON VAT"
+    },
+    {
+        "name": "GRAND HYDRAULIC VENTURES CORPORATION",
+        "address": "GF NICO BLDG MC ARTHUR HIGHWAY STO CRISTO ANGELES CITY PAMPANGA",
+        "tin": "775-468-295-00000",
+        "tax_type": "NON VAT"
+    },
+    {
+        "name": "GRM INTERNATIONA INC.",
+        "address": "R COLUMBIA COMPLEX BLDG.,NAIA AVE. SANTO NINO PARANAQUE CITY",
+        "tin": "000-409-520-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "GWM AUTO SUPPLY AND MOTORCYCLE PARTS",
+        "address": "UNIT 1 ESSEL COMMERCIAL, TELABASTAGAN, CSFP.",
+        "tin": "185-180-712-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "I.C.D.A. CARGO MOVERS",
+        "address": "#14-A VILLA ENCARNACION MARIES VILLAGE, MAYAMOT, ANTIPOLO CITY",
+        "tin": "247-366-229-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "INLAND CORPORATION",
+        "address": "470 SOLANA ST. BRGY.654 ZONE 069, INTRAMUROS MANILA",
+        "tin": "000-348-083-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "IRIS LINES, INC.",
+        "address": "LOT 28 INNOVATIVE ST., SUBIC BAY GATEWAY PARK 1 SUBIC BAY 2222 FREEPORT ZONE ZAMBALES PHILIPPINES",
+        "tin": "209-600-562-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "IRS EASTERN INC",
+        "address": "397 M.H DEL PILAR ST. MAYSILO 1477 CITY OF MALABON",
+        "tin": "006-439-081-00007",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "J4A PACKAGING MATERIALS AND CRATING SERVICES",
+        "address": "102A NINOY AQUINO AVE STO NINO PARANAQUE CITY",
+        "tin": "443-388-744-001",
+        "tax_type": "NON VAT"
+    },
+    {
+        "name": "LECIANN VENTURES INC",
+        "address": "MC BRIONES ST. MAGUIKAY MANDAUE CITY",
+        "tin": "208-123-218-005",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "LEDESMA U-FUEL SERVICE STATION",
+        "address": "UNIOIL GOV DRIVE BANCAL CARMONA CAVITE",
+        "tin": "107-604-852-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "LINKASIA FORWARDING SOLUTIONS CORP._PHP",
+        "address": "PARANAQUE CITY",
+        "tin": "008-077-349-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "M9S PETROLEUM CORPORATION",
+        "address": "1014 SAN MARCELINO ST. COR PEDRO GIL ST ZONE 75 BRGY 695 MALATE MANILA",
+        "tin": "603-176-611-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "MAC-NELS LINE, INC.",
+        "address": "3RD FLOOR ROXAS STRIP BUILDING ROXAS BLVD COR LIBERTAD-ARNAIZ ST PASAY CITY",
+        "tin": "000-216-419-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "MANDAUE MODERN PEST CONTROL INC.",
+        "address": "CABAHUG ST IBABAO MANDAUE CITY",
+        "tin": "259-066-393-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "MAYNILAD WATER SERVICES INC.",
+        "address": "MWSS COMPOUND KATIPUNAN RD BALARA QUEZON CITY",
+        "tin": "005-393-442-000",
+        "tax_type": "NON-VAT"
+    },
+    {
+        "name": "MCC TRANSPORT PHILIPPINES",
+        "address": "9/F ONE E-COM CENTER HARBOR DRIVE CORNER DRIVE CORNER SUNSET AVE MALL OF ASIA COMP 1300 PASAY CITY",
+        "tin": "006-737-078-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "MEDLOG PHILIPPINES INC.",
+        "address": "AIA TOWER 8767 PASEO DE ROXAS BEL-AIR 1209 CITY OF MAKATI",
+        "tin": "653-457-621-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "MENDZS FREIGHT FORWARDING CORPORATION",
+        "address": "RM 106 A G/F ECJ BLDG REAL ST COR ARZOBISPO ST BRGY. 655 ZONE 69 INTRAMUROS MANILA",
+        "tin": "009-318-577-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "MENORIAN FREIGHT FORWARDER",
+        "address": "BS L38 P3 BARCELONA SUBD IMUS CAVITE",
+        "tin": "144-400-972-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "MERALCO",
+        "address": "PQUE AIX BUS CTR QUIRINO PAR'QUE",
+        "tin": "000-101-528-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "MERIDIAN SHIPPING AND CONTAINER CARRIER INC",
+        "address": "4029 AIRPORT ROAD BACLARAN CITY OF PARANAQUE",
+        "tin": "007-344-259-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "MESSIAH T. SARDENIOLA",
+        "address": "481 AGUIDA ST ZONE 77 BRGY 701 MALATE MANILA",
+        "tin": "474-117-842-000",
+        "tax_type": "NON-VAT"
+    },
+    {
+        "name": "MONTCLAIRE GASOLINE STATION",
+        "address": "MC ARTHUR HI-WAY STO. DOMINGO ANGELES CITY",
+        "tin": "132-176-270-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "MPCALA HOLDINGS INC",
+        "address": "MPT SOUTH HUB ALAPAN II-B IMUS CAVITE",
+        "tin": "008-617-317-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "MR. J FILLING GAS STATION OPC",
+        "address": "LOT 7 1-13 ANGELES MAGALANG RD MANING 2009 ANGELES CITY PAMPANGA",
+        "tin": "605-012-668-00001",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "MR. J FILLING STATION",
+        "address": "STO. CRISTO MEXICO PAMPANGA",
+        "tin": "209-671-438-008",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "NCT TRANSNATIONAL CORP.",
+        "address": "TAWILIS ST. COR. DAGAT-DAGATAN AVE BRGY. 028 DISTRICT 2 CALOOCAN CITY",
+        "tin": "000-889-609-001",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "NEW VENTURES SHELL STATION",
+        "address": "AS FORTUNATA ST BANILAD MANDAUE CITY",
+        "tin": "200-206-114-004",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "NEY SHELL STATION",
+        "address": "SUBANGDAKU MANDAUE CITY",
+        "tin": "108-444-275-003",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "NGC HARDWARE & CONSTRUCTION SUPPLIES",
+        "address": "BLK 8 MC ARTHUR PULUNGBULU ANGELES CITY PAMPANGA",
+        "tin": "215-963-185-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "NLEX CORPORATION",
+        "address": "KM 12 NLEX COMPOUND BALINTAWAK CALOOCAN CITY",
+        "tin": "004-984-946-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "OCEANBOX CONTAINER SERVICES INC",
+        "address": "MANILA HARBOUR CENTRE BRGY 101 ZONE 8 1013 TONDO MANILA",
+        "tin": "605-060-535-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "OCTAGON COMPUTER SERVICES",
+        "address": "3/F CZ5 SM CITY BF B.F. HOMES NCR FOURTH DISTRICT OF PARANAQUE",
+        "tin": "004-780-008-160",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "OFFICE WAREHOUSE, INC.",
+        "address": "LC 258-259 SM CITY TELABASTAGAN BRGY TELABASTAGAN CITY OF SAN FERNANDO PAMPANGA",
+        "tin": "200-492-462-00093",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "PACIFIC CONCORD CONTAINER LINES, INC.",
+        "address": "3RD FLOOR TMI CENTRE BLDG ARZOBISPO ST COR ANDA ST BRGY ZONE 69 1002 INTRAMUROS MANILA",
+        "tin": "004-583-670-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "PACIFIC ROADLINK LOGISTICS INC.",
+        "address": "PROVINCIAL ROAD COR BYPASS RD TIAONG GUIGUINTO BULACAN",
+        "tin": "008-863-482-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "PAPERLINE ENTERPRISES INC",
+        "address": "1140 PRUDENCE BUILDING PASONG TAMO SAN ANTONIO NCR 4TH DISTRICT CITY OF MAKATI",
+        "tin": "009-708-837-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "PEOPLE'S AIR CARGO & WAREHOUSING CO. INC.",
+        "address": "PAIR-PAGS CENTER NAIA COMPOUND BRGY 198 1300 PASAY CITY NCR",
+        "tin": "000-305-554-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "PHILIPPINE AIRLINES",
+        "address": "NAIA ROAD PASAY CITY",
+        "tin": "000-597-645-021",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "PHILIPPINE AIRPORT GROUND SUPPORT SOLUTIONS INC.",
+        "address": "3F PAIRPAGS CENTER NAIA COMPOUND BRGY 198 PASAY CITY",
+        "tin": "202-224-068-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "PHILIPPINE RECLAMATION AUTHORITY",
+        "address": "7/F LEGASPI TOWERS 200 107 PASEO DE ROXAS ST LEGASPI VILLAGE SAN LORENZO CITY OF MAKATI",
+        "tin": "000-492-049-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "PHILIPPINE SKYLANDERS INTL (PSI) INC",
+        "address": "PSI ADMIN BLDG ICT COMPOUND MIA ROAD BRGY 198 1300PASAY CITY",
+        "tin": "000-305-304-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "PHILIPPINE SPRING WATER RESOURCES INC",
+        "address": "AC CORTES AVE. CAMBARO 6014 MANDAUE CITY CEBU",
+        "tin": "000-063-916-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "PLDT INC",
+        "address": "RAMON CONJUANGCO BLDG MAKATI CITY",
+        "tin": "000-488-793-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "PMTLAI TRAINING CENTER INC.",
+        "address": "ROOM 225 & 226 SKY FREGHT BLDG. B NINOY AQUINO AVE. STO NINO",
+        "tin": "623-809-573-0000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "POLARIS EXPRESS LOGISTICS CORPORATION",
+        "address": "MULTINATIONAL STO NINO PARANAQUE",
+        "tin": "008-426-776-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "PORT NET LOGISTICS, INC. - PHP",
+        "address": "ROOM 308 CROWN BLDG NORTH ROAD 6 NRA MABOLO 6000 CEBU CITY",
+        "tin": "243-268-956-00001",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "PRINT WEAVER PRINTING CENTER",
+        "address": "G/F AMB BUILDING, NINOY AQUINO AVENUE, STO. NINO, PARANAQUE CITY",
+        "tin": "200-599-899-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "PROQUEST, INC.",
+        "address": "UNIT 1402 SUNSET VIEW TOWERS 2230 ROXAS BLVD BRGY 13 ZONE 4 1300 PASAY CITY",
+        "tin": "004-677-601-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "PUREGOLD PRICE CLUB INC",
+        "address": "NINOY AQUINO AVENUE STO NINO PAR'QUE CTY",
+        "tin": "201-277-095-020",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "PWL PRESTIGE WAREHOUSING & LOGISTICS INC.",
+        "address": "27 F PRESTIGE BLDG P BURGOS ST ALANG-ALANG 6014 MANDAUE CITY CEBU",
+        "tin": "257-575-088-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "RECIMA CORPORATION",
+        "address": "DON SERAFIN RD ESSEL PARK SUBD TELABASTAGAN SAN FERNANDO PAMPANGA",
+        "tin": "242-009-712-001",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "REPUBLIC COURIER SERVICE INC",
+        "address": "NINOY AQUINO AVENUE STO NINO PAR'QUE CTY",
+        "tin": "000-138-017-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "RIGHT ON THE BUDGET PRINTSHOP",
+        "address": "11608 HIDALGO ST 393 ZONE 40 QUIAPO MANILA",
+        "tin": "122-225-903-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "SANJIN PEST EXTERMINATOR SERVICES",
+        "address": "NO. 290 FLORAVILLE SUBD., PANAPAAN BACOOR CAVITE",
+        "tin": "232-116-115-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "SEACONTAINER DEPOT CORPORATION",
+        "address": "1090 LAS HONORIO LOPEZ BLVD., NAVOTAS CITY",
+        "tin": "008-127-378-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "SEAHAWK TRANSPORT, INC.",
+        "address": "CRO SB CABAHUG AND UM SENO CENTRO MANDAUE",
+        "tin": "209-436-129-001",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "SECC COMPUTER SALES SERVICES AND ENTERPRI",
+        "address": "SECC BLDG. 225 ASB CABAHUG ST. IBABAO MANDAUE CITY",
+        "tin": "145-268-324-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "SMART COMMUNICATIONS INC",
+        "address": "SMART TOWER AYALA AVE MAKATI CITY",
+        "tin": "001-901-673",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "SMARTBOX CONTAINER YARD CORP.",
+        "address": "IBA CITY OF MEYCUAYAN BULACAN",
+        "tin": "778-070-264-0000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "SPRINT TRANSPORT SERVICES INC.",
+        "address": "L21 B2 A/B JFI CMPD C-3 RD N ORTH BAY BLVD SOUTH NBBS DISTRICT 1 NAVOTAS CITY",
+        "tin": "000-348-485-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "STANDARD INSURANCE CO., INC.",
+        "address": "30/F PETRON MEGA PLAZA BLGD., #358 SEN GIL PUYAT AVE. MAKATI CITY",
+        "tin": "000-821-466-017",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "TBS CONTAINER YARD",
+        "address": "112 NORTHBAY BOULEVARD NBBS DISTRICT 1 NAVOTAS CITY",
+        "tin": "774-257-500-0000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "TELABASTAGAN SHELL STATION",
+        "address": "MC ARTHUR HIGHWAY TELABASTAGAN CITY OF SAN FERNANDO",
+        "tin": "116-714-508-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "THE 20FIFTH GASOLINE STATION OPC",
+        "address": "PETRON NINOY AQUINO AVE SAN DIONISIO PARANAQUE CITY",
+        "tin": "619-676-162-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "THE MERCANTILE INSURANCE CO., INC.",
+        "address": "2ND FLR. MERCANTILE INSURANCE BLDG. GENERAL LUNA COR. BEATRIO STS. INTRAMUROS MANILA",
+        "tin": "000-825-516",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "TIRE ASIA GROUP, INC.",
+        "address": "PARANAQUE CITY",
+        "tin": "004-741-308-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "TITANIUM CONTAINER SOLUTION OPC",
+        "address": "BALIBIS PROPERTY LA MESA SERVICE ROAD UGONG 1440 CITY OF VALENZUELA",
+        "tin": "643-785-335-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "TOYOTA BACOOR, CAVITE, INC.",
+        "address": "MOLINO BLVD., MAMBOG 1V BACOOR, CAVITE",
+        "tin": "008-938-914-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "TRANSGLOBAL CONSOLIDATORS, INC.",
+        "address": "2/F PK BLDG NINOY AQUINO AVE. PASCOR DRIVE STO NINO PARANAQUE CITY",
+        "tin": "211-539-909-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "TRANSMODAL INTERNATIONAL INC",
+        "address": "G/F TMI CENTRE ARZOBISPO ST ZONE 069 BRGY 655 1002 INTRMUROS MANILA",
+        "tin": "002-498-818-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "TRANS-OCEAN CONTAINER SERVICES (PHILS) INC",
+        "address": "AREA 5 DAGAT-DAGATAN NBBS BRGY 2 DISTRICT 1 NAVOTAS CITY",
+        "tin": "000-001-269-0002",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "TSB SERVICE CENTER, INC.",
+        "address": "BLK 2 LOT3, DIAMOND ST., BERNABE SUBD. SAN DIONISIO, PARANAQUE CITY",
+        "tin": "000-304-935-000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "UPSON INTERNATIONAL",
+        "address": "3/F CSZ SM CITY BF B.F HOMES NCR FOURTH DISTRICT OF PARANAQUE",
+        "tin": "004-780-008-160",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "VALUCORE BUSINESS VENTURES CORPORATION",
+        "address": "KM 23 NORTH LUZON EXPRESSWAY LIAS MARILAO BULACAN",
+        "tin": "008-497-158-0000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "WILCON DEPOT INC.",
+        "address": "DR. A SANTOS AVENUE, BRGY. SAN DIONISIO, PARANAQUE CITY",
+        "tin": "009-192-878-00009",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "YANGMING SHIPPING PHILIPPINES, INC.",
+        "address": "5TH FLOOR DOUBLE DFRAGON CENTER WEST AVE. CORNER EDSA EXT BRGY. 76 1300 PASAY CITY",
+        "tin": "233-335-324-00000",
+        "tax_type": "VAT"
+    },
+    {
+        "name": "YONGXIN HARDWARE",
+        "address": "8255 DR. A SANTOS AVE. BRGY SAN DIONISIO PARANAQUE CITY",
+        "tin": "242-257-124-000",
+        "tax_type": "VAT"
+    }
+]

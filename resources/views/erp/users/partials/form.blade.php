@@ -33,11 +33,11 @@
         <select name="status" class="form-select erp-select"><option>Active</option><option {{ isset($record) && !$record->is_active ? 'selected' : '' }}>Inactive</option><option>Pending Invite</option><option>Locked</option></select>
     </div>
     <div class="col-md-6">
-        <label class="form-label">{{ $mode === 'edit' ? 'New Temporary Password (optional)' : 'Temporary Password' }}</label>
+        <label class="form-label">{{ $mode === 'edit' ? 'New Password (optional)' : 'Password' }}</label>
         <input type="password" name="password" class="form-control" minlength="12" {{ $mode === 'create' ? 'required' : '' }} autocomplete="new-password">
     </div>
     <div class="col-md-6">
-        <label class="form-label">Confirm Temporary Password</label>
+        <label class="form-label">Confirm Password</label>
         <input type="password" name="password_confirmation" class="form-control" minlength="12" {{ $mode === 'create' ? 'required' : '' }} autocomplete="new-password">
     </div>
     <div class="col-12">

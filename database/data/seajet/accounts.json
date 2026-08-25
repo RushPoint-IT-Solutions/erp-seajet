@@ -1,0 +1,752 @@
+[
+    {
+        "name": "Cash in Bank-BDO(USD)",
+        "type": "Bank",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Cash in Bank-BDO(PHP)",
+        "type": "Bank",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Cash in Bank-Metro(USD)",
+        "type": "Bank",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Cash in Bank-Metro(PHP)",
+        "type": "Bank",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Petty Cash Fund",
+        "type": "Bank",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Trucking Fund",
+        "type": "Bank",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "A/R-Reimbursable Charges (PHP)",
+        "type": "Accounts Receivable",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "A/R-Reimbursable Charges (USD)",
+        "type": "Accounts Receivable",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "A/R-Trade( BDO-PHP )",
+        "type": "Accounts Receivable",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "A/R-Trade( BDO-USD )",
+        "type": "Accounts Receivable",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "A/R-Trade(Metro-PHP)",
+        "type": "Accounts Receivable",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "A/R-Trade(Metro-USD)",
+        "type": "Accounts Receivable",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "A/R-Trade(DN)",
+        "type": "Accounts Receivable",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Advances for liquidation",
+        "type": "Other Current Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Advances from officers",
+        "type": "Other Current Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Advances to employees",
+        "type": "Other Current Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Advances to officers",
+        "type": "Other Current Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Advances to Suppliers",
+        "type": "Other Current Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Prepaid Tax",
+        "type": "Other Current Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Prepaid Income Tax",
+        "type": "Other Current Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Reimbursable charges",
+        "type": "Other Current Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Vat Input Tax",
+        "type": "Other Current Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Acc Depn-Leasehold Improvement",
+        "type": "Fixed Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Acc. Depn-Acctg Comp. Software",
+        "type": "Fixed Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Acc. Depn-Truck & tractor head",
+        "type": "Fixed Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Acc. Depn-Furn & Equip",
+        "type": "Fixed Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Acc. Depn - TE",
+        "type": "Fixed Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Accounting Computer Software",
+        "type": "Fixed Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Leasehold Improvement",
+        "type": "Fixed Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Office Furniture and Equip",
+        "type": "Fixed Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Transportation Equip",
+        "type": "Fixed Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Trucks and Tractor Head",
+        "type": "Fixed Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Container Deposit",
+        "type": "Other Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Creditable Withholding Tax",
+        "type": "Other Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Deferred Tax assets- MCIT",
+        "type": "Other Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Deferred tax assets- NOLCO",
+        "type": "Other Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Deposits",
+        "type": "Other Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Investments",
+        "type": "Other Asset",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "A/P-Trade (BDO - PHP)",
+        "type": "Accounts Payable",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "A/P-Trade (BDO - USD)",
+        "type": "Accounts Payable",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "A/P-Trade (Metro-PHP)",
+        "type": "Accounts Payable",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "A/P-Trade (Metro-USD)",
+        "type": "Accounts Payable",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Compensation-Withholding Tax Payable",
+        "type": "Other Current Liability",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Expanded Withholding Tax Payable",
+        "type": "Other Current Liability",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "HDMF Contri Payable",
+        "type": "Other Current Liability",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "HDMF Loan Payable",
+        "type": "Other Current Liability",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Income Tax Payable",
+        "type": "Other Current Liability",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Installment Payable",
+        "type": "Other Current Liability",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Output Vat Payable",
+        "type": "Other Current Liability",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "PHIC Contri Payable",
+        "type": "Other Current Liability",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "SSS Loan Payable",
+        "type": "Other Current Liability",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "SSS Contri Payable",
+        "type": "Other Current Liability",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Tax Account (Sales Taxes)",
+        "type": "Other Current Liability",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Vat Output Tax",
+        "type": "Other Current Liability",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Installment Payable",
+        "type": "Long Term Liability",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Capital Stock",
+        "type": "Equity",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Net Income",
+        "type": "Equity",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Net Loss",
+        "type": "Equity",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Opening Balance Equity",
+        "type": "Equity",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Prior Period Adjustment",
+        "type": "Equity",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Retained Earnings (Loss)",
+        "type": "Equity",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Interest Income",
+        "type": "Income",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Other Income",
+        "type": "Income",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Service Income- Vatable",
+        "type": "Income",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Service Income-DN",
+        "type": "Income",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Service Income-SOA A",
+        "type": "Income",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Service Income-Vat exempt",
+        "type": "Income",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Service Income-Zero rated",
+        "type": "Income",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Bank Charges",
+        "type": "Cost of Services",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Broker's Fee",
+        "type": "Cost of Services",
+        "tax": "0.05",
+        "atc": "WI139"
+    },
+    {
+        "name": "Chassis Rental",
+        "type": "Cost of Services",
+        "tax": "0.05",
+        "atc": "WC100"
+    },
+    {
+        "name": "Commission",
+        "type": "Cost of Services",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Demurrage",
+        "type": "Cost of Services",
+        "tax": "0.05",
+        "atc": "WC100"
+    },
+    {
+        "name": "Dep- Trucks and Tractor Head",
+        "type": "Cost of Services",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Export Air Expense",
+        "type": "Cost of Services",
+        "tax": "0.02",
+        "atc": "WC160"
+    },
+    {
+        "name": "Export Sea Expense",
+        "type": "Cost of Services",
+        "tax": "0.02",
+        "atc": "WC160"
+    },
+    {
+        "name": "Gas and Oil",
+        "type": "Cost of Services",
+        "tax": "0.01",
+        "atc": "WC158"
+    },
+    {
+        "name": "Import Air Expense",
+        "type": "Cost of Services",
+        "tax": "0.02",
+        "atc": "WC160"
+    },
+    {
+        "name": "Import Sea Expense",
+        "type": "Cost of Services",
+        "tax": "0.02",
+        "atc": "WC160"
+    },
+    {
+        "name": "Toll Fee",
+        "type": "Cost of Services",
+        "tax": "0.02",
+        "atc": "WC160"
+    },
+    {
+        "name": "13th Month Pay",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Bad Debts",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Christmas",
+        "type": "Expense",
+        "tax": "0.01",
+        "atc": "WC158"
+    },
+    {
+        "name": "Communication",
+        "type": "Expense",
+        "tax": "0.02",
+        "atc": "WC160"
+    },
+    {
+        "name": "Dep- Acctg Computer Software",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Dep-Office Equipment",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Depreciation-Transportation",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Documentary Stamps",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Donations",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Dues and Subscriptions",
+        "type": "Expense",
+        "tax": "0.02",
+        "atc": "WC160"
+    },
+    {
+        "name": "Employees Benefits",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Equip. Repair and Maintenance",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "HDMF Premium",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Insurance",
+        "type": "Expense",
+        "tax": "0.02",
+        "atc": "WC160"
+    },
+    {
+        "name": "Interest",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Lights and Water",
+        "type": "Expense",
+        "tax": "0.02",
+        "atc": "WC160"
+    },
+    {
+        "name": "Meal",
+        "type": "Expense",
+        "tax": "0.01",
+        "atc": "WC158"
+    },
+    {
+        "name": "Membership Fee",
+        "type": "Expense",
+        "tax": "0.02",
+        "atc": "WC160"
+    },
+    {
+        "name": "Miscellaneous",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Motor Vehicle Expense",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Notarials and Stamps",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Office and Pantry Supplies",
+        "type": "Expense",
+        "tax": "0.01",
+        "atc": "WC158"
+    },
+    {
+        "name": "PHIC Premium",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Postage and Courier",
+        "type": "Expense",
+        "tax": "0.02",
+        "atc": "WC160"
+    },
+    {
+        "name": "Printing and Duplication",
+        "type": "Expense",
+        "tax": "0.02",
+        "atc": "WC160"
+    },
+    {
+        "name": "Professional Fee",
+        "type": "Expense",
+        "tax": "0.1",
+        "atc": "WI011"
+    },
+    {
+        "name": "Rebates",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Rent Expense",
+        "type": "Expense",
+        "tax": "0.05",
+        "atc": "WC100"
+    },
+    {
+        "name": "Rental Deposit",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Repair&Maintenance-LABOR",
+        "type": "Expense",
+        "tax": "0.02",
+        "atc": "WC160"
+    },
+    {
+        "name": "Repair&Maintenance-MATERIALS",
+        "type": "Expense",
+        "tax": "0.01",
+        "atc": "WC158"
+    },
+    {
+        "name": "Representation",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Retirement Pay",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Salaries & Wages",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Separation Pay",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "SSS Premium",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Taxes and Licences",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Trainings & Seminars",
+        "type": "Expense",
+        "tax": "0.02",
+        "atc": "WC160"
+    },
+    {
+        "name": "Transportation",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Truck-Facilitation",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Truck-Meals",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Truck-Container Yard Fee",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Truck-RM Labor",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Truck-RM Materials",
+        "type": "Expense",
+        "tax": "",
+        "atc": ""
+    },
+    {
+        "name": "Exchange Gain or Loss",
+        "type": "Other Expense",
+        "tax": "",
+        "atc": ""
+    }
+]

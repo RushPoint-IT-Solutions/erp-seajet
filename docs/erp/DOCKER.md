@@ -31,10 +31,10 @@ On first boot the `app` container's entrypoint ([docker/entrypoint.sh](../../doc
 - phpMyAdmin: http://localhost:8081 (server `db`, user `seajet`, password `seajet`)
 - MySQL (host access): `localhost:3307` (user `seajet` / password `seajet`, root password `root`)
 
-## Seeding demo data
+## Seeding production master data
 
 ```bash
-docker compose exec app php artisan db:seed --class=ErpDemoSeeder
+docker compose exec app php artisan db:seed
 ```
 
 ## Common commands

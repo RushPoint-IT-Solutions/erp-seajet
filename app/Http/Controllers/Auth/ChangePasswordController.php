@@ -33,7 +33,7 @@ class ChangePasswordController extends Controller
         $user->save();
         request()->session()->regenerate();
 
-        $activity->log('password_changed', 'user', $user->id, [], ['forced_change_completed' => true], $user->company_id ?? null);
+        $activity->log('password_changed', 'user', $user->id, [], ['self_service' => true], $user->company_id ?? null);
 
         return redirect()->route('erp.dashboard')->with('success', 'Your password was changed.');
     }

@@ -91,7 +91,7 @@ class SeaJetTestDataSeeder extends Seeder
                 'name' => $user[0],
                 'email' => $user[1],
                 'password' => Hash::make('password'),
-                'must_change_password' => Schema::hasColumn('users', 'must_change_password'),
+                'must_change_password' => false,
                 'role' => $user[2],
                 'department' => $user[3],
                 'created_at' => $now,

@@ -1325,7 +1325,7 @@ class ModuleController extends Controller
         $userId = ctype_digit((string) ($data['user_id'] ?? '')) ? (int) $data['user_id'] : null;
         $existing = $userId ? DB::table('users')->where('company_id', $companyId)->where('id', $userId)->first() : null;
         if (!$existing && empty($data['password'])) {
-            return back()->withInput()->withErrors(['password' => 'A temporary password of at least 12 characters is required for a new user.']);
+            return back()->withInput()->withErrors(['password' => 'A password of at least 12 characters is required for a new user.']);
         }
         $duplicate = DB::table('users')->where('email', strtolower($data['email']))
             ->when($existing, function ($query) use ($existing) { $query->where('id', '<>', $existing->id); })
@@ -1353,7 +1353,7 @@ class ModuleController extends Controller
         ];
         if (!empty($data['password'])) {
             $payload['password'] = Hash::make($data['password']);
-            $payload['must_change_password'] = true;
+            $payload['must_change_password'] = false;
         }
 
         if ($existing) {

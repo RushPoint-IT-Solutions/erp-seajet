@@ -1,0 +1,1535 @@
+[
+    {
+        "type": "Service",
+        "name": "A.freight RE",
+        "description": "AIRFREIGHT CHARGES (95% OF FREIGHT)",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "A.freight SOA A",
+        "description": "AIRFREIGHT CHARGES",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "A. freight VAT",
+        "description": "AIRFREIGHT CHARGES (5% OF FREIGHT)",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "A.freight Zero",
+        "description": "AIRFREIGHT CHARGES (5% OF FREIGHT)",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Agency VAT",
+        "description": "AGENCY FEE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Agency ZERO",
+        "description": "AGENCY FEE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Agency RE",
+        "description": "AGENCY FEE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Amendment RE",
+        "description": "AMENDMENT FEE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Amo SOA A",
+        "description": "AMO RENEWAL PROCESSING",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Ams RE",
+        "description": "AMS",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Ams SOA A",
+        "description": "AMS",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Ams VAT",
+        "description": "AMS",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Ams ZERO",
+        "description": "AMS",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Arrastre RE",
+        "description": "ARRASTRE AND WEIGHING",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Arrastre SOA A",
+        "description": "ARRASTRE AND WEIGHING",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Arrastre VAT",
+        "description": "ARRASTRE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Arrastre ZERO",
+        "description": "ARRASTRE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Assessment VAT",
+        "description": "ASSESSMENT",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Awb RE",
+        "description": "AIRWAY BILL FEE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Awb VAT",
+        "description": "AIRWAY BILL FEE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Awb ZERO",
+        "description": "AIRWAY BILL FEE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Awb SOA A",
+        "description": "AIRWAY BILL FEE",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "BL fee RE",
+        "description": "B/L FEE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "BL fee SOA A",
+        "description": "B/L FEE",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "BL fee VAT",
+        "description": "B/L FEE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "BL fee ZERO",
+        "description": "B/L FEE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "BL surrender RE",
+        "description": "B/L SURRENDER FEE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "BL surrender VAT",
+        "description": "B/L SURRENDER FEE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "BL surrender ZERO",
+        "description": "B/L SURRENDER FEE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Bir attrig VAT",
+        "description": "BIR ATTRIG",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Bir attrig ZERO",
+        "description": "BIR ATTRIG",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Boatnote VAT",
+        "description": "BOATNOTE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Boatnote ZERO",
+        "description": "BOATNOTE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Bobtail RE",
+        "description": "BOBTAIL TRIP CHARGES",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Boc RE",
+        "description": "BOC FEE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Breakbulk RE",
+        "description": "BREAKBULK FEE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Breakbulk SOA A",
+        "description": "BREAKBULK FEE",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Breakbulk VAT",
+        "description": "BREAKBULK FEE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Breakbulk ZERO",
+        "description": "BREAKBULK FEE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Brokerage SOA A",
+        "description": "BROKERAGE FEE",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Brokerage VAT",
+        "description": "BROKERAGE FEE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Brokerage ZERO",
+        "description": "BROKERAGE FEE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Bunker RE",
+        "description": "BUNKER",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "C. guards VAT",
+        "description": "CUSTOMS GUARD",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "C. guards SOA A",
+        "description": "CUSTOMS GUARD",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "C.O SOA A",
+        "description": "CERTIFICATE OF ORIGIN",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "C.O VAT",
+        "description": "CERTIFICATE OF ORIGIN",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "C.O-ZERO",
+        "description": "CERTIFICATE OF ORIGIN",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "CAF VAT",
+        "description": "3% CAF",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "CAF ZERO",
+        "description": "3% CAF",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "CCC RE",
+        "description": "CCC FEE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Chassis RE",
+        "description": "CHASSIS RENTAL",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Chassis SOA A",
+        "description": "CHASSIS RENTAL",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Chassis VAT",
+        "description": "CHASSIS RENTAL",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Chassis ZERO",
+        "description": "CHASSIS RENTAL",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "CI/CIL VAT",
+        "description": "CI/CIL BOATNOTE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "CIC RE",
+        "description": "CIC AND ECRS",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Clearance ZERO",
+        "description": "CLEARANCE CHARGE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Clearance VAT",
+        "description": "CLEARANCE CHARGE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "CNIU VAT",
+        "description": "CNIU",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Co loader RE",
+        "description": "CO-LOADER",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Collect RE",
+        "description": "5% COLLECT FEE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Collect VAT",
+        "description": "5% COLLECT FEE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Collect ZERO",
+        "description": "5% COLLECT FEE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Consignee SOA A",
+        "description": "CONSIGNEE'S FEE",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "COR VAT",
+        "description": "COR RENEWAL",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Cranage RE",
+        "description": "CRANAGE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "CSF RE",
+        "description": "CSF",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "CSV RE",
+        "description": "CVS",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "CTF RE",
+        "description": "CTF",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Customs filing RE",
+        "description": "CUSTOMS FILING",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "D.O VAT",
+        "description": "DELIVERY ORDER",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "D.O ZERO",
+        "description": "DELIVERY ORDER",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Demurrage SOA A",
+        "description": "DEMURRAGE",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Demurrage RE",
+        "description": "DEMURRAGE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Destination RE",
+        "description": "DESTINATION CHARGES",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Destination VAT",
+        "description": "DESTINATION CHARGES",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Destination ZERO",
+        "description": "DESTINATION CHARGES",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Detention RE",
+        "description": "DETENTION CHARGES",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "DFA RE",
+        "description": "DFA",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "DG docs RE",
+        "description": "DG DOCS",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "DG Shipment VAT",
+        "description": "DG SHIPMENT",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Docs handling VAT",
+        "description": "DOCUMENTATION AND HANDLING",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Docs handling ZERO",
+        "description": "DOCUMENTATION AND HANDLING",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Docstamp SOA A",
+        "description": "DOCUMENTARY STAMP",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Docstamp VAT",
+        "description": "DOCUMENTARY STAMP",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Docstamp RE",
+        "description": "DOCUMENTARY STAMPS",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Docstamp ZERO",
+        "description": "DOCUMENTARY STAMPS",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Documentation RE",
+        "description": "DOCUMENTATION FEE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Documentation SOA A",
+        "description": "DOCUMENTATION FEE",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Documentation VAT",
+        "description": "DOCUMENTATION FEE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Documentation ZERO",
+        "description": "DOCUMENTATION FEE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "DOE app VAT",
+        "description": "DOE APPLICATION",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "DOE app RE",
+        "description": "DOE APPLICATION",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Duties RE",
+        "description": "DUTIES AND TAXES",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Duties SOA A",
+        "description": "DUTIES AND TAXES",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "E konek RE",
+        "description": "E- KONEK",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "E2M RE",
+        "description": "E2M",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "E2M SOA A",
+        "description": "E2M",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "E2M VAT",
+        "description": "E2M",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "EBS RE",
+        "description": "EBS",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "ED SOA A",
+        "description": "ED PROCESSING",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "ED VAT",
+        "description": "ED PROCESSING",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "ED ZERO",
+        "description": "ED PROCESSING",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "EDS RE",
+        "description": "EDS",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "ENS RE",
+        "description": "ENS",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "ETRACC RE",
+        "description": "ETRACC",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "ETRACC VAT",
+        "description": "ETRACC",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "ETRACC ZERO",
+        "description": "ETRACC",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Exworks RE",
+        "description": "EXWORKS CHARGES",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Facilitation SOA A",
+        "description": "FACILITATION",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Fuel surcharge RE",
+        "description": "FUEL SURCHARGE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Fuel surcharge VAT",
+        "description": "FUEL SURCHARGE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Fuel surcharge ZERO",
+        "description": "FUEL SURCHARGE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Fumigation SOA A",
+        "description": "FUMIGATION FEE",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Fumigation VAT",
+        "description": "FUMIGATION FEE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Fumigation ZERO",
+        "description": "FUMIGATION FEE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Handling SOA A",
+        "description": "HANDLING FEE",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Handling VAT",
+        "description": "HANDLING FEE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Handling ZERO",
+        "description": "HANDLING FEE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Handling RE",
+        "description": "HANDLING FEE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Hazardous RE",
+        "description": "HAZARDOUS CHARGES",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Hustling ZERO",
+        "description": "HUSTLING",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "ICCO SOA A",
+        "description": "ICCO",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "ICCO VAT",
+        "description": "ICCO",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "ICCO ZERO",
+        "description": "ICCO",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Import release SOA",
+        "description": "IMPORT RELEASE FEE",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Insurance RE",
+        "description": "INSURANCE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Insurance SOA A",
+        "description": "INSURANCE",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Insurance VAT",
+        "description": "INSURANCE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Insurance RE",
+        "description": "INSURANCE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "ISPS RE",
+        "description": "ISPS",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "LCL RE",
+        "description": "LCL SERVICE CHARGES",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "LCL VAT",
+        "description": "LCL SERVICE CHARGES",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "LCL RE",
+        "description": "LCL SERVICE CHARGES",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Lifting SOA A",
+        "description": "LIFTING OF ABANDONMENT",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Lifting VAT",
+        "description": "LIFTING OF ABANDONMENT",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Loading SOA A",
+        "description": "LOADING CHARGES",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Loading VAT",
+        "description": "LOADING CHARGES",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Loading ZERO",
+        "description": "LOADING CHARGES",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "LSF RE",
+        "description": "LSF",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "LSS RE",
+        "description": "LSS",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "LSS VAT",
+        "description": "LSS FEE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "LSS ZERO",
+        "description": "LSS FEE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Manifest RE",
+        "description": "MANIFEST FEE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Manifest SOA A",
+        "description": "MANIFEST FEE",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Manifest VAT",
+        "description": "MANIFEST FEE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Manifest ZERO",
+        "description": "MANIFEST FEE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "N. Stamps RE",
+        "description": "NOTARIAL AND STAMPS",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "N. Stamps VAT",
+        "description": "NOTARIAL AND STAMPS",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "N. Stamps ZERO",
+        "description": "NOTARIAL AND STAMPS",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "O. freight RE",
+        "description": "OCEAN FREIGHT (95% OF FREIGHT CHARGES)",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "O. freight SOA A",
+        "description": "OCEAN FREIGHT CHARGES",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "O. freight VAT",
+        "description": "OCEAN FREIGHT (5% OF FREIGHT CHARGES)",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "O. freight ZERO",
+        "description": "OCEAN FREIGHT CHARGES",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Origin RE",
+        "description": "ORIGIN CHARGES",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Overtime ZERO",
+        "description": "OVERTIME",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Overtime RE",
+        "description": "OVERTIME",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "PCCI RE",
+        "description": "PCCI",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "PCCI SOA A",
+        "description": "PCCI AND IAS CLEARANCE",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "PCCI clearance VAT",
+        "description": "PCCI CLEARANCE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "PCS RE",
+        "description": "PCS",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "PEZA RE",
+        "description": "PEZA FEE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "PO RE",
+        "description": "PO",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Port charges RE",
+        "description": "PORT CHARGES",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Port congestion RE",
+        "description": "PORT CONGESTION",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Processing SOA A",
+        "description": "PROCESSING FEE",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Processing VAT",
+        "description": "PROCESSING",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Processing ZERO",
+        "description": "PROCESSING FEE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "PSS RE",
+        "description": "PSS",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "RED DEA VAT",
+        "description": "RED,DEA AND XRAY",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "SCG RE",
+        "description": "SCG",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Seal RE",
+        "description": "SEAL FEE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Seal SOA A",
+        "description": "SEAL FEE",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Seal VAT",
+        "description": "SEAL FEE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Seal ZERO",
+        "description": "SEAL FEE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "SG RE",
+        "description": "SG",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Shipping line RE",
+        "description": "SHIPPING LINE CHARGES",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Forwarders RE",
+        "description": "FORWARDERS CHARGES",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Shut out RE",
+        "description": "SHUT-OUT CHARGES",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Solas VAT",
+        "description": "SOLAS ADMIN",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Solas ZERO",
+        "description": "SOLAS ADMIN",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Spotcheck SOA A",
+        "description": "SPOT CHECK",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Spotcheck RE",
+        "description": "SPOTCHECK",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Spotcheck VAT",
+        "description": "SPOTCHECK",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "SSC FEE SOA A",
+        "description": "SSC FEE",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Storage RE",
+        "description": "STORAGE CHARGES",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "TABS RE",
+        "description": "TABS",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "TABS SOA A",
+        "description": "TABS",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "TABS VAT",
+        "description": "TABS",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "TCC SOA A",
+        "description": "TCC",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Telex ZERO",
+        "description": "TELEX RELEASE FEE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Telex VAT",
+        "description": "TELEX FEE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Telex RE",
+        "description": "TELEX RELEASE FEE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "THC RE",
+        "description": "TERMINAL HANDLING CHARGE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "THC SOA A",
+        "description": "TERMINAL HANDLING CHARGE",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "THC VAT",
+        "description": "TERMINAL HANDLING CHARGE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "THC ZERO",
+        "description": "TERMINAL HANDLING CHARGE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Trucking SOA A",
+        "description": "TRUCKING CHARGES",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Trucking VAT",
+        "description": "TRUCKING CHARGES",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Trucking ZERO",
+        "description": "TRUCKING CHARGES",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Turn over RE",
+        "description": "TURN OVER FEE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Turn over VAT",
+        "description": "TURN OVER FEE",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Turn over ZERO",
+        "description": "TURN OVER FEE",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Turn over SOA A",
+        "description": "TURN OVER FEE",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Warehousing RE",
+        "description": "WAREHOUSING CHARGES",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Warehousing VAT",
+        "description": "WAREHOUSING CHARGES",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Wharfage RE",
+        "description": "WHARFAGE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Wharfage SOA A",
+        "description": "WHARFAGE",
+        "tax_type": "Non",
+        "account": "Service Income-SOA A"
+    },
+    {
+        "type": "Service",
+        "name": "Wharfinger RE",
+        "description": "WHARFINGER",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Wharfinger VAT",
+        "description": "WHARFINGER",
+        "tax_type": "VAT",
+        "account": "Service Income- Vatable"
+    },
+    {
+        "type": "Service",
+        "name": "Wharfinger ZERO",
+        "description": "WHARFINGER",
+        "tax_type": "Non",
+        "account": "Service Income-Zero rated"
+    },
+    {
+        "type": "Service",
+        "name": "Cont. imbalance RE",
+        "description": "CONTAINER IMBALANCE SURCHARGE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Op. service RE",
+        "description": "OPERATING SERVICE SURCHARGE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Import release RE",
+        "description": "IMPORT RELEASE FEE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Emergency RE",
+        "description": "EMERGENCY FUEL SURCHARGE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Equip. mgt RE",
+        "description": "EQUIPMENT MGT. SERVICE FEE",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "Cont. clean RE",
+        "description": "CONTAINER CLEANING DESTINATION",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    },
+    {
+        "type": "Service",
+        "name": "BAF RE",
+        "description": "BAF",
+        "tax_type": "Non",
+        "account": "Reimbursable charges"
+    }
+]
