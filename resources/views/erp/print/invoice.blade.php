@@ -261,7 +261,7 @@
         <div class="bi-field fit-single-line amount print-field-discount" data-fit-text style="left: {{ $p['discount'][0] }}px; top: {{ $p['discount'][1] }}px; {{ $fieldStyle('discount') }}">{{ $plainAmount($print['discount']) }}</div>
         <div class="bi-field fit-single-line amount print-field-add_vat" data-fit-text style="left: {{ $p['add_vat'][0] }}px; top: {{ $p['add_vat'][1] }}px; {{ $fieldStyle('add_vat') }}">{{ $money($print['vat_amount']) }}</div>
         <div class="bi-field fit-single-line amount print-field-withholding_tax" data-fit-text style="left: {{ $p['withholding_tax'][0] }}px; top: {{ $p['withholding_tax'][1] }}px; {{ $fieldStyle('withholding_tax') }}">{{ $money($print['withholding_tax']) }}</div>
-        <div class="bi-field fit-single-line amount header-value print-field-amount_due" data-fit-text style="left: {{ $p['amount_due'][0] }}px; top: {{ $p['amount_due'][1] }}px; {{ $fieldStyle('amount_due') }}">{{ $money($print['billing_total']) }}</div>
+        <div class="bi-field fit-single-line amount header-value print-field-amount_due" data-fit-text style="left: {{ $p['amount_due'][0] }}px; top: {{ $p['amount_due'][1] }}px; {{ $fieldStyle('amount_due') }}">{{ $money(max(0, $print['billing_total'] - $print['withholding_tax'])) }}</div>
         <div class="bi-field fit-single-line print-field-prepared_by" data-fit-text style="left: {{ $p['prepared_by'][0] }}px; top: {{ $p['prepared_by'][1] }}px; {{ $fieldStyle('prepared_by') }}">{{ $print['prepared_by'] }}</div>
 
         @foreach($customFields as $custom)

@@ -12,7 +12,10 @@
     $status = $record ? ucwords(str_replace('_', ' ', $record->status ?: 'draft')) : 'Draft';
     $paidTotal = $record ? (float) $record->paid_total : 0;
     $grandTotal = $record ? (float) $record->grand_total : (float) ($invoice['soa_total'] ?? 0);
+    $withholdingTaxRate = $record ? (float) $record->withholding_tax_rate : (float) ($invoice['withholding_tax_rate'] ?? 0);
+    $withholdingTaxAmount = $record ? (float) $record->withholding_tax_amount : (float) ($invoice['withholding_tax_amount'] ?? 0);
     $balance = max(0, $grandTotal - $paidTotal);
+    $netAmountDue = max(0, $balance - $withholdingTaxAmount);
 @endphp
 
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
@@ -127,6 +130,18 @@
                     <div class="col-md-4">
                         <div class="text-muted small">AR Account</div>
                         <div>{{ $invoice['ar_account'] ?? '-' }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-muted small">Withholding Tax %</div>
+                        <div>{{ rtrim(rtrim(number_format($withholdingTaxRate, 2), '0'), '.') }}%</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-muted small">Less Withholding Tax</div>
+                        <div>{{ $money($withholdingTaxAmount) }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-muted small">Please Pay This Amount</div>
+                        <div class="fw-semibold text-primary">{{ $money($netAmountDue) }}</div>
                     </div>
                 </div>
 

@@ -6380,6 +6380,8 @@ class ModuleController extends Controller
                 'zero_rated_amount' => ($data['vat_classification'] ?? '') === 'zero-rated' ? $totals['vatable_sales'] : 0,
                 'vat_exempt_amount' => ($data['vat_classification'] ?? '') === 'exempt' ? $totals['vatable_sales'] : 0,
                 'tax_total' => $totals['vat_amount'],
+                'withholding_tax_rate' => $totals['withholding_tax_rate'],
+                'withholding_tax_amount' => $totals['withholding_tax_amount'],
                 'freight_total' => $totals['reimbursement_total'],
                 'grand_total' => $totals['soa_total'],
                 'invoice_amount' => $totals['billing_total'],
@@ -6767,6 +6769,9 @@ class ModuleController extends Controller
                         'job_shipment_id' => $column('job_shipment_id', $column('shipment_job_id', $fallback['job_shipment_id'] ?? '')),
                         'vatable_sales' => number_format($subtotal, 2, '.', ''),
                         'vat_amount' => number_format($taxTotal, 2, '.', ''),
+                        'withholding_tax_rate' => $column('withholding_tax_rate', 0),
+                        'withholding_tax_amount' => number_format((float) $column('withholding_tax_amount', 0), 2, '.', ''),
+                        'withholding_tax' => number_format((float) $column('withholding_tax_amount', 0), 2, '.', ''),
                         'billing_total' => number_format($grandTotal - $reimbursementTotal, 2, '.', ''),
                         'reimbursement_total' => number_format($reimbursementTotal, 2, '.', ''),
                         'soa_total' => number_format($grandTotal, 2, '.', ''),
@@ -6850,6 +6855,9 @@ class ModuleController extends Controller
         $totals = $this->billingTotals($resolved);
         $resolved['vatable_sales'] = number_format($totals['vatable_sales'], 2, '.', '');
         $resolved['vat_amount'] = number_format($totals['vat_amount'], 2, '.', '');
+        $resolved['withholding_tax_rate'] = number_format($this->moneyToFloat($resolved['withholding_tax_rate'] ?? 0), 2, '.', '');
+        $resolved['withholding_tax_amount'] = number_format($this->moneyToFloat($resolved['withholding_tax_amount'] ?? 0), 2, '.', '');
+        $resolved['withholding_tax'] = $resolved['withholding_tax_amount'];
         $resolved['billing_total'] = number_format($totals['billing_total'], 2, '.', '');
         $resolved['reimbursement_total'] = number_format($totals['reimbursement_total'], 2, '.', '');
         $resolved['soa_total'] = number_format($totals['soa_total'], 2, '.', '');
@@ -7016,9 +7024,14 @@ class ModuleController extends Controller
             }
         }
 
+        $withholdingTaxRate = min(100, max(0, $this->moneyToFloat($data['withholding_tax_rate'] ?? 0)));
+        $withholdingTaxAmount = round($billingSubtotal * ($withholdingTaxRate / 100), 4);
+
         return [
             'vatable_sales' => $billingSubtotal,
             'vat_amount' => $vatAmount,
+            'withholding_tax_rate' => $withholdingTaxRate,
+            'withholding_tax_amount' => $withholdingTaxAmount,
             'billing_total' => $billingSubtotal + $vatAmount,
             'reimbursement_total' => $reimbursementTotal,
             'soa_total' => $billingSubtotal + $vatAmount + $reimbursementTotal,
@@ -7248,6 +7261,7 @@ class ModuleController extends Controller
             'class_code',
             'currency',
             'exchange_rate',
+            'withholding_tax_rate',
             'ar_account',
             'invoice_template',
             'customer_message',
@@ -7271,6 +7285,10 @@ class ModuleController extends Controller
             'original_invoice_no',
         ]);
 
+        request()->validate([
+            'withholding_tax_rate' => 'nullable|numeric|min:0|max:100',
+        ]);
+
         $originalInvoiceNo = trim((string) ($data['original_invoice_no'] ?? ''));
         $selectedTemplates = array_values(array_filter(array_map('trim', (array) ($data['invoice_template'] ?? []))));
         $invoiceNo = trim((string) ($data['invoice_no'] ?? ''));
@@ -7292,6 +7310,7 @@ class ModuleController extends Controller
 
         $totals = $this->billingTotals($data);
         $data['invoice_amount'] = number_format($totals['billing_total'], 2);
+        $data['withholding_tax_amount'] = number_format($totals['withholding_tax_amount'], 2);
         $data['amount'] = number_format($totals['soa_total'], 2);
         $data['reimbursement_total'] = number_format($totals['reimbursement_total'], 2);
         $data['soa_total'] = number_format($totals['soa_total'], 2);

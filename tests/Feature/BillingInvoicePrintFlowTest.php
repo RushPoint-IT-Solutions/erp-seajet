@@ -32,6 +32,7 @@ class BillingInvoicePrintFlowTest extends TestCase
         $response->assertSee('SOA A');
         $response->assertSee('SOA B');
         $response->assertSee('Billing Invoice');
+        $response->assertSee('Withholding Tax %');
         $response->assertSee('Print SOA B + Billing Invoice');
         $response->assertSee('Print SOA A');
     }
@@ -69,6 +70,7 @@ class BillingInvoicePrintFlowTest extends TestCase
             'qty' => ['1', '1'],
             'unit_price' => ['100.00', '50.00'],
             'line_class' => ['MANILA', 'MANILA'],
+            'line_ar_account' => ['A/Trade-Billing Invoice', 'A/R-Reimbursable Charges'],
             'tax_category' => ['12%', 'exempt'],
             'line_amount' => ['100.00', '50.00'],
         ]));
@@ -113,6 +115,55 @@ class BillingInvoicePrintFlowTest extends TestCase
         $show->assertSee('Print SOA A');
         $show->assertDontSee('Print SOA B');
         $show->assertDontSee('Print Billing Invoice');
+    }
+
+    public function test_billing_invoice_calculates_and_prints_withholding_tax_from_percentage()
+    {
+        $response = $this->post('/erp/invoices/review', $this->payload([
+            'customer_id' => 'CUST-001',
+            'customer_name' => 'North Harbor Trading',
+            'vat_classification' => '12%',
+            'ar_account' => 'A/Trade-Billing Invoice',
+            'invoice_template' => 'Billing Invoice',
+            'customer_tax_code' => 'VAT12',
+            'withholding_tax_rate' => '2',
+            'item' => ['Documentation VAT', 'Reimbursable Charges'],
+            'item_description' => ['DOC / IDENTIFICATION FEE', 'REIMBURSABLE CHARGES'],
+            'qty' => ['1', '1'],
+            'unit_price' => ['100.00', '50.00'],
+            'line_class' => ['MANILA', 'MANILA'],
+            'line_ar_account' => ['A/Trade-Billing Invoice', 'A/R-Reimbursable Charges'],
+            'tax_category' => ['12%', 'exempt'],
+            'line_amount' => ['100.00', '50.00'],
+        ]));
+
+        $response->assertRedirect();
+        $document = DB::table('sales_documents')->where('document_no', 'BI-TEST-001')->first();
+        $this->assertNotNull($document);
+        $this->assertEquals(2.0, (float) $document->withholding_tax_rate);
+        $this->assertEquals(2.0, (float) $document->withholding_tax_amount);
+        $this->assertEquals(162.0, (float) $document->grand_total);
+
+        $show = $this->get($response->headers->get('Location'));
+        $show->assertStatus(200);
+        $show->assertSee('Less Withholding Tax');
+        $show->assertSee('PHP 160.00');
+
+        $print = $this->get('/erp/billings/print/invoice?invoice=BI-TEST-001');
+        $print->assertStatus(200);
+        $print->assertSee('PHP 2.00');
+        $print->assertSee('PHP 110.00');
+    }
+
+    public function test_billing_invoice_rejects_invalid_withholding_percentage()
+    {
+        $response = $this->from('/erp/invoices/create')->post('/erp/invoices/review', $this->payload([
+            'withholding_tax_rate' => '101',
+        ]));
+
+        $response->assertRedirect('/erp/invoices/create');
+        $response->assertSessionHasErrors('withholding_tax_rate');
+        $this->assertFalse(DB::table('sales_documents')->where('document_no', 'BI-TEST-001')->exists());
     }
 
     public function test_closed_period_rolls_back_invoice_and_journal_together()

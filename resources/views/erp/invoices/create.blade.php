@@ -336,6 +336,14 @@
                                 <label class="form-label text-muted">Forex Rate</label>
                                 <input name="exchange_rate" id="exchangeRateInput" class="form-control invoice-field text-end" value="1.000000">
                             </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-muted">Withholding Tax %</label>
+                                <div class="input-group">
+                                    <input name="withholding_tax_rate" id="withholdingTaxRate" type="number" min="0" max="100" step="0.01" class="form-control invoice-field text-end" value="0">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                                <div class="form-text">Computed on sales net of VAT; reimbursements excluded.</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -435,9 +443,17 @@
                             <span class="text-muted">VAT</span>
                             <strong id="taxText">PHP 0.00</strong>
                         </div>
+                        <div class="d-flex justify-content-between py-2 border-bottom">
+                            <span class="text-muted">Invoice / SOA Total</span>
+                            <strong id="balanceText">PHP 0.00</strong>
+                        </div>
+                        <div class="d-flex justify-content-between py-2 border-bottom">
+                            <span class="text-muted">Less Withholding Tax (<span id="withholdingRateText">0%</span>)</span>
+                            <strong id="withholdingTaxText">PHP 0.00</strong>
+                        </div>
                         <div class="d-flex justify-content-between py-2">
-                            <span class="text-muted">SOA Total</span>
-                            <strong class="text-primary" id="balanceText">PHP 0.00</strong>
+                            <span class="fw-semibold">Please Pay This Amount</span>
+                            <strong class="text-primary" id="netAmountDueText">PHP 0.00</strong>
                         </div>
                         <div class="d-flex justify-content-between py-2 border-top" id="phpEquivalentRow">
                             <span class="text-muted">PHP Equivalent</span>
@@ -631,9 +647,15 @@
 
             var billingTotal = billingSubtotal + tax;
             var soaTotal = billingTotal + reimbursement;
+            var withholdingRate = Math.min(100, Math.max(0, numberValue($('#withholdingTaxRate').val())));
+            var withholdingTax = billingSubtotal * (withholdingRate / 100);
+            var netAmountDue = Math.max(0, soaTotal - withholdingTax);
             $('#subtotalText').text(currency() + ' ' + money(billingSubtotal));
             $('#taxText').text(currency() + ' ' + money(tax));
             $('#balanceText').text(currency() + ' ' + money(soaTotal));
+            $('#withholdingRateText').text(money(withholdingRate).replace(/\.00$/, '') + '%');
+            $('#withholdingTaxText').text(currency() + ' ' + money(withholdingTax));
+            $('#netAmountDueText').text(currency() + ' ' + money(netAmountDue));
             $('#amountInput').val(soaTotal.toFixed(2));
             $('#invoiceAmountInput').val(billingTotal ? money(billingTotal) : '');
             var exchangeRate = numberValue($('#exchangeRateInput').val()) || 1;
@@ -678,6 +700,7 @@
             $('textarea[name="invoice_to"]').val('North Harbor Trading\nNorth Harbor Center, Manila\nTIN: 000-345-111-000');
             $('textarea[name="consignee"]').val('North Harbor Trading\nManila Port Warehouse');
             $('input[name="total_payment"]').val('0.00');
+            $('#withholdingTaxRate').val('2.00');
             $('textarea[name="description"]').val('Sample billing for shipment-linked services. Includes VATable service charges and reimbursable charges.');
             $('#invoiceTemplate').val(['SOA_B', 'Billing Invoice']).trigger('change.select2');
 
@@ -760,6 +783,7 @@
             $('textarea[name="invoice_to"]').val(editInvoice.invoice_to || '');
             $('textarea[name="consignee"]').val(editInvoice.consignee || '');
             $('input[name="total_payment"]').val(editInvoice.total_payment || '');
+            $('#withholdingTaxRate').val(editInvoice.withholding_tax_rate || '0');
             $('textarea[name="description"]').val(editInvoice.description || '');
             $('#creditTerms').val(String(editInvoice.credit_term_days || '').replace(/[^0-9]/g, ''));
             setTemplateValues(editInvoice.invoice_template || (editInvoice.vat_classification === '12%' ? ['SOA_B', 'Billing Invoice'] : ['SOA_A']));
@@ -812,6 +836,7 @@
         });
         $('#invoiceLines').on('input change', '.line-unit, .line-qty, .line-tax', recalc);
         $('#exchangeRateInput').on('input', recalc);
+        $('#withholdingTaxRate').on('input change', recalc);
         $('#invoiceLines').on('change', '.line-account', syncDocumentAccount);
         $('#invoiceLines').on('change', '.item-select', function () {
             syncItem($(this).closest('tr'));
