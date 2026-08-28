@@ -701,7 +701,9 @@ class ModuleController extends Controller
             ->get()
             ->map(function ($invoice) {
                 $balance = $this->salesDocumentBalance($invoice);
-                $isActive = !in_array($invoice->status, ['paid', 'cancelled', 'voided'], true);
+                $status = strtolower((string) ($invoice->status ?: 'draft'));
+                $isFinal = in_array($status, ['cancelled', 'voided'], true);
+                $isActive = !in_array($status, ['paid', 'cancelled', 'voided'], true);
 
                 return (object) [
                     'id' => $invoice->id,
@@ -714,9 +716,10 @@ class ModuleController extends Controller
                     'grand_total' => (float) $invoice->grand_total,
                     'paid_total' => (float) $invoice->paid_total,
                     'balance' => $balance,
-                    'status' => $invoice->status ?: 'draft',
+                    'status' => $status,
                     'vat_classification' => $invoice->vat_classification,
                     'class_code' => $invoice->class_code,
+                    'counts_as_billed' => !$isFinal,
                     'active_unpaid' => $isActive && $balance > 0,
                 ];
             });
@@ -725,7 +728,7 @@ class ModuleController extends Controller
     private function customerInvoiceSummary($invoices)
     {
         $summary = [
-            'invoice_count' => $invoices->count(),
+            'invoice_count' => 0,
             'open_count' => 0,
             'billed' => 0,
             'paid' => 0,
@@ -733,6 +736,11 @@ class ModuleController extends Controller
         ];
 
         foreach ($invoices as $invoice) {
+            if (!$invoice->counts_as_billed) {
+                continue;
+            }
+
+            $summary['invoice_count']++;
             $summary['billed'] += $invoice->grand_total;
             $summary['paid'] += $invoice->paid_total;
             if ($invoice->active_unpaid) {
@@ -5297,11 +5305,17 @@ class ModuleController extends Controller
         $totalAmount = 0.0;
         $postedAmount = 0.0;
         $postedCount = 0;
+        $activeInvoiceCount = 0;
 
         foreach ($invoices as $invoice) {
             $amount = $this->moneyToFloat($invoice[6]);
             $status = strtolower($invoice[7]);
 
+            if (in_array($status, ['cancelled', 'voided'], true)) {
+                continue;
+            }
+
+            $activeInvoiceCount++;
             $totalAmount += $amount;
 
             if ($status === 'posted') {
@@ -5313,7 +5327,7 @@ class ModuleController extends Controller
         return view('erp.invoices.index', [
             'invoices' => $invoices,
             'stats' => [
-                ['label' => 'Invoices', 'value' => count($invoices), 'icon' => 'bi-receipt', 'tone' => 'primary'],
+                ['label' => 'Invoices', 'value' => $activeInvoiceCount, 'icon' => 'bi-receipt', 'tone' => 'primary'],
                 ['label' => 'Total Billed', 'value' => 'PHP '.number_format($totalAmount, 2), 'icon' => 'bi-cash-stack', 'tone' => 'success'],
                 ['label' => 'Posted Amount', 'value' => 'PHP '.number_format($postedAmount, 2), 'icon' => 'bi-check2-square', 'tone' => 'warning'],
                 ['label' => 'Posted', 'value' => $postedCount, 'icon' => 'bi-check2-circle', 'tone' => 'success'],
@@ -8304,14 +8318,19 @@ class ModuleController extends Controller
     private function salesDocumentBalanceExpression()
     {
         if (Schema::hasColumn('sales_documents', 'balance_due')) {
-            return 'case when sales_documents.balance_due > 0 then sales_documents.balance_due else (sales_documents.grand_total - sales_documents.paid_total) end';
+            return "case when lower(sales_documents.status) in ('cancelled', 'voided') then 0 when sales_documents.balance_due > 0 then sales_documents.balance_due else (sales_documents.grand_total - sales_documents.paid_total) end";
         }
 
-        return '(sales_documents.grand_total - sales_documents.paid_total)';
+        return "case when lower(sales_documents.status) in ('cancelled', 'voided') then 0 else (sales_documents.grand_total - sales_documents.paid_total) end";
     }
 
     private function salesDocumentBalance($invoice)
     {
+        $status = strtolower((string) ($invoice->status ?? ''));
+        if (in_array($status, ['cancelled', 'voided'], true)) {
+            return 0.0;
+        }
+
         $balanceDue = property_exists($invoice, 'balance_due') ? (float) $invoice->balance_due : 0;
         if ($balanceDue > 0) {
             return $balanceDue;
@@ -8478,7 +8497,9 @@ class ModuleController extends Controller
 
     private function workbookReportSummaryCards()
     {
-        $sales = Schema::hasTable('sales_documents') ? (float) DB::table('sales_documents')->sum('grand_total') : 0;
+        $sales = Schema::hasTable('sales_documents')
+            ? (float) DB::table('sales_documents')->whereNotIn('status', ['cancelled', 'voided'])->sum('grand_total')
+            : 0;
         $receipts = Schema::hasTable('receipts') ? (float) DB::table('receipts')->sum('amount') : 0;
         $payments = Schema::hasTable('payments') ? (float) DB::table('payments')->sum('amount') : 0;
         $journals = Schema::hasTable('journal_entries') ? DB::table('journal_entries')->count() : 0;
@@ -9127,7 +9148,9 @@ class ModuleController extends Controller
             return [];
         }
 
-        $query = DB::table('sales_documents')->leftJoin('customers', 'customers.id', '=', 'sales_documents.customer_id');
+        $query = DB::table('sales_documents')
+            ->leftJoin('customers', 'customers.id', '=', 'sales_documents.customer_id')
+            ->whereNotIn('sales_documents.status', ['cancelled', 'voided']);
 
         if (Schema::hasColumn('sales_documents', 'class_code')) {
             $query->where('sales_documents.class_code', $branch);

@@ -53,7 +53,10 @@ class DashboardController extends Controller
 
         $kpis = [];
         if ($dashboardAccess['ar']) {
-            $kpis[] = ['label' => 'Revenue', 'value' => $salesTotal, 'trend' => $this->countTable('sales_documents').' sales docs', 'tone' => 'success', 'icon' => 'bi-graph-up-arrow'];
+            $activeSalesDocumentCount = $this->countTable('sales_documents', function ($query) {
+                $query->whereNotIn('status', ['cancelled', 'voided']);
+            });
+            $kpis[] = ['label' => 'Revenue', 'value' => $salesTotal, 'trend' => $activeSalesDocumentCount.' sales docs', 'tone' => 'success', 'icon' => 'bi-graph-up-arrow'];
             $kpis[] = ['label' => 'Accounts Receivable', 'value' => $arBalance, 'trend' => $openInvoiceCount.' open invoices', 'tone' => 'danger', 'icon' => 'bi-receipt-cutoff'];
         }
         if ($dashboardAccess['ap']) {

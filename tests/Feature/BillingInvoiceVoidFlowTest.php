@@ -40,6 +40,7 @@ class BillingInvoiceVoidFlowTest extends TestCase
         ]);
         $this->assertSame($lineCount, DB::table('sales_document_lines')->where('sales_document_id', $invoice->id)->count());
         $this->get(route('erp.billings.edit', $invoice->id))->assertStatus(403);
+        $this->assertFinalInvoiceIsAuditOnly($invoice);
     }
 
     public function test_posted_invoice_is_voided_and_its_journal_is_reversed_without_deletion()
@@ -76,6 +77,7 @@ class BillingInvoiceVoidFlowTest extends TestCase
         $this->assertNotNull($reversal);
         $this->assertEquals($originalJournal->id, $reversal->reversed_entry_id);
         $this->assertSame($lineCount, DB::table('sales_document_lines')->where('sales_document_id', $invoice->id)->count());
+        $this->assertFinalInvoiceIsAuditOnly($invoice);
     }
 
     public function test_invoice_with_an_active_receipt_cannot_be_voided()
@@ -157,5 +159,59 @@ class BillingInvoiceVoidFlowTest extends TestCase
         $response->assertRedirect();
 
         return DB::table('sales_documents')->where('document_no', $documentNo)->first();
+    }
+
+    private function assertFinalInvoiceIsAuditOnly($invoice)
+    {
+        $documentTypes = ['invoice', 'billing_invoice', 'statement_of_account_a', 'soa_a', 'debit_note'];
+        $activeInvoices = DB::table('sales_documents')
+            ->where('company_id', $invoice->company_id)
+            ->whereIn('document_type', $documentTypes)
+            ->whereNotIn('status', ['cancelled', 'voided']);
+
+        $invoicePage = $this->get(route('erp.invoices.index'));
+        $invoicePage->assertStatus(200);
+        $invoicePage->assertSee($invoice->document_no);
+        $stats = collect($invoicePage->original->getData()['stats'])->keyBy('label');
+        $this->assertSame((int) (clone $activeInvoices)->count(), $stats['Invoices']['value']);
+        $this->assertSame(
+            'PHP '.number_format((float) (clone $activeInvoices)->sum('grand_total'), 2),
+            $stats['Total Billed']['value']
+        );
+
+        $customerPage = $this->get(route('erp.customers.show', $invoice->customer_id));
+        $customerPage->assertStatus(200);
+        $customerPage->assertSee($invoice->document_no);
+        $summary = $customerPage->original->getData()['summary'];
+        $customerInvoices = DB::table('sales_documents')
+            ->where('company_id', $invoice->company_id)
+            ->where('customer_id', $invoice->customer_id)
+            ->whereIn('document_type', $documentTypes)
+            ->whereNotIn('status', ['cancelled', 'voided']);
+        $this->assertSame((int) (clone $customerInvoices)->count(), $summary['invoice_count']);
+        $this->assertEquals((float) (clone $customerInvoices)->sum('grand_total'), $summary['billed']);
+        $this->assertEquals((float) (clone $customerInvoices)->sum('paid_total'), $summary['paid']);
+
+        $workbookPage = $this->get(route('erp.reports.workbook', ['report' => 'sales-manila']));
+        $workbookPage->assertStatus(200);
+        $workbookData = $workbookPage->original->getData();
+        $this->assertFalse(collect($workbookData['rows'])->contains(function ($row) use ($invoice) {
+            return ($row['BILLING INVOICE'] ?? '') === $invoice->document_no
+                || ($row['STATEMENT OF ACCOUNT NUMBER'] ?? '') === $invoice->document_no;
+        }));
+        $salesCard = collect($workbookData['summaryCards'])->firstWhere('label', 'Sales Book');
+        $expectedSales = DB::table('sales_documents')
+            ->whereNotIn('status', ['cancelled', 'voided'])
+            ->sum('grand_total');
+        $this->assertSame('PHP '.number_format((float) $expectedSales, 2), $salesCard['value']);
+
+        $dashboardPage = $this->get(route('erp.dashboard'));
+        $dashboardPage->assertStatus(200);
+        $revenueKpi = collect($dashboardPage->original->getData()['kpis'])->firstWhere('label', 'Revenue');
+        $activeCompanySales = DB::table('sales_documents')
+            ->where('company_id', $invoice->company_id)
+            ->whereNotIn('status', ['cancelled', 'voided']);
+        $this->assertEquals((float) (clone $activeCompanySales)->sum('grand_total'), $revenueKpi['value']);
+        $this->assertSame((clone $activeCompanySales)->count().' sales docs', $revenueKpi['trend']);
     }
 }
