@@ -16,6 +16,7 @@
     $withholdingTaxAmount = $record ? (float) $record->withholding_tax_amount : (float) ($invoice['withholding_tax_amount'] ?? 0);
     $balance = max(0, $grandTotal - $paidTotal);
     $netAmountDue = max(0, $balance - $withholdingTaxAmount);
+    $isFinal = $record && in_array(strtolower((string) $record->status), ['cancelled', 'voided'], true);
 @endphp
 
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
@@ -30,16 +31,18 @@
             <a href="{{ route('erp.invoices.index') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-arrow-left me-1"></i> Invoices
             </a>
-            <a href="{{ route('erp.billings.edit', $record ? $record->id : ($invoice['invoice_no'] ?? '')) }}" class="btn btn-outline-secondary">
-                <i class="bi bi-pencil me-1"></i> Edit
-            </a>
-            <button type="button"
-                    class="btn btn-primary invoice-payment-button"
-                    data-bs-toggle="modal"
-                    data-bs-target="#invoiceViewPaymentModal"
-                    data-invoice="{{ $invoice['invoice_no'] ?? '' }}">
-                <i class="bi bi-credit-card me-1"></i> Receive Payment
-            </button>
+            @unless($isFinal)
+                <a href="{{ route('erp.billings.edit', $record ? $record->id : ($invoice['invoice_no'] ?? '')) }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-pencil me-1"></i> Edit
+                </a>
+                <button type="button"
+                        class="btn btn-primary invoice-payment-button"
+                        data-bs-toggle="modal"
+                        data-bs-target="#invoiceViewPaymentModal"
+                        data-invoice="{{ $invoice['invoice_no'] ?? '' }}">
+                    <i class="bi bi-credit-card me-1"></i> Receive Payment
+                </button>
+            @endunless
         </div>
     </div>
 
@@ -197,7 +200,7 @@
             <div class="erp-card p-4">
                 <h2 class="h6 fw-bold mb-3">More Actions</h2>
                 <div class="d-grid gap-2">
-                    @if($record)
+                    @if($record && !$isFinal)
                         <form method="post" action="{{ route('erp.invoices.portal-link', $record->id) }}">
                             @csrf
                             <button type="submit" class="btn btn-outline-primary text-start w-100">
@@ -205,12 +208,14 @@
                             </button>
                         </form>
                     @endif
-                    <a href="{{ route('erp.billings.status') }}" class="btn btn-outline-secondary text-start">
-                        <i class="bi bi-toggle-on me-1"></i>Update Status
-                    </a>
-                    <a href="{{ route('erp.billings.delete', $record ? $record->id : ($invoice['invoice_no'] ?? '')) }}" class="btn btn-outline-danger text-start">
-                        <i class="bi bi-x-circle me-1"></i>Cancel / Void
-                    </a>
+                    @unless($isFinal)
+                        <a href="{{ route('erp.billings.status') }}" class="btn btn-outline-secondary text-start">
+                            <i class="bi bi-toggle-on me-1"></i>Update Status
+                        </a>
+                        <a href="{{ route('erp.billings.void', $record ? $record->id : ($invoice['invoice_no'] ?? '')) }}" class="btn btn-outline-danger text-start">
+                            <i class="bi bi-x-circle me-1"></i>{{ $record && (in_array(strtolower((string) $record->status), ['posted', 'approved'], true) || ($record->posting_status ?? 'unposted') === 'posted') ? 'Void Invoice' : 'Cancel Invoice' }}
+                        </a>
+                    @endunless
                 </div>
             </div>
         </div>

@@ -113,8 +113,8 @@ Route::middleware(['auth', 'permission.access'])->group(function () {
 
     Route::get('/erp/billings', 'Erp\ModuleController@billingIndex')->name('erp.billings.index');
     Route::get('/erp/billings/{invoice}/edit', 'Erp\ModuleController@billingEdit')->name('erp.billings.edit');
-    Route::get('/erp/billings/{invoice}/delete', 'Erp\ModuleController@billingDelete')->name('erp.billings.delete');
-    Route::post('/erp/billings/delete/review', 'Erp\ModuleController@billingDeleteReview')->name('erp.billings.delete.review');
+    Route::get('/erp/billings/{invoice}/void', 'Erp\ModuleController@billingVoid')->name('erp.billings.void');
+    Route::post('/erp/billings/{invoice}/void', 'Erp\ModuleController@billingVoidStore')->name('erp.billings.void.store');
     Route::get('/erp/billings/status/update', 'Erp\ModuleController@billingStatus')->name('erp.billings.status');
     Route::post('/erp/billings/status/review', 'Erp\ModuleController@billingStatusReview')->name('erp.billings.status.review');
     Route::get('/erp/billings/print-layout/invoice', 'Erp\ModuleController@billingInvoicePrintLayout')->name('erp.billings.print-layout.invoice');

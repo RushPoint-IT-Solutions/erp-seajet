@@ -5373,65 +5373,118 @@ class ModuleController extends Controller
 
     public function billingEdit($invoice)
     {
+        $record = $this->salesDocumentRecordByReference($invoice);
+        abort_if(in_array(strtolower((string) $record->status), ['cancelled', 'voided'], true), 403, 'A cancelled or voided invoice cannot be edited.');
+
         return view('erp.invoices.create', [
             'isEdit' => true,
-            'editingInvoice' => $this->billingPrintInvoiceDataFromReference($invoice),
+            'editingInvoice' => $this->billingPrintInvoiceDataFromReference($record->id),
             'customers' => $this->customerSelectOptions(),
             'invoiceTemplates' => $this->invoiceTemplates(),
             'items' => $this->invoiceItemOptions(),
         ]);
     }
 
-    public function billingDelete($invoice)
+    public function billingVoid($invoice)
     {
-        return view('erp.billings.delete', [
-            'invoiceNo' => $invoice,
-            'billing' => $this->billingPrintInvoiceDataFromReference($invoice),
+        $record = $this->salesDocumentRecordByReference($invoice);
+        $hasPostedJournal = Schema::hasTable('journal_entries') && DB::table('journal_entries')
+            ->where('company_id', $record->company_id)
+            ->where('source_type', 'sales_document')
+            ->where('source_id', $record->id)
+            ->where('posting_type', 'original')
+            ->where('status', 'posted')
+            ->exists();
+        $shouldVoid = in_array(strtolower((string) $record->status), ['posted', 'approved'], true)
+            || in_array(($record->posting_status ?? 'unposted'), ['posted', 'reversed'], true)
+            || $hasPostedJournal;
+
+        return view('erp.billings.void', [
+            'record' => $record,
+            'billing' => $this->billingPrintInvoiceDataFromReference($record->id),
+            'action' => strtolower((string) $record->status) === 'voided' || $shouldVoid ? 'void' : 'cancel',
+            'willReverseJournal' => $hasPostedJournal,
         ]);
     }
 
-    public function billingDeleteReview()
+    public function billingVoidStore($invoice)
     {
-        $data = request()->only(['invoice_no', 'customer', 'shipment_job_id', 'delete_action', 'reason']);
-        $invoiceNo = trim((string) ($data['invoice_no'] ?? ''));
-        $newStatus = stripos((string) ($data['delete_action'] ?? ''), 'cancel') !== false ? 'cancelled' : 'voided';
+        $data = request()->validate([
+            'reason' => 'required|string|min:5|max:1000',
+        ]);
+        $reason = trim($data['reason']);
+        $this->authorizeAccountingPosting('invoices', 'delete');
 
-        if ($invoiceNo !== '' && Schema::hasTable('sales_documents')) {
-            $this->authorizeAccountingPosting('invoices', 'delete');
-            $record = DB::table('sales_documents')
-                ->where('company_id', $this->defaultCompanyId())
-                ->where('document_no', $invoiceNo)
-                ->first();
-            abort_unless($record, 404);
-
-            if (($record->posting_status ?? 'unposted') === 'posted') {
-                app(PostingService::class)->reverseSource(
-                    'sales_document',
-                    $record->id,
-                    trim((string) ($data['reason'] ?? 'Invoice voided'))
-                );
+        $record = DB::transaction(function () use ($invoice, $reason) {
+            $record = $this->salesDocumentRecordByReference($invoice, true);
+            $oldStatus = strtolower((string) ($record->status ?: 'draft'));
+            if (in_array($oldStatus, ['cancelled', 'voided'], true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'status' => 'This invoice is already '.str_replace('_', ' ', $oldStatus).'.',
+                ]);
             }
 
-            DB::table('sales_documents')
-                ->where('id', $record->id)
-                ->update([
-                    'status' => $newStatus,
-                    'posting_status' => 'reversed',
-                    'remarks' => trim((string) ($data['reason'] ?? '')),
-                    'updated_at' => now(),
+            $activeApplications = Schema::hasTable('receipt_applications')
+                ? DB::table('receipt_applications')
+                    ->join('receipts', 'receipts.id', '=', 'receipt_applications.receipt_id')
+                    ->where('receipt_applications.sales_document_id', $record->id)
+                    ->whereNotIn('receipts.status', ['cancelled', 'voided'])
+                    ->sum('receipt_applications.amount_applied')
+                : 0;
+            if ((float) $activeApplications > 0 || (float) $record->paid_total > 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'status' => 'Void or cancel the applied customer receipt before voiding this invoice.',
                 ]);
+            }
 
-            app(ActivityLogger::class)->log('voided', 'sales_document', $record->id, [
+            $hasPostedJournal = Schema::hasTable('journal_entries') && DB::table('journal_entries')
+                ->where('company_id', $record->company_id)
+                ->where('source_type', 'sales_document')
+                ->where('source_id', $record->id)
+                ->where('posting_type', 'original')
+                ->where('status', 'posted')
+                ->exists();
+            $wasPosted = in_array(strtolower((string) $record->status), ['posted', 'approved'], true)
+                || ($record->posting_status ?? 'unposted') === 'posted'
+                || $hasPostedJournal;
+            $newStatus = $wasPosted ? 'voided' : 'cancelled';
+            $reversal = null;
+            if ($hasPostedJournal) {
+                $reversal = app(PostingService::class)->reverseSource('sales_document', $record->id, $reason);
+                if (!$reversal) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'status' => 'The posted invoice has no posted journal entry to reverse.',
+                    ]);
+                }
+            }
+
+            $auditRemark = strtoupper($newStatus).' '.now()->format('Y-m-d H:i').': '.$reason;
+            $remarks = trim(implode("\n", array_filter([(string) $record->remarks, $auditRemark])));
+            DB::table('sales_documents')->where('id', $record->id)->update([
+                'status' => $newStatus,
+                'posting_status' => $reversal ? 'reversed' : 'unposted',
+                'remarks' => $remarks,
+                'updated_at' => now(),
+            ]);
+            if (Schema::hasTable('client_portal_tokens')) {
+                DB::table('client_portal_tokens')->where('sales_document_id', $record->id)->delete();
+            }
+
+            app(ActivityLogger::class)->log($newStatus, 'sales_document', $record->id, [
                 'status' => $record->status,
+                'posting_status' => $record->posting_status ?? 'unposted',
             ], [
                 'status' => $newStatus,
-                'reason' => trim((string) ($data['reason'] ?? '')),
+                'posting_status' => $reversal ? 'reversed' : 'unposted',
+                'reason' => $reason,
             ], $record->company_id);
-        }
 
-        return view('erp.billings.delete-review', [
-            'delete' => array_merge($data, ['new_status' => $newStatus]),
-        ]);
+            return DB::table('sales_documents')->where('id', $record->id)->first();
+        });
+
+        return redirect()
+            ->route('erp.invoices.show', $record->id)
+            ->with('success', 'Invoice '.$record->document_no.' was '.$record->status.'. The document and its lines were retained.');
     }
 
     public function billingStatus()
@@ -6415,6 +6468,11 @@ class ModuleController extends Controller
                     'invoice_no' => 'A posted invoice is immutable. Reverse it and create a correcting document instead.',
                 ]);
             }
+            if ($existing && in_array(strtolower((string) $existing->status), ['cancelled', 'voided'], true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'invoice_no' => 'A cancelled or voided invoice cannot be changed. Create a new invoice instead.',
+                ]);
+            }
 
             if ($existing) {
                 DB::table('sales_documents')->where('id', $existing->id)->update($payload);
@@ -6873,6 +6931,26 @@ class ModuleController extends Controller
         }
 
         return $query->where('sales_documents.document_no', $reference);
+    }
+
+    private function salesDocumentRecordByReference($reference, $lockForUpdate = false)
+    {
+        abort_unless(Schema::hasTable('sales_documents'), 404);
+
+        $query = DB::table('sales_documents')
+            ->where('sales_documents.company_id', $this->defaultCompanyId())
+            ->where(function ($referenceQuery) use ($reference) {
+                $this->applySalesDocumentReference($referenceQuery, $reference);
+            });
+
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        $record = $query->first();
+        abort_unless($record, 404);
+
+        return $record;
     }
 
     private function invoiceTemplates()
@@ -7463,6 +7541,7 @@ class ModuleController extends Controller
             )
             ->where('sales_documents.company_id', $this->defaultCompanyId())
             ->whereIn('sales_documents.document_type', ['invoice', 'billing_invoice', 'soa', 'soa_a', 'statement_of_account_a', 'debit_note'])
+            ->whereNotIn('sales_documents.status', ['cancelled', 'voided'])
             ->whereRaw('(sales_documents.grand_total - sales_documents.paid_total) > 0')
             ->orderBy('sales_documents.document_date', 'desc')
             ->limit(150)
@@ -7548,6 +7627,10 @@ class ModuleController extends Controller
                 ->where('document_no', request('invoice_no'))
                 ->where('customer_id', $customer->id)
                 ->first();
+
+            if ($invoice && in_array(strtolower((string) $invoice->status), ['cancelled', 'voided'], true)) {
+                return back()->withInput()->withErrors(['invoice_no' => 'A cancelled or voided invoice cannot receive a payment.']);
+            }
         }
 
         $receiptNo = request('receipt_no') ?: $this->nextReceiptNumber($companyId);
@@ -7954,6 +8037,7 @@ class ModuleController extends Controller
             })
             ->first();
         abort_unless($document, 404);
+        abort_if(in_array(strtolower((string) $document->status), ['cancelled', 'voided'], true), 403, 'A cancelled or voided invoice cannot be shared.');
 
         $token = bin2hex(random_bytes(32));
         DB::table('client_portal_tokens')->where('sales_document_id', $document->id)->delete();
@@ -7994,6 +8078,7 @@ class ModuleController extends Controller
             ->select('sales_documents.*', 'customers.name as customer_name')
             ->first();
         abort_unless($document, 404);
+        abort_if(in_array(strtolower((string) $document->status), ['cancelled', 'voided'], true), 404);
 
         DB::table('client_portal_tokens')->where('id', $portalToken->id)->update([
             'last_used_at' => now(),

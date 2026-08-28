@@ -29,6 +29,7 @@
                 </thead>
                 <tbody>
                 @foreach($billings as $billing)
+                    @php $isFinal = in_array(strtolower((string) $billing[5]), ['cancelled', 'voided'], true); @endphp
                     <tr>
                         <td class="fw-semibold">{{ $billing[0] }}</td>
                         <td>{{ $billing[1] }}</td>
@@ -38,10 +39,14 @@
                         <td><span class="badge badge-soft">{{ $billing[5] }}</span></td>
                         <td>{{ $billing[6] }}</td>
                         <td class="text-end">
-                            <a href="{{ route('erp.billings.edit', $billing[0]) }}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
+                            @unless($isFinal)
+                                <a href="{{ route('erp.billings.edit', $billing[0]) }}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
+                            @endunless
                             <a href="{{ route('erp.billings.print-invoice', ['invoice' => $billing[0]]) }}" class="btn btn-sm btn-outline-secondary" title="Print BI"><i class="bi bi-printer"></i></a>
                             <a href="{{ route('erp.billings.print-soa', ['customer' => $billing[1]]) }}" class="btn btn-sm btn-outline-secondary" title="Print SOA"><i class="bi bi-file-earmark-text"></i></a>
-                            <a href="{{ route('erp.billings.delete', $billing[0]) }}" class="btn btn-sm btn-outline-danger" title="Void"><i class="bi bi-trash"></i></a>
+                            @unless($isFinal)
+                                <a href="{{ route('erp.billings.void', $billing[0]) }}" class="btn btn-sm btn-outline-danger" title="Void or cancel"><i class="bi bi-x-circle"></i></a>
+                            @endunless
                         </td>
                     </tr>
                 @endforeach

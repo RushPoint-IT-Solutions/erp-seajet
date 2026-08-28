@@ -129,6 +129,7 @@
                         </thead>
                         <tbody>
                         @foreach($invoices as $invoice)
+                            @php $isFinal = in_array(strtolower((string) $invoice[7]), ['cancelled', 'voided'], true); @endphp
                             <tr>
                                 <td class="fw-semibold">{{ $invoice[0] }}</td>
                                 <td>{{ $invoice[1] }}</td>
@@ -141,16 +142,18 @@
                                 <td>{{ $invoice[8] }}</td>
                                 <td class="text-end">
                                     <a href="{{ route('erp.invoices.show', $invoice[9]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="View"><i class="bi bi-eye"></i></a>
-                                    <a href="{{ route('erp.billings.edit', $invoice[9]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="Edit"><i class="bi bi-pencil"></i></a>
-                                    <a href="{{ route('erp.billings.delete', $invoice[9]) }}" class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" title="Cancel"><i class="bi bi-x-circle"></i></a>
-                                    <button type="button"
-                                            class="btn btn-sm btn-outline-secondary invoice-payment-button"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#invoicePaymentModal"
-                                            data-invoice="{{ $invoice[0] }}"
-                                            title="Payment">
-                                        <i class="bi bi-credit-card"></i>
-                                    </button>
+                                    @unless($isFinal)
+                                        <a href="{{ route('erp.billings.edit', $invoice[9]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="Edit"><i class="bi bi-pencil"></i></a>
+                                        <a href="{{ route('erp.billings.void', $invoice[9]) }}" class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" title="Void or cancel"><i class="bi bi-x-circle"></i></a>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-secondary invoice-payment-button"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#invoicePaymentModal"
+                                                data-invoice="{{ $invoice[0] }}"
+                                                title="Payment">
+                                            <i class="bi bi-credit-card"></i>
+                                        </button>
+                                    @endunless
                                 </td>
                             </tr>
                         @endforeach
