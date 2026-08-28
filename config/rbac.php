@@ -25,6 +25,24 @@ return [
         ],
     ],
 
+    'landing_routes' => [
+        'dashboard' => 'erp.dashboard',
+        'clients' => 'erp.customers.index',
+        'invoices' => 'erp.invoices.index',
+        'payments' => 'erp.payments.index',
+        'ar_reports' => 'erp.customer-billing.aging',
+        'vendors' => 'erp.suppliers.index',
+        'payables' => 'erp.expenses.index',
+        'accounting' => 'erp.accounting.coa',
+        'banking' => 'erp.banking.cashbook',
+        'fx' => 'erp.fx.index',
+        'tax' => 'erp.tax.vat-summary',
+        'reports' => 'erp.reports.index',
+        'user_access_control' => 'erp.users.index',
+        'finance_settings' => 'erp.settings.index',
+        'system_updates' => 'erp.system-update.index',
+    ],
+
     'roles' => [
         'admin' => [
             'name' => 'Administrator',

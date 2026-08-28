@@ -28,6 +28,13 @@ class PermissionAccess
             return $next($request);
         }
 
+        if ((string) optional($request->route())->getName() === 'erp.dashboard') {
+            $routeName = $this->rbac->firstAccessibleRoute($request->user());
+            if ($routeName && $routeName !== 'erp.dashboard') {
+                return redirect()->route($routeName);
+            }
+        }
+
         abort(403, 'You do not have permission to '.$resolvedAction.' this ERP area.');
     }
 

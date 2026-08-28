@@ -68,6 +68,17 @@ class RbacService
         return config('rbac.modules', []);
     }
 
+    public function firstAccessibleRoute($user)
+    {
+        foreach (config('rbac.landing_routes', []) as $module => $routeName) {
+            if ($this->allows($user, $module, 'view')) {
+                return $routeName;
+            }
+        }
+
+        return null;
+    }
+
     private function roleExistsForUser($user, $slug)
     {
         if (!Schema::hasTable('roles')) {

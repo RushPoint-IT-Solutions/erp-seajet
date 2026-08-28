@@ -95,6 +95,31 @@ class RbacAccessTest extends TestCase
         $this->get(route('erp.dashboard'))->assertStatus(403);
     }
 
+    public function test_user_without_dashboard_access_is_redirected_to_first_accessible_module()
+    {
+        $companyId = DB::table('companies')->orderBy('id')->value('id');
+        $roleId = DB::table('roles')->insertGetId([
+            'company_id' => $companyId,
+            'name' => 'AP Viewer',
+            'slug' => 'ap_viewer',
+            'description' => 'Payables access without dashboard access',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $permissionId = DB::table('permissions')->where('slug', 'payables.view')->value('id');
+        DB::table('permission_role')->insert([
+            'role_id' => $roleId,
+            'permission_id' => $permissionId,
+        ]);
+
+        $this->actingAsRole('ap_viewer', $companyId);
+
+        $this->get(route('erp.dashboard'))->assertRedirect(route('erp.expenses.index'));
+        $this->get(route('erp.expenses.index'))->assertOk();
+        $this->get(route('erp.invoices.index'))->assertStatus(403);
+    }
+
     public function test_system_update_screen_is_administrator_only()
     {
         $this->actingAsAdmin();
