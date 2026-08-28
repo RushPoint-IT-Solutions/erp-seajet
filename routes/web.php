@@ -54,6 +54,7 @@ Route::middleware(['auth', 'permission.access'])->group(function () {
     Route::get('/erp/payables/vendor-bills/create', 'Erp\ModuleController@vendorBillCreate')->name('erp.payables.vendor-bills.create');
     Route::get('/erp/payables/vendor-bills/view/{bill}', 'Erp\ModuleController@vendorBillView')->name('erp.payables.vendor-bills.view');
     Route::get('/erp/payables/vendor-bills/print/{bill}', 'Erp\ModuleController@vendorBillPrint')->name('erp.payables.vendor-bills.print');
+    Route::post('/erp/payables/vendor-bills/print-2307/layout/save', 'Erp\ModuleController@saveVendorBill2307Layout')->name('erp.payables.vendor-bills.print-2307.layout.save');
     Route::get('/erp/payables/vendor-bills/print-2307/{bill}', 'Erp\ModuleController@vendorBill2307Print')->name('erp.payables.vendor-bills.print-2307');
     Route::post('/erp/payables/vendor-bills/{bill}/attachments', 'Erp\ModuleController@uploadVendorBillAttachments')->name('erp.payables.vendor-bills.attachments');
     Route::post('/erp/payables/vendor-bills/review', 'Erp\ModuleController@vendorBillReview')->name('erp.payables.vendor-bills.review');
@@ -151,6 +152,7 @@ Route::middleware(['auth', 'permission.access'])->group(function () {
 });
 Route::get('/erp/settings', 'Erp\ModuleController@financeSettings')->name('erp.settings.index')->middleware(['auth', 'permission.access']);
 Route::post('/erp/settings/company', 'Erp\ModuleController@saveFinanceCompanySettings')->name('erp.settings.company.save')->middleware(['auth', 'permission.access']);
+Route::post('/erp/settings/bir-2307/payee-representative', 'Erp\ModuleController@saveFinanceBir2307PayeeRepresentative')->name('erp.settings.bir-2307.payee.save')->middleware(['auth', 'permission.access']);
 Route::post('/erp/settings/branches', 'Erp\ModuleController@saveFinanceBranch')->name('erp.settings.branches.save')->middleware(['auth', 'permission.access']);
 Route::post('/erp/settings/cost-centers', 'Erp\ModuleController@saveFinanceCostCenter')->name('erp.settings.cost-centers.save')->middleware(['auth', 'permission.access']);
 Route::post('/erp/settings/items', 'Erp\ModuleController@saveFinanceItem')->name('erp.settings.items.save')->middleware(['auth', 'permission.access']);

@@ -28,7 +28,10 @@ class SeaJetProductionDataSeeder extends Seeder
         $this->upsert('companies', ['code' => 'SJ'], [
             'code' => 'SJ',
             'name' => 'SEA-JET INTERNATIONAL FORWARDERS INC.',
-            'tin' => '000-143-896-000',
+            'tin' => '000-143-896-00000',
+            'bir_2307_payor_representative_name' => 'Gina C. Boloy',
+            'bir_2307_payor_representative_title' => 'Finance Manager',
+            'bir_2307_payor_representative_tin' => '293-263-579-000',
             'address' => 'UNIT 18 AND 19 BUILDING B CARGO VILLAGE COMPLEX NAIA AVE. BRGY. STO. NIÑO, PARAÑAQUE CITY',
             'base_currency' => 'PHP',
             'is_active' => true,

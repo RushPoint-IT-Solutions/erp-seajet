@@ -39,7 +39,7 @@ class SeaJetTestDataSeeder extends Seeder
         $this->upsert('companies', ['code' => 'SJ'], [
             'code' => 'SJ',
             'name' => 'SEA-JET INTERNATIONAL FORWARDERS INC.',
-            'tin' => '000-123-456-000',
+            'tin' => '000-123-456-00000',
             'address' => 'Harbor Business Center, Manila, Philippines',
             'base_currency' => 'PHP',
             'created_at' => $now,

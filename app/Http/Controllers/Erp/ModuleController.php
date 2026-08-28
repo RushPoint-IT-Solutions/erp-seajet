@@ -1079,10 +1079,7 @@ class ModuleController extends Controller
 
         return DB::table('accounts')
             ->where('company_id', $this->defaultCompanyId())
-            ->where(function ($query) use ($name, $label) {
-                $query->where('name', $name)
-                    ->orWhere(DB::raw("concat(code, ' - ', name)"), $label);
-            })
+            ->whereIn('name', array_values(array_unique([$name, $label])))
             ->value('id');
     }
 
@@ -1622,7 +1619,60 @@ class ModuleController extends Controller
         $record = $this->apBill2307PrintData($bill);
         abort_unless(!empty($record['form']), 404);
 
+        $record['printLayout'] = $this->vendorBill2307PrintLayout();
+        $record['printLayoutDefaults'] = $this->defaultVendorBill2307PrintLayout();
+        $record['canSaveLayout'] = $this->canSaveCheckPrintLayout();
+
         return view('erp.payables.vendor-bill-2307-print', $record);
+    }
+
+    public function saveVendorBill2307Layout()
+    {
+        abort_unless($this->canSaveCheckPrintLayout(), 403, 'Only an Administrator may save the BIR 2307 print layout.');
+
+        $defaults = $this->defaultVendorBill2307PrintLayout();
+        $submitted = request()->input('layout', []);
+        request()->validate(['layout' => 'present|array']);
+        abort_unless(empty(array_diff(array_keys($submitted), array_keys($defaults))), 422, 'The print layout contains an unknown field.');
+
+        $rules = ['layout' => 'present|array'];
+        foreach (array_keys($submitted) as $field) {
+            $rules['layout.'.$field] = 'required|array';
+            $rules['layout.'.$field.'.top'] = 'required|numeric|between:-50,1298';
+            $rules['layout.'.$field.'.left'] = 'required|numeric|between:-100,916';
+            $rules['layout.'.$field.'.width'] = 'required|numeric|between:4,816';
+            $rules['layout.'.$field.'.font_size'] = 'required|numeric|between:6,24';
+        }
+
+        $validated = request()->validate($rules);
+        $layout = $this->sanitizeVendorBill2307PrintLayout($validated['layout']);
+        abort_unless(Schema::hasTable('print_layouts'), 503, 'Print layout storage is not available. Run the database migrations first.');
+
+        DB::table('print_layouts')->updateOrInsert(
+            [
+                'company_id' => $this->defaultCompanyId(),
+                'document_type' => 'bir_2307',
+                'layout_name' => 'Default',
+            ],
+            [
+                'paper_size' => 'legal',
+                'paper_width' => 816,
+                'paper_height' => 1248,
+                'template_url' => asset('images/bir_2307_bg.png'),
+                'print_template' => true,
+                'positions' => json_encode($layout),
+                'field_styles' => json_encode([]),
+                'custom_fields' => json_encode([]),
+                'is_default' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
+
+        return response()->json([
+            'status' => 'BIR 2307 print layout saved.',
+            'layout' => $layout,
+        ]);
     }
 
     public function apPaymentCreate()
@@ -3721,9 +3771,15 @@ class ModuleController extends Controller
                 'suppliers.name as payee_name',
                 'suppliers.tin as payee_tin',
                 'suppliers.address as payee_address',
+                'suppliers.bir_2307_payee_representative_name as payee_authorized_name',
+                'suppliers.bir_2307_payee_representative_title as payee_authorized_title',
+                'suppliers.bir_2307_payee_representative_tin as payee_authorized_tin',
                 'companies.name as payer_name',
                 'companies.tin as payer_tin',
-                'companies.address as payer_address'
+                'companies.address as payer_address',
+                'companies.bir_2307_payor_representative_name as payer_authorized_name',
+                'companies.bir_2307_payor_representative_title as payer_authorized_title',
+                'companies.bir_2307_payor_representative_tin as payer_authorized_tin'
             );
 
         $record = is_numeric($bill)
@@ -3820,9 +3876,119 @@ class ModuleController extends Controller
                 'payer_name' => $record->payer_name ?: '',
                 'payer_address' => $record->payer_address ?: '',
                 'payer_zip' => $this->zipCodeFromAddress($record->payer_address),
+                'payer_authorized_name' => $record->payer_authorized_name ?: '',
+                'payer_authorized_title' => $record->payer_authorized_title ?: '',
+                'payer_authorized_tin' => $record->payer_authorized_tin ?: '',
+                'payee_authorized_name' => $record->payee_authorized_name ?: '',
+                'payee_authorized_title' => $record->payee_authorized_title ?: '',
+                'payee_authorized_tin' => $record->payee_authorized_tin ?: '',
             ],
             'pages' => $pages,
         ];
+    }
+
+    private function defaultVendorBill2307PrintLayout()
+    {
+        $layout = [
+            'payee_name' => ['top' => 218, 'left' => 45, 'width' => 746, 'font_size' => 11],
+            'payee_zip' => ['top' => 257, 'left' => 721, 'width' => 68, 'font_size' => 12],
+            'payer_name' => ['top' => 372, 'left' => 45, 'width' => 746, 'font_size' => 11],
+            'payer_zip' => ['top' => 411, 'left' => 721, 'width' => 68, 'font_size' => 12],
+            'payer_authorized_name' => ['top' => 976, 'left' => 188, 'width' => 440, 'font_size' => 11],
+            'payer_authorized_title' => ['top' => 991, 'left' => 188, 'width' => 440, 'font_size' => 9],
+            'payer_authorized_tin' => ['top' => 1004, 'left' => 188, 'width' => 440, 'font_size' => 9],
+            'payee_authorized_name' => ['top' => 1079, 'left' => 188, 'width' => 440, 'font_size' => 11],
+            'payee_authorized_title' => ['top' => 1094, 'left' => 188, 'width' => 440, 'font_size' => 9],
+            'payee_authorized_tin' => ['top' => 1107, 'left' => 188, 'width' => 440, 'font_size' => 9],
+        ];
+        $characterFields = [
+            'period_from' => ['top' => 141, 'left' => 202, 'step' => 13.5, 'width' => 13, 'font_size' => 12, 'limit' => 10],
+            'period_to' => ['top' => 141, 'left' => 532, 'step' => 13.5, 'width' => 13, 'font_size' => 12, 'limit' => 10],
+            'payee_tin' => ['top' => 181, 'left' => 276, 'step' => 19, 'width' => 18, 'font_size' => 12, 'limit' => 15],
+            'payer_tin' => ['top' => 336, 'left' => 277, 'step' => 19, 'width' => 18, 'font_size' => 12, 'limit' => 17],
+            'payee_address' => ['top' => 256, 'left' => 45, 'step' => 6, 'width' => 8, 'font_size' => 10, 'limit' => 112],
+            'payer_address' => ['top' => 410, 'left' => 45, 'step' => 6, 'width' => 8, 'font_size' => 10, 'limit' => 112],
+        ];
+        foreach ($characterFields as $field => $position) {
+            for ($index = 0; $index < $position['limit']; $index++) {
+                $layout[$field.'_char_'.$index] = [
+                    'top' => $position['top'],
+                    'left' => round($position['left'] + ($index * $position['step']), 2),
+                    'width' => $position['width'],
+                    'font_size' => $position['font_size'],
+                ];
+            }
+        }
+        $columns = [
+            'description' => ['left' => 27, 'width' => 208],
+            'atc' => ['left' => 236, 'width' => 57],
+            'month_1' => ['left' => 294, 'width' => 96],
+            'month_2' => ['left' => 391, 'width' => 97],
+            'month_3' => ['left' => 489, 'width' => 96],
+            'row_total' => ['left' => 585, 'width' => 96],
+            'row_tax' => ['left' => 681, 'width' => 113],
+        ];
+
+        for ($row = 0; $row < 10; $row++) {
+            $top = round(488 + ($row * 18.25), 2);
+            foreach ($columns as $column => $position) {
+                $layout['detail_'.$row.'_'.$column] = [
+                    'top' => $top,
+                    'left' => $position['left'],
+                    'width' => $position['width'],
+                    'font_size' => 9,
+                ];
+            }
+        }
+
+        foreach (['month_1', 'month_2', 'month_3', 'row_total', 'row_tax'] as $column) {
+            $layout['grand_'.$column] = [
+                'top' => 670,
+                'left' => $columns[$column]['left'],
+                'width' => $columns[$column]['width'],
+                'font_size' => 10,
+            ];
+        }
+
+        return $layout;
+    }
+
+    private function vendorBill2307PrintLayout()
+    {
+        $defaults = $this->defaultVendorBill2307PrintLayout();
+        if (!Schema::hasTable('print_layouts')) {
+            return $defaults;
+        }
+
+        $saved = DB::table('print_layouts')
+            ->where('company_id', $this->defaultCompanyId())
+            ->where('document_type', 'bir_2307')
+            ->where('layout_name', 'Default')
+            ->first();
+
+        if (!$saved) {
+            return $defaults;
+        }
+
+        return $this->sanitizeVendorBill2307PrintLayout(json_decode($saved->positions ?: '{}', true) ?: []);
+    }
+
+    private function sanitizeVendorBill2307PrintLayout($layout)
+    {
+        $defaults = $this->defaultVendorBill2307PrintLayout();
+        $layout = is_array($layout) ? $layout : [];
+        $clean = [];
+        foreach ($defaults as $field => $fallback) {
+            $position = isset($layout[$field]) && is_array($layout[$field]) ? $layout[$field] : [];
+            $clean[$field] = [
+                'top' => round(max(-50, min(1298, (float) ($position['top'] ?? $fallback['top']))), 2),
+                'left' => round(max(-100, min(916, (float) ($position['left'] ?? $fallback['left']))), 2),
+                'width' => round(max(4, min(816, (float) ($position['width'] ?? $fallback['width']))), 2),
+                'font_size' => round(max(6, min(24, (float) ($position['font_size'] ?? $fallback['font_size']))), 1),
+            ];
+        }
+
+        return $clean;
     }
 
     private function zipCodeFromAddress($address)
@@ -9118,6 +9284,17 @@ class ModuleController extends Controller
         $currencyRates = $this->financeCurrencyRates($companyId);
         $bankAccounts = $this->financeBankAccounts($companyId);
         $accounts = $this->financeAccountOptions($companyId);
+        $payeeRepresentatives = Schema::hasTable('suppliers')
+            ? DB::table('suppliers')
+                ->where('company_id', $companyId)
+                ->orderBy('name')
+                ->get([
+                    'id as supplier_id', 'code', 'name',
+                    'bir_2307_payee_representative_name',
+                    'bir_2307_payee_representative_title',
+                    'bir_2307_payee_representative_tin',
+                ])
+            : collect();
 
         $settingStats = [
             ['label' => 'Cost Centers', 'value' => $costCenters->count(), 'icon' => 'bi-diagram-3', 'tone' => 'primary'],
@@ -9139,6 +9316,7 @@ class ModuleController extends Controller
             ],
             'Tax, Currency & Banking' => [
                 ['name' => 'Tax Codes', 'description' => '12% VAT, zero-rated, exempt, EWT, CWT, and withholding defaults for AR/AP.', 'route' => route('erp.settings.index').'#tax-codes', 'icon' => 'bi-percent', 'status' => 'Active'],
+                ['name' => 'BIR 2307 Representatives', 'description' => 'Authorized payor and payee names, titles, and TINs printed on Form 2307.', 'route' => route('erp.settings.index').'#bir-2307-representatives', 'icon' => 'bi-person-vcard', 'status' => 'Active'],
                 ['name' => 'Currency Rates', 'description' => 'USD/PHP exchange rates for invoice, AP, payment, bank, and FX revaluation.', 'route' => route('erp.settings.index').'#currency-rates', 'icon' => 'bi-currency-dollar', 'status' => 'Required'],
                 ['name' => 'Bank Accounts', 'description' => 'PHP and USD bank accounts for receipts, payments, check printing, and reconciliation.', 'route' => route('erp.settings.index').'#bank-accounts', 'icon' => 'bi-bank', 'status' => 'Active'],
             ],
@@ -9160,7 +9338,8 @@ class ModuleController extends Controller
             'taxCodes',
             'currencyRates',
             'bankAccounts',
-            'accounts'
+            'accounts',
+            'payeeRepresentatives'
         ));
     }
 
@@ -9168,9 +9347,12 @@ class ModuleController extends Controller
     {
         $data = request()->validate([
             'name' => 'required|string|max:255',
-            'tin' => 'nullable|string|max:100',
+            'tin' => ['nullable', 'string', 'max:17', 'regex:/^\d{3}-\d{3}-\d{3}-\d{5}$/'],
             'address' => 'nullable|string|max:1000',
             'base_currency' => 'required|string|max:3',
+            'bir_2307_payor_representative_name' => 'nullable|string|max:255',
+            'bir_2307_payor_representative_title' => 'nullable|string|max:255',
+            'bir_2307_payor_representative_tin' => ['nullable', 'string', 'max:30', 'regex:/^\d{3}-\d{3}-\d{3}-\d{3}$/'],
         ]);
 
         if (Schema::hasTable('companies')) {
@@ -9178,6 +9360,32 @@ class ModuleController extends Controller
         }
 
         return redirect()->route('erp.settings.index')->with('status', 'Company finance settings saved.');
+    }
+
+    public function saveFinanceBir2307PayeeRepresentative()
+    {
+        $data = request()->validate([
+            'supplier_id' => 'required|integer',
+            'bir_2307_payee_representative_name' => 'nullable|string|max:255',
+            'bir_2307_payee_representative_title' => 'nullable|string|max:255',
+            'bir_2307_payee_representative_tin' => ['nullable', 'string', 'max:30', 'regex:/^\d{3}-\d{3}-\d{3}-\d{3}$/'],
+        ]);
+
+        $supplier = DB::table('suppliers')
+            ->where('company_id', $this->defaultCompanyId())
+            ->where('id', $data['supplier_id'])
+            ->first();
+        abort_unless($supplier, 422, 'The selected payee is invalid for this company.');
+
+        DB::table('suppliers')->where('id', $supplier->id)->update([
+            'bir_2307_payee_representative_name' => trim((string) ($data['bir_2307_payee_representative_name'] ?? '')) ?: null,
+            'bir_2307_payee_representative_title' => trim((string) ($data['bir_2307_payee_representative_title'] ?? '')) ?: null,
+            'bir_2307_payee_representative_tin' => trim((string) ($data['bir_2307_payee_representative_tin'] ?? '')) ?: null,
+            'updated_at' => now(),
+        ]);
+
+        return redirect(route('erp.settings.index').'#bir-2307-representatives')
+            ->with('status', 'BIR 2307 payee representative saved for '.$supplier->name.'.');
     }
 
     public function saveFinanceBranch()

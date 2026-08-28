@@ -49,6 +49,6 @@ class SeaJetProductionSeedTest extends TestCase
         $this->assertSame('VAT-exempt', $vendor->tax_classification);
 
         $company = DB::table('companies')->where('code', 'SJ')->first();
-        $this->assertSame('000-143-896-000', $company->tin);
+        $this->assertSame('000-143-896-00000', $company->tin);
     }
 }

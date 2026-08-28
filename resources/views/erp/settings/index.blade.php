@@ -92,12 +92,53 @@
                 {{ csrf_field() }}
                 <div class="row g-2">
                     <div class="col-md-6"><label class="form-label small text-muted">Company Name</label><input name="name" class="form-control form-control-sm" value="{{ $company->name ?? '' }}" required></div>
-                    <div class="col-md-3"><label class="form-label small text-muted">TIN</label><input name="tin" class="form-control form-control-sm" value="{{ $company->tin ?? '' }}"></div>
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted">Payor TIN (BIR 2307)</label>
+                        <input name="tin" class="form-control form-control-sm" value="{{ old('tin', $company->tin ?? '') }}" placeholder="000-000-000-00000" pattern="\d{3}-\d{3}-\d{3}-\d{5}" maxlength="17" title="Use the format 000-000-000-00000">
+                        <div class="form-text">Printed as the payor TIN on Form 2307.</div>
+                    </div>
                     <div class="col-md-3"><label class="form-label small text-muted">Base Currency</label><input name="base_currency" class="form-control form-control-sm text-uppercase" value="{{ $company->base_currency ?? 'PHP' }}" maxlength="3" required></div>
                     <div class="col-12"><label class="form-label small text-muted">Address</label><input name="address" class="form-control form-control-sm" value="{{ $company->address ?? '' }}"></div>
+                    <div class="col-12"><hr class="my-2"><div class="small fw-semibold">BIR 2307 Payor Authorized Representative</div></div>
+                    <div class="col-md-5"><label class="form-label small text-muted">Printed Name</label><input name="bir_2307_payor_representative_name" class="form-control form-control-sm" value="{{ $company->bir_2307_payor_representative_name ?? '' }}" placeholder="Gina C. Boloy"></div>
+                    <div class="col-md-4"><label class="form-label small text-muted">Title / Designation</label><input name="bir_2307_payor_representative_title" class="form-control form-control-sm" value="{{ $company->bir_2307_payor_representative_title ?? '' }}" placeholder="Finance Manager"></div>
+                    <div class="col-md-3"><label class="form-label small text-muted">Representative TIN</label><input name="bir_2307_payor_representative_tin" class="form-control form-control-sm" value="{{ $company->bir_2307_payor_representative_tin ?? '' }}" placeholder="000-000-000-000" pattern="\d{3}-\d{3}-\d{3}-\d{3}"></div>
                 </div>
                 <div class="text-end mt-2"><button class="btn btn-sm btn-primary"><i class="bi bi-save me-1"></i>Save Company</button></div>
             </form>
+        </section>
+
+        <section class="erp-card p-3" id="bir-2307-representatives">
+            <h2 class="h6 fw-bold mb-1">BIR 2307 Payee Authorized Representative</h2>
+            <p class="small text-muted">Saved per vendor and printed in the payee signature area of Form 2307.</p>
+            <form method="post" action="{{ route('erp.settings.bir-2307.payee.save') }}" class="settings-form settings-edit-form mb-3">
+                {{ csrf_field() }}
+                <div class="row g-2">
+                    <div class="col-12"><label class="form-label small text-muted">Vendor / Payee</label><select name="supplier_id" class="form-select form-select-sm" required><option value=""></option>@foreach($payeeRepresentatives as $representative)<option value="{{ $representative->supplier_id }}">{{ $representative->code }} - {{ $representative->name }}</option>@endforeach</select></div>
+                    <div class="col-md-5"><label class="form-label small text-muted">Printed Name</label><input name="bir_2307_payee_representative_name" class="form-control form-control-sm"></div>
+                    <div class="col-md-4"><label class="form-label small text-muted">Title / Designation</label><input name="bir_2307_payee_representative_title" class="form-control form-control-sm"></div>
+                    <div class="col-md-3"><label class="form-label small text-muted">Representative TIN</label><input name="bir_2307_payee_representative_tin" class="form-control form-control-sm" placeholder="000-000-000-000" pattern="\d{3}-\d{3}-\d{3}-\d{3}"></div>
+                </div>
+                <div class="text-end mt-2"><button class="btn btn-sm btn-primary"><i class="bi bi-save me-1"></i>Save Payee Representative</button></div>
+            </form>
+            <div class="settings-table table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead><tr><th>Vendor</th><th>Representative</th><th>Title</th><th>TIN</th><th></th></tr></thead>
+                    <tbody>
+                    @forelse($payeeRepresentatives as $representative)
+                        <tr>
+                            <td class="fw-semibold">{{ $representative->code }} - {{ $representative->name }}</td>
+                            <td>{{ $representative->bir_2307_payee_representative_name ?: '-' }}</td>
+                            <td>{{ $representative->bir_2307_payee_representative_title ?: '-' }}</td>
+                            <td>{{ $representative->bir_2307_payee_representative_tin ?: '-' }}</td>
+                            <td class="text-end"><button type="button" class="btn btn-sm btn-outline-secondary edit-row" data-form="#bir-2307-representatives form" data-row='@json($representative)'><i class="bi bi-pencil"></i></button></td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="5" class="text-center text-muted">No vendors available.</td></tr>
+                    @endforelse
+                    </tbody>
+                </table>
+            </div>
         </section>
 
         <section class="erp-card p-3" id="branches">
