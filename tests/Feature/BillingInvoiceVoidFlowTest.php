@@ -171,13 +171,29 @@ class BillingInvoiceVoidFlowTest extends TestCase
 
         $invoicePage = $this->get(route('erp.invoices.index'));
         $invoicePage->assertStatus(200);
-        $invoicePage->assertSee($invoice->document_no);
+        $invoicePage->assertSee('Voided / Cancelled');
+        $this->assertFalse(collect($invoicePage->original->getData()['invoices'])->contains(function ($row) use ($invoice) {
+            return ($row[0] ?? '') === $invoice->document_no;
+        }));
         $stats = collect($invoicePage->original->getData()['stats'])->keyBy('label');
         $this->assertSame((int) (clone $activeInvoices)->count(), $stats['Invoices']['value']);
         $this->assertSame(
             'PHP '.number_format((float) (clone $activeInvoices)->sum('grand_total'), 2),
             $stats['Total Billed']['value']
         );
+        $finalInvoiceCount = DB::table('sales_documents')
+            ->where('company_id', $invoice->company_id)
+            ->whereIn('document_type', $documentTypes)
+            ->whereIn('status', ['cancelled', 'voided'])
+            ->count();
+        $this->assertSame($finalInvoiceCount, $invoicePage->original->getData()['invoiceTabCounts']['voided']);
+
+        $voidedPage = $this->get(route('erp.invoices.index', ['tab' => 'voided']));
+        $voidedPage->assertStatus(200);
+        $this->assertTrue(collect($voidedPage->original->getData()['invoices'])->contains(function ($row) use ($invoice) {
+            return ($row[0] ?? '') === $invoice->document_no;
+        }));
+        $this->assertSame('voided', $voidedPage->original->getData()['selectedInvoiceTab']);
 
         $customerPage = $this->get(route('erp.customers.show', $invoice->customer_id));
         $customerPage->assertStatus(200);
@@ -204,6 +220,41 @@ class BillingInvoiceVoidFlowTest extends TestCase
             ->whereNotIn('status', ['cancelled', 'voided'])
             ->sum('grand_total');
         $this->assertSame('PHP '.number_format((float) $expectedSales, 2), $salesCard['value']);
+
+        $journalNumbers = DB::table('journal_entries')
+            ->where('source_type', 'sales_document')
+            ->where('source_id', $invoice->id)
+            ->pluck('journal_no');
+        foreach (['general-ledger', 'general-journal'] as $report) {
+            $reportPage = $this->get(route('erp.reports.workbook', [
+                'report' => $report,
+                'period' => date('Y-m'),
+            ]));
+            $reportPage->assertStatus(200);
+            $reportRows = collect($reportPage->original->getData()['rows']);
+            foreach ($journalNumbers as $journalNumber) {
+                $this->assertFalse($reportRows->contains(function ($row) use ($journalNumber) {
+                    return ($row['JV NO'] ?? '') === $journalNumber
+                        || strpos((string) ($row['SOURCE'] ?? ''), (string) $journalNumber) !== false;
+                }));
+            }
+        }
+
+        foreach (['erp.customer-billing.aging', 'erp.tax.vat-summary', 'erp.tax.sales-purchases'] as $reportRoute) {
+            $reportPage = $this->get(route($reportRoute));
+            $reportPage->assertStatus(200);
+            $reportPage->assertDontSee($invoice->document_no);
+        }
+
+        $reportsIndex = $this->get(route('erp.reports.index'));
+        $reportsIndex->assertStatus(200);
+        $openArCard = collect($reportsIndex->original->getData()['reportStats'])->firstWhere('label', 'Open AR');
+        $expectedOpenAr = DB::table('sales_documents')
+            ->where('company_id', $invoice->company_id)
+            ->whereNotIn('status', ['cancelled', 'voided', 'paid'])
+            ->selectRaw('COALESCE(SUM(grand_total - paid_total), 0) as balance')
+            ->value('balance');
+        $this->assertSame('PHP '.number_format((float) $expectedOpenAr, 2), $openArCard['value']);
 
         $dashboardPage = $this->get(route('erp.dashboard'));
         $dashboardPage->assertStatus(200);

@@ -105,12 +105,26 @@
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                     <div>
                         <h2 class="h6 fw-bold mb-0">Invoice List</h2>
-                        <small class="text-muted">Billing invoices, SOA A documents, debit notes, and payment actions.</small>
+                        <small class="text-muted">Active billing documents and a separate audit view for voided or cancelled invoices.</small>
                     </div>
                     <a href="{{ route('erp.invoices.create') }}" class="btn btn-primary btn-sm" data-bs-toggle="tooltip" title="Create new">
                         <i class="bi bi-plus-lg"></i>
                     </a>
                 </div>
+                <ul class="nav nav-tabs mb-3 no-print" aria-label="Invoice status tabs">
+                    <li class="nav-item">
+                        <a class="nav-link {{ $selectedInvoiceTab === 'active' ? 'active' : '' }}"
+                           href="{{ route('erp.invoices.index', ['tab' => 'active']) }}">
+                            Active <span class="badge rounded-pill text-bg-light ms-1">{{ $invoiceTabCounts['active'] }}</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ $selectedInvoiceTab === 'voided' ? 'active' : '' }}"
+                           href="{{ route('erp.invoices.index', ['tab' => 'voided']) }}">
+                            Voided / Cancelled <span class="badge rounded-pill text-bg-light ms-1">{{ $invoiceTabCounts['voided'] }}</span>
+                        </a>
+                    </li>
+                </ul>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle invoices-table w-100">
                         <thead>

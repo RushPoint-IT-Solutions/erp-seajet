@@ -5301,13 +5301,13 @@ class ModuleController extends Controller
 
     public function invoiceIndex()
     {
-        $invoices = $this->billingRows();
+        $allInvoices = $this->billingRows();
         $totalAmount = 0.0;
         $postedAmount = 0.0;
         $postedCount = 0;
         $activeInvoiceCount = 0;
 
-        foreach ($invoices as $invoice) {
+        foreach ($allInvoices as $invoice) {
             $amount = $this->moneyToFloat($invoice[6]);
             $status = strtolower($invoice[7]);
 
@@ -5324,8 +5324,25 @@ class ModuleController extends Controller
             }
         }
 
+        $isFinalInvoice = function ($invoice) {
+            return in_array(strtolower((string) $invoice[7]), ['cancelled', 'voided'], true);
+        };
+        $finalInvoiceCount = count(array_filter($allInvoices, $isFinalInvoice));
+        $selectedInvoiceTab = request('tab', 'active');
+        if (!in_array($selectedInvoiceTab, ['active', 'voided'], true)) {
+            $selectedInvoiceTab = 'active';
+        }
+        $invoices = array_values(array_filter($allInvoices, function ($invoice) use ($isFinalInvoice, $selectedInvoiceTab) {
+            return $selectedInvoiceTab === 'voided' ? $isFinalInvoice($invoice) : !$isFinalInvoice($invoice);
+        }));
+
         return view('erp.invoices.index', [
             'invoices' => $invoices,
+            'selectedInvoiceTab' => $selectedInvoiceTab,
+            'invoiceTabCounts' => [
+                'active' => $activeInvoiceCount,
+                'voided' => $finalInvoiceCount,
+            ],
             'stats' => [
                 ['label' => 'Invoices', 'value' => $activeInvoiceCount, 'icon' => 'bi-receipt', 'tone' => 'primary'],
                 ['label' => 'Total Billed', 'value' => 'PHP '.number_format($totalAmount, 2), 'icon' => 'bi-cash-stack', 'tone' => 'success'],
@@ -8649,6 +8666,8 @@ class ModuleController extends Controller
             ->where('journal_entries.company_id', $this->defaultCompanyId())
             ->groupBy('journal_entry_lines.account_id', 'journal_entries.source_module');
 
+        $this->excludeVoidedSalesDocumentJournals($query);
+
         if ($startDate) {
             $query->where('journal_entries.journal_date', '>=', $startDate);
         }
@@ -8939,12 +8958,17 @@ class ModuleController extends Controller
             return [];
         }
 
-        return DB::table('journal_entry_lines')
+        $query = DB::table('journal_entry_lines')
             ->join('journal_entries', 'journal_entries.id', '=', 'journal_entry_lines.journal_entry_id')
             ->leftJoin('accounts', 'accounts.id', '=', 'journal_entry_lines.account_id')
+            ->where('journal_entries.company_id', $this->defaultCompanyId())
             ->when($period, function ($query) use ($period) {
                 $this->applyMonthFilter($query, 'journal_entries.journal_date', $period);
-            })
+            });
+
+        $this->excludeVoidedSalesDocumentJournals($query);
+
+        return $query
             ->orderBy('journal_entries.journal_date')
             ->orderBy('journal_entry_lines.id')
             ->limit(500)
@@ -9053,12 +9077,17 @@ class ModuleController extends Controller
             return [];
         }
 
-        return DB::table('journal_entry_lines')
+        $query = DB::table('journal_entry_lines')
             ->join('journal_entries', 'journal_entries.id', '=', 'journal_entry_lines.journal_entry_id')
             ->leftJoin('accounts', 'accounts.id', '=', 'journal_entry_lines.account_id')
+            ->where('journal_entries.company_id', $this->defaultCompanyId())
             ->when($period, function ($query) use ($period) {
                 $this->applyMonthFilter($query, 'journal_entries.journal_date', $period);
-            })
+            });
+
+        $this->excludeVoidedSalesDocumentJournals($query);
+
+        return $query
             ->orderBy('journal_entries.journal_date')
             ->orderBy('journal_entry_lines.id')
             ->limit(500)
@@ -9090,6 +9119,26 @@ class ModuleController extends Controller
                 ];
             })
             ->all();
+    }
+
+    private function excludeVoidedSalesDocumentJournals($query)
+    {
+        if (!Schema::hasTable('sales_documents')
+            || !Schema::hasColumn('journal_entries', 'source_type')
+            || !Schema::hasColumn('journal_entries', 'source_id')) {
+            return $query;
+        }
+
+        $voidedDocumentIds = DB::table('sales_documents')
+            ->select('id')
+            ->where('company_id', $this->defaultCompanyId())
+            ->whereIn('status', ['cancelled', 'voided']);
+
+        return $query->where(function ($journalQuery) use ($voidedDocumentIds) {
+            $journalQuery->whereNull('journal_entries.source_type')
+                ->orWhere('journal_entries.source_type', '<>', 'sales_document')
+                ->orWhereNotIn('journal_entries.source_id', $voidedDocumentIds);
+        });
     }
 
     private function cashReceiptsWorkbookRows($branch, $period)
