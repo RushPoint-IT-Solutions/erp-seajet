@@ -286,6 +286,7 @@
 @section('content')
     <div class="d-flex justify-content-end gap-2 mb-3 no-print">
         <a href="{{ route('erp.payables.vendor-bills.view', $bill['bill_no']) }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back to Bill</a>
+        <a href="{{ route('erp.payables.vendor-bills.print-2307', $bill['bill_no']) }}" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-text me-1"></i> Print 2307</a>
         <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print Bill</button>
     </div>
 
@@ -340,9 +341,10 @@
                         <th style="width: 20%;">Account</th>
                         <th style="width: 19%;">Memo</th>
                         <th style="width: 10%;">Tax</th>
+                        <th style="width: 9%;">ATC/WC</th>
                         <th style="width: 13%;">Amount</th>
-                        <th style="width: 20%;">Customer:Job</th>
-                        <th style="width: 11%;">Class</th>
+                        <th style="width: 15%;">Customer:Job</th>
+                        <th style="width: 7%;">Class</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -351,6 +353,7 @@
                             <td>{{ $line->account_name ?? '' }}</td>
                             <td>{{ $line->memo ?? $line->description ?? '' }}</td>
                             <td>{{ $line->tax_category ?? '' }}</td>
+                            <td>{{ ($line->atc_code ?? '') ?: ($line->account_atc_code ?? '') }}</td>
                             <td class="bill-num">{{ $money($line->amount ?? $line->line_total ?? 0) }}</td>
                             <td>{{ $line->customer_job_id ? $line->customer_job_id.' - '.($line->customer_job_name ?? '') : '' }}</td>
                             <td>{{ $line->class_code ?? '' }}</td>
@@ -360,12 +363,14 @@
                             <td>Reimbursable charges</td>
                             <td>{{ $bill['memo'] }}</td>
                             <td></td>
+                            <td></td>
                             <td class="bill-num">{{ $money($bill['total']) }}</td>
                             <td></td>
                             <td></td>
                         </tr>
                     @endforelse
                     <tr class="filler">
+                        <td></td>
                         <td></td>
                         <td></td>
                         <td></td>

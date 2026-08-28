@@ -986,7 +986,14 @@ class ModuleController extends Controller
 
         return DB::table('accounts')
             ->leftJoin('account_categories', 'account_categories.id', '=', 'accounts.account_category_id')
-            ->select('accounts.id', 'accounts.code', 'accounts.name', 'account_categories.name as category')
+            ->select(
+                'accounts.id',
+                'accounts.code',
+                'accounts.name',
+                'accounts.atc_code',
+                'accounts.tax_code as withholding_rate',
+                'account_categories.name as category'
+            )
             ->where('accounts.is_active', true)
             ->where('accounts.company_id', $this->defaultCompanyId())
             ->where(function ($query) {
@@ -1006,6 +1013,8 @@ class ModuleController extends Controller
                     'name' => $account->name,
                     'label' => $label,
                     'category' => $account->category,
+                    'atc_code' => $account->atc_code,
+                    'withholding_rate' => $this->withholdingRatePercent($account->withholding_rate),
                 ];
             });
     }
@@ -1528,6 +1537,8 @@ class ModuleController extends Controller
             'memo' => 'nullable|string',
             'expense_account' => 'nullable|array',
             'expense_tax' => 'nullable|array',
+            'expense_atc_code' => 'nullable|array',
+            'expense_withholding_rate' => 'nullable|array',
             'expense_amount' => 'nullable|array',
             'expense_memo' => 'nullable|array',
             'expense_customer_job' => 'nullable|array',
@@ -1604,6 +1615,14 @@ class ModuleController extends Controller
         abort_unless(!empty($record['bill']), 404);
 
         return view('erp.payables.vendor-bill-print', $record);
+    }
+
+    public function vendorBill2307Print($bill)
+    {
+        $record = $this->apBill2307PrintData($bill);
+        abort_unless(!empty($record['form']), 404);
+
+        return view('erp.payables.vendor-bill-2307-print', $record);
     }
 
     public function apPaymentCreate()
@@ -2392,6 +2411,87 @@ class ModuleController extends Controller
         ];
     }
 
+    private function apBillLineWithholdingTotals(array $data, $grossAmount, array $taxSplit)
+    {
+        $accounts = (array) ($data['expense_account'] ?? []);
+        $taxes = (array) ($data['expense_tax'] ?? []);
+        $amounts = (array) ($data['expense_amount'] ?? []);
+        $rates = (array) ($data['expense_withholding_rate'] ?? []);
+        $withholdingAmount = 0.0;
+        $withholdingBase = 0.0;
+        $hasLineWithholding = false;
+
+        foreach ($amounts as $index => $amount) {
+            $lineAmount = $this->moneyToFloat($amount);
+            if ($lineAmount <= 0) {
+                continue;
+            }
+
+            $profile = $this->expenseAccountWithholdingProfile($accounts[$index] ?? null);
+            $rate = trim((string) ($rates[$index] ?? '')) !== ''
+                ? $this->moneyToFloat($rates[$index])
+                : $profile['rate'];
+
+            if ($rate <= 0) {
+                continue;
+            }
+
+            $hasLineWithholding = true;
+            $base = $this->vendorBillLineWithholdingBase($lineAmount, $taxes[$index] ?? null);
+            $withholdingBase += $base;
+            $withholdingAmount += $base * ($rate / 100);
+        }
+
+        if ($hasLineWithholding) {
+            return [
+                'rate' => $withholdingBase > 0 ? ($withholdingAmount / $withholdingBase) * 100 : 0,
+                'amount' => $withholdingAmount,
+            ];
+        }
+
+        $rate = $this->moneyToFloat($data['withholding_tax_rate'] ?? 0);
+        $amount = $this->moneyToFloat($data['withholding_tax_amount'] ?? 0);
+        if ($amount <= 0 && $rate > 0) {
+            // BIR EWT is computed on the income payment net of VAT, not the VAT-inclusive gross.
+            $base = max(0, $grossAmount - $taxSplit['input_vat']);
+            $amount = $base * ($rate / 100);
+        }
+
+        return ['rate' => $rate, 'amount' => $amount];
+    }
+
+    private function vendorBillLineWithholdingBase($amount, $taxCategory)
+    {
+        $taxCategory = strtoupper(trim((string) $taxCategory));
+
+        return in_array($taxCategory, ['VAT12', '12%'], true) ? $amount / 1.12 : $amount;
+    }
+
+    private function expenseAccountWithholdingProfile($accountLabel)
+    {
+        $accountId = $this->expenseAccountIdFromLabel($accountLabel);
+        $account = $accountId
+            ? DB::table('accounts')->where('id', $accountId)->first(['name', 'atc_code', 'tax_code'])
+            : null;
+
+        return [
+            'name' => $account ? $account->name : trim((string) $accountLabel),
+            'atc_code' => $account ? strtoupper(trim((string) $account->atc_code)) : '',
+            'rate' => $account ? $this->withholdingRatePercent($account->tax_code) : 0,
+        ];
+    }
+
+    private function withholdingRatePercent($rate)
+    {
+        if ($rate === null || trim((string) $rate) === '') {
+            return 0.0;
+        }
+
+        $numericRate = $this->moneyToFloat($rate);
+
+        return abs($numericRate) <= 1 ? $numericRate * 100 : $numericRate;
+    }
+
     private function saveApBill(array $data)
     {
         return DB::transaction(function () use ($data) {
@@ -2409,13 +2509,9 @@ class ModuleController extends Controller
 
             $grossAmount = $lineTotal > 0 ? $lineTotal : $this->moneyToFloat($data['gross_amount'] ?? 0);
             $taxSplit = $this->apBillTaxSplit($data, $grossAmount);
-            $whtRate = $this->moneyToFloat($data['withholding_tax_rate'] ?? 0);
-            $whtAmount = $this->moneyToFloat($data['withholding_tax_amount'] ?? 0);
-            if ($whtAmount <= 0 && $whtRate > 0) {
-                // BIR EWT is computed on the income payment net of VAT, not the VAT-inclusive gross.
-                $whtBase = max(0, $grossAmount - $taxSplit['input_vat']);
-                $whtAmount = $whtBase * ($whtRate / 100);
-            }
+            $withholding = $this->apBillLineWithholdingTotals($data, $grossAmount, $taxSplit);
+            $whtRate = $withholding['rate'];
+            $whtAmount = $withholding['amount'];
             $netAmount = max(0, $grossAmount - $whtAmount);
             $usdToPhpRate = $this->moneyToFloat($data['exchange_rate'] ?? 1) ?: 1;
             $exchangeRate = strtoupper($data['currency']) === 'USD' ? $usdToPhpRate : 1;
@@ -2507,6 +2603,8 @@ class ModuleController extends Controller
 
         $accounts = (array) ($data['expense_account'] ?? []);
         $taxes = (array) ($data['expense_tax'] ?? []);
+        $atcCodes = (array) ($data['expense_atc_code'] ?? []);
+        $withholdingRates = (array) ($data['expense_withholding_rate'] ?? []);
         $amounts = (array) ($data['expense_amount'] ?? []);
         $memos = (array) ($data['expense_memo'] ?? []);
         $jobs = (array) ($data['expense_customer_job'] ?? []);
@@ -2519,11 +2617,22 @@ class ModuleController extends Controller
                 continue;
             }
 
+            $profile = $this->expenseAccountWithholdingProfile($account);
+            $atcCode = strtoupper(trim((string) ($atcCodes[$index] ?? $profile['atc_code'])));
+            $withholdingRate = trim((string) ($withholdingRates[$index] ?? '')) !== ''
+                ? $this->moneyToFloat($withholdingRates[$index])
+                : $profile['rate'];
+            $withholdingBase = $this->vendorBillLineWithholdingBase($amount, $taxes[$index] ?? null);
+            $withholdingAmount = $withholdingBase * ($withholdingRate / 100);
+
             DB::table($table)->insert($this->tablePayload($table, [
                 'purchase_document_id' => $billId,
                 'account_id' => $this->expenseAccountIdFromLabel($account),
                 'account_name' => $account,
                 'tax_category' => $taxes[$index] ?? null,
+                'atc_code' => $atcCode ?: null,
+                'withholding_tax_rate' => $withholdingRate,
+                'withholding_tax_amount' => $withholdingAmount,
                 'amount' => $amount,
                 'description' => $memos[$index] ?? ($account ?: 'Vendor bill expense'),
                 'quantity' => 1,
@@ -3531,11 +3640,22 @@ class ModuleController extends Controller
             return [];
         }
 
-        $query = DB::table($table)->where('purchase_document_id', $billId);
+        $query = DB::table($table)
+            ->select($table.'.*')
+            ->where($table.'.purchase_document_id', $billId);
+
+        if (Schema::hasTable('accounts') && Schema::hasColumn($table, 'account_id')) {
+            $query->leftJoin('accounts', 'accounts.id', '=', $table.'.account_id')
+                ->addSelect(
+                    'accounts.name as account_master_name',
+                    'accounts.atc_code as account_atc_code',
+                    'accounts.tax_code as account_withholding_rate'
+                );
+        }
 
         if (Schema::hasTable('customers')) {
             $query->leftJoin('customers', 'customers.customer_id', '=', $table.'.customer_job_id')
-                ->select($table.'.*', 'customers.name as customer_job_name');
+                ->addSelect('customers.name as customer_job_name');
         }
 
         return $query->get();
@@ -3585,6 +3705,129 @@ class ModuleController extends Controller
             ],
             'lines' => $lines,
         ];
+    }
+
+    private function apBill2307PrintData($bill)
+    {
+        if (!Schema::hasTable('purchase_documents')) {
+            return ['form' => null, 'pages' => []];
+        }
+
+        $query = DB::table('purchase_documents')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_documents.supplier_id')
+            ->leftJoin('companies', 'companies.id', '=', 'purchase_documents.company_id')
+            ->select(
+                'purchase_documents.*',
+                'suppliers.name as payee_name',
+                'suppliers.tin as payee_tin',
+                'suppliers.address as payee_address',
+                'companies.name as payer_name',
+                'companies.tin as payer_tin',
+                'companies.address as payer_address'
+            );
+
+        $record = is_numeric($bill)
+            ? $query->where('purchase_documents.id', $bill)->first()
+            : $query->where('purchase_documents.document_no', $bill)->first();
+
+        if (!$record) {
+            return ['form' => null, 'pages' => []];
+        }
+
+        $date = \Carbon\Carbon::parse($record->document_date);
+        $quarterStartMonth = ((int) floor(($date->month - 1) / 3) * 3) + 1;
+        $periodFrom = \Carbon\Carbon::create($date->year, $quarterStartMonth, 1)->startOfDay();
+        $periodTo = $periodFrom->copy()->addMonths(2)->endOfMonth();
+        $monthIndex = $date->month - $quarterStartMonth;
+        $currencyFactor = strtoupper((string) $record->currency) === 'USD'
+            ? ((float) ($record->usd_to_php_rate ?: $record->exchange_rate) ?: 1)
+            : 1;
+        $rows = [];
+
+        foreach ($this->apBillLines($record->id) as $line) {
+            $amount = (float) (data_get($line, 'amount') ?? data_get($line, 'line_total') ?? 0);
+            if ($amount <= 0) {
+                continue;
+            }
+
+            $accountLabel = data_get($line, 'account_name') ?: data_get($line, 'account_master_name');
+            $profile = $this->expenseAccountWithholdingProfile($accountLabel);
+            $description = data_get($line, 'account_master_name') ?: $profile['name'];
+            $atcCode = strtoupper(trim((string) (data_get($line, 'atc_code') ?: data_get($line, 'account_atc_code') ?: $profile['atc_code'])));
+            $rate = (float) data_get($line, 'withholding_tax_rate');
+            if ($rate <= 0) {
+                $rate = $this->withholdingRatePercent(data_get($line, 'account_withholding_rate')) ?: $profile['rate'];
+            }
+            if ($rate <= 0) {
+                $rate = (float) $record->withholding_tax_rate;
+            }
+
+            $base = $this->vendorBillLineWithholdingBase($amount, data_get($line, 'tax_category'));
+            $tax = (float) data_get($line, 'withholding_tax_amount');
+            if ($tax <= 0 && $rate > 0) {
+                $tax = $base * ($rate / 100);
+            }
+
+            $key = strtolower(trim((string) $description)).'|'.$atcCode;
+            if (!isset($rows[$key])) {
+                $rows[$key] = [
+                    'description' => $description ?: 'Vendor bill payment',
+                    'atc_code' => $atcCode,
+                    'months' => [0.0, 0.0, 0.0],
+                    'tax_withheld' => 0.0,
+                ];
+            }
+            $rows[$key]['months'][$monthIndex] += $base * $currencyFactor;
+            $rows[$key]['tax_withheld'] += $tax * $currencyFactor;
+        }
+
+        if (empty($rows)) {
+            $gross = (float) ($record->gross_amount ?: $record->subtotal);
+            $inputVat = (float) $record->tax_total;
+            $rows['vendor-bill'] = [
+                'description' => $record->memo ?: ($record->remarks ?: 'Vendor bill payment'),
+                'atc_code' => '',
+                'months' => [0.0, 0.0, 0.0],
+                'tax_withheld' => (float) $record->withholding_tax_amount * $currencyFactor,
+            ];
+            $rows['vendor-bill']['months'][$monthIndex] = max(0, $gross - $inputVat) * $currencyFactor;
+        }
+
+        $rows = array_values($rows);
+        $expectedTax = (float) $record->withholding_tax_amount * $currencyFactor;
+        $rowTax = array_sum(array_map(function ($row) {
+            return $row['tax_withheld'];
+        }, $rows));
+        if ($expectedTax > 0 && !empty($rows) && abs($expectedTax - $rowTax) >= 0.005) {
+            $rows[0]['tax_withheld'] += $expectedTax - $rowTax;
+        }
+
+        $pages = array_chunk($rows, 10);
+        if (empty($pages)) {
+            $pages = [[]];
+        }
+
+        return [
+            'form' => [
+                'bill_no' => $record->document_no,
+                'period_from' => $periodFrom->format('m/d/Y'),
+                'period_to' => $periodTo->format('m/d/Y'),
+                'payee_tin' => $record->payee_tin ?: '',
+                'payee_name' => $record->payee_name ?: '',
+                'payee_address' => $record->payee_address ?: '',
+                'payee_zip' => $this->zipCodeFromAddress($record->payee_address),
+                'payer_tin' => $record->payer_tin ?: '',
+                'payer_name' => $record->payer_name ?: '',
+                'payer_address' => $record->payer_address ?: '',
+                'payer_zip' => $this->zipCodeFromAddress($record->payer_address),
+            ],
+            'pages' => $pages,
+        ];
+    }
+
+    private function zipCodeFromAddress($address)
+    {
+        return preg_match('/\b(\d{4})\b/', (string) $address, $matches) ? $matches[1] : '';
     }
 
     private function latestPaymentIdForBill($billNo)

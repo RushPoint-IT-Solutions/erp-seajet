@@ -11,6 +11,7 @@
         </div>
         <div class="d-flex flex-wrap gap-2">
             <a href="{{ route('erp.payables.vendor-bills.print', $bill['bill_no']) }}" class="btn btn-outline-secondary"><i class="bi bi-printer me-1"></i> Print Bill</a>
+            <a href="{{ route('erp.payables.vendor-bills.print-2307', $bill['bill_no']) }}" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-text me-1"></i> Print 2307</a>
             <a href="{{ route('erp.payables.check-voucher.bill', $bill['bill_no']) }}" class="btn btn-outline-secondary"><i class="bi bi-receipt me-1"></i> Check Voucher</a>
             <a href="{{ route('erp.payables.check-voucher.layout') }}" class="btn btn-outline-secondary"><i class="bi bi-sliders me-1"></i> Voucher Layout</a>
             <a href="{{ route('erp.payables.approvals') }}" class="btn btn-primary"><i class="bi bi-check2-square me-1"></i> Send for Approval</a>
@@ -48,6 +49,8 @@
                     <tr>
                         <th>Account</th>
                         <th>Tax</th>
+                        <th>ATC / WC</th>
+                        <th class="text-end">WHT %</th>
                         <th class="text-end">Amount</th>
                         <th>Memo</th>
                         <th>Customer:Job</th>
@@ -60,6 +63,8 @@
                         <tr>
                             <td>{{ $line->account_name ?? '' }}</td>
                             <td>{{ $line->tax_category ?? '' }}</td>
+                            <td>{{ ($line->atc_code ?? '') ?: ($line->account_atc_code ?? '') }}</td>
+                            <td class="text-end">{{ number_format((float) ($line->withholding_tax_rate ?? 0), 2) }}%</td>
                             <td class="text-end">{{ number_format((float) ($line->amount ?? $line->line_total ?? 0), 2) }}</td>
                             <td>{{ $line->memo ?? $line->description ?? '' }}</td>
                             <td>{{ $line->customer_job_id ? $line->customer_job_id.' - '.($line->customer_job_name ?? '') : '' }}</td>
@@ -96,6 +101,7 @@
             <a href="{{ route('erp.payables.vendor-bills.create', ['bill' => $bill['bill_no']]) }}" class="btn btn-outline-secondary"><i class="bi bi-pencil me-1"></i> Edit Bill</a>
             <a href="{{ route('erp.payables.vendor-bills.create') }}" class="btn btn-outline-secondary"><i class="bi bi-plus-lg me-1"></i> Enter Another Bill</a>
             <a href="{{ route('erp.payables.vendor-bills.print', $bill['bill_no']) }}" class="btn btn-outline-secondary"><i class="bi bi-printer me-1"></i> Print Bill</a>
+            <a href="{{ route('erp.payables.vendor-bills.print-2307', $bill['bill_no']) }}" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-text me-1"></i> Print 2307</a>
             <a href="{{ route('erp.payables.check-voucher.bill', $bill['bill_no']) }}" class="btn btn-outline-secondary"><i class="bi bi-receipt me-1"></i> Check Voucher</a>
             <a href="{{ route('erp.payables.payments.create', ['bill' => $bill['bill_no']]) }}" class="btn btn-primary"><i class="bi bi-cash-stack me-1"></i> Pay Bill</a>
         </div>

@@ -307,8 +307,10 @@
                     <table class="table bill-lines align-middle" id="expenseLines">
                         <thead>
                         <tr>
-                            <th style="width: 230px">Account</th>
-                            <th style="width: 120px">Tax</th>
+                            <th style="width: 220px">Account</th>
+                            <th style="width: 105px">Tax</th>
+                            <th style="width: 100px">ATC / WC</th>
+                            <th style="width: 90px">WHT %</th>
                             <th class="text-end" style="width: 150px">Amount</th>
                             <th>Memo</th>
                             <th style="width: 220px">Customer:Job</th>
@@ -330,12 +332,25 @@
                                     <?php
                                         $lineAccount = $line ? ($line->account_name ?? '') : '';
                                         $lineAccountInOptions = in_array($lineAccount, $expenseAccountLabels, true);
+                                        $lineAccountProfile = $expenseAccounts->first(function ($account) use ($lineAccount) {
+                                            return $account->label === $lineAccount;
+                                        });
+                                        $lineAtcCode = $line
+                                            ? (($line->atc_code ?? '') ?: ($line->account_atc_code ?? '') ?: ($lineAccountProfile->atc_code ?? ''))
+                                            : '';
+                                        $savedLineRate = $line ? (float) ($line->withholding_tax_rate ?? 0) : 0;
+                                        $lineWithholdingRate = $savedLineRate > 0
+                                            ? $savedLineRate
+                                            : (float) ($lineAccountProfile->withholding_rate ?? 0);
                                     ?>
                                     @if($lineAccount && !$lineAccountInOptions)
                                         <option value="{{ $lineAccount }}" selected>{{ $lineAccount }}</option>
                                     @endif
                                     @foreach($expenseAccounts as $account)
-                                        <option value="{{ $account->label }}" {{ ($line && ($line->account_name ?? '') === $account->label) ? 'selected' : '' }}>{{ $account->label }}</option>
+                                        <option value="{{ $account->label }}"
+                                                data-atc="{{ $account->atc_code }}"
+                                                data-wht-rate="{{ $account->withholding_rate }}"
+                                                {{ ($line && ($line->account_name ?? '') === $account->label) ? 'selected' : '' }}>{{ $account->label }}</option>
                                     @endforeach
                                 </select>
                             </td>
@@ -347,6 +362,8 @@
                                     @endforeach
                                 </select>
                             </td>
+                            <td><input name="expense_atc_code[]" class="form-control text-uppercase line-atc-code" maxlength="20" value="{{ $lineAtcCode }}" placeholder="WC160"></td>
+                            <td><input name="expense_withholding_rate[]" class="form-control text-end line-wht-rate" type="number" min="0" max="100" step="0.01" value="{{ $lineWithholdingRate ?: '' }}"></td>
                             <td><input name="expense_amount[]" class="form-control text-end expense-amount" value="{{ $line ? number_format((float) ($line->amount ?? $line->line_total ?? 0), 2) : '' }}"></td>
                             <td><input name="expense_memo[]" class="form-control" value="{{ $line ? ($line->memo ?? $line->description ?? '') : '' }}"></td>
                             <td>
@@ -469,6 +486,8 @@
         function recalc() {
             var total = 0;
             var inputVat = 0;
+            var lineWithholding = 0;
+            var hasLineWithholding = false;
             $('#expenseLines tbody tr').each(function () {
                 var row = $(this);
                 var amount = numberValue(row.find('.expense-amount').val());
@@ -478,6 +497,13 @@
                 if (category === 'VAT12') {
                     var net = amount / 1.12;
                     inputVat += amount - net;
+                }
+
+                var lineRate = numberValue(row.find('.line-wht-rate').val());
+                if (lineRate > 0) {
+                    hasLineWithholding = true;
+                    var lineBase = category === 'VAT12' ? amount / 1.12 : amount;
+                    lineWithholding += lineBase * (lineRate / 100);
                 }
             });
 
@@ -490,7 +516,7 @@
             var whtRate = numberValue($('#whtRate').val());
             // BIR EWT is computed on the income payment net of VAT, not the VAT-inclusive gross.
             var whtBase = Math.max(0, total - inputVat);
-            var whtAmount = whtBase * (whtRate / 100);
+            var whtAmount = hasLineWithholding ? lineWithholding : whtBase * (whtRate / 100);
             var net = total - whtAmount;
             var php = currency() === 'USD' ? total * numberValue($('#exchangeRate').val()) : total;
 
@@ -507,12 +533,22 @@
             });
         }
 
+        function syncLineWithholding(row) {
+            var option = row.find('.expense-account option:selected');
+            row.find('.line-atc-code').val(option.data('atc') || '');
+            row.find('.line-wht-rate').val(option.data('wht-rate') || '');
+        }
+
         $('#supplierSelect').on('change', function () {
             syncSupplier();
             recalc();
         });
         $('#currencySelect, #exchangeRate, #grossAmount, #whtRate').on('input change', recalc);
-        $('#expenseLines').on('input change', '.expense-amount', recalc);
+        $('#expenseLines').on('change', '.expense-account', function () {
+            syncLineWithholding($(this).closest('tr'));
+            recalc();
+        });
+        $('#expenseLines').on('input change', '.expense-amount, .line-atc-code, .line-wht-rate, select[name="expense_tax[]"]', recalc);
         $('#recalculateBill').on('click', recalc);
 
         $('#addExpenseLine').on('click', function () {
