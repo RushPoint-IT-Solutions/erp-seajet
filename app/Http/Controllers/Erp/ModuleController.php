@@ -3808,8 +3808,9 @@ class ModuleController extends Controller
 
             $accountLabel = data_get($line, 'account_name') ?: data_get($line, 'account_master_name');
             $profile = $this->expenseAccountWithholdingProfile($accountLabel);
-            $description = data_get($line, 'account_master_name') ?: $profile['name'];
+            $accountDescription = data_get($line, 'account_master_name') ?: $profile['name'];
             $atcCode = strtoupper(trim((string) (data_get($line, 'atc_code') ?: data_get($line, 'account_atc_code') ?: $profile['atc_code'])));
+            $description = $this->bir2307IncomePaymentDescription($atcCode, $accountDescription);
             $rate = (float) data_get($line, 'withholding_tax_rate');
             if ($rate <= 0) {
                 $rate = $this->withholdingRatePercent(data_get($line, 'account_withholding_rate')) ?: $profile['rate'];
@@ -3824,7 +3825,7 @@ class ModuleController extends Controller
                 $tax = $base * ($rate / 100);
             }
 
-            $key = strtolower(trim((string) $description)).'|'.$atcCode;
+            $key = $atcCode !== '' ? $atcCode : strtolower(trim((string) $description));
             if (!isset($rows[$key])) {
                 $rows[$key] = [
                     'description' => $description ?: 'Vendor bill payment',
@@ -3936,7 +3937,7 @@ class ModuleController extends Controller
                     'top' => $top,
                     'left' => $position['left'],
                     'width' => $position['width'],
-                    'font_size' => 9,
+                    'font_size' => $column === 'description' ? 7 : 9,
                 ];
             }
         }
@@ -3994,6 +3995,21 @@ class ModuleController extends Controller
     private function zipCodeFromAddress($address)
     {
         return preg_match('/\b(\d{4})\b/', (string) $address, $matches) ? $matches[1] : '';
+    }
+
+    private function bir2307IncomePaymentDescription($atcCode, $fallback)
+    {
+        $descriptions = [
+            'WC100' => 'Rentals of real or personal property used in business',
+            'WC158' => 'Income payments made by top withholding agents to local/resident suppliers of goods',
+            'WC160' => 'Income payments made by top withholding agents to local/resident suppliers of services',
+            'WI011' => 'Professional fees for services rendered by individuals',
+            'WI139' => 'Brokerage fees paid to individual brokers',
+        ];
+
+        $atcCode = strtoupper(trim((string) $atcCode));
+
+        return $descriptions[$atcCode] ?? ($fallback ?: 'Vendor bill payment');
     }
 
     private function latestPaymentIdForBill($billNo)

@@ -71,6 +71,8 @@ class VendorBill2307PrintTest extends TestCase
         $printResponse->assertOk()
             ->assertSee('images/bir_2307_bg.png')
             ->assertSee('WC160')
+            ->assertSee('Income payments made by top withholding agents to local/resident suppliers of services')
+            ->assertDontSee('Export Air Expense')
             ->assertSee('10,000.00')
             ->assertSee('200.00')
             ->assertSee($supplier->name)
@@ -177,5 +179,52 @@ class VendorBill2307PrintTest extends TestCase
         }
 
         $this->assertSame('123-456-789-54321', $printedTin);
+    }
+
+    public function test_2307_uses_the_equivalent_income_payment_description_for_each_configured_atc()
+    {
+        $descriptions = [
+            'WC100' => 'Rentals of real or personal property used in business',
+            'WC158' => 'Income payments made by top withholding agents to local/resident suppliers of goods',
+            'WC160' => 'Income payments made by top withholding agents to local/resident suppliers of services',
+            'WI011' => 'Professional fees for services rendered by individuals',
+            'WI139' => 'Brokerage fees paid to individual brokers',
+        ];
+        $rates = ['WC100' => 5, 'WC158' => 1, 'WC160' => 2, 'WI011' => 10, 'WI139' => 2];
+        $supplier = DB::table('suppliers')->whereNotNull('tin')->orderBy('id')->first();
+        $accounts = [];
+
+        foreach (array_keys($descriptions) as $code) {
+            $account = DB::table('accounts')->where('atc_code', $code)->orderBy('id')->first();
+            $this->assertNotNull($account, 'Missing seeded account for '.$code);
+            $accounts[] = trim(($account->code ? $account->code.' - ' : '').$account->name);
+        }
+
+        $this->post(route('erp.payables.vendor-bills.review'), [
+            'transaction_type' => 'Bill',
+            'supplier_id' => $supplier->code,
+            'supplier_name' => $supplier->name,
+            'supplier_address' => $supplier->address,
+            'bill_date' => '2026-08-28',
+            'currency' => 'PHP',
+            'exchange_rate' => '1',
+            'expense_account' => $accounts,
+            'expense_tax' => array_fill(0, count($accounts), 'EXEMPT'),
+            'expense_atc_code' => array_keys($descriptions),
+            'expense_withholding_rate' => array_values($rates),
+            'expense_amount' => array_fill(0, count($accounts), '1,000.00'),
+            'expense_memo' => array_fill(0, count($accounts), ''),
+            'expense_customer_job' => array_fill(0, count($accounts), ''),
+            'expense_class' => array_fill(0, count($accounts), 'MANILA'),
+            'save_mode' => 'close',
+        ])->assertRedirect();
+
+        $billId = DB::table('purchase_documents')->orderBy('id', 'desc')->value('id');
+        $response = $this->get(route('erp.payables.vendor-bills.print-2307', $billId));
+        $response->assertOk();
+
+        foreach ($descriptions as $code => $description) {
+            $response->assertSee($code)->assertSee($description);
+        }
     }
 }

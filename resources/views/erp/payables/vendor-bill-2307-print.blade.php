@@ -71,7 +71,7 @@
     .bir-field-right { text-align: right; padding-right: 4px; }
     .bir-character { text-align: center; }
     .bir-payee-zip, .bir-payer-zip { letter-spacing: 6px; }
-    .bir-description { padding-left: 3px; }
+    .bir-description { height: 18px; padding-left: 3px; white-space: normal; line-height: 8px; }
     .bir-atc { text-align: center; font-weight: 600; }
     .bir-grand-total { font-weight: 700; }
     #birDragReadout {
