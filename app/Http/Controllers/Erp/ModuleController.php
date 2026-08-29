@@ -3603,7 +3603,50 @@ class ModuleController extends Controller
             }
         }
 
+        if (empty($savedStyles['_compact_sections']) && !$fromRequest) {
+            $sectionOffsets = [
+                'payment_info_title' => -26,
+                'amount_header' => -40,
+                'account_name_label' => -40,
+                'account_name' => -40,
+                'amount' => -40,
+                'account_no_label' => -40,
+                'account_no' => -40,
+                'amount_words' => -40,
+                'description_label' => -94,
+                'description' => -94,
+                'account_title_header' => -148,
+                'debit_header' => -148,
+                'credit_header' => -148,
+                'debit_account_title' => -148,
+                'debit_amount' => -148,
+                'credit_account_title' => -148,
+                'credit_amount' => -148,
+                'total_label' => -148,
+                'total_debit' => -148,
+                'total_credit' => -148,
+                'prepared_by_label' => -168,
+                'prepared_by' => -168,
+                'prepared_date_label' => -168,
+                'checked_by_label' => -168,
+                'checked_by' => -168,
+                'checked_date_label' => -168,
+                'approved_by_label' => -168,
+                'approved_by' => -168,
+                'approved_date_label' => -168,
+                'received_by_label' => -168,
+                'received_by' => -168,
+                'received_date_label' => -168,
+            ];
+            foreach ($sectionOffsets as $field => $offset) {
+                if (isset($layout['positions'][$field])) {
+                    $layout['positions'][$field][1] = max(0, $layout['positions'][$field][1] + $offset);
+                }
+            }
+        }
+
         $layout['field_styles']['_box_heights'] = $layout['box_heights'];
+        $layout['field_styles']['_compact_sections'] = true;
 
         return $layout;
     }
