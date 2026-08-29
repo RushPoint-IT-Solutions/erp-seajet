@@ -4180,6 +4180,8 @@ class ModuleController extends Controller
         return DB::table('payments')
             ->where('company_id', $this->defaultCompanyId())
             ->where('bill_no', $billNo)
+            ->whereNotIn('status', ['voided', 'cancelled'])
+            ->whereNotIn('approval_status', ['Voided', 'Cancelled'])
             ->orderBy('payment_date', 'desc')
             ->orderBy('id', 'desc')
             ->value('id');

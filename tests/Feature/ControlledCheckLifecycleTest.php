@@ -265,6 +265,29 @@ class ControlledCheckLifecycleTest extends TestCase
         $this->assertEquals($paidBefore, (float) DB::table('purchase_documents')->where('id', $bill->id)->value('paid_total'));
         $this->assertSame(1, DB::table('journal_entries')->where('source_type', 'payment')
             ->where('source_id', $payment->id)->where('posting_type', 'reversal')->count());
+
+        $newPreparationUrl = route('erp.payables.payments.create', [
+            'bill' => $bill->document_no,
+            'method' => 'Cheque',
+        ]);
+        $this->get(route('erp.payables.check-voucher.bill', $bill->document_no))
+            ->assertRedirect($newPreparationUrl);
+        $this->actingAsAdmin();
+        $this->get($newPreparationUrl)
+            ->assertOk()
+            ->assertSee('value="Cheque" selected', false);
+
+        $this->post(route('erp.payables.payments.review'), $this->paymentPayload($bill, $bank, [
+            'payment_no' => 'PV-CONTROL-RECREATED',
+            'check_no' => 'CONTROL-RECREATED',
+            'amount' => '7.25',
+        ]))->assertOk();
+        $this->assertDatabaseHas('payments', [
+            'bill_no' => $bill->document_no,
+            'payment_no' => 'PV-CONTROL-RECREATED',
+            'check_no' => 'CONTROL-RECREATED',
+            'status' => 'for_approval',
+        ]);
     }
 
     private function actingAsFinance($companyId)
