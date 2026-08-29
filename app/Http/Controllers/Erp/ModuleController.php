@@ -3865,8 +3865,9 @@ class ModuleController extends Controller
             ? ((float) ($record->usd_to_php_rate ?: $record->exchange_rate) ?: 1)
             : 1;
         $rows = [];
+        $billLines = $this->apBillLines($record->id);
 
-        foreach ($this->apBillLines($record->id) as $line) {
+        foreach ($billLines as $line) {
             $amount = (float) (data_get($line, 'amount') ?? data_get($line, 'line_total') ?? 0);
             if ($amount <= 0) {
                 continue;
@@ -3878,15 +3879,12 @@ class ModuleController extends Controller
             $atcCode = strtoupper(trim((string) (data_get($line, 'atc_code') ?: data_get($line, 'account_atc_code') ?: $profile['atc_code'])));
             $description = $this->bir2307IncomePaymentDescription($atcCode, $accountDescription);
             $rate = (float) data_get($line, 'withholding_tax_rate');
-            if ($rate <= 0) {
-                $rate = $this->withholdingRatePercent(data_get($line, 'account_withholding_rate')) ?: $profile['rate'];
-            }
-            if ($rate <= 0) {
-                $rate = (float) $record->withholding_tax_rate;
+            $tax = (float) data_get($line, 'withholding_tax_amount');
+            if ($rate <= 0 && $tax <= 0) {
+                continue;
             }
 
             $base = $this->vendorBillLineWithholdingBase($amount, data_get($line, 'tax_category'));
-            $tax = (float) data_get($line, 'withholding_tax_amount');
             if ($tax <= 0 && $rate > 0) {
                 $tax = $base * ($rate / 100);
             }
@@ -3904,7 +3902,7 @@ class ModuleController extends Controller
             $rows[$key]['tax_withheld'] += $tax * $currencyFactor;
         }
 
-        if (empty($rows)) {
+        if (empty($rows) && $billLines->isEmpty() && (float) $record->withholding_tax_amount > 0) {
             $gross = (float) ($record->gross_amount ?: $record->subtotal);
             $inputVat = (float) $record->tax_total;
             $rows['vendor-bill'] = [

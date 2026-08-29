@@ -215,6 +215,48 @@ class VendorBill2307PrintTest extends TestCase
         $this->assertSame('123-456-789-54321', $printedTin);
     }
 
+    public function test_2307_prints_only_lines_with_withholding()
+    {
+        $withheldAccount = DB::table('accounts')->where('atc_code', 'WC160')->where('is_active', true)->first();
+        $assetAccount = DB::table('accounts')
+            ->join('account_categories', 'account_categories.id', '=', 'accounts.account_category_id')
+            ->where('account_categories.name', 'Assets')
+            ->where('accounts.is_active', true)
+            ->select('accounts.*')
+            ->first();
+        $supplier = DB::table('suppliers')->whereNotNull('tin')->orderBy('id')->first();
+
+        $this->post(route('erp.payables.vendor-bills.review'), [
+            'transaction_type' => 'Bill',
+            'supplier_id' => $supplier->code,
+            'supplier_name' => $supplier->name,
+            'supplier_address' => $supplier->address,
+            'bill_date' => '2026-08-28',
+            'currency' => 'PHP',
+            'exchange_rate' => '1',
+            'expense_account' => [
+                $withheldAccount->code.' - '.$withheldAccount->name,
+                $assetAccount->code.' - '.$assetAccount->name,
+            ],
+            'expense_tax' => ['VAT12', 'EXEMPT'],
+            'expense_atc_code' => ['WC160', ''],
+            'expense_withholding_rate' => ['2', '0'],
+            'expense_amount' => ['11,200.00', '500.00'],
+            'expense_memo' => ['Withheld service', 'Asset purchase without withholding'],
+            'expense_customer_job' => ['', ''],
+            'expense_class' => ['MANILA', 'MANILA'],
+            'save_mode' => 'close',
+        ])->assertRedirect();
+
+        $billId = DB::table('purchase_documents')->orderBy('id', 'desc')->value('id');
+        $this->get(route('erp.payables.vendor-bills.print-2307', $billId))
+            ->assertOk()
+            ->assertSee('WC160')
+            ->assertSee('Income payments made by top withholding agents to local/resident suppliers of services')
+            ->assertDontSee($assetAccount->name)
+            ->assertDontSee('Asset purchase without withholding');
+    }
+
     public function test_2307_uses_the_equivalent_income_payment_description_for_each_configured_atc()
     {
         $descriptions = [
