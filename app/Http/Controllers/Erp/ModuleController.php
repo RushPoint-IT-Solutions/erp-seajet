@@ -3116,7 +3116,13 @@ class ModuleController extends Controller
 
         $query = DB::table('payments')
             ->leftJoin('suppliers', 'suppliers.id', '=', 'payments.supplier_id')
-            ->select('payments.*', 'suppliers.name as supplier_name')
+            ->leftJoin('bank_accounts', 'bank_accounts.id', '=', 'payments.bank_account_id')
+            ->select(
+                'payments.*',
+                'suppliers.name as supplier_name',
+                'bank_accounts.bank_name as payment_bank_name',
+                'bank_accounts.account_no as payment_bank_account_no'
+            )
             ->where('payments.company_id', $this->defaultCompanyId());
 
         $payment = $paymentId
@@ -3135,10 +3141,13 @@ class ModuleController extends Controller
         $documentDate = !empty($payment->payment_date)
             ? date('m/d/Y', strtotime($payment->payment_date))
             : now()->format('m/d/Y');
-        $accountNo = '-';
-        if (!empty($payment->bank_account) && preg_match('/(?:CA#|SA#|Acct#|Account#)\s*([A-Za-z0-9\-]+)/i', $payment->bank_account, $matches)) {
+        $accountNo = $payment->payment_bank_account_no ?: '-';
+        if ($accountNo === '-' && !empty($payment->bank_account) && preg_match('/(?:CA#|SA#|Acct#|Account#)\s*([A-Za-z0-9\-]+)/i', $payment->bank_account, $matches)) {
             $accountNo = $matches[1];
         }
+        $bankName = $payment->payment_bank_name ?: 'Bank';
+        $cashInBankTitle = 'Cash in Bank - '.$bankName.($accountNo !== '-' ? ' ('.$accountNo.')' : '');
+        $vendorBillMemo = $bill ? trim((string) ($bill->memo ?: $bill->remarks)) : '';
 
         return [
             'id' => $payment->id,
@@ -3151,17 +3160,18 @@ class ModuleController extends Controller
             'shipment_job_id' => $payment->shipment_job_id ?: '-',
             'payment_method' => $payment->payment_method,
             'bank_account' => $payment->bank_account ?: '-',
-            'account_name' => $payment->payee_snapshot ?: ($payment->supplier_name ?: '-'),
+            'bank_name' => $payment->payment_bank_name ?: '-',
+            'account_name' => $payment->payment_bank_name ?: '-',
             'account_no' => $accountNo,
             'check_no' => $payment->check_no ?: '-',
             'bill_no' => $payment->bill_no,
-            'description' => $bill && $bill->memo ? $bill->memo : 'Shipment-linked vendor expense',
+            'description' => $vendorBillMemo,
             'currency' => $payment->currency ?: 'PHP',
             'gross' => $gross,
             'withholding' => $wht,
             'net' => $net,
             'debit_account_title' => 'A/P-Trade ('.($payment->bank_account ?: ($payment->currency ?: 'PHP')).')',
-            'credit_account_title' => 'Cash in Bank-'.$payment->bank_account,
+            'credit_account_title' => $cashInBankTitle,
             'amount_words' => $payment->amount_words_snapshot ?: $this->amountToWords($net, $payment->currency ?: 'PHP'),
         ];
     }
@@ -3673,6 +3683,7 @@ class ModuleController extends Controller
             'shipment_job_id' => '-',
             'payment_method' => '-',
             'bank_account' => '-',
+            'bank_name' => '-',
             'account_name' => '-',
             'account_no' => '-',
             'check_no' => '-',
@@ -3683,7 +3694,7 @@ class ModuleController extends Controller
             'withholding' => 0,
             'net' => 0,
             'debit_account_title' => 'A/P-Trade (BDO - PHP)',
-            'credit_account_title' => 'Cash in Bank-BDO CA# 4898002879',
+            'credit_account_title' => 'Cash in Bank - BDO (4898002879)',
             'amount_words' => 'Zero Pesos Only',
         ];
     }

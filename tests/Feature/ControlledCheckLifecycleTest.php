@@ -25,6 +25,10 @@ class ControlledCheckLifecycleTest extends TestCase
     public function test_maker_checker_print_release_and_clear_lifecycle()
     {
         list($bill, $bank) = $this->billAndBank();
+        DB::table('purchase_documents')->where('id', $bill->id)->update([
+            'memo' => 'Vendor Bill header memo for check voucher',
+            'remarks' => 'Legacy bill remarks',
+        ]);
         $balanceBefore = (float) $bill->grand_total - (float) $bill->paid_total;
 
         $response = $this->post(route('erp.payables.payments.review'), $this->paymentPayload($bill, $bank, [
@@ -47,6 +51,14 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertOk()
             ->assertSee('Check No.')
             ->assertSee('CONTROL-1001');
+        $this->get(route('erp.payables.check-voucher', $payment->id))
+            ->assertOk()
+            ->assertSee('Bank Name:')
+            ->assertSee($bank->bank_name)
+            ->assertSee('Cash in Bank - '.$bank->bank_name.' ('.$bank->account_no.')')
+            ->assertSee('Vendor Bill header memo for check voucher')
+            ->assertDontSee('Legacy bill remarks')
+            ->assertDontSee($bank->account_name);
 
         $this->get(route('erp.payables.check-print', $payment->id))
             ->assertRedirect(route('erp.payables.approvals'))
