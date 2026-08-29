@@ -309,7 +309,7 @@
             height: 18px;
         }
         .bill-expense-table tbody tr.filler td {
-            height: 500px;
+            height: 420px;
         }
         .bill-class { font-size: 12px; }
         .bill-expense-total,
