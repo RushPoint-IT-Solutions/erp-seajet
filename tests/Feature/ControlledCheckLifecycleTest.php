@@ -58,6 +58,9 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertSee('Cash in Bank - '.$bank->bank_name.' ('.$bank->account_no.')')
             ->assertSee('Vendor Bill header memo for check voucher')
             ->assertDontSee('Legacy bill remarks')
+            ->assertSee('MLP')
+            ->assertSee('GCB')
+            ->assertSee('ASA/BCA/CAC')
             ->assertDontSee($bank->account_name);
 
         $this->get(route('erp.payables.check-print', $payment->id))
