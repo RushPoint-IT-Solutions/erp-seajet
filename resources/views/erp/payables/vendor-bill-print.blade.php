@@ -14,6 +14,13 @@
 
         return in_array($taxCategory, ['VAT12', '12%'], true) ? $amount / 1.12 : $amount;
     };
+    $accountName = function ($line) {
+        if (trim((string) ($line->account_master_name ?? '')) !== '') {
+            return $line->account_master_name;
+        }
+
+        return preg_replace('/^[^\s]+\s+-\s+/', '', (string) ($line->account_name ?? ''), 1);
+    };
     $expenseTotal = $printLines->isEmpty()
         ? max(0, (float) $bill['gross_amount'] - (float) $bill['input_vat'] - (float) $bill['withholding_tax_amount'])
         : $printLines->sum($expenseAmount) - (float) $bill['withholding_tax_amount'];
@@ -371,10 +378,10 @@
                 <tbody>
                     @forelse($lines as $line)
                         <tr>
-                            <td>{{ $line->account_name ?? '' }}</td>
+                            <td>{{ $accountName($line) }}</td>
                             <td>{{ $line->memo ?? $line->description ?? '' }}</td>
                             <td class="bill-num">{{ $money($expenseAmount($line)) }}</td>
-                            <td>{{ $line->customer_job_id ? $line->customer_job_id.' - '.($line->customer_job_name ?? '') : '' }}</td>
+                            <td>{{ $line->customer_job_name ?? '' }}</td>
                             <td class="bill-class">{{ $line->class_code ?? '' }}</td>
                         </tr>
                     @empty

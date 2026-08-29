@@ -52,7 +52,7 @@
                         <th>ATC / WC</th>
                         <th class="text-end">WHT %</th>
                         <th class="text-end">Amount</th>
-                        <th>Memo</th>
+                        <th>Item Memo</th>
                         <th>Customer:Job</th>
                         <th>Billable</th>
                         <th>Class</th>

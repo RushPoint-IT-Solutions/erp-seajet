@@ -1007,8 +1007,10 @@ class ModuleController extends Controller
             ->where(function ($query) {
                 $query->where('account_categories.name', 'like', '%Expense%')
                     ->orWhere('account_categories.name', 'like', '%Cost%')
+                    ->orWhere('account_categories.name', 'like', '%Asset%')
                     ->orWhere('accounts.name', 'like', '%Expense%')
-                    ->orWhere('accounts.name', 'like', '%Cost%');
+                    ->orWhere('accounts.name', 'like', '%Cost%')
+                    ->orWhere('accounts.type', 'like', '%Asset%');
             })
             ->orderBy('accounts.code')
             ->get()

@@ -256,7 +256,7 @@
                                     <input name="due_date" type="date" class="form-control bill-field" value="{{ $bill['due_date'] ?? '' }}">
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label small text-muted">Memo</label>
+                                    <label class="form-label small text-muted">Bill Memo</label>
                                     <input name="memo" class="form-control bill-field" value="{{ $bill['memo'] ?? '' }}">
                                 </div>
                                 <div class="col-md-6">
@@ -325,7 +325,7 @@
                             <th style="width: 100px">ATC / WC</th>
                             <th style="width: 90px">WHT %</th>
                             <th class="text-end" style="width: 150px">Amount</th>
-                            <th>Memo</th>
+                            <th>Item Memo</th>
                             <th style="width: 220px">Customer:Job</th>
                             <th style="width: 100px">Billable?</th>
                             <th style="width: 140px">Class</th>

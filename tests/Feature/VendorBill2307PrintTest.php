@@ -27,10 +27,24 @@ class VendorBill2307PrintTest extends TestCase
             ->where('atc_code', 'WC160')
             ->where('is_active', true)
             ->first();
+        $assetAccount = DB::table('accounts')
+            ->join('account_categories', 'account_categories.id', '=', 'accounts.account_category_id')
+            ->where('account_categories.name', 'Assets')
+            ->where('accounts.is_active', true)
+            ->select('accounts.*')
+            ->first();
         $supplier = DB::table('suppliers')->whereNotNull('tin')->orderBy('id')->first();
+        $customer = DB::table('customers')->orderBy('id')->first();
 
         $this->assertNotNull($account);
+        $this->assertNotNull($assetAccount);
         $this->assertNotNull($supplier);
+        $this->assertNotNull($customer);
+        $this->get(route('erp.payables.vendor-bills.create'))
+            ->assertOk()
+            ->assertSee($assetAccount->code.' - '.$assetAccount->name)
+            ->assertSee('Bill Memo')
+            ->assertSee('Item Memo');
 
         $accountLabel = $account->code.' - '.$account->name;
         $response = $this->post(route('erp.payables.vendor-bills.review'), [
@@ -41,11 +55,12 @@ class VendorBill2307PrintTest extends TestCase
             'bill_date' => '2026-08-28',
             'currency' => 'PHP',
             'exchange_rate' => '1',
+            'memo' => 'Header bill memo',
             'expense_account' => [$accountLabel],
             'expense_tax' => ['VAT12'],
             'expense_amount' => ['11,200.00'],
             'expense_memo' => ['Test service expense'],
-            'expense_customer_job' => [''],
+            'expense_customer_job' => [$customer->customer_id],
             'expense_class' => ['MANILA'],
             'save_mode' => 'close',
         ]);
@@ -59,9 +74,17 @@ class VendorBill2307PrintTest extends TestCase
         $this->assertEquals(200.0, (float) $line->withholding_tax_amount);
         $this->assertEquals(200.0, (float) $bill->withholding_tax_amount);
         $this->assertEquals(11000.0, (float) $bill->grand_total);
+        $this->assertSame('Header bill memo', $bill->memo);
+        $this->assertSame('Test service expense', $line->memo);
 
         $vendorBillPrint = $this->get(route('erp.payables.vendor-bills.print', $bill->id));
         $vendorBillPrint->assertOk()
+            ->assertSee('Header bill memo')
+            ->assertSee('Test service expense')
+            ->assertSee($account->name)
+            ->assertDontSee($accountLabel)
+            ->assertSee(e($customer->name), false)
+            ->assertDontSee(e($customer->customer_id.' - '.$customer->name), false)
             ->assertSee('Expanded Withholding Tax Payable')
             ->assertSee('10,000.00')
             ->assertSee('-200.00')
