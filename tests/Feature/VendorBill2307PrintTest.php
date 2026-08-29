@@ -255,6 +255,21 @@ class VendorBill2307PrintTest extends TestCase
             ->assertSee('Income payments made by top withholding agents to local/resident suppliers of services')
             ->assertDontSee($assetAccount->name)
             ->assertDontSee('Asset purchase without withholding');
+
+        DB::table('vendor_bill_lines')->where('purchase_document_id', $billId)->update([
+            'withholding_tax_rate' => 0,
+            'withholding_tax_amount' => 0,
+        ]);
+        DB::table('purchase_documents')->where('id', $billId)->update([
+            'withholding_tax_rate' => 0,
+            'withholding_tax_amount' => 0,
+        ]);
+
+        $this->get(route('erp.payables.vendor-bills.print-2307', $billId))
+            ->assertOk()
+            ->assertDontSee('WC160')
+            ->assertDontSee('Income payments made by top withholding agents to local/resident suppliers of services')
+            ->assertDontSee($assetAccount->name);
     }
 
     public function test_2307_uses_the_equivalent_income_payment_description_for_each_configured_atc()

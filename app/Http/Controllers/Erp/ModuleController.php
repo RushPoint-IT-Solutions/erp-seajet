@@ -2117,6 +2117,15 @@ class ModuleController extends Controller
 
     public function checkVoucherPreview($payment = null)
     {
+        if ($payment) {
+            $record = $this->resolveLegacyPaymentBankAccount($this->paymentRecordForCompany($payment));
+            abort_unless($record, 404);
+            $errors = $this->checkVoucherPreparationErrors($record);
+            if (!empty($errors)) {
+                return redirect()->route('erp.payables.approvals')->withErrors($errors);
+            }
+        }
+
         return view('erp.payables.check-voucher', [
             'voucher' => $this->paymentPrintData($payment),
             'layout' => $this->checkVoucherPrintLayoutPayload(),
@@ -2127,8 +2136,12 @@ class ModuleController extends Controller
 
     public function recordCheckVoucherPrint($payment)
     {
-        $record = $this->paymentRecordForCompany($payment);
+        $record = $this->resolveLegacyPaymentBankAccount($this->paymentRecordForCompany($payment));
         abort_unless($record, 404);
+        $errors = $this->checkVoucherPreparationErrors($record);
+        if (!empty($errors)) {
+            throw \Illuminate\Validation\ValidationException::withMessages($errors);
+        }
 
         $voucher = $this->paymentPrintData($payment);
         $layout = $this->checkVoucherPrintLayoutPayload();
@@ -2825,8 +2838,12 @@ class ModuleController extends Controller
             $currency = strtoupper($data['currency']);
             $exchangeRate = $currency === 'PHP' ? 1 : max(0.000001, $this->moneyToFloat($data['exchange_rate'] ?? 1));
             $paymentNo = trim((string) ($data['payment_no'] ?? ''));
-            if ($paymentNo === '') {
+            if ($paymentNo === '' || preg_match('/^PV-\d+$/i', $paymentNo)) {
                 $paymentNo = $this->nextDocumentNumber('payment_voucher', 'PV-', 5);
+            } elseif (DB::table('payments')->where('company_id', $companyId)->where('payment_no', $paymentNo)->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'payment_no' => 'Payment No. already exists. Use a different custom payment number.',
+                ]);
             }
             $voucherNo = $this->nextDocumentNumber('check_voucher', 'CV-', 5);
             $bankAccountId = null;
@@ -3245,6 +3262,26 @@ class ModuleController extends Controller
         $issuance = $this->activeCheckIssuance($payment->id);
         if ((!$issuance || (int) $issuance->print_count === 0) && !$this->hasRecordedCheckVoucherPrint($payment->id)) {
             $errors['check_voucher'] = 'Print the Check Voucher before printing the Check.';
+        }
+
+        return $errors;
+    }
+
+    private function checkVoucherPreparationErrors($payment)
+    {
+        $errors = [];
+        $hasValidBank = $payment && !empty($payment->bank_account_id)
+            && DB::table('bank_accounts')
+                ->where('company_id', $payment->company_id)
+                ->where('id', $payment->bank_account_id)
+                ->where('is_active', true)
+                ->exists();
+
+        if (!$hasValidBank) {
+            $errors['bank_account'] = 'Select an active bank before preparing the Check Voucher.';
+        }
+        if (!$payment || trim((string) $payment->check_no) === '') {
+            $errors['check_no'] = 'Enter the check number before preparing the Check Voucher.';
         }
 
         return $errors;
@@ -3913,18 +3950,6 @@ class ModuleController extends Controller
             $rows[$key]['tax_withheld'] += $tax * $currencyFactor;
         }
 
-        if (empty($rows) && $billLines->isEmpty() && (float) $record->withholding_tax_amount > 0) {
-            $gross = (float) ($record->gross_amount ?: $record->subtotal);
-            $inputVat = (float) $record->tax_total;
-            $rows['vendor-bill'] = [
-                'description' => $record->memo ?: ($record->remarks ?: 'Vendor bill payment'),
-                'atc_code' => '',
-                'months' => [0.0, 0.0, 0.0],
-                'tax_withheld' => (float) $record->withholding_tax_amount * $currencyFactor,
-            ];
-            $rows['vendor-bill']['months'][$monthIndex] = max(0, $gross - $inputVat) * $currencyFactor;
-        }
-
         $rows = array_values($rows);
         $expectedTax = (float) $record->withholding_tax_amount * $currencyFactor;
         $rowTax = array_sum(array_map(function ($row) {
@@ -4200,6 +4225,14 @@ class ModuleController extends Controller
         }
 
         $next = ((int) $series->current_number) + 1;
+        $seriesPrefix = $series->prefix ?: $prefix;
+        $seriesPadding = (int) ($series->padding ?: $padding);
+        $number = $seriesPrefix.str_pad($next, $seriesPadding, '0', STR_PAD_LEFT);
+        while ($this->documentNumberExists($documentType, $companyId, $number)) {
+            $next++;
+            $number = $seriesPrefix.str_pad($next, $seriesPadding, '0', STR_PAD_LEFT);
+        }
+
         if ($increment) {
             DB::table('number_series')->where('id', $series->id)->update([
                 'current_number' => $next,
@@ -4207,7 +4240,31 @@ class ModuleController extends Controller
             ]);
         }
 
-        return ($series->prefix ?: $prefix).str_pad($next, (int) ($series->padding ?: $padding), '0', STR_PAD_LEFT);
+        return $number;
+    }
+
+    private function documentNumberExists($documentType, $companyId, $number)
+    {
+        $targets = [
+            'vendor_bill' => ['purchase_documents', 'document_no'],
+            'payment_voucher' => ['payments', 'payment_no'],
+            'check_voucher' => ['payments', 'voucher_no'],
+            'journal_voucher' => ['journal_entries', 'journal_no'],
+        ];
+
+        if (!isset($targets[$documentType]) || !Schema::hasTable($targets[$documentType][0])) {
+            return false;
+        }
+
+        list($table, $column) = $targets[$documentType];
+        if (!Schema::hasColumn($table, $column)) {
+            return false;
+        }
+
+        return DB::table($table)
+            ->where('company_id', $companyId)
+            ->where($column, $number)
+            ->exists();
     }
 
     private function tablePayload($table, array $payload)

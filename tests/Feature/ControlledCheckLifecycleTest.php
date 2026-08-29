@@ -63,6 +63,23 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertSee('ASA/BCA/CAC')
             ->assertDontSee($bank->account_name);
 
+        DB::table('payments')->where('id', $payment->id)->update([
+            'bank_account_id' => null,
+            'bank_account' => null,
+            'check_no' => null,
+        ]);
+        $this->get(route('erp.payables.check-voucher', $payment->id))
+            ->assertRedirect(route('erp.payables.approvals'))
+            ->assertSessionHasErrors(['bank_account', 'check_no']);
+        $this->postJson(route('erp.payables.check-voucher.print.event', $payment->id))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['bank_account', 'check_no']);
+        DB::table('payments')->where('id', $payment->id)->update([
+            'bank_account_id' => $bank->id,
+            'bank_account' => $bank->account_no,
+            'check_no' => 'CONTROL-1001',
+        ]);
+
         $this->get(route('erp.payables.check-print', $payment->id))
             ->assertRedirect(route('erp.payables.approvals'))
             ->assertSessionHasErrors('check');
@@ -144,6 +161,31 @@ class ControlledCheckLifecycleTest extends TestCase
         $this->from(route('erp.payables.payments.create'))->post(route('erp.payables.payments.review'), $duplicatePayload)
             ->assertRedirect(route('erp.payables.payments.create'))->assertSessionHasErrors('check_no');
         $this->assertDatabaseMissing('payments', ['payment_no' => 'PV-CONTROL-1002']);
+    }
+
+    public function test_automatic_payment_number_skips_an_existing_stale_preview()
+    {
+        list($bill, $bank) = $this->billAndBank();
+        $existingPaymentId = DB::table('payments')->orderBy('id')->value('id');
+        DB::table('payments')->where('id', $existingPaymentId)->update(['payment_no' => 'PV-00323']);
+        DB::table('number_series')
+            ->where('company_id', $bill->company_id)
+            ->where('document_type', 'payment_voucher')
+            ->update(['current_number' => 322, 'prefix' => 'PV-', 'padding' => 5]);
+
+        $this->post(route('erp.payables.payments.review'), $this->paymentPayload($bill, $bank, [
+            'payment_no' => 'PV-00323',
+            'check_no' => 'CONTROL-AUTO-NUMBER',
+            'amount' => '6.00',
+        ]))->assertOk();
+
+        $payment = DB::table('payments')->where('check_no', 'CONTROL-AUTO-NUMBER')->first();
+        $this->assertNotNull($payment);
+        $this->assertSame('PV-00324', $payment->payment_no);
+        $this->assertSame(324, (int) DB::table('number_series')
+            ->where('company_id', $bill->company_id)
+            ->where('document_type', 'payment_voucher')
+            ->value('current_number'));
     }
 
     public function test_layout_saves_new_versions_and_keeps_only_latest_active()

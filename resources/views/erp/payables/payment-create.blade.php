@@ -18,7 +18,7 @@
         <div class="row g-3">
             <div class="col-md-3">
                 <label class="form-label">Payment No</label>
-                <input name="payment_no" class="form-control" value="{{ $nextPaymentNo }}" required>
+                <input name="payment_no" class="form-control bg-light" value="{{ $nextPaymentNo }}" readonly required>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Payment Date</label>
@@ -63,11 +63,11 @@
             </div>
             <div class="col-md-4">
                 <label class="form-label">Payment Method</label>
-                <select name="payment_method" class="form-select erp-select"><option>Bank</option><option>Cheque</option><option>Online Transfer</option></select>
+                <select name="payment_method" id="paymentMethod" class="form-select erp-select"><option>Bank</option><option>Cheque</option><option>Online Transfer</option></select>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Bank Account</label>
-                <select name="bank_account" class="form-select erp-select">
+                <select name="bank_account" id="bankAccount" class="form-select erp-select" required>
                     <option value="">Select account...</option>
                     @foreach($bankAccounts as $bank)
                         <option value="{{ $bank['account_no'] }}">{{ $bank['bank'] }} - {{ $bank['name'] }} ({{ $bank['currency'] }})</option>
@@ -76,7 +76,7 @@
             </div>
             <div class="col-md-3">
                 <label class="form-label">Check No</label>
-                <input name="check_no" class="form-control" value="">
+                <input name="check_no" id="checkNumber" class="form-control" value="">
             </div>
             <div class="col-md-3">
                 <label class="form-label">Currency</label>
@@ -133,10 +133,16 @@
             }
         }
 
+        function syncCheckRequirements() {
+            $('#checkNumber').prop('required', $('#paymentMethod').val() === 'Cheque');
+        }
+
         $('#billSelect').on('change', syncBill);
         $('#currencySelect').on('change', syncCurrency);
+        $('#paymentMethod').on('change', syncCheckRequirements);
         syncBill();
         syncCurrency();
+        syncCheckRequirements();
     });
 </script>
 @endpush
