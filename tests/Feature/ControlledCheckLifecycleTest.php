@@ -351,6 +351,8 @@ class ControlledCheckLifecycleTest extends TestCase
 
         $this->get(route('erp.payables.check-voucher'))
             ->assertOk()
+            ->assertSee('width: 748px', false)
+            ->assertDontSee('width: 364px', false)
             ->assertSee('height: 60px', false)
             ->assertSee('height: 220px', false)
             ->assertDontSee('cv-muted-line');

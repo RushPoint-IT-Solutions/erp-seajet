@@ -3538,20 +3538,25 @@ class ModuleController extends Controller
         $savedStyles = $saved['field_styles'] ?? [];
         $defaultBoxHeights = [
             'payee' => 126,
-            'amount' => 96,
-            'description' => 104,
-            'accounting' => 176,
-            'signatures' => 150,
+            'amount' => 70,
+            'description' => 64,
+            'accounting' => 160,
+            'signatures' => 145,
         ];
+        $legacyBoxHeights = ['amount' => 96, 'description' => 104, 'accounting' => 176, 'signatures' => 150];
         $savedBoxHeights = isset($savedStyles['_box_heights']) && is_array($savedStyles['_box_heights'])
             ? $savedStyles['_box_heights']
             : [];
 
         $layout['box_heights'] = [];
         foreach ($defaultBoxHeights as $box => $height) {
+            $savedHeight = $savedBoxHeights[$box] ?? $height;
+            if (!$fromRequest && isset($legacyBoxHeights[$box]) && (int) $savedHeight === $legacyBoxHeights[$box]) {
+                $savedHeight = $height;
+            }
             $layout['box_heights'][$box] = max(40, min(600, (int) request(
                 'box_height_'.$box,
-                $savedBoxHeights[$box] ?? $height
+                $savedHeight
             )));
         }
 

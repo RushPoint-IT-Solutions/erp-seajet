@@ -9,6 +9,8 @@
     $fieldStyles = $layout['field_styles'];
     $customFields = $layout['custom_fields'];
     $boxHeights = $layout['box_heights'];
+    $boxHeights['amount'] = max($boxHeights['amount'], 47 + $fieldStyles['amount_words']['height']);
+    $boxHeights['description'] = max($boxHeights['description'], 24 + $fieldStyles['description']['height']);
     $formattedAmount = number_format($voucher['net'], 2);
     $values = [
         'company_name' => strtoupper($voucher['company']),
@@ -94,16 +96,16 @@
     .cv-vline { position: absolute; border-left: 1px solid #111827; }
     .cv-amount-box {
         position: absolute;
-        left: 430px;
-        top: 390px;
-        width: 364px;
+        left: 46px;
+        top: 388px;
+        width: 748px;
         height: {{ $boxHeights['amount'] }}px;
         border: 1px solid #111827;
     }
     .cv-amount-box-line {
         position: absolute;
         left: 0;
-        top: 44px;
+        top: 36px;
         width: 100%;
         border-top: 1px solid #111827;
     }
@@ -165,7 +167,7 @@
             @php($paymentInfoFields = ['payment_info_title', 'amount_header', 'account_name_label', 'account_name', 'amount', 'account_no_label', 'account_no', 'amount_words'])
             @foreach($positions as $field => $point)
                 @continue(($point[0] ?? 0) < 0 || ($point[1] ?? 0) < 0)
-                @php($paymentColumnPositions = ['account_name_label' => [70, 399], 'account_name' => [180, 399], 'account_no_label' => [70, 437], 'account_no' => [180, 437], 'amount_header' => [442, 398], 'amount' => [530, 398], 'amount_words' => [442, 444]])
+                @php($paymentColumnPositions = ['account_name_label' => [70, 397], 'account_name' => [180, 397], 'account_no_label' => [70, 431], 'account_no' => [180, 431], 'amount_header' => [442, 397], 'amount' => [530, 397], 'amount_words' => [442, 431]])
                 @php($fixedWidths = ['account_name_label' => 105, 'account_name' => 230, 'account_no_label' => 105, 'account_no' => 230, 'amount_header' => 80, 'amount' => 250, 'amount_words' => 330])
                 @php($renderTop = isset($paymentColumnPositions[$field]) ? $paymentColumnPositions[$field][1] : (($point[1] ?? 0) - (in_array($field, $paymentInfoFields, true) ? 28 : 0)))
                 @php($minimumWidth = ['logo_mark' => 320, 'company_name' => 460, 'form_title' => 200, 'payment_info_title' => 220][$field] ?? $fieldStyles[$field]['width'])
