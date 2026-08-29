@@ -3038,7 +3038,9 @@ class ModuleController extends Controller
                     'payment_no' => $payment->payment_no,
                     'supplier' => $payment->payee_snapshot ?: ($payment->supplier_name ?: '-'),
                     'shipment_job_id' => $payment->shipment_job_id ?: '-',
-                    'check_no' => $payment->check_no ?: '-',
+                    'check_no' => $issuance && trim((string) $issuance->check_no) !== ''
+                        ? $issuance->check_no
+                        : ($payment->check_no ?: '-'),
                     'currency' => $payment->currency ?: 'PHP',
                     'amount' => number_format((float) $payment->amount, 2),
                     'status' => $status,

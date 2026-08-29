@@ -29,13 +29,14 @@
     <div class="erp-card p-3">
         <div class="table-responsive">
             <table class="table table-hover align-middle module-table w-100">
-                <thead><tr><th>Payment</th><th>Supplier</th><th>Method / Check</th><th>Currency</th><th class="text-end">Amount</th><th>Status</th><th>Check Control</th><th class="text-end">Actions</th></tr></thead>
+                <thead><tr><th>Payment</th><th>Supplier</th><th>Method</th><th>Check No.</th><th>Currency</th><th class="text-end">Amount</th><th>Status</th><th>Check Control</th><th class="text-end">Actions</th></tr></thead>
                 <tbody>
                 @foreach($approvals as $row)
                     <tr>
                         <td><div class="fw-semibold">{{ $row['payment_no'] }}</div><small class="text-muted">{{ $row['shipment_job_id'] }}</small></td>
                         <td>{{ $row['supplier'] }}</td>
-                        <td><div>{{ $row['payment_method'] }}</div><small class="text-muted">{{ $row['check_no'] }}</small></td>
+                        <td>{{ $row['payment_method'] }}</td>
+                        <td class="fw-semibold">{{ $row['check_no'] }}</td>
                         <td>{{ $row['currency'] }}</td>
                         <td class="text-end">{{ $row['amount'] }}</td>
                         <td><span class="badge {{ strtolower($row['status']) === 'released' ? 'text-bg-success' : (strtolower($row['status']) === 'voided' ? 'text-bg-danger' : 'text-bg-secondary') }}">{{ $row['status'] }}</span></td>

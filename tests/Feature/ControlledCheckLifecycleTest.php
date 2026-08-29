@@ -43,6 +43,10 @@ class ControlledCheckLifecycleTest extends TestCase
             'check_no' => 'CONTROL-1001',
             'status' => 'assigned',
         ]);
+        $this->get(route('erp.payables.approvals'))
+            ->assertOk()
+            ->assertSee('Check No.')
+            ->assertSee('CONTROL-1001');
 
         $this->get(route('erp.payables.check-print', $payment->id))
             ->assertRedirect(route('erp.payables.approvals'))
