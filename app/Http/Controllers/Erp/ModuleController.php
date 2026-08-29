@@ -2450,7 +2450,6 @@ class ModuleController extends Controller
             ->get()
             ->map(function ($bill) {
                 $balance = max(0, (float) $bill->grand_total - (float) $bill->paid_total);
-
                 return [
                     $bill->document_no,
                     $bill->supplier_name ?: '-',
@@ -2499,9 +2498,8 @@ class ModuleController extends Controller
             $taxCategory = strtoupper(trim((string) ($taxes[$index] ?? '')));
 
             if (in_array($taxCategory, ['VAT12', '12%'], true)) {
-                $net = $lineAmount / 1.12;
-                $vatable += $net;
-                $inputVat += $lineAmount - $net;
+                $vatable += $lineAmount;
+                $inputVat += $lineAmount * 0.12;
             } elseif ($taxCategory === 'ZERO') {
                 $zeroRated += $lineAmount;
             } elseif ($taxCategory === 'EXEMPT') {
@@ -2574,9 +2572,7 @@ class ModuleController extends Controller
 
     private function vendorBillLineWithholdingBase($amount, $taxCategory)
     {
-        $taxCategory = strtoupper(trim((string) $taxCategory));
-
-        return in_array($taxCategory, ['VAT12', '12%'], true) ? $amount / 1.12 : $amount;
+        return $amount;
     }
 
     private function expenseAccountWithholdingProfile($accountLabel)
@@ -2619,8 +2615,10 @@ class ModuleController extends Controller
                 $lineTotal += $this->moneyToFloat($amount);
             }
 
-            $grossAmount = $lineTotal > 0 ? $lineTotal : $this->moneyToFloat($data['gross_amount'] ?? 0);
-            $taxSplit = $this->apBillTaxSplit($data, $grossAmount);
+            $taxSplit = $this->apBillTaxSplit($data, $lineTotal);
+            $grossAmount = $lineTotal > 0
+                ? $lineTotal + $taxSplit['input_vat']
+                : $this->moneyToFloat($data['gross_amount'] ?? 0);
             $withholding = $this->apBillLineWithholdingTotals($data, $grossAmount, $taxSplit);
             $whtRate = $withholding['rate'];
             $whtAmount = $withholding['amount'];
@@ -2658,7 +2656,7 @@ class ModuleController extends Controller
                 'usd_to_php_rate' => $usdToPhpRate,
                 'gross_amount' => $grossAmount,
                 'php_amount' => $phpAmount,
-                'subtotal' => $grossAmount,
+                'subtotal' => $lineTotal > 0 ? $lineTotal : max(0, $grossAmount - $taxSplit['input_vat']),
                 'vatable_amount' => $taxSplit['vatable_amount'],
                 'zero_rated_amount' => $taxSplit['zero_rated_amount'],
                 'vat_exempt_amount' => $taxSplit['vat_exempt_amount'],
@@ -3773,6 +3771,11 @@ class ModuleController extends Controller
 
     private function apBillArray($bill)
     {
+        $billLines = collect($this->apBillLines($bill->id));
+        $lineAmountsExcludeVat = $this->apBillUsesNetLineAmounts($bill, $billLines);
+        $expenseTotal = $this->apBillExpenseTotal($bill, $billLines, $lineAmountsExcludeVat);
+        $expenseBalance = max(0, $expenseTotal - (float) ($bill->paid_total ?? 0));
+
         return [
             'id' => $bill->id,
             'transaction_type' => $bill->transaction_type ?? $bill->document_type,
@@ -3796,6 +3799,9 @@ class ModuleController extends Controller
             'withholding_tax_rate' => $bill->withholding_tax_rate ?? 0,
             'withholding_tax_amount' => number_format((float) ($bill->withholding_tax_amount ?? 0), 2),
             'net_amount' => number_format((float) ($bill->net_amount ?? $bill->grand_total), 2),
+            'expense_total' => number_format($expenseTotal, 2),
+            'expense_balance' => number_format($expenseBalance, 2),
+            'line_amounts_exclude_vat' => $lineAmountsExcludeVat,
             'memo' => $bill->memo ?? $bill->remarks,
             'approval_status' => $bill->approval_status ?? $bill->status,
         ];
@@ -3827,6 +3833,53 @@ class ModuleController extends Controller
         }
 
         return $query->get();
+    }
+
+    private function apBillExpenseTotal($bill, $lines = null, $lineAmountsExcludeVat = null)
+    {
+        $lines = $lines === null ? collect($this->apBillLines($bill->id)) : collect($lines);
+        if ($lines->isEmpty()) {
+            return max(0, (float) ($bill->gross_amount ?? $bill->subtotal ?? 0)
+                - (float) ($bill->tax_total ?? 0)
+                - (float) ($bill->withholding_tax_amount ?? 0));
+        }
+
+        $lineAmountsExcludeVat = $lineAmountsExcludeVat === null
+            ? $this->apBillUsesNetLineAmounts($bill, $lines)
+            : $lineAmountsExcludeVat;
+        $lineTotal = $lines->sum(function ($line) use ($lineAmountsExcludeVat) {
+            return $this->apBillLineExpenseAmount($line, $lineAmountsExcludeVat);
+        });
+
+        return max(0, $lineTotal - (float) ($bill->withholding_tax_amount ?? 0));
+    }
+
+    private function apBillUsesNetLineAmounts($bill, $lines = null)
+    {
+        $tax = (float) ($bill->tax_total ?? 0);
+        if ($tax <= 0) {
+            return true;
+        }
+
+        $lines = $lines === null ? collect($this->apBillLines($bill->id)) : collect($lines);
+        $lineTotal = $lines->sum(function ($line) {
+            return (float) ($line->amount ?? $line->line_total ?? 0);
+        });
+        $subtotal = (float) ($bill->subtotal ?? 0);
+        $gross = (float) ($bill->gross_amount ?? 0);
+
+        return abs($subtotal - $lineTotal) < 0.01
+            && abs($gross - ($subtotal + $tax)) < 0.01;
+    }
+
+    private function apBillLineExpenseAmount($line, $lineAmountsExcludeVat)
+    {
+        $amount = (float) ($line->amount ?? $line->line_total ?? 0);
+        $taxCategory = strtoupper(trim((string) ($line->tax_category ?? '')));
+
+        return !$lineAmountsExcludeVat && in_array($taxCategory, ['VAT12', '12%'], true)
+            ? $amount / 1.12
+            : $amount;
     }
 
     private function apBillPrintData($bill)
@@ -3867,6 +3920,7 @@ class ModuleController extends Controller
                 'currency' => data_get($record, 'currency') ?: 'PHP',
                 'gross_amount' => $grossAmount,
                 'input_vat' => $inputVat,
+                'line_amounts_exclude_vat' => $this->apBillUsesNetLineAmounts($record, $lines),
                 'withholding_tax_rate' => (float) (data_get($record, 'withholding_tax_rate') ?? 0),
                 'withholding_tax_amount' => $whtAmount,
                 'total' => $total,
@@ -3918,6 +3972,7 @@ class ModuleController extends Controller
             : 1;
         $rows = [];
         $billLines = $this->apBillLines($record->id);
+        $lineAmountsExcludeVat = $this->apBillUsesNetLineAmounts($record, $billLines);
 
         foreach ($billLines as $line) {
             $amount = (float) (data_get($line, 'amount') ?? data_get($line, 'line_total') ?? 0);
@@ -3936,7 +3991,7 @@ class ModuleController extends Controller
                 continue;
             }
 
-            $base = $this->vendorBillLineWithholdingBase($amount, data_get($line, 'tax_category'));
+            $base = $this->apBillLineExpenseAmount($line, $lineAmountsExcludeVat);
             if ($tax <= 0 && $rate > 0) {
                 $tax = $base * ($rate / 100);
             }

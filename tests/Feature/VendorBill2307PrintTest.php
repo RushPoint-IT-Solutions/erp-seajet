@@ -58,7 +58,7 @@ class VendorBill2307PrintTest extends TestCase
             'memo' => 'Header bill memo',
             'expense_account' => [$accountLabel],
             'expense_tax' => ['VAT12'],
-            'expense_amount' => ['11,200.00'],
+            'expense_amount' => ['10,000.00'],
             'expense_memo' => ['Test service expense'],
             'expense_customer_job' => [$customer->customer_id],
             'expense_class' => ['MANILA'],
@@ -72,6 +72,9 @@ class VendorBill2307PrintTest extends TestCase
         $this->assertSame('WC160', $line->atc_code);
         $this->assertEquals(2.0, (float) $line->withholding_tax_rate);
         $this->assertEquals(200.0, (float) $line->withholding_tax_amount);
+        $this->assertEquals(10000.0, (float) $bill->subtotal);
+        $this->assertEquals(1200.0, (float) $bill->tax_total);
+        $this->assertEquals(11200.0, (float) $bill->gross_amount);
         $this->assertEquals(200.0, (float) $bill->withholding_tax_amount);
         $this->assertEquals(11000.0, (float) $bill->grand_total);
         $this->assertSame('Header bill memo', $bill->memo);
@@ -93,6 +96,10 @@ class VendorBill2307PrintTest extends TestCase
             ->assertSee('Bill Total :PHP 11,000.00')
             ->assertDontSee('>Tax</th>', false)
             ->assertDontSee('ATC/WC');
+
+        $this->get(route('erp.payables.payments.create', ['bill' => $bill->document_no, 'method' => 'Cheque']))
+            ->assertOk()
+            ->assertSee('id="amountInput" class="form-control" value="11000.00"', false);
 
         $this->post(route('erp.settings.bir-2307.payee.save'), [
             'supplier_id' => $supplier->id,
@@ -241,7 +248,7 @@ class VendorBill2307PrintTest extends TestCase
             'expense_tax' => ['VAT12', 'EXEMPT'],
             'expense_atc_code' => ['WC160', ''],
             'expense_withholding_rate' => ['2', '0'],
-            'expense_amount' => ['11,200.00', '500.00'],
+            'expense_amount' => ['10,000.00', '500.00'],
             'expense_memo' => ['Withheld service', 'Asset purchase without withholding'],
             'expense_customer_job' => ['', ''],
             'expense_class' => ['MANILA', 'MANILA'],

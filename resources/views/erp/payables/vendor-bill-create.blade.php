@@ -356,6 +356,10 @@
                                             ? $savedLineRate
                                             : (float) ($lineAccountProfile->withholding_rate ?? 0);
                                         $lineTaxCategory = strtoupper((string) ($line->tax_category ?? ''));
+                                        $lineAmount = $line ? (float) ($line->amount ?? $line->line_total ?? 0) : 0;
+                                        if ($line && !($bill['line_amounts_exclude_vat'] ?? true) && $lineTaxCategory === 'VAT12') {
+                                            $lineAmount /= 1.12;
+                                        }
                                         $lineClassCode = strtoupper(trim((string) ($line->class_code ?? ''))) ?: 'MANILA';
                                     ?>
                                     @if($lineAccount && !$lineAccountInOptions)
@@ -383,7 +387,7 @@
                             </td>
                             <td><input name="expense_atc_code[]" class="form-control text-uppercase line-atc-code" maxlength="20" value="{{ $lineAtcCode }}" placeholder="WC160"></td>
                             <td><input name="expense_withholding_rate[]" class="form-control text-end line-wht-rate" type="number" min="0" max="100" step="0.01" value="{{ $lineWithholdingRate ?: '' }}"></td>
-                            <td><input name="expense_amount[]" class="form-control text-end expense-amount" value="{{ $line ? number_format((float) ($line->amount ?? $line->line_total ?? 0), 2) : '' }}"></td>
+                            <td><input name="expense_amount[]" class="form-control text-end expense-amount" value="{{ $line ? number_format($lineAmount, 2) : '' }}"></td>
                             <td><input name="expense_memo[]" class="form-control" value="{{ $line ? ($line->memo ?? $line->description ?? '') : '' }}"></td>
                             <td>
                                 <select name="expense_customer_job[]" class="form-select line-customer customer-job-search">
@@ -503,44 +507,44 @@
         }
 
         function recalc() {
-            var total = 0;
+            var expenseSubtotal = 0;
             var inputVat = 0;
             var lineWithholding = 0;
             var hasLineWithholding = false;
             $('#expenseLines tbody tr').each(function () {
                 var row = $(this);
                 var amount = numberValue(row.find('.expense-amount').val());
-                total += amount;
+                expenseSubtotal += amount;
 
                 var category = String(row.find('select[name="expense_tax[]"]').val() || '').toUpperCase();
                 row.find('.line-vatable').prop('checked', category === 'VAT12');
                 if (category === 'VAT12') {
-                    var net = amount / 1.12;
-                    inputVat += amount - net;
+                    inputVat += amount * 0.12;
                 }
 
                 var lineRate = numberValue(row.find('.line-wht-rate').val());
                 if (lineRate > 0) {
                     hasLineWithholding = true;
-                    var lineBase = category === 'VAT12' ? amount / 1.12 : amount;
-                    lineWithholding += lineBase * (lineRate / 100);
+                    lineWithholding += amount * (lineRate / 100);
                 }
             });
 
-            if (!total) {
-                total = numberValue($('#grossAmount').val());
+            var billTotal = expenseSubtotal + inputVat;
+            if (!expenseSubtotal) {
+                billTotal = numberValue($('#grossAmount').val());
+                expenseSubtotal = Math.max(0, billTotal - inputVat);
             } else {
-                $('#grossAmount').val(money(total));
+                $('#grossAmount').val(money(billTotal));
             }
 
             var whtRate = numberValue($('#whtRate').val());
             // BIR EWT is computed on the income payment net of VAT, not the VAT-inclusive gross.
-            var whtBase = Math.max(0, total - inputVat);
+            var whtBase = expenseSubtotal;
             var whtAmount = hasLineWithholding ? lineWithholding : whtBase * (whtRate / 100);
-            var net = total - whtAmount;
-            var php = currency() === 'USD' ? total * numberValue($('#exchangeRate').val()) : total;
+            var net = billTotal - whtAmount;
+            var php = currency() === 'USD' ? billTotal * numberValue($('#exchangeRate').val()) : billTotal;
 
-            $('#expenseTabTotal').text(currency() + ' ' + money(total));
+            $('#expenseTabTotal').text(currency() + ' ' + money(expenseSubtotal));
             $('#inputVatAmount').val(inputVat ? money(inputVat) : '');
             $('#whtAmount').val(whtAmount ? money(whtAmount) : '');
             $('#netAmount').val(net ? net.toFixed(2) : '');

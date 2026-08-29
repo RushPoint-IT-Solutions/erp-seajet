@@ -8,11 +8,13 @@
         return number_format((float) $amount, 2);
     };
     $printLines = collect($lines);
-    $expenseAmount = function ($line) {
+    $expenseAmount = function ($line) use ($bill) {
         $amount = (float) ($line->amount ?? $line->line_total ?? 0);
         $taxCategory = strtoupper(trim((string) ($line->tax_category ?? '')));
 
-        return in_array($taxCategory, ['VAT12', '12%'], true) ? $amount / 1.12 : $amount;
+        return empty($bill['line_amounts_exclude_vat']) && in_array($taxCategory, ['VAT12', '12%'], true)
+            ? $amount / 1.12
+            : $amount;
     };
     $accountName = function ($line) {
         if (trim((string) ($line->account_master_name ?? '')) !== '') {
