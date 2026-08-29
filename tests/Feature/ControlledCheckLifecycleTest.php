@@ -52,7 +52,8 @@ class ControlledCheckLifecycleTest extends TestCase
         $this->get(route('erp.payables.approvals'))
             ->assertOk()
             ->assertSee('Check No.')
-            ->assertSee('CONTROL-1001');
+            ->assertSee('CONTROL-1001')
+            ->assertSee(route('erp.payables.payments.approve', $payment->id));
         $supplierName = DB::table('suppliers')->where('id', $bill->supplier_id)->value('name');
         $this->get(route('erp.payables.check-voucher', $payment->id))
             ->assertOk()
@@ -91,10 +92,6 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertSessionHasErrors('check');
 
         $this->post(route('erp.payables.payments.approve', $payment->id))
-            ->assertSessionHasErrors('approval_status');
-
-        $this->actingAsFinance($bill->company_id);
-        $this->post(route('erp.payables.payments.approve', $payment->id))
             ->assertRedirect(route('erp.payables.approvals'));
         $this->assertDatabaseHas('payments', [
             'id' => $payment->id,
@@ -102,6 +99,7 @@ class ControlledCheckLifecycleTest extends TestCase
             'posting_status' => 'unposted',
         ]);
 
+        $this->actingAsFinance($bill->company_id);
         $this->get(route('erp.payables.check-print', $payment->id))
             ->assertRedirect(route('erp.payables.approvals'))
             ->assertSessionHasErrors('check');
@@ -110,7 +108,9 @@ class ControlledCheckLifecycleTest extends TestCase
         $this->get(route('erp.payables.check-print', $payment->id))
             ->assertOk()
             ->assertSee('id="checkPayeeName"', false)
-            ->assertSee('Alternate Check Payee');
+            ->assertSee('Alternate Check Payee')
+            ->assertSee('size: 88.9mm 210mm', false)
+            ->assertSee('rotate(90deg)', false);
         $this->post(route('erp.payables.check-print.payee.update', $payment->id), [
             'payee_name' => 'Updated Printed Payee',
         ])->assertRedirect(route('erp.payables.check-print', $payment->id));

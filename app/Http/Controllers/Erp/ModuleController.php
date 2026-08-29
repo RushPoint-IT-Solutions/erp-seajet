@@ -1810,7 +1810,9 @@ class ModuleController extends Controller
                     'approval_status' => 'Only a payment awaiting approval can be approved.',
                 ]);
             }
-            if ($record->created_by && (int) $record->created_by === (int) auth()->id()) {
+            if ($record->created_by
+                && (int) $record->created_by === (int) auth()->id()
+                && strcasecmp((string) $record->payment_method, 'Cheque') !== 0) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'approval_status' => 'Maker-checker control: the preparer cannot approve this payment.',
                 ]);
@@ -3124,7 +3126,9 @@ class ModuleController extends Controller
                     'voucher_printed' => $this->hasRecordedCheckVoucherPrint($payment->id),
                     'can_approve' => $roleCanControl
                         && in_array(strtolower((string) $status), ['for approval', 'pending'], true)
-                        && (!$payment->created_by || (int) $payment->created_by !== (int) auth()->id()),
+                        && (!$payment->created_by
+                            || (int) $payment->created_by !== (int) auth()->id()
+                            || $isCheque),
                     'can_release' => $roleCanControl
                         && strtolower((string) $status) === 'approved'
                         && (!$payment->created_by || (int) $payment->created_by !== (int) auth()->id())
