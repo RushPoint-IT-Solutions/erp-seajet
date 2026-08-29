@@ -211,7 +211,7 @@
             margin: 0;
             padding: 0;
             font-family: "Courier New", "Lucida Console", monospace;
-            font-size: 12px;
+            font-size: 14px;
             line-height: 1.12;
             color: #000 !important;
             page-break-after: avoid;
@@ -243,12 +243,12 @@
             text-align: center;
             line-height: 1.1;
         }
-        .bill-print-company-name { font-size: 14px; }
-        .bill-print-company-meta { font-size: 11px; }
+        .bill-print-company-name { font-size: 16px; }
+        .bill-print-company-meta { font-size: 13px; }
         .bill-print-form-title {
             margin-top: 8px;
             text-align: center;
-            font-size: 15px;
+            font-size: 17px;
         }
         .bill-small-grid,
         .bill-box,
@@ -274,7 +274,7 @@
         .bill-box-body {
             padding: 4px 5px;
             font-family: "Courier New", "Lucida Console", monospace;
-            font-size: 12px;
+            font-size: 14px;
             line-height: 1.08;
         }
         .bill-meta-box {
@@ -288,7 +288,7 @@
         }
         .bill-title {
             margin: 8px 0 5px;
-            font-size: 17px;
+            font-size: 19px;
         }
         .bill-expense-table th,
         .bill-expense-table td {
@@ -301,15 +301,15 @@
         .bill-expense-table tbody tr.filler td {
             height: 500px;
         }
-        .bill-class { font-size: 10px; }
+        .bill-class { font-size: 12px; }
         .bill-expense-total,
         .bill-vat-total {
             margin-top: 4px;
-            font-size: 11px;
+            font-size: 13px;
         }
         .bill-total {
             margin-top: 5px;
-            font-size: 15px;
+            font-size: 17px;
         }
     }
 </style>
