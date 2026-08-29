@@ -27,7 +27,8 @@ return [
         ['label' => 'AR Invoices', 'icon' => 'bi-file-earmark-pdf-fill', 'route' => 'erp.invoices.index', 'patterns' => ['erp/invoices*', 'erp/billings*', 'erp/invoice/preview'], 'permission' => 'invoices.view'],
         ['label' => 'AR Collections', 'icon' => 'bi-credit-card-fill', 'route' => 'erp.payments.create', 'patterns' => ['erp/payments*'], 'permission' => 'payments.view'],
         ['label' => 'Vendors', 'icon' => 'bi-building-fill', 'route' => 'erp.suppliers.index', 'patterns' => ['erp/suppliers*'], 'permission' => 'vendors.view'],
-        ['label' => 'Accounts Payable (AP)', 'icon' => 'bi-file-earmark-check-fill', 'route' => 'erp.expenses.index', 'patterns' => ['erp/expenses', 'erp/payables*'], 'permission' => 'payables.view'],
+        ['label' => 'Accounts Payable (AP)', 'icon' => 'bi-file-earmark-check-fill', 'route' => 'erp.expenses.index', 'patterns' => ['erp/expenses', 'erp/payables/vendor-bills*', 'erp/payables/payments/create*', 'erp/payables/aging'], 'permission' => 'payables.view'],
+        ['label' => 'Check Preparation', 'icon' => 'bi-printer-fill', 'route' => 'erp.payables.approvals', 'patterns' => ['erp/payables/payment-approvals', 'erp/payables/check-register', 'erp/payables/check-voucher*', 'erp/payables/check/*'], 'permission' => 'payables.view'],
         [
             'label' => 'Reports',
             'icon' => 'bi-graph-up-arrow',

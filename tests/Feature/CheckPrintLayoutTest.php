@@ -27,6 +27,7 @@ class CheckPrintLayoutTest extends TestCase
     {
         $payment = DB::table('payments')->orderBy('id')->first();
 
+        $this->postJson(route('erp.payables.check-voucher.print.event', $payment->id))->assertOk();
         $response = $this->get(route('erp.payables.check-print', $payment->id));
 
         $response->assertOk();

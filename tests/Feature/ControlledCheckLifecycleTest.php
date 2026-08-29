@@ -60,6 +60,11 @@ class ControlledCheckLifecycleTest extends TestCase
             'posting_status' => 'unposted',
         ]);
 
+        $this->get(route('erp.payables.check-print', $payment->id))
+            ->assertRedirect(route('erp.payables.approvals'))
+            ->assertSessionHasErrors('check');
+        $this->postJson(route('erp.payables.check-voucher.print.event', $payment->id))->assertOk();
+        $this->assertDatabaseHas('check_voucher_print_events', ['payment_id' => $payment->id]);
         $this->get(route('erp.payables.check-print', $payment->id))->assertOk();
         $this->postJson(route('erp.payables.check-print.event', $payment->id), [])->assertOk();
         $this->assertDatabaseHas('check_print_events', [
@@ -149,6 +154,7 @@ class ControlledCheckLifecycleTest extends TestCase
 
         $this->actingAsFinance($bill->company_id);
         $this->post(route('erp.payables.payments.approve', $payment->id));
+        $this->postJson(route('erp.payables.check-voucher.print.event', $payment->id))->assertOk();
         $this->postJson(route('erp.payables.check-print.event', $payment->id), [])->assertOk();
         $spoiled = DB::table('check_issuances')->where('payment_id', $payment->id)->first();
 

@@ -53,7 +53,7 @@
                                     <form method="post" action="{{ route('erp.payables.payments.approve', $row['id']) }}">@csrf<button class="btn btn-sm btn-outline-primary">Approve</button></form>
                                 @endif
                                 @if($row['can_print'])
-                                    <a href="{{ route('erp.payables.check-print', $row['id']) }}" class="btn btn-sm btn-primary">{{ $row['print_count'] ? 'Reprint' : 'Print Check' }}</a>
+                                    <a href="{{ $row['print_count'] || $row['voucher_printed'] ? route('erp.payables.check-print', $row['id']) : route('erp.payables.check-voucher', $row['id']) }}" class="btn btn-sm btn-primary">{{ $row['print_count'] ? 'Reprint Check' : ($row['voucher_printed'] ? 'Print Check' : 'Print Check Voucher') }}</a>
                                 @endif
                                 @if($row['can_release'])
                                     <form method="post" action="{{ route('erp.payables.payments.release', $row['id']) }}" onsubmit="return confirm('Release and post this payment to the ledger?')">@csrf<button class="btn btn-sm btn-success">Release</button></form>

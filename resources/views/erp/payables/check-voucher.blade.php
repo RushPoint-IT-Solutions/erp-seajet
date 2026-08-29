@@ -104,9 +104,9 @@
 @section('content')
     <div class="d-flex justify-content-end gap-2 mb-3 no-print">
         <a href="{{ route('erp.payables.check-voucher.layout', array_filter(['payment' => $voucher['id']])) }}" class="btn btn-outline-secondary"><i class="bi bi-sliders me-1"></i> Adjust Layout</a>
-        <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print Voucher</button>
+        <button type="button" class="btn btn-outline-secondary" id="printVoucherButton"><i class="bi bi-printer me-1"></i> Print Check Voucher</button>
         @if(!empty($voucher['id']))
-            <a href="{{ route('erp.payables.check-print', $voucher['id']) }}" class="btn btn-primary"><i class="bi bi-bank me-1"></i> Print Check</a>
+            <a href="{{ route('erp.payables.check-print', $voucher['id']) }}" class="btn btn-primary {{ $voucherPrinted ? '' : 'd-none' }}" id="printCheckButton"><i class="bi bi-bank me-1"></i> Print Check</a>
         @endif
     </div>
 
@@ -148,4 +148,40 @@
             @endforeach
         </div>
     </div>
+
+    @if(!empty($voucher['id']))
+        <script>
+            document.getElementById('printVoucherButton').addEventListener('click', async function () {
+                const button = this;
+                button.disabled = true;
+
+                try {
+                    const response = await fetch('{{ route('erp.payables.check-voucher.print.event', $voucher['id']) }}', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Unable to record the check voucher print request.');
+                    }
+
+                    window.print();
+                    document.getElementById('printCheckButton').classList.remove('d-none');
+                } catch (error) {
+                    window.alert(error.message);
+                } finally {
+                    button.disabled = false;
+                }
+            });
+        </script>
+    @else
+        <script>
+            document.getElementById('printVoucherButton').addEventListener('click', function () {
+                window.print();
+            });
+        </script>
+    @endif
 @endsection

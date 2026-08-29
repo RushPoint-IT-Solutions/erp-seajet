@@ -32,15 +32,15 @@
         min-height: 172px;
     }
     .bill-print-brand {
-        display: grid;
-        grid-template-columns: 100px 1fr;
-        gap: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
         align-items: center;
         padding-top: 2px;
     }
     .bill-print-logo {
-        width: 90px;
-        height: 56px;
+        width: 190px;
+        height: 100px;
         object-fit: contain;
     }
     .bill-print-company {
@@ -196,28 +196,27 @@
             grid-template-columns: 1fr 250px;
         }
         .bill-print-logo {
-            display: none;
+            display: block;
+            width: 160px;
+            height: 78px;
+            margin: 0 auto;
         }
         .bill-print-brand {
-            display: block;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
             padding-top: 0;
         }
         .bill-print-company {
-            text-align: left;
+            text-align: center;
             line-height: 1.1;
-        }
-        .bill-print-company::before {
-            content: "SEA-JET";
-            display: block;
-            font-size: 15px;
-            font-weight: 800;
-            letter-spacing: 1px;
         }
         .bill-print-company-name { font-size: 12px; }
         .bill-print-company-meta { font-size: 9px; }
         .bill-print-form-title {
             margin-top: 8px;
-            text-align: left;
+            text-align: center;
             font-size: 13px;
         }
         .bill-small-grid,

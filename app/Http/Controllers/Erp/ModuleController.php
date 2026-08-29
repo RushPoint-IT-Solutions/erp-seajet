@@ -2119,6 +2119,41 @@ class ModuleController extends Controller
             'voucher' => $this->paymentPrintData($payment),
             'layout' => $this->checkVoucherPrintLayoutPayload(),
             'fields' => $this->checkVoucherPrintFields(),
+            'voucherPrinted' => $payment ? $this->hasRecordedCheckVoucherPrint($payment) : false,
+        ]);
+    }
+
+    public function recordCheckVoucherPrint($payment)
+    {
+        $record = $this->paymentRecordForCompany($payment);
+        abort_unless($record, 404);
+
+        $voucher = $this->paymentPrintData($payment);
+        $layout = $this->checkVoucherPrintLayoutPayload();
+        $payloadHash = hash('sha256', json_encode([$voucher, $layout]));
+
+        $eventId = DB::table('check_voucher_print_events')->insertGetId([
+            'company_id' => $record->company_id,
+            'payment_id' => $record->id,
+            'payload_snapshot' => json_encode($voucher),
+            'layout_snapshot' => json_encode($layout),
+            'payload_hash' => $payloadHash,
+            'printed_by' => auth()->id(),
+            'ip_address' => request()->ip(),
+            'user_agent' => substr((string) request()->userAgent(), 0, 1000),
+            'created_at' => now(),
+        ]);
+
+        app(ActivityLogger::class)->log('print_requested', 'check_voucher', $record->id, [], [
+            'payment_no' => $record->payment_no,
+            'voucher_no' => $record->voucher_no,
+            'event_id' => $eventId,
+            'payload_hash' => $payloadHash,
+        ], $record->company_id);
+
+        return response()->json([
+            'status' => 'Check voucher print request recorded.',
+            'event' => ['id' => $eventId],
         ]);
     }
 
@@ -3010,6 +3045,7 @@ class ModuleController extends Controller
                     'payment_method' => $payment->payment_method,
                     'check_status' => $issuance ? $issuance->status : null,
                     'print_count' => $issuance ? (int) $issuance->print_count : 0,
+                    'voucher_printed' => $this->hasRecordedCheckVoucherPrint($payment->id),
                     'can_approve' => $roleCanControl
                         && in_array(strtolower((string) $status), ['for approval', 'pending'], true)
                         && (!$payment->created_by || (int) $payment->created_by !== (int) auth()->id()),
@@ -3192,8 +3228,21 @@ class ModuleController extends Controller
         if (in_array(strtolower((string) $payment->status), ['voided', 'cancelled'], true)) {
             $errors['status'] = 'A voided or cancelled payment cannot be printed.';
         }
+        $issuance = $this->activeCheckIssuance($payment->id);
+        if ((!$issuance || (int) $issuance->print_count === 0) && !$this->hasRecordedCheckVoucherPrint($payment->id)) {
+            $errors['check_voucher'] = 'Print the Check Voucher before printing the Check.';
+        }
 
         return $errors;
+    }
+
+    private function hasRecordedCheckVoucherPrint($paymentId)
+    {
+        return Schema::hasTable('check_voucher_print_events')
+            && DB::table('check_voucher_print_events')
+                ->where('company_id', $this->defaultCompanyId())
+                ->where('payment_id', $paymentId)
+                ->exists();
     }
 
     private function canOperateChecks()
