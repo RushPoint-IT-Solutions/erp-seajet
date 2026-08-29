@@ -130,6 +130,9 @@
         gap: 14px;
         margin-bottom: 18px;
     }
+    .bill-meta-line > div:first-child {
+        white-space: nowrap;
+    }
     .bill-title {
         margin: 30px 0 16px;
         font-size: 31px;
@@ -156,9 +159,6 @@
     .bill-expense-table td:last-child { border-right: 0; }
     .bill-expense-table tbody td {
         height: 34px;
-    }
-    .bill-expense-table tbody tr.filler td {
-        height: 430px;
     }
     .bill-num { text-align: right; }
     .bill-class {
@@ -202,14 +202,14 @@
         }
         .bill-print-wrap { overflow: hidden; }
         .bill-print-sheet {
-            width: calc(8.14in - 12px);
+            width: calc(8.14in - 28px);
             height: calc(10.64in - 12px);
             min-height: 0;
             max-height: calc(10.64in - 12px);
             overflow: hidden;
             border: 0;
             box-shadow: none;
-            margin: 12px 0 0 12px;
+            margin: 12px 0 0 28px;
             padding: 0;
             font-family: "Courier New", "Lucida Console", monospace;
             font-size: 14px;
@@ -228,8 +228,8 @@
         }
         .bill-print-logo {
             display: block;
-            width: 260px;
-            height: 100px;
+            width: 320px;
+            height: 115px;
             margin: 0 auto;
         }
         .bill-print-brand {
@@ -265,7 +265,10 @@
             border-color: #000;
             line-height: 1.2;
         }
-        .bill-meta-stack > .bill-small-grid { margin: 0 20px; }
+        .bill-meta-stack > .bill-small-grid {
+            width: 50%;
+            margin: 0 20px 0 auto;
+        }
         .bill-info-row {
             grid-template-columns: 260px 1fr;
             gap: 22px;
@@ -293,7 +296,7 @@
         }
         .bill-meta-line {
             margin-bottom: 5px;
-            grid-template-columns: 58px 1fr;
+            grid-template-columns: 76px 1fr;
             gap: 8px;
         }
         .bill-title {
@@ -307,9 +310,6 @@
         }
         .bill-expense-table tbody td {
             height: 18px;
-        }
-        .bill-expense-table tbody tr.filler td {
-            height: 420px;
         }
         .bill-class { font-size: 12px; }
         .bill-expense-total,
@@ -410,12 +410,6 @@
                             <td class="bill-class"></td>
                         </tr>
                     @endif
-                    <tr class="filler">
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                    </tr>
                 </tbody>
             </table>
 

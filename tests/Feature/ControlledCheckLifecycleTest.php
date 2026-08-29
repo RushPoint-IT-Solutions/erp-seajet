@@ -58,6 +58,8 @@ class ControlledCheckLifecycleTest extends TestCase
         $this->get(route('erp.payables.check-voucher', $payment->id))
             ->assertOk()
             ->assertSee('Account Name:')
+            ->assertSee('height: 82px', false)
+            ->assertSee('width: 320px', false)
             ->assertSee($supplierName)
             ->assertSee('A/P Trade ('.$bank->bank_name.') - '.$bill->currency)
             ->assertSee('CL-CONTROL')

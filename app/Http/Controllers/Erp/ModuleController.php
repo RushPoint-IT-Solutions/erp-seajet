@@ -3552,14 +3552,14 @@ class ModuleController extends Controller
                 'font_size' => max(7, min(40, (int) request('fs_'.$field, $savedStyle['font_size'] ?? $defaultFontSize))),
             ];
 
-            if ($field === 'logo_mark' && $layout['field_styles'][$field]['width'] < 240) {
+            if ($field === 'logo_mark' && $layout['field_styles'][$field]['width'] < 320) {
                 $currentWidth = $layout['field_styles'][$field]['width'];
                 if ($layout['positions'][$field][0] >= 0) {
                     $layout['positions'][$field][0] = max(0, (int) round(
-                        $layout['positions'][$field][0] - ((240 - $currentWidth) / 2)
+                        $layout['positions'][$field][0] - ((320 - $currentWidth) / 2)
                     ));
                 }
-                $layout['field_styles'][$field]['width'] = 240;
+                $layout['field_styles'][$field]['width'] = 320;
             }
         }
 
@@ -3726,7 +3726,7 @@ class ModuleController extends Controller
             return 300;
         }
         if (in_array($field, ['logo_mark'])) {
-            return 240;
+            return 320;
         }
 
         return 130;

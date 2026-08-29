@@ -95,8 +95,8 @@
     }
     .drag-field.amount { text-align: right; }
     .drag-field.header-text { text-align: center; font-weight: 700; letter-spacing: .02em; }
-    .drag-field.logo-mark { height: 66px; text-align: center; }
-    .drag-field.logo-mark img { display: block; width: 100%; height: 60px; object-fit: contain; pointer-events: none; }
+    .drag-field.logo-mark { height: 88px; text-align: center; }
+    .drag-field.logo-mark img { display: block; width: 100%; height: 82px; object-fit: contain; pointer-events: none; }
     .drag-field.label { color: #374151; }
     .drag-field.signature { text-align: center; border-top: 1px solid #111827; border-left-color: transparent; border-right-color: transparent; border-bottom-color: transparent; padding-top: 6px; }
     .drag-field.active { outline: 2px solid #0d6efd; outline-offset: 1px; background: rgba(13, 110, 253, .08); }

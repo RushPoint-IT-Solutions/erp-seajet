@@ -84,8 +84,8 @@
     .cv-field.nowrap { white-space: nowrap; }
     .cv-field.amount { text-align: right; }
     .cv-field.header-text { text-align: center; font-weight: 700; letter-spacing: .02em; }
-    .cv-field.logo-mark { height: 60px; text-align: center; }
-    .cv-field.logo-mark img { display: block; width: 100%; height: 60px; object-fit: contain; }
+    .cv-field.logo-mark { height: 82px; text-align: center; }
+    .cv-field.logo-mark img { display: block; width: 100%; height: 82px; object-fit: contain; }
     .cv-field.label { color: #374151; }
     .cv-field.signature { text-align: center; border-top: 1px solid #111827; padding-top: 6px; }
     .cv-box { position: absolute; border: 1px solid #111827; }
@@ -172,7 +172,7 @@
                 @php($paymentColumnPositions = ['account_name_label' => [70, 399], 'account_name' => [180, 399], 'account_no_label' => [70, 437], 'account_no' => [180, 437], 'amount_header' => [442, 398], 'amount' => [530, 398], 'amount_words' => [442, 444]])
                 @php($fixedWidths = ['account_name_label' => 105, 'account_name' => 230, 'account_no_label' => 105, 'account_no' => 230, 'amount_header' => 80, 'amount' => 250, 'amount_words' => 330])
                 @php($renderTop = isset($paymentColumnPositions[$field]) ? $paymentColumnPositions[$field][1] : (($point[1] ?? 0) - (in_array($field, $paymentInfoFields, true) ? 28 : 0)))
-                @php($minimumWidth = ['company_name' => 460, 'form_title' => 200, 'payment_info_title' => 220][$field] ?? $fieldStyles[$field]['width'])
+                @php($minimumWidth = ['logo_mark' => 320, 'company_name' => 460, 'form_title' => 200, 'payment_info_title' => 220][$field] ?? $fieldStyles[$field]['width'])
                 @php($renderWidth = $fixedWidths[$field] ?? max($fieldStyles[$field]['width'], $minimumWidth))
                 @php($renderLeft = $field === 'logo_mark' ? (($settings['paper_width'] - $renderWidth) / 2) : (isset($paymentColumnPositions[$field]) ? $paymentColumnPositions[$field][0] : (($point[0] ?? 0) - (in_array($field, ['company_name', 'form_title'], true) ? (($renderWidth - $fieldStyles[$field]['width']) / 2) : 0))))
                 @php($fontIncrease = $field === 'company_name' ? 4 : 2)
