@@ -181,7 +181,7 @@
         margin-top: 14px;
         text-align: right;
         font-size: 23px;
-        font-weight: 500;
+        font-weight: 700;
     }
     @media print {
         @page { size: 8.5in 11in; margin: 0.18in; }
@@ -201,14 +201,14 @@
         }
         .bill-print-wrap { overflow: hidden; }
         .bill-print-sheet {
-            width: 8.14in;
-            height: 10.64in;
+            width: calc(8.14in - 12px);
+            height: calc(10.64in - 12px);
             min-height: 0;
-            max-height: 10.64in;
+            max-height: calc(10.64in - 12px);
             overflow: hidden;
             border: 0;
             box-shadow: none;
-            margin: 0;
+            margin: 12px 0 0 12px;
             padding: 0;
             font-family: "Courier New", "Lucida Console", monospace;
             font-size: 14px;
