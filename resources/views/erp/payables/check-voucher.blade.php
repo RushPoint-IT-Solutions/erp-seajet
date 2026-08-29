@@ -10,7 +10,6 @@
     $customFields = $layout['custom_fields'];
     $formattedAmount = number_format($voucher['net'], 2);
     $values = [
-        'logo_mark' => 'SJ',
         'company_name' => strtoupper($voucher['company']),
         'form_title' => 'CHECK VOUCHER',
         'payee_label' => 'PAYEE',
@@ -84,7 +83,8 @@
     }
     .cv-field.amount { text-align: right; }
     .cv-field.header-text { text-align: center; font-weight: 700; letter-spacing: .02em; }
-    .cv-field.logo-mark { text-align: center; font-weight: 800; color: #6b7280; border: 2px solid #9ca3af; transform: skew(-12deg); }
+    .cv-field.logo-mark { height: 60px; text-align: center; }
+    .cv-field.logo-mark img { display: block; width: 100%; height: 60px; object-fit: contain; }
     .cv-field.label { color: #374151; }
     .cv-field.signature { text-align: center; border-top: 1px solid #111827; padding-top: 6px; }
     .cv-box { position: absolute; border: 1px solid #111827; }
@@ -137,7 +137,11 @@
                 @continue(($point[0] ?? 0) < 0 || ($point[1] ?? 0) < 0)
                 @php($classes = (in_array($field, ['company_name', 'form_title']) ? ' header-text' : '').($field === 'logo_mark' ? ' logo-mark' : '').(in_array($field, ['amount', 'debit_amount', 'credit_amount', 'total_debit', 'total_credit']) ? ' amount' : '').(strpos($field, 'label') !== false || strpos($field, 'header') !== false ? ' label' : ''))
                 <div class="cv-field{{ $classes }}" style="left: {{ $point[0] }}px; top: {{ $point[1] }}px; width: {{ $fieldStyles[$field]['width'] }}px; font-size: {{ $fieldStyles[$field]['font_size'] }}px;">
-                    {{ $values[$field] ?? '' }}
+                    @if($field === 'logo_mark')
+                        <img src="{{ asset('images/gen_off_seajetlogo.webp') }}" alt="SeaJet logo">
+                    @else
+                        {{ $values[$field] ?? '' }}
+                    @endif
                 </div>
             @endforeach
 

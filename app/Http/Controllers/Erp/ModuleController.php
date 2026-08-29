@@ -3444,6 +3444,11 @@ class ModuleController extends Controller
                 'width' => max(30, min(1000, (int) request('w_'.$field, $savedStyle['width'] ?? $defaultWidth))),
                 'font_size' => max(7, min(40, (int) request('fs_'.$field, $savedStyle['font_size'] ?? $defaultFontSize))),
             ];
+
+            if ($field === 'logo_mark' && $layout['field_styles'][$field]['width'] <= 60) {
+                $layout['positions'][$field][0] = max(0, $layout['positions'][$field][0] - 73);
+                $layout['field_styles'][$field]['width'] = 190;
+            }
         }
 
         return $layout;
@@ -3487,7 +3492,7 @@ class ModuleController extends Controller
     private function defaultCheckVoucherPrintPositions()
     {
         return [
-            'logo_mark' => [388, 28],
+            'logo_mark' => [315, 28],
             'company_name' => [232, 108],
             'form_title' => [338, 136],
             'payee_label' => [52, 196],
@@ -3600,7 +3605,7 @@ class ModuleController extends Controller
             return 300;
         }
         if (in_array($field, ['logo_mark'])) {
-            return 44;
+            return 190;
         }
 
         return 130;

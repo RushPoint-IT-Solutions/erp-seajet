@@ -10,7 +10,6 @@
     $customFields = $layout['custom_fields'];
     $formattedAmount = number_format($sample['net'], 2);
     $sampleValues = [
-        'logo_mark' => 'SJ',
         'company_name' => strtoupper($sample['company']),
         'form_title' => 'CHECK VOUCHER',
         'payee_label' => 'PAYEE',
@@ -96,7 +95,8 @@
     }
     .drag-field.amount { text-align: right; }
     .drag-field.header-text { text-align: center; font-weight: 700; letter-spacing: .02em; }
-    .drag-field.logo-mark { text-align: center; font-weight: 800; color: #6b7280; border: 2px solid #9ca3af; transform: skew(-12deg); }
+    .drag-field.logo-mark { height: 66px; text-align: center; }
+    .drag-field.logo-mark img { display: block; width: 100%; height: 60px; object-fit: contain; pointer-events: none; }
     .drag-field.label { color: #374151; }
     .drag-field.signature { text-align: center; border-top: 1px solid #111827; border-left-color: transparent; border-right-color: transparent; border-bottom-color: transparent; padding-top: 6px; }
     .drag-field.active { outline: 2px solid #0d6efd; outline-offset: 1px; background: rgba(13, 110, 253, .08); }
@@ -180,7 +180,11 @@
                         <div class="drag-field{{ $classes }}" data-kind="standard" data-field="{{ $field }}" style="left: {{ $point[0] }}px; top: {{ $point[1] }}px; width: {{ $fieldStyles[$field]['width'] }}px; font-size: {{ $fieldStyles[$field]['font_size'] }}px;">
                             <button type="button" class="field-remove" title="Hide"><i class="bi bi-x"></i></button>
                             <span class="field-resize" title="Resize"></span>
-                            {{ $sampleValues[$field] ?? $fields[$field] }}
+                            @if($field === 'logo_mark')
+                                <img src="{{ asset('images/gen_off_seajetlogo.webp') }}" alt="SeaJet logo">
+                            @else
+                                {{ $sampleValues[$field] ?? $fields[$field] }}
+                            @endif
                         </div>
                     @endforeach
 
