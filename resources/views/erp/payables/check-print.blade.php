@@ -75,9 +75,9 @@
     }
     .check-field {
         color: #000;
-        font-family: Arial, Helvetica, sans-serif;
+        font-family: Calibri, Arial, Helvetica, sans-serif;
         font-size: 12pt;
-        font-weight: 700;
+        font-weight: 400;
         line-height: 1.15;
         position: absolute;
         touch-action: none;
