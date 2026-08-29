@@ -21,13 +21,13 @@
         'document_date_label' => 'Document Date:',
         'document_date' => $voucher['document_date'],
         'payment_info_title' => 'PAYMENT INFORMATION',
-        'amount_header' => 'Amount',
+        'amount_header' => 'Amount :',
         'account_name_label' => 'Account Name:',
         'account_name' => $voucher['account_name'],
         'amount' => $formattedAmount,
         'account_no_label' => 'Account No:',
         'account_no' => $voucher['account_no'],
-        'amount_words' => $voucher['amount_words'],
+        'amount_words' => 'Word : '.$voucher['amount_words'],
         'description_label' => 'DESCRIPTION',
         'description' => $voucher['description'],
         'account_title_header' => 'Account Title',
@@ -92,6 +92,21 @@
     .cv-line { position: absolute; border-top: 1px solid #111827; }
     .cv-vline { position: absolute; border-left: 1px solid #111827; }
     .cv-muted-line { position: absolute; border-top: 1px dashed #111827; opacity: .55; }
+    .cv-amount-box {
+        position: absolute;
+        left: 58px;
+        top: 390px;
+        width: 350px;
+        height: 78px;
+        border: 1px solid #111827;
+    }
+    .cv-amount-box-line {
+        position: absolute;
+        left: 0;
+        top: 28px;
+        width: 100%;
+        border-top: 1px solid #111827;
+    }
     @media print {
         @page { size: letter; margin: 0; }
         html, body {
@@ -149,13 +164,17 @@
                 <div class="cv-line" style="left: 48px; top: 962px; width: 744px;"></div>
             @endif
 
+            <div class="cv-amount-box"><div class="cv-amount-box-line"></div></div>
+
             @php($paymentInfoFields = ['payment_info_title', 'amount_header', 'account_name_label', 'account_name', 'amount', 'account_no_label', 'account_no', 'amount_words'])
             @foreach($positions as $field => $point)
                 @continue(($point[0] ?? 0) < 0 || ($point[1] ?? 0) < 0)
-                @php($renderTop = ($point[1] ?? 0) - (in_array($field, $paymentInfoFields, true) ? 28 : 0))
+                @php($paymentColumnPositions = ['amount_header' => [70, 397], 'amount' => [150, 397], 'amount_words' => [70, 428], 'account_name_label' => [430, 397], 'account_name' => [540, 397], 'account_no_label' => [430, 435], 'account_no' => [540, 435]])
+                @php($fixedWidths = ['amount_header' => 80, 'amount' => 240, 'amount_words' => 326, 'account_name_label' => 105, 'account_name' => 244, 'account_no_label' => 105, 'account_no' => 244])
+                @php($renderTop = isset($paymentColumnPositions[$field]) ? $paymentColumnPositions[$field][1] : (($point[1] ?? 0) - (in_array($field, $paymentInfoFields, true) ? 28 : 0)))
                 @php($minimumWidth = ['company_name' => 460, 'form_title' => 200, 'payment_info_title' => 220][$field] ?? $fieldStyles[$field]['width'])
-                @php($renderWidth = max($fieldStyles[$field]['width'], $minimumWidth))
-                @php($renderLeft = ($point[0] ?? 0) - (in_array($field, ['company_name', 'form_title'], true) ? (($renderWidth - $fieldStyles[$field]['width']) / 2) : 0))
+                @php($renderWidth = $fixedWidths[$field] ?? max($fieldStyles[$field]['width'], $minimumWidth))
+                @php($renderLeft = $field === 'logo_mark' ? (($settings['paper_width'] - $renderWidth) / 2) : (isset($paymentColumnPositions[$field]) ? $paymentColumnPositions[$field][0] : (($point[0] ?? 0) - (in_array($field, ['company_name', 'form_title'], true) ? (($renderWidth - $fieldStyles[$field]['width']) / 2) : 0))))
                 @php($fontIncrease = $field === 'company_name' ? 4 : 2)
                 @php($classes = (in_array($field, ['company_name', 'form_title']) ? ' header-text' : '').($field === 'logo_mark' ? ' logo-mark' : '').(in_array($field, ['company_name', 'form_title', 'payment_info_title'], true) ? ' nowrap' : '').(in_array($field, ['amount', 'debit_amount', 'credit_amount', 'total_debit', 'total_credit']) ? ' amount' : '').(strpos($field, 'label') !== false || strpos($field, 'header') !== false ? ' label' : ''))
                 <div class="cv-field{{ $classes }}" style="left: {{ $renderLeft }}px; top: {{ $renderTop }}px; width: {{ $renderWidth }}px; font-size: {{ min(40, $fieldStyles[$field]['font_size'] + $fontIncrease) }}px;">
