@@ -2245,6 +2245,58 @@ class ModuleController extends Controller
         ]);
     }
 
+    public function updateCheckPayee($payment)
+    {
+        abort_unless($this->canOperateChecks(), 403, 'Only Finance or an Administrator may edit a check payee.');
+        $data = request()->validate([
+            'payee_name' => 'required|string|max:255',
+        ]);
+        $companyId = $this->defaultCompanyId();
+        $payee = trim($data['payee_name']);
+
+        DB::transaction(function () use ($payment, $companyId, $payee) {
+            $record = DB::table('payments')
+                ->where('company_id', $companyId)
+                ->where('id', $payment)
+                ->lockForUpdate()
+                ->first();
+            abort_unless($record, 404);
+
+            $issuance = $this->activeCheckIssuance($record->id, true);
+            abort_unless($issuance, 422, 'No active check issuance exists for this payment.');
+            if (strtolower((string) $record->approval_status) !== 'approved') {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'payee_name' => 'The payment must be approved before editing the check payee.',
+                ]);
+            }
+            if (!in_array($issuance->status, ['assigned', 'printed'], true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'payee_name' => 'The payee cannot be changed after the check is released or closed.',
+                ]);
+            }
+
+            DB::table('payments')->where('id', $record->id)->update([
+                'payee_snapshot' => $payee,
+                'updated_at' => now(),
+            ]);
+            DB::table('check_issuances')->where('id', $issuance->id)->update([
+                'payee_name' => $payee,
+                'updated_at' => now(),
+            ]);
+
+            app(ActivityLogger::class)->log('payee_updated', 'check_issuance', $issuance->id, [
+                'payee_name' => $issuance->payee_name,
+            ], [
+                'payee_name' => $payee,
+                'payment_id' => $record->id,
+            ], $companyId);
+        });
+
+        return redirect()
+            ->route('erp.payables.check-print', $payment)
+            ->with('status', 'Check payee updated.');
+    }
+
     public function saveCheckPrintLayout()
     {
         abort_unless($this->canSaveCheckPrintLayout(), 403, 'Only an Administrator may save the check print layout.');
@@ -3184,7 +3236,7 @@ class ModuleController extends Controller
             'payment_method' => $payment->payment_method,
             'bank_account' => $payment->bank_account ?: '-',
             'bank_name' => $payment->payment_bank_name ?: '-',
-            'account_name' => $apTradeTitle,
+            'account_name' => $payment->supplier_name ?: '-',
             'account_no' => $clientAccountNo !== '' ? $clientAccountNo : '-',
             'check_no' => $payment->check_no ?: '-',
             'bill_no' => $payment->bill_no,

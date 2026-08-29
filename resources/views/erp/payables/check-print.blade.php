@@ -233,6 +233,18 @@
                 The first print request will be recorded before the print dialog opens.
             @endif
         </div>
+        @if($canPrintCheck && in_array($checkIssuance->status, ['assigned', 'printed'], true))
+            <form method="post" action="{{ route('erp.payables.check-print.payee.update', $voucher['id']) }}" class="row g-2 align-items-end mt-2">
+                {{ csrf_field() }}
+                <div class="col-md-6">
+                    <label for="checkPayeeName" class="form-label small mb-1">Payee Name</label>
+                    <input type="text" name="payee_name" id="checkPayeeName" class="form-control form-control-sm" value="{{ old('payee_name', $voucher['supplier']) }}" maxlength="255" required>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-floppy me-1"></i> Save Payee</button>
+                </div>
+            </form>
+        @endif
     </div>
 
     @if($canSaveLayout)
@@ -290,6 +302,14 @@
     var status = document.getElementById('checkSaveStatus');
     var selectedField = null;
     var dragging = null;
+    var payeeInput = document.getElementById('checkPayeeName');
+    var payeeField = document.querySelector('.check-field[data-font-key="payee"]');
+
+    if (payeeInput && payeeField) {
+        payeeInput.addEventListener('input', function () {
+            payeeField.textContent = '***' + this.value + '***';
+        });
+    }
 
     var labels = {
         date_m1: 'Month digit 1', date_m2: 'Month digit 2',

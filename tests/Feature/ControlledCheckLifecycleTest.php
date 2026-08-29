@@ -53,9 +53,11 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertOk()
             ->assertSee('Check No.')
             ->assertSee('CONTROL-1001');
+        $supplierName = DB::table('suppliers')->where('id', $bill->supplier_id)->value('name');
         $this->get(route('erp.payables.check-voucher', $payment->id))
             ->assertOk()
             ->assertSee('Account Name:')
+            ->assertSee($supplierName)
             ->assertSee('A/P Trade ('.$bank->bank_name.') - '.$bill->currency)
             ->assertSee('CL-CONTROL')
             ->assertSee('Alternate Check Payee')
@@ -105,7 +107,24 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertSessionHasErrors('check');
         $this->postJson(route('erp.payables.check-voucher.print.event', $payment->id))->assertOk();
         $this->assertDatabaseHas('check_voucher_print_events', ['payment_id' => $payment->id]);
-        $this->get(route('erp.payables.check-print', $payment->id))->assertOk();
+        $this->get(route('erp.payables.check-print', $payment->id))
+            ->assertOk()
+            ->assertSee('id="checkPayeeName"', false)
+            ->assertSee('Alternate Check Payee');
+        $this->post(route('erp.payables.check-print.payee.update', $payment->id), [
+            'payee_name' => 'Updated Printed Payee',
+        ])->assertRedirect(route('erp.payables.check-print', $payment->id));
+        $this->assertDatabaseHas('payments', [
+            'id' => $payment->id,
+            'payee_snapshot' => 'Updated Printed Payee',
+        ]);
+        $this->assertDatabaseHas('check_issuances', [
+            'payment_id' => $payment->id,
+            'payee_name' => 'Updated Printed Payee',
+        ]);
+        $this->get(route('erp.payables.check-print', $payment->id))
+            ->assertOk()
+            ->assertSee('Updated Printed Payee');
         $this->postJson(route('erp.payables.check-print.event', $payment->id), [])->assertOk();
         $this->assertDatabaseHas('check_print_events', [
             'payment_id' => $payment->id,
@@ -124,6 +143,13 @@ class ControlledCheckLifecycleTest extends TestCase
         $this->assertSame('posted', $released->posting_status);
         $this->assertNotNull($released->journal_entry_id);
         $this->assertEquals($balanceBefore - 10.50, (float) DB::table('purchase_documents')->where('id', $bill->id)->value(DB::raw('grand_total - paid_total')));
+        $this->post(route('erp.payables.check-print.payee.update', $payment->id), [
+            'payee_name' => 'Disallowed Released Payee',
+        ])->assertSessionHasErrors('payee_name');
+        $this->assertDatabaseHas('payments', [
+            'id' => $payment->id,
+            'payee_snapshot' => 'Updated Printed Payee',
+        ]);
 
         $check = DB::table('check_issuances')->where('payment_id', $payment->id)->where('status', 'released')->first();
         $this->post(route('erp.payables.checks.clear', $check->id), [
