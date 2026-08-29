@@ -44,7 +44,7 @@ class VendorBill2307PrintTest extends TestCase
             ->assertOk()
             ->assertSee($assetAccount->code.' - '.$assetAccount->name)
             ->assertSee('Bill Memo')
-            ->assertSee('Item Memo');
+            ->assertDontSee('Item Memo');
 
         $accountLabel = $account->code.' - '.$account->name;
         $response = $this->post(route('erp.payables.vendor-bills.review'), [
@@ -83,7 +83,7 @@ class VendorBill2307PrintTest extends TestCase
         $vendorBillPrint = $this->get(route('erp.payables.vendor-bills.print', $bill->id));
         $vendorBillPrint->assertOk()
             ->assertSee('Header bill memo')
-            ->assertSee('Test service expense')
+            ->assertDontSee('Test service expense')
             ->assertSee($account->name)
             ->assertDontSee($accountLabel)
             ->assertSee(e($customer->name), false)
@@ -95,6 +95,7 @@ class VendorBill2307PrintTest extends TestCase
             ->assertSee('VAT 12% : 1,200.00')
             ->assertSee('Bill Total :PHP 11,000.00')
             ->assertDontSee('>Tax</th>', false)
+            ->assertDontSee('>Memo</th>', false)
             ->assertDontSee('ATC/WC');
 
         $this->get(route('erp.payables.payments.create', ['bill' => $bill->document_no, 'method' => 'Cheque']))

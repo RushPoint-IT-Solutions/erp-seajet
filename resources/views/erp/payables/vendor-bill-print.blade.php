@@ -211,7 +211,7 @@
             margin: 0;
             padding: 0;
             font-family: "Courier New", "Lucida Console", monospace;
-            font-size: 10px;
+            font-size: 12px;
             line-height: 1.12;
             color: #000 !important;
             page-break-after: avoid;
@@ -243,12 +243,12 @@
             text-align: center;
             line-height: 1.1;
         }
-        .bill-print-company-name { font-size: 12px; }
-        .bill-print-company-meta { font-size: 9px; }
+        .bill-print-company-name { font-size: 14px; }
+        .bill-print-company-meta { font-size: 11px; }
         .bill-print-form-title {
             margin-top: 8px;
             text-align: center;
-            font-size: 13px;
+            font-size: 15px;
         }
         .bill-small-grid,
         .bill-box,
@@ -274,7 +274,7 @@
         .bill-box-body {
             padding: 4px 5px;
             font-family: "Courier New", "Lucida Console", monospace;
-            font-size: 10px;
+            font-size: 12px;
             line-height: 1.08;
         }
         .bill-meta-box {
@@ -288,7 +288,7 @@
         }
         .bill-title {
             margin: 8px 0 5px;
-            font-size: 15px;
+            font-size: 17px;
         }
         .bill-expense-table th,
         .bill-expense-table td {
@@ -301,15 +301,15 @@
         .bill-expense-table tbody tr.filler td {
             height: 500px;
         }
-        .bill-class { font-size: 8px; }
+        .bill-class { font-size: 10px; }
         .bill-expense-total,
         .bill-vat-total {
             margin-top: 4px;
-            font-size: 9px;
+            font-size: 11px;
         }
         .bill-total {
             margin-top: 5px;
-            font-size: 13px;
+            font-size: 15px;
         }
     }
 </style>
@@ -370,18 +370,16 @@
             <table class="bill-expense-table">
                 <thead>
                     <tr>
-                        <th style="width: 23%;">Account</th>
-                        <th style="width: 26%;">Memo</th>
-                        <th style="width: 15%;">Amount</th>
-                        <th style="width: 25%;">Customer:Job</th>
-                        <th style="width: 11%;">Class</th>
+                        <th style="width: 31%;">Account</th>
+                        <th style="width: 18%;">Amount</th>
+                        <th style="width: 36%;">Customer:Job</th>
+                        <th style="width: 15%;">Class</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($lines as $line)
                         <tr>
                             <td>{{ $accountName($line) }}</td>
-                            <td>{{ $line->memo ?? $line->description ?? '' }}</td>
                             <td class="bill-num">{{ $money($expenseAmount($line)) }}</td>
                             <td>{{ $line->customer_job_name ?? '' }}</td>
                             <td class="bill-class">{{ $line->class_code ?? '' }}</td>
@@ -389,7 +387,6 @@
                     @empty
                         <tr>
                             <td>Reimbursable charges</td>
-                            <td>{{ $bill['memo'] }}</td>
                             <td class="bill-num">{{ $money($expenseTotal) }}</td>
                             <td></td>
                             <td></td>
@@ -398,14 +395,12 @@
                     @if($bill['withholding_tax_amount'] > 0)
                         <tr>
                             <td>Expanded Withholding Tax Payable</td>
-                            <td></td>
                             <td class="bill-num">-{{ $money($bill['withholding_tax_amount']) }}</td>
                             <td></td>
                             <td class="bill-class"></td>
                         </tr>
                     @endif
                     <tr class="filler">
-                        <td></td>
                         <td></td>
                         <td></td>
                         <td></td>

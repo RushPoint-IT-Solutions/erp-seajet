@@ -52,7 +52,6 @@
                         <th>ATC / WC</th>
                         <th class="text-end">WHT %</th>
                         <th class="text-end">Amount</th>
-                        <th>Item Memo</th>
                         <th>Customer:Job</th>
                         <th>Billable</th>
                         <th>Class</th>
@@ -66,7 +65,6 @@
                             <td>{{ ($line->atc_code ?? '') ?: ($line->account_atc_code ?? '') }}</td>
                             <td class="text-end">{{ number_format((float) ($line->withholding_tax_rate ?? 0), 2) }}%</td>
                             <td class="text-end">{{ number_format((float) ($line->amount ?? $line->line_total ?? 0), 2) }}</td>
-                            <td>{{ $line->memo ?? $line->description ?? '' }}</td>
                             <td>{{ $line->customer_job_id ? $line->customer_job_id.' - '.($line->customer_job_name ?? '') : '' }}</td>
                             <td>{{ !empty($line->is_billable) ? 'Yes' : 'No' }}</td>
                             <td>{{ $line->class_code ?? '' }}</td>

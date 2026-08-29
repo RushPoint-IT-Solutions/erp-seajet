@@ -325,7 +325,6 @@
                             <th style="width: 100px">ATC / WC</th>
                             <th style="width: 90px">WHT %</th>
                             <th class="text-end" style="width: 150px">Amount</th>
-                            <th>Item Memo</th>
                             <th style="width: 220px">Customer:Job</th>
                             <th style="width: 100px">Billable?</th>
                             <th style="width: 140px">Class</th>
@@ -360,6 +359,7 @@
                                         if ($line && !($bill['line_amounts_exclude_vat'] ?? true) && $lineTaxCategory === 'VAT12') {
                                             $lineAmount /= 1.12;
                                         }
+                                        $lineItemMemo = $line ? ($line->memo ?? $line->description ?? '') : '';
                                         $lineClassCode = strtoupper(trim((string) ($line->class_code ?? ''))) ?: 'MANILA';
                                     ?>
                                     @if($lineAccount && !$lineAccountInOptions)
@@ -372,6 +372,7 @@
                                                 {{ ($line && ($line->account_name ?? '') === $account->label) ? 'selected' : '' }}>{{ $account->label }}</option>
                                     @endforeach
                                 </select>
+                                <input type="hidden" name="expense_memo[]" class="expense-item-memo" value="{{ $lineItemMemo }}">
                             </td>
                             <td>
                                 <label class="form-check d-flex align-items-center gap-1 mb-1 text-nowrap">
@@ -388,7 +389,6 @@
                             <td><input name="expense_atc_code[]" class="form-control text-uppercase line-atc-code" maxlength="20" value="{{ $lineAtcCode }}" placeholder="WC160"></td>
                             <td><input name="expense_withholding_rate[]" class="form-control text-end line-wht-rate" type="number" min="0" max="100" step="0.01" value="{{ $lineWithholdingRate ?: '' }}"></td>
                             <td><input name="expense_amount[]" class="form-control text-end expense-amount" value="{{ $line ? number_format($lineAmount, 2) : '' }}"></td>
-                            <td><input name="expense_memo[]" class="form-control" value="{{ $line ? ($line->memo ?? $line->description ?? '') : '' }}"></td>
                             <td>
                                 <select name="expense_customer_job[]" class="form-select line-customer customer-job-search">
                                     <option value=""></option>
@@ -628,6 +628,7 @@
 
             var row = source.clone();
             row.find('input[type="text"], input:not([type])').val('');
+            row.find('.expense-item-memo').val('');
             row.find('input[type="checkbox"]').prop('checked', false);
             row.find('select').val('');
             row.find('.expense-class').val('MANILA');
