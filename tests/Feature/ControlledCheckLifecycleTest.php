@@ -109,7 +109,7 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertOk()
             ->assertSee('id="checkPayeeName"', false)
             ->assertSee('Alternate Check Payee')
-            ->assertSee('size: 210mm 88.9mm', false)
+            ->assertSee('size: A4 portrait', false)
             ->assertDontSee('rotate(90deg)', false);
         $this->post(route('erp.payables.check-print.payee.update', $payment->id), [
             'payee_name' => 'Updated Printed Payee',

@@ -127,7 +127,7 @@
     }
     @page {
         margin: 0;
-        size: {{ $paperWidth }}mm {{ $paperHeight }}mm;
+        size: A4 portrait;
     }
     @media print {
         html,
