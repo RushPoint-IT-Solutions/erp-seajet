@@ -8,6 +8,7 @@
     $positions = $layout['positions'];
     $fieldStyles = $layout['field_styles'];
     $customFields = $layout['custom_fields'];
+    $boxHeights = $layout['box_heights'];
     $formattedAmount = number_format($voucher['net'], 2);
     $values = [
         'company_name' => strtoupper($voucher['company']),
@@ -85,19 +86,18 @@
     .cv-field.amount { text-align: right; }
     .cv-field.header-text { text-align: center; font-weight: 700; letter-spacing: .02em; }
     .cv-field.logo-mark { height: 82px; text-align: center; }
-    .cv-field.logo-mark img { display: block; width: 100%; height: 82px; object-fit: contain; }
+    .cv-field.logo-mark img { display: block; width: 100%; height: 100%; object-fit: contain; }
     .cv-field.label { color: #374151; }
     .cv-field.signature { text-align: center; border-top: 1px solid #111827; padding-top: 6px; }
     .cv-box { position: absolute; border: 1px solid #111827; }
     .cv-line { position: absolute; border-top: 1px solid #111827; }
     .cv-vline { position: absolute; border-left: 1px solid #111827; }
-    .cv-muted-line { position: absolute; border-top: 1px dashed #111827; opacity: .55; }
     .cv-amount-box {
         position: absolute;
         left: 430px;
         top: 390px;
         width: 364px;
-        height: 96px;
+        height: {{ $boxHeights['amount'] }}px;
         border: 1px solid #111827;
     }
     .cv-amount-box-line {
@@ -144,22 +144,18 @@
     <div class="cv-print-wrap">
         <div class="cv-print-sheet">
             @if(!$settings['template_url'] || !$settings['print_template'])
-                <div class="cv-box" style="left: 46px; top: 190px; width: 292px; height: 126px;"></div>
+                <div class="cv-box" style="left: 46px; top: 190px; width: 292px; height: {{ $boxHeights['payee'] }}px;"></div>
                 <div class="cv-line" style="left: 46px; top: 236px; width: 292px;"></div>
-                <div class="cv-muted-line" style="left: 640px; top: 218px; width: 174px;"></div>
-                <div class="cv-muted-line" style="left: 640px; top: 258px; width: 174px;"></div>
-                <div class="cv-muted-line" style="left: 640px; top: 298px; width: 174px;"></div>
-                <div class="cv-muted-line" style="left: 384px; top: 502px; width: 288px;"></div>
-                <div class="cv-box" style="left: 46px; top: 522px; width: 748px; height: 104px;"></div>
-                <div class="cv-box" style="left: 48px; top: 650px; width: 744px; height: 176px;"></div>
+                <div class="cv-box" style="left: 46px; top: 522px; width: 748px; height: {{ $boxHeights['description'] }}px;"></div>
+                <div class="cv-box" style="left: 48px; top: 650px; width: 744px; height: {{ $boxHeights['accounting'] }}px;"></div>
                 <div class="cv-line" style="left: 48px; top: 678px; width: 744px;"></div>
                 <div class="cv-line" style="left: 48px; top: 790px; width: 744px;"></div>
-                <div class="cv-vline" style="left: 504px; top: 650px; height: 176px;"></div>
-                <div class="cv-vline" style="left: 650px; top: 650px; height: 176px;"></div>
-                <div class="cv-box" style="left: 48px; top: 840px; width: 744px; height: 150px;"></div>
-                <div class="cv-vline" style="left: 214px; top: 840px; height: 150px;"></div>
-                <div class="cv-vline" style="left: 386px; top: 840px; height: 150px;"></div>
-                <div class="cv-vline" style="left: 592px; top: 840px; height: 150px;"></div>
+                <div class="cv-vline" style="left: 504px; top: 650px; height: {{ $boxHeights['accounting'] }}px;"></div>
+                <div class="cv-vline" style="left: 650px; top: 650px; height: {{ $boxHeights['accounting'] }}px;"></div>
+                <div class="cv-box" style="left: 48px; top: 840px; width: 744px; height: {{ $boxHeights['signatures'] }}px;"></div>
+                <div class="cv-vline" style="left: 214px; top: 840px; height: {{ $boxHeights['signatures'] }}px;"></div>
+                <div class="cv-vline" style="left: 386px; top: 840px; height: {{ $boxHeights['signatures'] }}px;"></div>
+                <div class="cv-vline" style="left: 592px; top: 840px; height: {{ $boxHeights['signatures'] }}px;"></div>
                 <div class="cv-line" style="left: 48px; top: 876px; width: 744px;"></div>
                 <div class="cv-line" style="left: 48px; top: 962px; width: 744px;"></div>
             @endif
@@ -177,7 +173,7 @@
                 @php($renderLeft = $field === 'logo_mark' ? (($settings['paper_width'] - $renderWidth) / 2) : (isset($paymentColumnPositions[$field]) ? $paymentColumnPositions[$field][0] : (($point[0] ?? 0) - (in_array($field, ['company_name', 'form_title'], true) ? (($renderWidth - $fieldStyles[$field]['width']) / 2) : 0))))
                 @php($fontIncrease = $field === 'company_name' ? 4 : 2)
                 @php($classes = (in_array($field, ['company_name', 'form_title']) ? ' header-text' : '').($field === 'logo_mark' ? ' logo-mark' : '').(in_array($field, ['company_name', 'form_title', 'payment_info_title'], true) ? ' nowrap' : '').(in_array($field, ['debit_amount', 'credit_amount', 'total_debit', 'total_credit']) ? ' amount' : '').(strpos($field, 'label') !== false || strpos($field, 'header') !== false ? ' label' : ''))
-                <div class="cv-field{{ $classes }}" style="left: {{ $renderLeft }}px; top: {{ $renderTop }}px; width: {{ $renderWidth }}px; font-size: {{ min(40, $fieldStyles[$field]['font_size'] + $fontIncrease) }}px;">
+                <div class="cv-field{{ $classes }}" style="left: {{ $renderLeft }}px; top: {{ $renderTop }}px; width: {{ $renderWidth }}px; height: {{ $fieldStyles[$field]['height'] }}px; font-size: {{ min(40, $fieldStyles[$field]['font_size'] + $fontIncrease) }}px;">
                     @if($field === 'logo_mark')
                         <img src="{{ asset('images/gen_off_seajetlogo.webp') }}" alt="SeaJet logo">
                     @else
@@ -187,7 +183,7 @@
             @endforeach
 
             @foreach($customFields as $custom)
-                <div class="cv-field" style="left: {{ $custom['x'] }}px; top: {{ $custom['y'] }}px; width: {{ $custom['width'] }}px; font-size: {{ min(40, $custom['font_size'] + 2) }}px;">
+                <div class="cv-field" style="left: {{ $custom['x'] }}px; top: {{ $custom['y'] }}px; width: {{ $custom['width'] }}px; height: {{ $custom['height'] }}px; font-size: {{ min(40, $custom['font_size'] + 2) }}px;">
                     {{ $custom['text'] }}
                 </div>
             @endforeach

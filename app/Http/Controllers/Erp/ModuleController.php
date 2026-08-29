@@ -3536,6 +3536,24 @@ class ModuleController extends Controller
 
         $savedPositions = $saved['positions'] ?? [];
         $savedStyles = $saved['field_styles'] ?? [];
+        $defaultBoxHeights = [
+            'payee' => 126,
+            'amount' => 96,
+            'description' => 104,
+            'accounting' => 176,
+            'signatures' => 150,
+        ];
+        $savedBoxHeights = isset($savedStyles['_box_heights']) && is_array($savedStyles['_box_heights'])
+            ? $savedStyles['_box_heights']
+            : [];
+
+        $layout['box_heights'] = [];
+        foreach ($defaultBoxHeights as $box => $height) {
+            $layout['box_heights'][$box] = max(40, min(600, (int) request(
+                'box_height_'.$box,
+                $savedBoxHeights[$box] ?? $height
+            )));
+        }
 
         foreach ($defaults as $field => $point) {
             $savedPoint = $savedPositions[$field] ?? $point;
@@ -3549,6 +3567,7 @@ class ModuleController extends Controller
             ];
             $layout['field_styles'][$field] = [
                 'width' => max(30, min(1000, (int) request('w_'.$field, $savedStyle['width'] ?? $defaultWidth))),
+                'height' => max(18, min(600, (int) request('h_'.$field, $savedStyle['height'] ?? ($field === 'logo_mark' ? 82 : 24)))),
                 'font_size' => max(7, min(40, (int) request('fs_'.$field, $savedStyle['font_size'] ?? $defaultFontSize))),
             ];
 
@@ -3562,6 +3581,8 @@ class ModuleController extends Controller
                 $layout['field_styles'][$field]['width'] = 320;
             }
         }
+
+        $layout['field_styles']['_box_heights'] = $layout['box_heights'];
 
         return $layout;
     }
@@ -3744,6 +3765,7 @@ class ModuleController extends Controller
         $xs = (array) request('custom_x', []);
         $ys = (array) request('custom_y', []);
         $widths = (array) request('custom_w', []);
+        $heights = (array) request('custom_h', []);
         $fontSizes = (array) request('custom_fs', []);
 
         $fields = [];
@@ -3755,6 +3777,7 @@ class ModuleController extends Controller
                 'x' => $xs[$index] ?? 60,
                 'y' => $ys[$index] ?? 60,
                 'width' => $widths[$index] ?? 180,
+                'height' => $heights[$index] ?? 24,
                 'font_size' => $fontSizes[$index] ?? 11,
             ];
         }
@@ -3772,6 +3795,7 @@ class ModuleController extends Controller
                 'x' => max(0, min(1800, (int) ($field['x'] ?? 60))),
                 'y' => max(0, min(2400, (int) ($field['y'] ?? 60))),
                 'width' => max(30, min(1000, (int) ($field['width'] ?? 180))),
+                'height' => max(18, min(600, (int) ($field['height'] ?? 24))),
                 'font_size' => max(7, min(40, (int) ($field['font_size'] ?? 11))),
             ];
         }, is_array($fields) ? $fields : []));

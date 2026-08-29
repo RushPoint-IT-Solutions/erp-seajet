@@ -83,7 +83,7 @@ class VendorBill2307PrintTest extends TestCase
         $vendorBillPrint = $this->get(route('erp.payables.vendor-bills.print', $bill->id));
         $vendorBillPrint->assertOk()
             ->assertSee('width: 320px', false)
-            ->assertSee('margin: 12px 0 0 28px', false)
+            ->assertSee('margin: 28px 0 0 28px', false)
             ->assertSee('white-space: nowrap', false)
             ->assertSee('width: 50%', false)
             ->assertSee('margin: 0 0 0 auto', false)

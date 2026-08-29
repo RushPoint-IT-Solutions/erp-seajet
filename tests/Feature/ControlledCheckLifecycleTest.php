@@ -325,6 +325,37 @@ class ControlledCheckLifecycleTest extends TestCase
         $this->assertSame(1, DB::table('check_layout_profiles')->where('profile_name', 'QA Printer')->where('is_active', true)->count());
     }
 
+    public function test_check_voucher_layout_saves_field_and_table_box_heights()
+    {
+        $this->get(route('erp.payables.check-voucher.layout'))
+            ->assertOk()
+            ->assertSee('id="fieldHeightControl"', false)
+            ->assertSee('id="box_height_accounting"', false)
+            ->assertDontSee('cv-guide-muted');
+
+        $this->post(route('erp.payables.check-voucher.layout.save'), [
+            'paper_size' => 'letter',
+            'paper_width' => 816,
+            'paper_height' => 1056,
+            'print_template' => '0',
+            'custom_fields_present' => '1',
+            'h_description' => 60,
+            'box_height_accounting' => 220,
+        ])->assertRedirect(route('erp.payables.check-voucher.layout'));
+
+        $styles = json_decode(DB::table('print_layouts')
+            ->where('document_type', 'check_voucher')
+            ->value('field_styles'), true);
+        $this->assertSame(60, $styles['description']['height']);
+        $this->assertSame(220, $styles['_box_heights']['accounting']);
+
+        $this->get(route('erp.payables.check-voucher'))
+            ->assertOk()
+            ->assertSee('height: 60px', false)
+            ->assertSee('height: 220px', false)
+            ->assertDontSee('cv-muted-line');
+    }
+
     public function test_spoiled_check_replacement_and_released_payment_void_are_auditable()
     {
         list($bill, $bank) = $this->billAndBank();

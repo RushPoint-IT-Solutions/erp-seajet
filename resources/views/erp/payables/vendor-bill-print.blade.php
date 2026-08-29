@@ -203,13 +203,13 @@
         .bill-print-wrap { overflow: hidden; }
         .bill-print-sheet {
             width: calc(8.14in - 28px);
-            height: calc(10.64in - 12px);
+            height: calc(10.64in - 28px);
             min-height: 0;
-            max-height: calc(10.64in - 12px);
+            max-height: calc(10.64in - 28px);
             overflow: hidden;
             border: 0;
             box-shadow: none;
-            margin: 12px 0 0 28px;
+            margin: 28px 0 0 28px;
             padding: 0;
             font-family: "Courier New", "Lucida Console", monospace;
             font-size: 14px;

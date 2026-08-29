@@ -8,6 +8,7 @@
     $positions = $layout['positions'];
     $fieldStyles = $layout['field_styles'];
     $customFields = $layout['custom_fields'];
+    $boxHeights = $layout['box_heights'];
     $formattedAmount = number_format($sample['net'], 2);
     $sampleValues = [
         'company_name' => strtoupper($sample['company']),
@@ -80,7 +81,6 @@
     .cv-guide-box { position: absolute; pointer-events: none; border: 1px solid rgba(17, 24, 39, .5); }
     .cv-guide-line { position: absolute; pointer-events: none; border-top: 1px solid rgba(17, 24, 39, .5); }
     .cv-guide-vline { position: absolute; pointer-events: none; border-left: 1px solid rgba(17, 24, 39, .5); }
-    .cv-guide-muted { position: absolute; pointer-events: none; border-top: 1px dashed rgba(17, 24, 39, .45); }
     .drag-field {
         position: absolute;
         box-sizing: border-box;
@@ -96,7 +96,7 @@
     .drag-field.amount { text-align: right; }
     .drag-field.header-text { text-align: center; font-weight: 700; letter-spacing: .02em; }
     .drag-field.logo-mark { height: 88px; text-align: center; }
-    .drag-field.logo-mark img { display: block; width: 100%; height: 82px; object-fit: contain; pointer-events: none; }
+    .drag-field.logo-mark img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
     .drag-field.label { color: #374151; }
     .drag-field.signature { text-align: center; border-top: 1px solid #111827; border-left-color: transparent; border-right-color: transparent; border-bottom-color: transparent; padding-top: 6px; }
     .drag-field.active { outline: 2px solid #0d6efd; outline-offset: 1px; background: rgba(13, 110, 253, .08); }
@@ -139,7 +139,11 @@
             <input type="hidden" name="x_{{ $field }}" id="x_{{ $field }}" value="{{ $point[0] }}">
             <input type="hidden" name="y_{{ $field }}" id="y_{{ $field }}" value="{{ $point[1] }}">
             <input type="hidden" name="w_{{ $field }}" id="w_{{ $field }}" value="{{ $fieldStyles[$field]['width'] }}">
+            <input type="hidden" name="h_{{ $field }}" id="h_{{ $field }}" value="{{ $fieldStyles[$field]['height'] }}">
             <input type="hidden" name="fs_{{ $field }}" id="fs_{{ $field }}" value="{{ $fieldStyles[$field]['font_size'] }}">
+        @endforeach
+        @foreach($boxHeights as $box => $height)
+            <input type="hidden" name="box_height_{{ $box }}" id="box_height_{{ $box }}" value="{{ $height }}">
         @endforeach
         <div id="customHiddenInputs">
             @foreach($customFields as $custom)
@@ -149,6 +153,7 @@
                 <input type="hidden" name="custom_x[]" id="custom_x_{{ $custom['key'] }}" value="{{ $custom['x'] }}">
                 <input type="hidden" name="custom_y[]" id="custom_y_{{ $custom['key'] }}" value="{{ $custom['y'] }}">
                 <input type="hidden" name="custom_w[]" id="custom_w_{{ $custom['key'] }}" value="{{ $custom['width'] }}">
+                <input type="hidden" name="custom_h[]" id="custom_h_{{ $custom['key'] }}" value="{{ $custom['height'] }}">
                 <input type="hidden" name="custom_fs[]" id="custom_fs_{{ $custom['key'] }}" value="{{ $custom['font_size'] }}">
             @endforeach
         </div>
@@ -156,28 +161,26 @@
         <div class="cv-layout-shell">
             <div class="cv-layout-wrap">
                 <div class="cv-layout-sheet {{ $settings['print_template'] ? '' : 'cv-template-muted' }}" id="layoutSheet">
-                    <div class="cv-guide-box" style="left: 46px; top: 190px; width: 292px; height: 126px;"></div>
+                    <div class="cv-guide-box" data-box="payee" style="left: 46px; top: 190px; width: 292px; height: {{ $boxHeights['payee'] }}px;"></div>
                     <div class="cv-guide-line" style="left: 46px; top: 236px; width: 292px;"></div>
-                    <div class="cv-guide-muted" style="left: 640px; top: 218px; width: 174px;"></div>
-                    <div class="cv-guide-muted" style="left: 640px; top: 258px; width: 174px;"></div>
-                    <div class="cv-guide-muted" style="left: 640px; top: 298px; width: 174px;"></div>
-                    <div class="cv-guide-muted" style="left: 384px; top: 502px; width: 288px;"></div>
-                    <div class="cv-guide-box" style="left: 46px; top: 522px; width: 748px; height: 104px;"></div>
-                    <div class="cv-guide-box" style="left: 48px; top: 650px; width: 744px; height: 176px;"></div>
+                    <div class="cv-guide-box" data-box="amount" style="left: 430px; top: 390px; width: 364px; height: {{ $boxHeights['amount'] }}px;"></div>
+                    <div class="cv-guide-line" style="left: 430px; top: 434px; width: 364px;"></div>
+                    <div class="cv-guide-box" data-box="description" style="left: 46px; top: 522px; width: 748px; height: {{ $boxHeights['description'] }}px;"></div>
+                    <div class="cv-guide-box" data-box="accounting" style="left: 48px; top: 650px; width: 744px; height: {{ $boxHeights['accounting'] }}px;"></div>
                     <div class="cv-guide-line" style="left: 48px; top: 678px; width: 744px;"></div>
                     <div class="cv-guide-line" style="left: 48px; top: 790px; width: 744px;"></div>
-                    <div class="cv-guide-vline" style="left: 504px; top: 650px; height: 176px;"></div>
-                    <div class="cv-guide-vline" style="left: 650px; top: 650px; height: 176px;"></div>
-                    <div class="cv-guide-box" style="left: 48px; top: 840px; width: 744px; height: 150px;"></div>
-                    <div class="cv-guide-vline" style="left: 214px; top: 840px; height: 150px;"></div>
-                    <div class="cv-guide-vline" style="left: 386px; top: 840px; height: 150px;"></div>
-                    <div class="cv-guide-vline" style="left: 592px; top: 840px; height: 150px;"></div>
+                    <div class="cv-guide-vline" data-box="accounting" style="left: 504px; top: 650px; height: {{ $boxHeights['accounting'] }}px;"></div>
+                    <div class="cv-guide-vline" data-box="accounting" style="left: 650px; top: 650px; height: {{ $boxHeights['accounting'] }}px;"></div>
+                    <div class="cv-guide-box" data-box="signatures" style="left: 48px; top: 840px; width: 744px; height: {{ $boxHeights['signatures'] }}px;"></div>
+                    <div class="cv-guide-vline" data-box="signatures" style="left: 214px; top: 840px; height: {{ $boxHeights['signatures'] }}px;"></div>
+                    <div class="cv-guide-vline" data-box="signatures" style="left: 386px; top: 840px; height: {{ $boxHeights['signatures'] }}px;"></div>
+                    <div class="cv-guide-vline" data-box="signatures" style="left: 592px; top: 840px; height: {{ $boxHeights['signatures'] }}px;"></div>
                     <div class="cv-guide-line" style="left: 48px; top: 876px; width: 744px;"></div>
                     <div class="cv-guide-line" style="left: 48px; top: 962px; width: 744px;"></div>
 
                     @foreach($positions as $field => $point)
                         @php($classes = (in_array($field, ['company_name', 'form_title']) ? ' header-text' : '').($field === 'logo_mark' ? ' logo-mark' : '').(in_array($field, ['amount', 'debit_amount', 'credit_amount', 'total_debit', 'total_credit']) ? ' amount' : '').(strpos($field, 'label') !== false || strpos($field, 'header') !== false ? ' label' : ''))
-                        <div class="drag-field{{ $classes }}" data-kind="standard" data-field="{{ $field }}" style="left: {{ $point[0] }}px; top: {{ $point[1] }}px; width: {{ $fieldStyles[$field]['width'] }}px; font-size: {{ $fieldStyles[$field]['font_size'] }}px;">
+                        <div class="drag-field{{ $classes }}" data-kind="standard" data-field="{{ $field }}" style="left: {{ $point[0] }}px; top: {{ $point[1] }}px; width: {{ $fieldStyles[$field]['width'] }}px; height: {{ $fieldStyles[$field]['height'] }}px; font-size: {{ $fieldStyles[$field]['font_size'] }}px;">
                             <button type="button" class="field-remove" title="Hide"><i class="bi bi-x"></i></button>
                             <span class="field-resize" title="Resize"></span>
                             @if($field === 'logo_mark')
@@ -189,7 +192,7 @@
                     @endforeach
 
                     @foreach($customFields as $custom)
-                        <div class="drag-field custom-field" data-kind="custom" data-field="{{ $custom['key'] }}" style="left: {{ $custom['x'] }}px; top: {{ $custom['y'] }}px; width: {{ $custom['width'] }}px; font-size: {{ $custom['font_size'] }}px;">
+                        <div class="drag-field custom-field" data-kind="custom" data-field="{{ $custom['key'] }}" style="left: {{ $custom['x'] }}px; top: {{ $custom['y'] }}px; width: {{ $custom['width'] }}px; height: {{ $custom['height'] }}px; font-size: {{ $custom['font_size'] }}px;">
                             <button type="button" class="field-remove" title="Remove"><i class="bi bi-x"></i></button>
                             <span class="field-resize" title="Resize"></span>
                             {{ $custom['text'] }}
@@ -247,9 +250,24 @@
                         <input type="number" class="form-control form-control-sm" id="fieldWidthControl">
                     </div>
                     <div class="col-6">
+                        <label class="form-label small text-muted">Height</label>
+                        <input type="number" class="form-control form-control-sm" id="fieldHeightControl">
+                    </div>
+                    <div class="col-6">
                         <label class="form-label small text-muted">Font</label>
                         <input type="number" class="form-control form-control-sm" id="fieldFontControl">
                     </div>
+                </div>
+
+                <hr>
+                <h3 class="h6 fw-bold mb-2">Box Heights</h3>
+                <div class="row g-2 mb-3">
+                    @foreach(['payee' => 'Payee', 'amount' => 'Amount', 'description' => 'Description', 'accounting' => 'Accounting Table', 'signatures' => 'Signature Table'] as $box => $label)
+                        <div class="col-6">
+                            <label class="form-label small text-muted">{{ $label }}</label>
+                            <input type="number" min="40" max="600" class="form-control form-control-sm box-height-control" data-box="{{ $box }}" value="{{ $boxHeights[$box] }}">
+                        </div>
+                    @endforeach
                 </div>
 
                 <hr>
@@ -289,6 +307,7 @@
             $('#fieldXControl').val(parseInt(el.style.left, 10) || 0);
             $('#fieldYControl').val(parseInt(el.style.top, 10) || 0);
             $('#fieldWidthControl').val(parseInt(el.style.width, 10) || 120);
+            $('#fieldHeightControl').val(parseInt(el.style.height, 10) || 24);
             $('#fieldFontControl').val(parseInt(el.style.fontSize, 10) || 11);
         }
 
@@ -319,17 +338,21 @@
             syncControls(el);
         }
 
-        function updateSize(el, width, fontSize) {
+        function updateSize(el, width, height, fontSize) {
             width = Math.max(30, parseInt(width, 10) || 120);
+            height = Math.max(18, parseInt(height, 10) || 24);
             fontSize = Math.max(7, parseInt(fontSize, 10) || 11);
             el.style.width = width + 'px';
+            el.style.height = height + 'px';
             el.style.fontSize = fontSize + 'px';
             var field = $(el).data('field');
             if ($(el).data('kind') === 'custom') {
                 $('#custom_w_' + field).val(width);
+                $('#custom_h_' + field).val(height);
                 $('#custom_fs_' + field).val(fontSize);
             } else {
                 $('#w_' + field).val(width);
+                $('#h_' + field).val(height);
                 $('#fs_' + field).val(fontSize);
             }
             syncControls(el);
@@ -366,12 +389,23 @@
                 event.stopPropagation();
                 var el = $(handle).closest('.drag-field')[0];
                 setActive($(el).data('field'));
-                resize = { pointerId: event.pointerId, startX: event.clientX, width: parseInt(el.style.width, 10) || 120 };
+                resize = {
+                    pointerId: event.pointerId,
+                    startX: event.clientX,
+                    startY: event.clientY,
+                    width: parseInt(el.style.width, 10) || 120,
+                    height: parseInt(el.style.height, 10) || 24
+                };
                 handle.setPointerCapture(event.pointerId);
             });
             handle.addEventListener('pointermove', function (event) {
                 if (!resize || resize.pointerId !== event.pointerId) return;
-                updateSize(selectedElement(), resize.width + event.clientX - resize.startX, $('#fieldFontControl').val());
+                updateSize(
+                    selectedElement(),
+                    resize.width + event.clientX - resize.startX,
+                    resize.height + event.clientY - resize.startY,
+                    $('#fieldFontControl').val()
+                );
             });
             handle.addEventListener('pointerup', function (event) {
                 if (resize && resize.pointerId === event.pointerId) resize = null;
@@ -403,9 +437,15 @@
             var el = selectedElement();
             if (el) updatePosition(el, $('#fieldXControl').val(), $('#fieldYControl').val());
         });
-        $('#fieldWidthControl, #fieldFontControl').on('input', function () {
+        $('#fieldWidthControl, #fieldHeightControl, #fieldFontControl').on('input', function () {
             var el = selectedElement();
-            if (el) updateSize(el, $('#fieldWidthControl').val(), $('#fieldFontControl').val());
+            if (el) updateSize(el, $('#fieldWidthControl').val(), $('#fieldHeightControl').val(), $('#fieldFontControl').val());
+        });
+        $('.box-height-control').on('input', function () {
+            var box = $(this).data('box');
+            var height = Math.max(40, parseInt($(this).val(), 10) || 40);
+            $('#box_height_' + box).val(height);
+            $('[data-box="' + box + '"]').css('height', height + 'px');
         });
         $('#paperSizeControl, #paperWidthControl, #paperHeightControl, #templateUrlControl, #printTemplateControl').on('input change', applyPaperAndTemplate);
         $('#templateFileControl').on('change', function () {
@@ -426,6 +466,7 @@
             var x = 60;
             var y = 620;
             var width = 180;
+            var height = 24;
             var font = 11;
             $('#customHiddenInputs').append(
                 '<input type="hidden" name="custom_key[]" id="custom_key_' + key + '" value="' + key + '">' +
@@ -434,12 +475,13 @@
                 '<input type="hidden" name="custom_x[]" id="custom_x_' + key + '" value="' + x + '">' +
                 '<input type="hidden" name="custom_y[]" id="custom_y_' + key + '" value="' + y + '">' +
                 '<input type="hidden" name="custom_w[]" id="custom_w_' + key + '" value="' + width + '">' +
+                '<input type="hidden" name="custom_h[]" id="custom_h_' + key + '" value="' + height + '">' +
                 '<input type="hidden" name="custom_fs[]" id="custom_fs_' + key + '" value="' + font + '">'
             );
             $('#custom_label_' + key).val(label);
             $('#custom_text_' + key).val(text);
             var field = $('<div class="drag-field custom-field" data-kind="custom"></div>');
-            field.attr('data-field', key).css({ left: x + 'px', top: y + 'px', width: width + 'px', fontSize: font + 'px' });
+            field.attr('data-field', key).css({ left: x + 'px', top: y + 'px', width: width + 'px', height: height + 'px', fontSize: font + 'px' });
             field.append('<button type="button" class="field-remove" title="Remove"><i class="bi bi-x"></i></button><span class="field-resize" title="Resize"></span>');
             field.append(document.createTextNode(text));
             $('#layoutSheet').append(field);
@@ -454,7 +496,7 @@
             var el = $(this).closest('.drag-field');
             var field = el.data('field');
             if (el.data('kind') === 'custom') {
-                $('#custom_key_' + field + ', #custom_label_' + field + ', #custom_text_' + field + ', #custom_x_' + field + ', #custom_y_' + field + ', #custom_w_' + field + ', #custom_fs_' + field).remove();
+                $('#custom_key_' + field + ', #custom_label_' + field + ', #custom_text_' + field + ', #custom_x_' + field + ', #custom_y_' + field + ', #custom_w_' + field + ', #custom_h_' + field + ', #custom_fs_' + field).remove();
                 el.remove();
             } else {
                 el.hide();
