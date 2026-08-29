@@ -81,6 +81,7 @@
         line-height: 1.05;
         color: #111827;
     }
+    .cv-field.nowrap { white-space: nowrap; }
     .cv-field.amount { text-align: right; }
     .cv-field.header-text { text-align: center; font-weight: 700; letter-spacing: .02em; }
     .cv-field.logo-mark { height: 60px; text-align: center; }
@@ -151,9 +152,13 @@
             @php($paymentInfoFields = ['payment_info_title', 'amount_header', 'account_name_label', 'account_name', 'amount', 'account_no_label', 'account_no', 'amount_words'])
             @foreach($positions as $field => $point)
                 @continue(($point[0] ?? 0) < 0 || ($point[1] ?? 0) < 0)
-                @php($renderTop = ($point[1] ?? 0) - (in_array($field, $paymentInfoFields, true) ? 12 : 0))
-                @php($classes = (in_array($field, ['company_name', 'form_title']) ? ' header-text' : '').($field === 'logo_mark' ? ' logo-mark' : '').(in_array($field, ['amount', 'debit_amount', 'credit_amount', 'total_debit', 'total_credit']) ? ' amount' : '').(strpos($field, 'label') !== false || strpos($field, 'header') !== false ? ' label' : ''))
-                <div class="cv-field{{ $classes }}" style="left: {{ $point[0] }}px; top: {{ $renderTop }}px; width: {{ $fieldStyles[$field]['width'] }}px; font-size: {{ min(40, $fieldStyles[$field]['font_size'] + 2) }}px;">
+                @php($renderTop = ($point[1] ?? 0) - (in_array($field, $paymentInfoFields, true) ? 28 : 0))
+                @php($minimumWidth = ['company_name' => 460, 'form_title' => 200, 'payment_info_title' => 220][$field] ?? $fieldStyles[$field]['width'])
+                @php($renderWidth = max($fieldStyles[$field]['width'], $minimumWidth))
+                @php($renderLeft = ($point[0] ?? 0) - (in_array($field, ['company_name', 'form_title'], true) ? (($renderWidth - $fieldStyles[$field]['width']) / 2) : 0))
+                @php($fontIncrease = $field === 'company_name' ? 4 : 2)
+                @php($classes = (in_array($field, ['company_name', 'form_title']) ? ' header-text' : '').($field === 'logo_mark' ? ' logo-mark' : '').(in_array($field, ['company_name', 'form_title', 'payment_info_title'], true) ? ' nowrap' : '').(in_array($field, ['amount', 'debit_amount', 'credit_amount', 'total_debit', 'total_credit']) ? ' amount' : '').(strpos($field, 'label') !== false || strpos($field, 'header') !== false ? ' label' : ''))
+                <div class="cv-field{{ $classes }}" style="left: {{ $renderLeft }}px; top: {{ $renderTop }}px; width: {{ $renderWidth }}px; font-size: {{ min(40, $fieldStyles[$field]['font_size'] + $fontIncrease) }}px;">
                     @if($field === 'logo_mark')
                         <img src="{{ asset('images/gen_off_seajetlogo.webp') }}" alt="SeaJet logo">
                     @else

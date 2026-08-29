@@ -228,8 +228,8 @@
         }
         .bill-print-logo {
             display: block;
-            width: 160px;
-            height: 78px;
+            width: 210px;
+            height: 88px;
             margin: 0 auto;
         }
         .bill-print-brand {
@@ -256,18 +256,27 @@
         .bill-expense-table {
             border-color: #000;
         }
-        .bill-small-grid > div {
-            min-height: 20px;
-            padding: 3px 5px;
-            border-color: #000;
+        .bill-small-grid {
+            grid-template-columns: 1fr 1fr;
         }
+        .bill-small-grid > div {
+            min-height: 28px;
+            padding: 5px 20px;
+            border-color: #000;
+            line-height: 1.2;
+        }
+        .bill-meta-stack > .bill-small-grid { margin: 0 20px; }
         .bill-info-row {
             grid-template-columns: 260px 1fr;
             gap: 22px;
             margin-top: 8px;
+            align-items: stretch;
         }
         .bill-meta-stack { gap: 6px; }
-        .bill-box { min-height: 76px; }
+        .bill-box {
+            height: 100%;
+            min-height: 0;
+        }
         .bill-box-label {
             padding: 3px 5px;
             border-color: #000;
