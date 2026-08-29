@@ -14,6 +14,7 @@
     $characters = function ($value) {
         return preg_split('//u', (string) $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
     };
+    $dateFieldIndexes = [0, 1, 3, 4, 6, 7, 8, 9];
 @endphp
 
 @push('styles')
@@ -161,13 +162,15 @@
                 <img src="{{ asset('images/bir_2307_bg.png') }}" class="bir-2307-background" alt="BIR Form 2307">
 
                 @foreach($characters($form['period_from']) as $characterIndex => $character)
-                    @if($characterIndex < 10)
-                        <div class="bir-field bir-character" tabindex="0" data-field-key="period_from_char_{{ $characterIndex }}" data-field-label="Period from character {{ $characterIndex + 1 }}" style="{{ $fieldStyle('period_from_char_'.$characterIndex) }}">@if($character === ' ')&nbsp;@else{{ $character }}@endif</div>
+                    @if(isset($dateFieldIndexes[$characterIndex]))
+                        @php($fieldIndex = $dateFieldIndexes[$characterIndex])
+                        <div class="bir-field bir-character" tabindex="0" data-field-key="period_from_char_{{ $fieldIndex }}" data-field-label="Period from digit {{ $characterIndex + 1 }}" style="{{ $fieldStyle('period_from_char_'.$fieldIndex) }}">{{ $character }}</div>
                     @endif
                 @endforeach
                 @foreach($characters($form['period_to']) as $characterIndex => $character)
-                    @if($characterIndex < 10)
-                        <div class="bir-field bir-character" tabindex="0" data-field-key="period_to_char_{{ $characterIndex }}" data-field-label="Period to character {{ $characterIndex + 1 }}" style="{{ $fieldStyle('period_to_char_'.$characterIndex) }}">@if($character === ' ')&nbsp;@else{{ $character }}@endif</div>
+                    @if(isset($dateFieldIndexes[$characterIndex]))
+                        @php($fieldIndex = $dateFieldIndexes[$characterIndex])
+                        <div class="bir-field bir-character" tabindex="0" data-field-key="period_to_char_{{ $fieldIndex }}" data-field-label="Period to digit {{ $characterIndex + 1 }}" style="{{ $fieldStyle('period_to_char_'.$fieldIndex) }}">{{ $character }}</div>
                     @endif
                 @endforeach
                 @foreach($characters($form['payee_tin']) as $characterIndex => $character)

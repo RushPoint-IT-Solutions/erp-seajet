@@ -98,7 +98,11 @@
                         <div class="form-text">Printed as the payor TIN on Form 2307.</div>
                     </div>
                     <div class="col-md-3"><label class="form-label small text-muted">Base Currency</label><input name="base_currency" class="form-control form-control-sm text-uppercase" value="{{ $company->base_currency ?? 'PHP' }}" maxlength="3" required></div>
-                    <div class="col-12"><label class="form-label small text-muted">Address</label><input name="address" class="form-control form-control-sm" value="{{ $company->address ?? '' }}"></div>
+                    <div class="col-md-9"><label class="form-label small text-muted">Address</label><input name="address" class="form-control form-control-sm" value="{{ old('address', $company->address ?? '') }}"></div>
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted">ZIP Code (BIR 2307)</label>
+                        <input name="zip_code" class="form-control form-control-sm" value="{{ old('zip_code', $company->zip_code ?? '') }}" inputmode="numeric" pattern="\d{4}" maxlength="4" placeholder="0000" title="Enter a 4-digit ZIP code">
+                    </div>
                     <div class="col-12"><hr class="my-2"><div class="small fw-semibold">BIR 2307 Payor Authorized Representative</div></div>
                     <div class="col-md-5"><label class="form-label small text-muted">Printed Name</label><input name="bir_2307_payor_representative_name" class="form-control form-control-sm" value="{{ $company->bir_2307_payor_representative_name ?? '' }}" placeholder="Gina C. Boloy"></div>
                     <div class="col-md-4"><label class="form-label small text-muted">Title / Designation</label><input name="bir_2307_payor_representative_title" class="form-control form-control-sm" value="{{ $company->bir_2307_payor_representative_title ?? '' }}" placeholder="Finance Manager"></div>

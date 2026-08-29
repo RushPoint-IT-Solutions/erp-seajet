@@ -4184,6 +4184,7 @@ class ModuleController extends Controller
                 'companies.name as payer_name',
                 'companies.tin as payer_tin',
                 'companies.address as payer_address',
+                'companies.zip_code as payer_zip',
                 'companies.bir_2307_payor_representative_name as payer_authorized_name',
                 'companies.bir_2307_payor_representative_title as payer_authorized_title',
                 'companies.bir_2307_payor_representative_tin as payer_authorized_tin'
@@ -4274,8 +4275,8 @@ class ModuleController extends Controller
         return [
             'form' => [
                 'bill_no' => $record->document_no,
-                'period_from' => $periodFrom->format('m/d/Y'),
-                'period_to' => $periodTo->format('m/d/Y'),
+                'period_from' => $periodFrom->format('mdY'),
+                'period_to' => $periodTo->format('mdY'),
                 'payee_tin' => $record->payee_tin ?: '',
                 'payee_name' => $record->payee_name ?: '',
                 'payee_address' => $record->payee_address ?: '',
@@ -4283,7 +4284,7 @@ class ModuleController extends Controller
                 'payer_tin' => $record->payer_tin ?: '',
                 'payer_name' => $record->payer_name ?: '',
                 'payer_address' => $record->payer_address ?: '',
-                'payer_zip' => $this->zipCodeFromAddress($record->payer_address),
+                'payer_zip' => $record->payer_zip ?: $this->zipCodeFromAddress($record->payer_address),
                 'payer_authorized_name' => $record->payer_authorized_name ?: '',
                 'payer_authorized_title' => $record->payer_authorized_title ?: '',
                 'payer_authorized_tin' => $record->payer_authorized_tin ?: '',
@@ -9975,6 +9976,7 @@ class ModuleController extends Controller
             'name' => 'required|string|max:255',
             'tin' => ['nullable', 'string', 'max:17', 'regex:/^\d{3}-\d{3}-\d{3}-\d{5}$/'],
             'address' => 'nullable|string|max:1000',
+            'zip_code' => ['nullable', 'string', 'max:10', 'regex:/^\d{4}$/'],
             'base_currency' => 'required|string|max:3',
             'bir_2307_payor_representative_name' => 'nullable|string|max:255',
             'bir_2307_payor_representative_title' => 'nullable|string|max:255',

@@ -35,6 +35,7 @@ class VendorBill2307PrintTest extends TestCase
             ->first();
         $supplier = DB::table('suppliers')->whereNotNull('tin')->orderBy('id')->first();
         DB::table('suppliers')->where('id', $supplier->id)->update(['zip_code' => '1704']);
+        DB::table('companies')->where('id', $supplier->company_id)->update(['zip_code' => '1700']);
         $customer = DB::table('customers')->orderBy('id')->first();
 
         $this->assertNotNull($account);
@@ -130,11 +131,18 @@ class VendorBill2307PrintTest extends TestCase
             ->assertSee('200.00')
             ->assertSee($supplier->name)
             ->assertSee('1704')
+            ->assertSee('1700')
             ->assertSee('Lock positions')
             ->assertSee('Save Layout')
             ->assertSee('data-field-key="payee_name"', false)
             ->assertSee('data-field-key="period_from_char_0"', false)
+            ->assertSee('data-field-key="period_from_char_9"', false)
+            ->assertDontSee('data-field-key="period_from_char_2"', false)
+            ->assertDontSee('data-field-key="period_from_char_5"', false)
             ->assertSee('data-field-key="period_to_char_0"', false)
+            ->assertSee('data-field-key="period_to_char_9"', false)
+            ->assertDontSee('data-field-key="period_to_char_2"', false)
+            ->assertDontSee('data-field-key="period_to_char_5"', false)
             ->assertSee('data-field-key="payee_tin_char_0"', false)
             ->assertSee('data-field-key="payee_address_char_0"', false)
             ->assertSee('data-field-key="payer_tin_char_0"', false)
@@ -205,7 +213,7 @@ class VendorBill2307PrintTest extends TestCase
             ->assertSee('UTS LOGISTICS AND DISTRIBUTION CO., INC.');
     }
 
-    public function test_payor_tin_is_editable_in_company_profile_and_used_by_2307()
+    public function test_payor_tin_and_zip_are_editable_in_company_profile_and_used_by_2307()
     {
         $company = DB::table('companies')->where('code', 'SJ')->first();
 
@@ -213,6 +221,7 @@ class VendorBill2307PrintTest extends TestCase
             'name' => $company->name,
             'tin' => '123-456-789-54321',
             'address' => $company->address,
+            'zip_code' => '1018',
             'base_currency' => $company->base_currency,
             'bir_2307_payor_representative_name' => $company->bir_2307_payor_representative_name,
             'bir_2307_payor_representative_title' => $company->bir_2307_payor_representative_title,
@@ -220,11 +229,12 @@ class VendorBill2307PrintTest extends TestCase
         ])->assertRedirect(route('erp.settings.index'));
 
         $this->assertSame('123-456-789-54321', DB::table('companies')->where('id', $company->id)->value('tin'));
+        $this->assertSame('1018', DB::table('companies')->where('id', $company->id)->value('zip_code'));
 
         Artisan::call('db:seed', ['--class' => 'VendorBill2307SampleSeeder']);
         $billId = DB::table('purchase_documents')->where('document_no', 'BILL-2307-SAMPLE')->value('id');
         $response = $this->get(route('erp.payables.vendor-bills.print-2307', $billId));
-        $response->assertOk();
+        $response->assertOk()->assertSee('1018');
 
         preg_match_all('/data-field-key="payer_tin_char_(\d+)"[^>]*>(.*?)<\/div>/', $response->getContent(), $matches, PREG_SET_ORDER);
         $printedTin = '';
