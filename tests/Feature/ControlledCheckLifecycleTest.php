@@ -188,6 +188,18 @@ class ControlledCheckLifecycleTest extends TestCase
             ->value('current_number'));
     }
 
+    public function test_check_preparation_opens_payment_form_with_cheque_selected()
+    {
+        $this->get(route('erp.payables.approvals'))
+            ->assertOk()
+            ->assertSee(route('erp.payables.payments.create', ['method' => 'Cheque']));
+
+        $this->get(route('erp.payables.payments.create', ['method' => 'Cheque']))
+            ->assertOk()
+            ->assertSee('value="Cheque" selected', false)
+            ->assertSee('id="checkNumber" class="form-control" value="" required', false);
+    }
+
     public function test_layout_saves_new_versions_and_keeps_only_latest_active()
     {
         $bank = DB::table('bank_accounts')->orderBy('id')->first();

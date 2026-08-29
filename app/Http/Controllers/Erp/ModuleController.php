@@ -1688,11 +1688,15 @@ class ModuleController extends Controller
     public function apPaymentCreate()
     {
         $selectedBill = request('bill') ? $this->apBillByNumber(request('bill')) : null;
+        $selectedPaymentMethod = in_array(request('method'), ['Cheque', 'Bank', 'Online Transfer'], true)
+            ? request('method')
+            : 'Bank';
 
         return view('erp.payables.payment-create', [
             'suppliers' => $this->vendorRows(),
             'openBills' => $this->openApBills(),
             'selectedBill' => $selectedBill,
+            'selectedPaymentMethod' => $selectedPaymentMethod,
             'nextPaymentNo' => $this->nextDocumentNumber('payment_voucher', 'PV-', 5, false),
             'bankAccounts' => $this->bankAccounts(),
         ]);
@@ -2179,7 +2183,7 @@ class ModuleController extends Controller
 
         if (!$paymentId) {
             return redirect()
-                ->route('erp.payables.payments.create', ['bill' => $billNo])
+                ->route('erp.payables.payments.create', ['bill' => $billNo, 'method' => 'Cheque'])
                 ->with('status', 'Create or release a payment first before printing the check voucher.');
         }
 

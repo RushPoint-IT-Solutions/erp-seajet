@@ -13,6 +13,7 @@
     </div>
 
     @php($selectedBill = $selectedBill ?? null)
+    @php($selectedPaymentMethod = $selectedPaymentMethod ?? 'Bank')
     <form class="erp-card p-4" method="post" action="{{ route('erp.payables.payments.review') }}" enctype="multipart/form-data">
         {{ csrf_field() }}
         <div class="row g-3">
@@ -63,7 +64,11 @@
             </div>
             <div class="col-md-4">
                 <label class="form-label">Payment Method</label>
-                <select name="payment_method" id="paymentMethod" class="form-select erp-select"><option>Bank</option><option>Cheque</option><option>Online Transfer</option></select>
+                <select name="payment_method" id="paymentMethod" class="form-select erp-select">
+                    @foreach(['Bank', 'Cheque', 'Online Transfer'] as $method)
+                        <option value="{{ $method }}" {{ $selectedPaymentMethod === $method ? 'selected' : '' }}>{{ $method }}</option>
+                    @endforeach
+                </select>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Bank Account</label>
@@ -76,7 +81,7 @@
             </div>
             <div class="col-md-3">
                 <label class="form-label">Check No</label>
-                <input name="check_no" id="checkNumber" class="form-control" value="">
+                <input name="check_no" id="checkNumber" class="form-control" value="" {{ $selectedPaymentMethod === 'Cheque' ? 'required' : '' }}>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Currency</label>

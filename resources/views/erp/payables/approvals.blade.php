@@ -11,7 +11,7 @@
         </div>
         <div class="d-flex gap-2">
             <a href="{{ route('erp.payables.check-register') }}" class="btn btn-outline-secondary"><i class="bi bi-journal-check me-1"></i> Check Register</a>
-            <a href="{{ route('erp.payables.payments.create') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i> New Payment</a>
+            <a href="{{ route('erp.payables.payments.create', ['method' => 'Cheque']) }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i> New Payment</a>
         </div>
     </div>
 
