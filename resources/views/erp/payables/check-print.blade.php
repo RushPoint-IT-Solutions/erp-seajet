@@ -77,7 +77,7 @@
         color: #000;
         font-family: Calibri, Arial, Helvetica, sans-serif;
         font-size: 12pt;
-        font-weight: 400;
+        font-weight: 700;
         line-height: 1.15;
         position: absolute;
         touch-action: none;
