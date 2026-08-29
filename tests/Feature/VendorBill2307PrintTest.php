@@ -66,6 +66,7 @@ class VendorBill2307PrintTest extends TestCase
             ->assertSee('10,000.00')
             ->assertSee('-200.00')
             ->assertSee('Expense Total : 9,800.00')
+            ->assertSee('VAT 12% : 1,200.00')
             ->assertSee('Bill Total :PHP 11,000.00')
             ->assertDontSee('>Tax</th>', false)
             ->assertDontSee('ATC/WC');

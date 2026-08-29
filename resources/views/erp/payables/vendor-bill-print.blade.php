@@ -161,11 +161,13 @@
         font-size: 12px;
         color: #4b5563;
     }
-    .bill-expense-total {
+    .bill-expense-total,
+    .bill-vat-total {
         margin-top: 8px;
         text-align: right;
         font-size: 12px;
     }
+    .bill-vat-total { margin-top: 4px; }
     .bill-total {
         margin-top: 14px;
         text-align: right;
@@ -291,7 +293,8 @@
             height: 500px;
         }
         .bill-class { font-size: 8px; }
-        .bill-expense-total {
+        .bill-expense-total,
+        .bill-vat-total {
             margin-top: 4px;
             font-size: 9px;
         }
@@ -403,6 +406,7 @@
             </table>
 
             <div class="bill-expense-total">Expense Total : {{ $money($expenseTotal) }}</div>
+            <div class="bill-vat-total">VAT 12% : {{ $money($bill['input_vat']) }}</div>
             <div class="bill-total">Bill Total :{{ $bill['currency'] }} {{ $money($billTotal) }}</div>
         </div>
     </div>
