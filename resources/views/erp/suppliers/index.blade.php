@@ -149,6 +149,7 @@
                         <td class="text-end">{{ $supplier['open_bills'] }}</td>
                         <td class="text-end fw-semibold">{{ $supplier['open_ap_display'] }}</td>
                         <td class="text-end">
+                            <a href="{{ route('erp.suppliers.edit', $supplier['id']) }}" class="btn btn-sm btn-outline-primary" title="Edit Vendor"><i class="bi bi-pencil"></i></a>
                             <a href="{{ route('erp.payables.vendor-bills.create', ['supplier' => $supplier['supplier_id']]) }}" class="btn btn-sm btn-outline-secondary" title="Vendor Bill"><i class="bi bi-receipt"></i></a>
                             <a href="{{ route('erp.payables.payments.create', ['supplier' => $supplier['supplier_id']]) }}" class="btn btn-sm btn-outline-secondary" title="Pay Bills"><i class="bi bi-cash"></i></a>
                         </td>

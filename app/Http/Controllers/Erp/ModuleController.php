@@ -886,6 +886,7 @@ class ModuleController extends Controller
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:255',
             'address' => 'nullable|string|max:1000',
+            'zip_code' => ['nullable', 'regex:/^\d{4}$/'],
             'default_ap_account' => 'nullable|string|max:255',
             'default_expense_account_id' => 'nullable|integer',
             'preferred_payment_method' => 'nullable|string|max:255',
@@ -913,6 +914,7 @@ class ModuleController extends Controller
             'email' => isset($data['email']) ? $data['email'] : null,
             'phone' => isset($data['phone']) ? $data['phone'] : null,
             'address' => isset($data['address']) ? $data['address'] : null,
+            'zip_code' => $data['zip_code'] ?? null,
             'payment_terms' => $data['payment_terms'],
             'payment_term_days' => $this->paymentTermDays($data['payment_terms']),
             'currency' => $data['currency'],
@@ -927,6 +929,81 @@ class ModuleController extends Controller
         ]);
 
         return redirect()->route('erp.suppliers.index')->with('success', 'Vendor '.$code.' was saved to the database.');
+    }
+
+    public function supplierEdit($supplier)
+    {
+        $record = DB::table('suppliers')
+            ->where('company_id', $this->defaultCompanyId())
+            ->where('id', $supplier)
+            ->first();
+        abort_unless($record, 404);
+
+        return view('erp.suppliers.create', [
+            'nextSupplierCode' => $record->code,
+            'expenseAccounts' => $this->expenseAccountOptions(),
+            'supplier' => $record,
+            'isEdit' => true,
+        ]);
+    }
+
+    public function supplierUpdate($supplier)
+    {
+        $data = request()->validate([
+            'supplier_id' => 'required|string|max:50',
+            'name' => 'required|string|max:255',
+            'tin' => 'nullable|string|max:255',
+            'tax_classification' => 'required|string|max:255',
+            'payment_terms' => 'required|string|max:50',
+            'currency' => 'required|string|max:3',
+            'default_class_code' => 'required|string|max:50',
+            'contact_person' => 'nullable|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'nullable|string|max:255',
+            'address' => 'nullable|string|max:1000',
+            'zip_code' => ['nullable', 'regex:/^\d{4}$/'],
+            'default_ap_account' => 'nullable|string|max:255',
+            'default_expense_account_id' => 'nullable|integer',
+            'preferred_payment_method' => 'nullable|string|max:255',
+            'withholding_tax' => 'nullable|string|max:50',
+        ]);
+
+        $companyId = $this->defaultCompanyId();
+        $record = DB::table('suppliers')->where('company_id', $companyId)->where('id', $supplier)->first();
+        abort_unless($record, 404);
+
+        $code = strtoupper(trim($data['supplier_id']));
+        $duplicate = DB::table('suppliers')
+            ->where('company_id', $companyId)
+            ->where('code', $code)
+            ->where('id', '<>', $record->id)
+            ->exists();
+        if ($duplicate) {
+            return redirect()->back()->withInput()->withErrors(['supplier_id' => 'This vendor ID already exists.']);
+        }
+
+        DB::table('suppliers')->where('id', $record->id)->update([
+            'code' => $code,
+            'name' => $data['name'],
+            'tin' => $data['tin'] ?? null,
+            'tax_classification' => $data['tax_classification'],
+            'contact_person' => $data['contact_person'] ?? null,
+            'email' => $data['email'] ?? null,
+            'phone' => $data['phone'] ?? null,
+            'address' => $data['address'] ?? null,
+            'zip_code' => $data['zip_code'] ?? null,
+            'payment_terms' => $data['payment_terms'],
+            'payment_term_days' => $this->paymentTermDays($data['payment_terms']),
+            'currency' => $data['currency'],
+            'preferred_payment_method' => $data['preferred_payment_method'] ?? null,
+            'default_class_code' => $data['default_class_code'],
+            'default_ap_account' => $data['default_ap_account'] ?? null,
+            'default_expense_account_id' => $data['default_expense_account_id'] ?? null,
+            'withholding_tax' => $data['withholding_tax'] ?? '0%',
+            'updated_at' => now(),
+        ]);
+
+        return redirect()->route('erp.suppliers.index')->with('success', 'Vendor '.$code.' was updated.');
     }
 
     private function vendorRows()
@@ -4100,6 +4177,7 @@ class ModuleController extends Controller
                 'suppliers.name as payee_name',
                 'suppliers.tin as payee_tin',
                 'suppliers.address as payee_address',
+                'suppliers.zip_code as payee_zip',
                 'suppliers.bir_2307_payee_representative_name as payee_authorized_name',
                 'suppliers.bir_2307_payee_representative_title as payee_authorized_title',
                 'suppliers.bir_2307_payee_representative_tin as payee_authorized_tin',
@@ -4201,7 +4279,7 @@ class ModuleController extends Controller
                 'payee_tin' => $record->payee_tin ?: '',
                 'payee_name' => $record->payee_name ?: '',
                 'payee_address' => $record->payee_address ?: '',
-                'payee_zip' => $this->zipCodeFromAddress($record->payee_address),
+                'payee_zip' => $record->payee_zip ?: $this->zipCodeFromAddress($record->payee_address),
                 'payer_tin' => $record->payer_tin ?: '',
                 'payer_name' => $record->payer_name ?: '',
                 'payer_address' => $record->payer_address ?: '',

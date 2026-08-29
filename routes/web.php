@@ -37,6 +37,8 @@ Route::middleware(['auth', 'permission.access'])->group(function () {
     Route::get('/erp/suppliers', 'Erp\ModuleController@suppliers')->name('erp.suppliers.index');
     Route::get('/erp/suppliers/create', 'Erp\ModuleController@supplierCreate')->name('erp.suppliers.create');
     Route::post('/erp/suppliers', 'Erp\ModuleController@supplierStore')->name('erp.suppliers.store');
+    Route::get('/erp/suppliers/{supplier}/edit', 'Erp\ModuleController@supplierEdit')->name('erp.suppliers.edit');
+    Route::put('/erp/suppliers/{supplier}', 'Erp\ModuleController@supplierUpdate')->name('erp.suppliers.update');
 });
 Route::prefix('/erp/users')->name('erp.users.')->middleware(['auth', 'permission.access'])->group(function () {
     Route::get('/', 'Erp\ModuleController@usersIndex')->name('index');

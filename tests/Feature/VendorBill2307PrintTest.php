@@ -34,6 +34,7 @@ class VendorBill2307PrintTest extends TestCase
             ->select('accounts.*')
             ->first();
         $supplier = DB::table('suppliers')->whereNotNull('tin')->orderBy('id')->first();
+        DB::table('suppliers')->where('id', $supplier->id)->update(['zip_code' => '1704']);
         $customer = DB::table('customers')->orderBy('id')->first();
 
         $this->assertNotNull($account);
@@ -128,6 +129,7 @@ class VendorBill2307PrintTest extends TestCase
             ->assertSee('10,000.00')
             ->assertSee('200.00')
             ->assertSee($supplier->name)
+            ->assertSee('1704')
             ->assertSee('Lock positions')
             ->assertSee('Save Layout')
             ->assertSee('data-field-key="payee_name"', false)
