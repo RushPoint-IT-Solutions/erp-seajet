@@ -1715,6 +1715,7 @@ class ModuleController extends Controller
             'shipment_job_id' => 'nullable|string|max:100',
             'supplier_id' => 'required|string|max:100',
             'supplier_name' => 'nullable|string|max:255',
+            'payee_name' => 'required|string|max:255',
             'payment_method' => 'required|in:Cheque,Bank Transfer,Online Transfer,Bank',
             'bank_account' => 'required|string|max:255',
             'check_no' => 'required_if:payment_method,Cheque|nullable|string|max:100',
@@ -2880,7 +2881,7 @@ class ModuleController extends Controller
                 'approval_status' => 'For Approval',
                 'created_by' => auth()->id(),
                 'submitted_at' => now(),
-                'payee_snapshot' => $bill->supplier_name ?: ($data['supplier_name'] ?? 'Unknown Payee'),
+                'payee_snapshot' => trim($data['payee_name']),
                 'amount_words_snapshot' => $this->amountToWords($amount, $currency),
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -3160,12 +3161,15 @@ class ModuleController extends Controller
         $documentDate = !empty($payment->payment_date)
             ? date('m/d/Y', strtotime($payment->payment_date))
             : now()->format('m/d/Y');
-        $accountNo = $payment->payment_bank_account_no ?: '-';
-        if ($accountNo === '-' && !empty($payment->bank_account) && preg_match('/(?:CA#|SA#|Acct#|Account#)\s*([A-Za-z0-9\-]+)/i', $payment->bank_account, $matches)) {
-            $accountNo = $matches[1];
+        $bankAccountNo = $payment->payment_bank_account_no ?: '-';
+        if ($bankAccountNo === '-' && !empty($payment->bank_account) && preg_match('/(?:CA#|SA#|Acct#|Account#)\s*([A-Za-z0-9\-]+)/i', $payment->bank_account, $matches)) {
+            $bankAccountNo = $matches[1];
         }
         $bankName = $payment->payment_bank_name ?: 'Bank';
-        $cashInBankTitle = 'Cash in Bank - '.$bankName.($accountNo !== '-' ? ' ('.$accountNo.')' : '');
+        $currency = strtoupper($payment->currency ?: 'PHP');
+        $apTradeTitle = 'A/P Trade ('.$bankName.') - '.$currency;
+        $cashInBankTitle = 'Cash in Bank - '.$bankName.($bankAccountNo !== '-' ? ' ('.$bankAccountNo.')' : '');
+        $clientAccountNo = $bill ? trim((string) ($bill->client_customer_id ?? '')) : '';
         $vendorBillMemo = $bill ? trim((string) ($bill->memo ?: $bill->remarks)) : '';
 
         return [
@@ -3180,16 +3184,16 @@ class ModuleController extends Controller
             'payment_method' => $payment->payment_method,
             'bank_account' => $payment->bank_account ?: '-',
             'bank_name' => $payment->payment_bank_name ?: '-',
-            'account_name' => $payment->payment_bank_name ?: '-',
-            'account_no' => $accountNo,
+            'account_name' => $apTradeTitle,
+            'account_no' => $clientAccountNo !== '' ? $clientAccountNo : '-',
             'check_no' => $payment->check_no ?: '-',
             'bill_no' => $payment->bill_no,
             'description' => $vendorBillMemo,
-            'currency' => $payment->currency ?: 'PHP',
+            'currency' => $currency,
             'gross' => $gross,
             'withholding' => $wht,
             'net' => $net,
-            'debit_account_title' => 'A/P-Trade ('.($payment->bank_account ?: ($payment->currency ?: 'PHP')).')',
+            'debit_account_title' => $apTradeTitle,
             'credit_account_title' => $cashInBankTitle,
             'amount_words' => $payment->amount_words_snapshot ?: $this->amountToWords($net, $payment->currency ?: 'PHP'),
         ];
@@ -3732,7 +3736,7 @@ class ModuleController extends Controller
             'gross' => 0,
             'withholding' => 0,
             'net' => 0,
-            'debit_account_title' => 'A/P-Trade (BDO - PHP)',
+            'debit_account_title' => 'A/P Trade (BDO) - PHP',
             'credit_account_title' => 'Cash in Bank - BDO (4898002879)',
             'amount_words' => 'Zero Pesos Only',
         ];
@@ -4202,6 +4206,7 @@ class ModuleController extends Controller
             'voucher_no' => $payment->voucher_no ?? null,
             'supplier_id' => $payment->supplier_code ?? $payment->supplier_id,
             'supplier_name' => $payment->supplier_name,
+            'payee_name' => $payment->payee_snapshot ?: $payment->supplier_name,
             'shipment_job_id' => $payment->shipment_job_id,
             'bill_no' => $payment->bill_no,
             'payment_date' => $payment->payment_date,

@@ -54,13 +54,18 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-5">
+            <div class="col-md-4">
                 <label class="form-label">Supplier Name</label>
                 <select name="supplier_name" id="supplierName" class="form-select erp-select">
                     @foreach($suppliers as $supplier)
                         <option {{ $selectedBill && $selectedBill['supplier_name'] === $supplier['name'] ? 'selected' : '' }}>{{ $supplier['name'] }}</option>
                     @endforeach
                 </select>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">Payee Name</label>
+                <input name="payee_name" id="payeeName" class="form-control" value="{{ old('payee_name', $selectedBill['supplier_name'] ?? '') }}" maxlength="255" required>
+                <div class="form-text">Editable when the check must be issued to a name other than the supplier.</div>
             </div>
             <div class="col-md-4">
                 <label class="form-label">Payment Method</label>
@@ -125,6 +130,7 @@
             $('#shipmentJobId').val(option.data('job') || '');
             $('#supplierId').val(option.data('supplier-id') || '');
             $('#supplierName').val(option.data('supplier-name') || '');
+            $('#payeeName').val(option.data('supplier-name') || '');
             $('#currencySelect').val(option.data('currency') || 'PHP');
             $('#amountInput').val(option.data('amount') || '');
             syncCurrency();

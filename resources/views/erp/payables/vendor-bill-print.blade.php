@@ -45,11 +45,8 @@
         font-size: 13px;
     }
     .bill-top-grid {
-        display: grid;
-        grid-template-columns: 1fr 330px;
-        gap: 52px;
-        align-items: start;
-        min-height: 172px;
+        min-height: 190px;
+        text-align: center;
     }
     .bill-print-brand {
         display: flex;
@@ -102,6 +99,10 @@
         gap: 52px;
         margin-top: 18px;
         align-items: start;
+    }
+    .bill-meta-stack {
+        display: grid;
+        gap: 10px;
     }
     .bill-box {
         border: 1px solid #111827;
@@ -222,9 +223,8 @@
             box-shadow: none !important;
         }
         .bill-top-grid {
-            min-height: 0;
-            gap: 22px;
-            grid-template-columns: 1fr 250px;
+            min-height: 150px;
+            text-align: center;
         }
         .bill-print-logo {
             display: block;
@@ -266,6 +266,7 @@
             gap: 22px;
             margin-top: 8px;
         }
+        .bill-meta-stack { gap: 6px; }
         .bill-box { min-height: 76px; }
         .bill-box-label {
             padding: 3px 5px;
@@ -325,23 +326,15 @@
     <div class="bill-print-wrap">
         <div class="bill-print-sheet">
             <div class="bill-top-grid">
-                <div>
-                    <div class="bill-print-brand">
-                        <img src="{{ asset('images/gen_off_seajetlogo.webp') }}" class="bill-print-logo" alt="SeaJet logo">
-                        <div class="bill-print-company">
-                            <div class="bill-print-company-name">Sea-Jet International Forwarders, Inc.</div>
-                            <div class="bill-print-company-meta">Unit 18 & 19 Bldg. B, Cargo Village Complex</div>
-                            <div class="bill-print-company-meta">Paranaque City 1704, Philippines</div>
-                        </div>
+                <div class="bill-print-brand">
+                    <img src="{{ asset('images/gen_off_seajetlogo.webp') }}" class="bill-print-logo" alt="SeaJet logo">
+                    <div class="bill-print-company">
+                        <div class="bill-print-company-name">Sea-Jet International Forwarders, Inc.</div>
+                        <div class="bill-print-company-meta">Unit 18 & 19 Bldg. B, Cargo Village Complex</div>
+                        <div class="bill-print-company-meta">Paranaque City 1704, Philippines</div>
                     </div>
-                    <div class="bill-print-form-title">Vendor Bill</div>
                 </div>
-                <div class="bill-small-grid">
-                    <div>Date</div>
-                    <div>Ref. No.</div>
-                    <div>{{ $bill['date'] }}</div>
-                    <div>{{ $bill['ref_no'] }}</div>
-                </div>
+                <div class="bill-print-form-title">Vendor Bill</div>
             </div>
 
             <div class="bill-info-row">
@@ -349,18 +342,26 @@
                     <div class="bill-box-label">Vendor</div>
                     <div class="bill-box-body">{{ $bill['vendor'] }}@if(!empty($bill['vendor_address'])){{ "\n".$bill['vendor_address'] }}@endif</div>
                 </div>
-                <div class="bill-meta-box">
-                    <div class="bill-meta-line">
-                        <div>Bill Due</div>
-                        <div>{{ $bill['bill_due'] }}</div>
+                <div class="bill-meta-stack">
+                    <div class="bill-small-grid">
+                        <div>Date</div>
+                        <div>Ref. No.</div>
+                        <div>{{ $bill['date'] }}</div>
+                        <div>{{ $bill['ref_no'] }}</div>
                     </div>
-                    <div class="bill-meta-line">
-                        <div>Terms</div>
-                        <div>{{ $bill['terms'] }}</div>
-                    </div>
-                    <div class="bill-meta-line">
-                        <div>Memo</div>
-                        <div>{{ $bill['memo'] }}</div>
+                    <div class="bill-meta-box">
+                        <div class="bill-meta-line">
+                            <div>Bill Due</div>
+                            <div>{{ $bill['bill_due'] }}</div>
+                        </div>
+                        <div class="bill-meta-line">
+                            <div>Terms</div>
+                            <div>{{ $bill['terms'] }}</div>
+                        </div>
+                        <div class="bill-meta-line">
+                            <div>Memo</div>
+                            <div>{{ $bill['memo'] }}</div>
+                        </div>
                     </div>
                 </div>
             </div>

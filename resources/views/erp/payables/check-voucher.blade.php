@@ -22,8 +22,8 @@
         'document_date' => $voucher['document_date'],
         'payment_info_title' => 'PAYMENT INFORMATION',
         'amount_header' => 'Amount',
-        'account_name_label' => 'Bank Name:',
-        'account_name' => $voucher['bank_name'],
+        'account_name_label' => 'Account Name:',
+        'account_name' => $voucher['account_name'],
         'amount' => $formattedAmount,
         'account_no_label' => 'Account No:',
         'account_no' => $voucher['account_no'],
@@ -148,10 +148,12 @@
                 <div class="cv-line" style="left: 48px; top: 962px; width: 744px;"></div>
             @endif
 
+            @php($paymentInfoFields = ['payment_info_title', 'amount_header', 'account_name_label', 'account_name', 'amount', 'account_no_label', 'account_no', 'amount_words'])
             @foreach($positions as $field => $point)
                 @continue(($point[0] ?? 0) < 0 || ($point[1] ?? 0) < 0)
+                @php($renderTop = ($point[1] ?? 0) - (in_array($field, $paymentInfoFields, true) ? 12 : 0))
                 @php($classes = (in_array($field, ['company_name', 'form_title']) ? ' header-text' : '').($field === 'logo_mark' ? ' logo-mark' : '').(in_array($field, ['amount', 'debit_amount', 'credit_amount', 'total_debit', 'total_credit']) ? ' amount' : '').(strpos($field, 'label') !== false || strpos($field, 'header') !== false ? ' label' : ''))
-                <div class="cv-field{{ $classes }}" style="left: {{ $point[0] }}px; top: {{ $point[1] }}px; width: {{ $fieldStyles[$field]['width'] }}px; font-size: {{ $fieldStyles[$field]['font_size'] }}px;">
+                <div class="cv-field{{ $classes }}" style="left: {{ $point[0] }}px; top: {{ $renderTop }}px; width: {{ $fieldStyles[$field]['width'] }}px; font-size: {{ min(40, $fieldStyles[$field]['font_size'] + 2) }}px;">
                     @if($field === 'logo_mark')
                         <img src="{{ asset('images/gen_off_seajetlogo.webp') }}" alt="SeaJet logo">
                     @else
@@ -161,7 +163,7 @@
             @endforeach
 
             @foreach($customFields as $custom)
-                <div class="cv-field" style="left: {{ $custom['x'] }}px; top: {{ $custom['y'] }}px; width: {{ $custom['width'] }}px; font-size: {{ $custom['font_size'] }}px;">
+                <div class="cv-field" style="left: {{ $custom['x'] }}px; top: {{ $custom['y'] }}px; width: {{ $custom['width'] }}px; font-size: {{ min(40, $custom['font_size'] + 2) }}px;">
                     {{ $custom['text'] }}
                 </div>
             @endforeach

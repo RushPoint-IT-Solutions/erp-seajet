@@ -28,6 +28,7 @@ class ControlledCheckLifecycleTest extends TestCase
         DB::table('purchase_documents')->where('id', $bill->id)->update([
             'memo' => 'Vendor Bill header memo for check voucher',
             'remarks' => 'Legacy bill remarks',
+            'client_customer_id' => 'CL-CONTROL',
         ]);
         $balanceBefore = (float) $bill->grand_total - (float) $bill->paid_total;
 
@@ -42,6 +43,7 @@ class ControlledCheckLifecycleTest extends TestCase
         $this->assertSame('unposted', $payment->posting_status);
         $this->assertSame(1, (int) $payment->created_by);
         $this->assertSame('Ten Pesos and 50/100 Only', $payment->amount_words_snapshot);
+        $this->assertSame('Alternate Check Payee', $payment->payee_snapshot);
         $this->assertDatabaseHas('check_issuances', [
             'payment_id' => $payment->id,
             'check_no' => 'CONTROL-1001',
@@ -53,8 +55,10 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertSee('CONTROL-1001');
         $this->get(route('erp.payables.check-voucher', $payment->id))
             ->assertOk()
-            ->assertSee('Bank Name:')
-            ->assertSee($bank->bank_name)
+            ->assertSee('Account Name:')
+            ->assertSee('A/P Trade ('.$bank->bank_name.') - '.$bill->currency)
+            ->assertSee('CL-CONTROL')
+            ->assertSee('Alternate Check Payee')
             ->assertSee('Cash in Bank - '.$bank->bank_name.' ('.$bank->account_no.')')
             ->assertSee('Vendor Bill header memo for check voucher')
             ->assertDontSee('Legacy bill remarks')
@@ -336,6 +340,7 @@ class ControlledCheckLifecycleTest extends TestCase
             'shipment_job_id' => $bill->shipment_job_id,
             'supplier_id' => (string) $bill->supplier_id,
             'supplier_name' => 'Snapshot Payee',
+            'payee_name' => 'Alternate Check Payee',
             'payment_method' => 'Cheque',
             'bank_account' => $bank->account_no,
             'check_no' => 'CONTROL-1001',
