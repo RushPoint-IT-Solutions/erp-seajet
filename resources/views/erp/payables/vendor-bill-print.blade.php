@@ -15,8 +15,8 @@
         return in_array($taxCategory, ['VAT12', '12%'], true) ? $amount / 1.12 : $amount;
     };
     $expenseTotal = $printLines->isEmpty()
-        ? max(0, (float) $bill['gross_amount'] - (float) $bill['input_vat'])
-        : $printLines->sum($expenseAmount);
+        ? max(0, (float) $bill['gross_amount'] - (float) $bill['input_vat'] - (float) $bill['withholding_tax_amount'])
+        : $printLines->sum($expenseAmount) - (float) $bill['withholding_tax_amount'];
     $billTotal = $expenseTotal + (float) $bill['input_vat'];
 @endphp
 
