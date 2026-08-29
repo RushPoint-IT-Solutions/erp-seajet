@@ -18,8 +18,6 @@
     ];
     $paperWidth = (float) $checkProfile['paper_width_mm'];
     $paperHeight = (float) $checkProfile['paper_height_mm'];
-    $printPageWidth = $paperHeight;
-    $printPageHeight = $paperWidth;
     $offsetX = (float) $checkProfile['offset_x_mm'];
     $offsetY = (float) $checkProfile['offset_y_mm'];
 @endphp
@@ -129,16 +127,16 @@
     }
     @page {
         margin: 0;
-        size: {{ $printPageWidth }}mm {{ $printPageHeight }}mm;
+        size: {{ $paperWidth }}mm {{ $paperHeight }}mm;
     }
     @media print {
         html,
         body {
             background: #fff !important;
-            height: {{ $printPageHeight }}mm;
+            height: {{ $paperHeight }}mm;
             margin: 0 !important;
             padding: 0 !important;
-            width: {{ $printPageWidth }}mm;
+            width: {{ $paperWidth }}mm;
         }
         .erp-main > section {
             margin: 0 !important;
@@ -146,19 +144,13 @@
         }
         .check-print-page,
         .check-preview-scroll {
-            height: {{ $printPageHeight }}mm;
             margin: 0 !important;
             overflow: visible !important;
             padding: 0 !important;
-            position: relative;
-            width: {{ $printPageWidth }}mm;
         }
         .check-sheet {
             box-shadow: none !important;
             margin: 0 !important;
-            position: absolute;
-            transform: translateX({{ $paperHeight }}mm) rotate(90deg);
-            transform-origin: top left;
         }
         .check-sheet::before,
         .check-sheet::after {
