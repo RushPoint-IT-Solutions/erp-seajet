@@ -92,11 +92,26 @@
     .cv-vline { position: absolute; border-left: 1px solid #111827; }
     .cv-muted-line { position: absolute; border-top: 1px dashed #111827; opacity: .55; }
     @media print {
+        @page { size: letter; margin: 0; }
+        html, body {
+            width: 8.5in;
+            height: 11in;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden;
+        }
         .erp-sidebar, .erp-topbar, .no-print { display: none !important; }
         .erp-main { margin: 0 !important; }
         .erp-main > section { padding: 0 !important; }
         body { background: #fff !important; }
-        .cv-print-sheet { border: 0; box-shadow: none; margin: 0; }
+        .cv-print-wrap { width: 8.5in; height: 11in; overflow: hidden; }
+        .cv-print-sheet {
+            border: 0;
+            box-shadow: none;
+            margin: 0;
+            transform: translate(12px, 12px) scale(.97);
+            transform-origin: top left;
+        }
     }
 </style>
 @endpush

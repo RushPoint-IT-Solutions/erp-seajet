@@ -94,12 +94,14 @@
         .erp-sidebar, .erp-topbar, .no-print { display: none !important; }
         .erp-main { margin: 0 !important; }
         .erp-main > section { padding: 0 !important; }
-        .bir-2307-wrap { overflow: visible; padding: 0; background: #fff; }
+        .bir-2307-wrap { overflow: hidden; padding: 0; background: #fff; }
         .bir-2307-page {
             width: 8.5in;
             height: 13in;
             margin: 0;
             box-shadow: none;
+            transform: translate(12px, 12px) scale(.97);
+            transform-origin: top left;
             page-break-after: always;
             break-after: page;
             -webkit-print-color-adjust: exact;
