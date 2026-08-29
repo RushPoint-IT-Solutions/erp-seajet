@@ -60,6 +60,16 @@ class VendorBill2307PrintTest extends TestCase
         $this->assertEquals(200.0, (float) $bill->withholding_tax_amount);
         $this->assertEquals(11000.0, (float) $bill->grand_total);
 
+        $vendorBillPrint = $this->get(route('erp.payables.vendor-bills.print', $bill->id));
+        $vendorBillPrint->assertOk()
+            ->assertSee('Expanded Withholding Tax Payable')
+            ->assertSee('10,000.00')
+            ->assertSee('-200.00')
+            ->assertSee('Expense Total : 10,000.00')
+            ->assertSee('Bill Total :PHP 11,200.00')
+            ->assertDontSee('>Tax</th>', false)
+            ->assertDontSee('ATC/WC');
+
         $this->post(route('erp.settings.bir-2307.payee.save'), [
             'supplier_id' => $supplier->id,
             'bir_2307_payee_representative_name' => 'Sample Payee Signatory',

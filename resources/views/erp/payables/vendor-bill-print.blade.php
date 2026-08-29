@@ -7,6 +7,17 @@
     $money = function ($amount) {
         return number_format((float) $amount, 2);
     };
+    $printLines = collect($lines);
+    $expenseAmount = function ($line) {
+        $amount = (float) ($line->amount ?? $line->line_total ?? 0);
+        $taxCategory = strtoupper(trim((string) ($line->tax_category ?? '')));
+
+        return in_array($taxCategory, ['VAT12', '12%'], true) ? $amount / 1.12 : $amount;
+    };
+    $expenseTotal = $printLines->isEmpty()
+        ? max(0, (float) $bill['gross_amount'] - (float) $bill['input_vat'])
+        : $printLines->sum($expenseAmount);
+    $billTotal = $expenseTotal + (float) $bill['input_vat'];
 @endphp
 
 @push('styles')
@@ -140,11 +151,20 @@
         height: 430px;
     }
     .bill-num { text-align: right; }
+    .bill-class {
+        font-size: 10px;
+        overflow-wrap: anywhere;
+    }
     .bill-total-line {
         margin-top: 10px;
         text-align: right;
         font-size: 12px;
         color: #4b5563;
+    }
+    .bill-expense-total {
+        margin-top: 8px;
+        text-align: right;
+        font-size: 12px;
     }
     .bill-total {
         margin-top: 14px;
@@ -268,9 +288,10 @@
             height: 18px;
         }
         .bill-expense-table tbody tr.filler td {
-            height: 200px;
+            height: 500px;
         }
-        .bill-total-line {
+        .bill-class { font-size: 8px; }
+        .bill-expense-total {
             margin-top: 4px;
             font-size: 9px;
         }
@@ -337,13 +358,11 @@
             <table class="bill-expense-table">
                 <thead>
                     <tr>
-                        <th style="width: 20%;">Account</th>
-                        <th style="width: 19%;">Memo</th>
-                        <th style="width: 10%;">Tax</th>
-                        <th style="width: 9%;">ATC/WC</th>
-                        <th style="width: 13%;">Amount</th>
-                        <th style="width: 15%;">Customer:Job</th>
-                        <th style="width: 7%;">Class</th>
+                        <th style="width: 23%;">Account</th>
+                        <th style="width: 26%;">Memo</th>
+                        <th style="width: 15%;">Amount</th>
+                        <th style="width: 25%;">Customer:Job</th>
+                        <th style="width: 11%;">Class</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -351,26 +370,29 @@
                         <tr>
                             <td>{{ $line->account_name ?? '' }}</td>
                             <td>{{ $line->memo ?? $line->description ?? '' }}</td>
-                            <td>{{ $line->tax_category ?? '' }}</td>
-                            <td>{{ ($line->atc_code ?? '') ?: ($line->account_atc_code ?? '') }}</td>
-                            <td class="bill-num">{{ $money($line->amount ?? $line->line_total ?? 0) }}</td>
+                            <td class="bill-num">{{ $money($expenseAmount($line)) }}</td>
                             <td>{{ $line->customer_job_id ? $line->customer_job_id.' - '.($line->customer_job_name ?? '') : '' }}</td>
-                            <td>{{ $line->class_code ?? '' }}</td>
+                            <td class="bill-class">{{ $line->class_code ?? '' }}</td>
                         </tr>
                     @empty
                         <tr>
                             <td>Reimbursable charges</td>
                             <td>{{ $bill['memo'] }}</td>
-                            <td></td>
-                            <td></td>
-                            <td class="bill-num">{{ $money($bill['total']) }}</td>
+                            <td class="bill-num">{{ $money($expenseTotal) }}</td>
                             <td></td>
                             <td></td>
                         </tr>
                     @endforelse
+                    @if($bill['withholding_tax_amount'] > 0)
+                        <tr>
+                            <td>Expanded Withholding Tax Payable</td>
+                            <td></td>
+                            <td class="bill-num">-{{ $money($bill['withholding_tax_amount']) }}</td>
+                            <td></td>
+                            <td class="bill-class"></td>
+                        </tr>
+                    @endif
                     <tr class="filler">
-                        <td></td>
-                        <td></td>
                         <td></td>
                         <td></td>
                         <td></td>
@@ -380,14 +402,8 @@
                 </tbody>
             </table>
 
-            <div class="bill-total-line">Gross Amount (VAT Inclusive) : {{ $money($bill['gross_amount']) }}</div>
-            @if($bill['input_vat'] > 0)
-                <div class="bill-total-line">Input VAT (included above) : {{ $money($bill['input_vat']) }}</div>
-            @endif
-            @if($bill['withholding_tax_amount'] > 0)
-                <div class="bill-total-line">Less: Withholding Tax ({{ rtrim(rtrim(number_format($bill['withholding_tax_rate'], 2), '0'), '.') }}%) : ({{ $money($bill['withholding_tax_amount']) }})</div>
-            @endif
-            <div class="bill-total">Bill Total :{{ $bill['currency'] }} {{ $money($bill['total']) }}</div>
+            <div class="bill-expense-total">Expense Total : {{ $money($expenseTotal) }}</div>
+            <div class="bill-total">Bill Total :{{ $bill['currency'] }} {{ $money($billTotal) }}</div>
         </div>
     </div>
 @endsection
