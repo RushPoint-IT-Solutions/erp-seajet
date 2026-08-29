@@ -60,7 +60,7 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertSee($supplierName)
             ->assertSee('A/P Trade ('.$bank->bank_name.') - '.$bill->currency)
             ->assertSee('CL-CONTROL')
-            ->assertSee('Alternate Check Payee')
+            ->assertDontSee('Alternate Check Payee')
             ->assertSee('Cash in Bank - '.$bank->bank_name.' ('.$bank->account_no.')')
             ->assertSee('Vendor Bill header memo for check voucher')
             ->assertDontSee('Legacy bill remarks')
