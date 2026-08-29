@@ -86,6 +86,8 @@ class VendorBill2307PrintTest extends TestCase
             ->assertSee('margin: 12px 0 0 28px', false)
             ->assertSee('white-space: nowrap', false)
             ->assertSee('width: 50%', false)
+            ->assertSee('margin: 0 0 0 auto', false)
+            ->assertSee('grid-template-columns: 44% 56%', false)
             ->assertDontSee('class="filler"', false)
             ->assertSee('Header bill memo')
             ->assertDontSee('Test service expense')

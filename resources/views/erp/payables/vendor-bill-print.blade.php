@@ -257,17 +257,19 @@
             border-color: #000;
         }
         .bill-small-grid {
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 44% 56%;
+            font-size: 12px;
         }
         .bill-small-grid > div {
             min-height: 28px;
-            padding: 5px 20px;
+            padding: 5px 6px;
             border-color: #000;
             line-height: 1.2;
+            white-space: nowrap;
         }
         .bill-meta-stack > .bill-small-grid {
             width: 50%;
-            margin: 0 20px 0 auto;
+            margin: 0 0 0 auto;
         }
         .bill-info-row {
             grid-template-columns: 260px 1fr;
