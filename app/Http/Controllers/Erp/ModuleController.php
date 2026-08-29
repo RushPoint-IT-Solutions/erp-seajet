@@ -3536,6 +3536,18 @@ class ModuleController extends Controller
 
         $savedPositions = $saved['positions'] ?? [];
         $savedStyles = $saved['field_styles'] ?? [];
+        $legacyCompactPositions = [
+            'payment_info_title' => [58, 374],
+            'amount_header' => [432, 382],
+            'account_name_label' => [60, 424],
+            'account_name' => [196, 424],
+            'amount' => [500, 424],
+            'account_no_label' => [60, 462],
+            'account_no' => [196, 462],
+            'amount_words' => [384, 462],
+            'description_label' => [56, 538],
+            'description' => [204, 538],
+        ];
         $defaultBoxHeights = [
             'payee' => 126,
             'amount' => 70,
@@ -3562,6 +3574,10 @@ class ModuleController extends Controller
 
         foreach ($defaults as $field => $point) {
             $savedPoint = $savedPositions[$field] ?? $point;
+            if (isset($legacyCompactPositions[$field])
+                && array_map('intval', (array) $savedPoint) === $legacyCompactPositions[$field]) {
+                $savedPoint = $point;
+            }
             $savedStyle = $savedStyles[$field] ?? [];
             $defaultWidth = $this->checkVoucherDefaultWidth($field);
             $defaultFontSize = in_array($field, ['company_name', 'form_title']) ? 14 : 11;
@@ -3641,16 +3657,16 @@ class ModuleController extends Controller
             'document_no' => [640, 236],
             'document_date_label' => [430, 282],
             'document_date' => [640, 276],
-            'payment_info_title' => [58, 374],
-            'amount_header' => [432, 382],
-            'account_name_label' => [60, 424],
-            'account_name' => [196, 424],
-            'amount' => [500, 424],
-            'account_no_label' => [60, 462],
-            'account_no' => [196, 462],
-            'amount_words' => [384, 462],
-            'description_label' => [56, 538],
-            'description' => [204, 538],
+            'payment_info_title' => [58, 346],
+            'amount_header' => [442, 392],
+            'account_name_label' => [70, 392],
+            'account_name' => [180, 392],
+            'amount' => [530, 392],
+            'account_no_label' => [70, 423],
+            'account_no' => [180, 423],
+            'amount_words' => [442, 423],
+            'description_label' => [56, 526],
+            'description' => [204, 526],
             'account_title_header' => [150, 636],
             'debit_header' => [558, 636],
             'credit_header' => [704, 636],

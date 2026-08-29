@@ -9,8 +9,8 @@
     $fieldStyles = $layout['field_styles'];
     $customFields = $layout['custom_fields'];
     $boxHeights = $layout['box_heights'];
-    $boxHeights['amount'] = max($boxHeights['amount'], 47 + $fieldStyles['amount_words']['height']);
-    $boxHeights['description'] = max($boxHeights['description'], 24 + $fieldStyles['description']['height']);
+    $boxHeights['amount'] = max($boxHeights['amount'], 41 + $fieldStyles['amount_words']['height']);
+    $boxHeights['description'] = max($boxHeights['description'], 8 + $fieldStyles['description']['height']);
     $formattedAmount = number_format($voucher['net'], 2);
     $values = [
         'company_name' => strtoupper($voucher['company']),
@@ -105,7 +105,7 @@
     .cv-amount-box-line {
         position: absolute;
         left: 0;
-        top: 36px;
+        top: 30px;
         width: 100%;
         border-top: 1px solid #111827;
     }
@@ -164,15 +164,12 @@
 
             <div class="cv-amount-box"><div class="cv-amount-box-line"></div></div>
 
-            @php($paymentInfoFields = ['payment_info_title', 'amount_header', 'account_name_label', 'account_name', 'amount', 'account_no_label', 'account_no', 'amount_words'])
             @foreach($positions as $field => $point)
                 @continue(($point[0] ?? 0) < 0 || ($point[1] ?? 0) < 0)
-                @php($paymentColumnPositions = ['account_name_label' => [70, 397], 'account_name' => [180, 397], 'account_no_label' => [70, 431], 'account_no' => [180, 431], 'amount_header' => [442, 397], 'amount' => [530, 397], 'amount_words' => [442, 431]])
-                @php($fixedWidths = ['account_name_label' => 105, 'account_name' => 230, 'account_no_label' => 105, 'account_no' => 230, 'amount_header' => 80, 'amount' => 250, 'amount_words' => 330])
-                @php($renderTop = isset($paymentColumnPositions[$field]) ? $paymentColumnPositions[$field][1] : (($point[1] ?? 0) - (in_array($field, $paymentInfoFields, true) ? 28 : 0)))
+                @php($renderTop = $point[1] ?? 0)
                 @php($minimumWidth = ['logo_mark' => 320, 'company_name' => 460, 'form_title' => 200, 'payment_info_title' => 220][$field] ?? $fieldStyles[$field]['width'])
-                @php($renderWidth = $fixedWidths[$field] ?? max($fieldStyles[$field]['width'], $minimumWidth))
-                @php($renderLeft = $field === 'logo_mark' ? (($settings['paper_width'] - $renderWidth) / 2) : (isset($paymentColumnPositions[$field]) ? $paymentColumnPositions[$field][0] : (($point[0] ?? 0) - (in_array($field, ['company_name', 'form_title'], true) ? (($renderWidth - $fieldStyles[$field]['width']) / 2) : 0))))
+                @php($renderWidth = max($fieldStyles[$field]['width'], $minimumWidth))
+                @php($renderLeft = $field === 'logo_mark' ? (($settings['paper_width'] - $renderWidth) / 2) : ($point[0] ?? 0))
                 @php($fontIncrease = $field === 'company_name' ? 4 : 2)
                 @php($classes = (in_array($field, ['company_name', 'form_title']) ? ' header-text' : '').($field === 'logo_mark' ? ' logo-mark' : '').(in_array($field, ['company_name', 'form_title', 'payment_info_title'], true) ? ' nowrap' : '').(in_array($field, ['debit_amount', 'credit_amount', 'total_debit', 'total_credit']) ? ' amount' : '').(strpos($field, 'label') !== false || strpos($field, 'header') !== false ? ' label' : ''))
                 <div class="cv-field{{ $classes }}" style="left: {{ $renderLeft }}px; top: {{ $renderTop }}px; width: {{ $renderWidth }}px; height: {{ $fieldStyles[$field]['height'] }}px; font-size: {{ min(40, $fieldStyles[$field]['font_size'] + $fontIncrease) }}px;">

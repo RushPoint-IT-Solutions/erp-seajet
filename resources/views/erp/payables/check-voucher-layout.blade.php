@@ -9,8 +9,8 @@
     $fieldStyles = $layout['field_styles'];
     $customFields = $layout['custom_fields'];
     $boxHeights = $layout['box_heights'];
-    $boxHeights['amount'] = max($boxHeights['amount'], 47 + $fieldStyles['amount_words']['height']);
-    $boxHeights['description'] = max($boxHeights['description'], 24 + $fieldStyles['description']['height']);
+    $boxHeights['amount'] = max($boxHeights['amount'], 41 + $fieldStyles['amount_words']['height']);
+    $boxHeights['description'] = max($boxHeights['description'], 8 + $fieldStyles['description']['height']);
     $formattedAmount = number_format($sample['net'], 2);
     $sampleValues = [
         'company_name' => strtoupper($sample['company']),
@@ -166,7 +166,7 @@
                     <div class="cv-guide-box" data-box="payee" style="left: 46px; top: 190px; width: 292px; height: {{ $boxHeights['payee'] }}px;"></div>
                     <div class="cv-guide-line" style="left: 46px; top: 236px; width: 292px;"></div>
                     <div class="cv-guide-box" data-box="amount" style="left: 46px; top: 388px; width: 748px; height: {{ $boxHeights['amount'] }}px;"></div>
-                    <div class="cv-guide-line" style="left: 46px; top: 424px; width: 748px;"></div>
+                    <div class="cv-guide-line" style="left: 46px; top: 418px; width: 748px;"></div>
                     <div class="cv-guide-box" data-box="description" style="left: 46px; top: 522px; width: 748px; height: {{ $boxHeights['description'] }}px;"></div>
                     <div class="cv-guide-box" data-box="accounting" style="left: 48px; top: 650px; width: 744px; height: {{ $boxHeights['accounting'] }}px;"></div>
                     <div class="cv-guide-line" style="left: 48px; top: 678px; width: 744px;"></div>
@@ -358,8 +358,8 @@
                 $('#fs_' + field).val(fontSize);
             }
             var boxMap = {
-                amount_words: { box: 'amount', offset: 47 },
-                description: { box: 'description', offset: 24 }
+                amount_words: { box: 'amount', offset: 41 },
+                description: { box: 'description', offset: 8 }
             };
             if (boxMap[field]) {
                 var boxControl = $('.box-height-control[data-box="' + boxMap[field].box + '"]');

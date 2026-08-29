@@ -340,6 +340,10 @@ class ControlledCheckLifecycleTest extends TestCase
             'print_template' => '0',
             'custom_fields_present' => '1',
             'h_description' => 60,
+            'x_amount' => 600,
+            'y_amount' => 405,
+            'x_amount_words' => 410,
+            'y_amount_words' => 438,
             'box_height_accounting' => 220,
         ])->assertRedirect(route('erp.payables.check-voucher.layout'));
 
@@ -353,6 +357,8 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertOk()
             ->assertSee('width: 748px', false)
             ->assertDontSee('width: 364px', false)
+            ->assertSee('left: 600px; top: 405px', false)
+            ->assertSee('left: 410px; top: 438px', false)
             ->assertSee('height: 60px', false)
             ->assertSee('height: 220px', false)
             ->assertDontSee('cv-muted-line');
