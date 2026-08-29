@@ -121,6 +121,7 @@
         @php($bill = $bill ?? [])
         @php($lines = collect($lines ?? []))
         @php($attachments = collect($attachments ?? []))
+        @php($vat12Selected = collect(old('expense_tax', $lines->pluck('tax_category')->all()))->contains('VAT12'))
         @php($errors = $errors ?? new \Illuminate\Support\ViewErrorBag)
         @if(session('status'))
             <div class="alert alert-success">{{ session('status') }}</div>
@@ -278,6 +279,18 @@
                             <div class="erp-card p-3 bg-white">
                                 <div class="small text-muted">Net Payable</div>
                                 <div class="h4 fw-bold text-primary" id="netPayableText">USD 0.00</div>
+                                <div class="row g-2 mt-2 align-items-end">
+                                    <div class="col-6">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="vat12Toggle" {{ $vat12Selected ? 'checked' : '' }}>
+                                            <label class="form-check-label fw-semibold" for="vat12Toggle">VAT 12%</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small text-muted">Input VAT</label>
+                                        <input id="inputVatAmount" class="form-control form-control-sm bill-field text-end" value="{{ $bill['input_vat'] ?? '' }}" readonly>
+                                    </div>
+                                </div>
                                 <div class="row g-2 mt-2">
                                     <div class="col-6">
                                         <label class="form-label small text-muted">WHT %</label>
@@ -308,7 +321,7 @@
                         <thead>
                         <tr>
                             <th style="width: 220px">Account</th>
-                            <th style="width: 105px">Tax</th>
+                            <th style="width: 130px">Tax</th>
                             <th style="width: 100px">ATC / WC</th>
                             <th style="width: 90px">WHT %</th>
                             <th class="text-end" style="width: 150px">Amount</th>
@@ -342,6 +355,8 @@
                                         $lineWithholdingRate = $savedLineRate > 0
                                             ? $savedLineRate
                                             : (float) ($lineAccountProfile->withholding_rate ?? 0);
+                                        $lineTaxCategory = strtoupper((string) ($line->tax_category ?? ''));
+                                        $lineClassCode = strtoupper(trim((string) ($line->class_code ?? ''))) ?: 'MANILA';
                                     ?>
                                     @if($lineAccount && !$lineAccountInOptions)
                                         <option value="{{ $lineAccount }}" selected>{{ $lineAccount }}</option>
@@ -355,10 +370,14 @@
                                 </select>
                             </td>
                             <td>
-                                <select name="expense_tax[]" class="form-select">
+                                <label class="form-check d-flex align-items-center gap-1 mb-1 text-nowrap">
+                                    <input class="form-check-input line-vatable mt-0" type="checkbox" {{ $lineTaxCategory === 'VAT12' ? 'checked' : '' }}>
+                                    <span class="small fw-semibold">VAT 12%</span>
+                                </label>
+                                <select name="expense_tax[]" class="form-select form-select-sm line-tax-category" aria-label="Expense line tax classification">
                                     <option value=""></option>
                                     @foreach(['VAT12', 'ZERO', 'EXEMPT'] as $tax)
-                                        <option value="{{ $tax }}" {{ ($line && ($line->tax_category ?? '') === $tax) ? 'selected' : '' }}>{{ $tax }}</option>
+                                        <option value="{{ $tax }}" {{ $lineTaxCategory === $tax ? 'selected' : '' }}>{{ $tax }}</option>
                                     @endforeach
                                 </select>
                             </td>
@@ -376,10 +395,10 @@
                             </td>
                             <td class="text-center"><input name="expense_billable[{{ $index }}]" class="form-check-input expense-billable" type="checkbox" value="Yes" {{ ($line && !empty($line->is_billable)) ? 'checked' : '' }}></td>
                             <td>
-                                <select name="expense_class[]" class="form-select">
+                                <select name="expense_class[]" class="form-select expense-class">
                                     <option value=""></option>
                                     @foreach(['MANILA', 'PAMPANGA', 'CEBU'] as $class)
-                                        <option value="{{ $class }}" {{ ($line && ($line->class_code ?? '') === $class) ? 'selected' : '' }}>{{ $class }}</option>
+                                        <option value="{{ $class }}" {{ $lineClassCode === $class ? 'selected' : '' }}>{{ $class }}</option>
                                     @endforeach
                                 </select>
                             </td>
@@ -494,6 +513,7 @@
                 total += amount;
 
                 var category = String(row.find('select[name="expense_tax[]"]').val() || '').toUpperCase();
+                row.find('.line-vatable').prop('checked', category === 'VAT12');
                 if (category === 'VAT12') {
                     var net = amount / 1.12;
                     inputVat += amount - net;
@@ -521,10 +541,34 @@
             var php = currency() === 'USD' ? total * numberValue($('#exchangeRate').val()) : total;
 
             $('#expenseTabTotal').text(currency() + ' ' + money(total));
+            $('#inputVatAmount').val(inputVat ? money(inputVat) : '');
             $('#whtAmount').val(whtAmount ? money(whtAmount) : '');
             $('#netAmount').val(net ? net.toFixed(2) : '');
             $('#netPayableText').text(currency() + ' ' + money(net));
             $('#phpAmount').val(php ? money(php) : '');
+            syncVat12Toggle();
+        }
+
+        function syncVat12Toggle() {
+            var activeCount = 0;
+            var vatCount = 0;
+
+            $('#expenseLines tbody tr').each(function () {
+                var row = $(this);
+                var category = String(row.find('select[name="expense_tax[]"]').val() || '').toUpperCase();
+                var isActive = category || row.find('.expense-account').val() || numberValue(row.find('.expense-amount').val()) > 0;
+                if (!isActive) {
+                    return;
+                }
+                activeCount++;
+                if (category === 'VAT12') {
+                    vatCount++;
+                }
+            });
+
+            $('#vat12Toggle')
+                .prop('checked', activeCount > 0 && vatCount === activeCount)
+                .prop('indeterminate', vatCount > 0 && vatCount < activeCount);
         }
 
         function reindexRows() {
@@ -548,7 +592,28 @@
             syncLineWithholding($(this).closest('tr'));
             recalc();
         });
+        $('#expenseLines').on('change', '.line-vatable', function () {
+            var taxSelect = $(this).closest('tr').find('select[name="expense_tax[]"]');
+            if (this.checked) {
+                taxSelect.val('VAT12');
+            } else if (String(taxSelect.val() || '').toUpperCase() === 'VAT12') {
+                taxSelect.val('');
+            }
+            recalc();
+        });
         $('#expenseLines').on('input change', '.expense-amount, .line-atc-code, .line-wht-rate, select[name="expense_tax[]"]', recalc);
+        $('#vat12Toggle').on('change', function () {
+            var checked = this.checked;
+            $('#expenseLines select[name="expense_tax[]"]').each(function () {
+                var category = String($(this).val() || '').toUpperCase();
+                if (checked && category !== 'ZERO' && category !== 'EXEMPT') {
+                    $(this).val('VAT12');
+                } else if (!checked && category === 'VAT12') {
+                    $(this).val('');
+                }
+            });
+            recalc();
+        });
         $('#recalculateBill').on('click', recalc);
 
         $('#addExpenseLine').on('click', function () {
@@ -561,6 +626,10 @@
             row.find('input[type="text"], input:not([type])').val('');
             row.find('input[type="checkbox"]').prop('checked', false);
             row.find('select').val('');
+            row.find('.expense-class').val('MANILA');
+            if ($('#vat12Toggle').prop('checked')) {
+                row.find('select[name="expense_tax[]"]').val('VAT12');
+            }
             $('#expenseLines tbody').append(row);
             initExpenseAccountSearch(source);
             initCustomerJobSearch(source);
