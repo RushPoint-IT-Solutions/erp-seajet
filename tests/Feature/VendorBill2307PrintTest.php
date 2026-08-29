@@ -118,6 +118,9 @@ class VendorBill2307PrintTest extends TestCase
 
         $printResponse = $this->get(route('erp.payables.vendor-bills.print-2307', $bill->id));
         $printResponse->assertOk()
+            ->assertSee('size: letter portrait', false)
+            ->assertSee('height: 11in', false)
+            ->assertSee('transform: scaleY(0.8461538462)', false)
             ->assertSee('images/bir_2307_bg.png')
             ->assertSee('WC160')
             ->assertSee('Income payments made by top withholding agents to local/resident suppliers of services')

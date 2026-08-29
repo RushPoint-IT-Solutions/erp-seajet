@@ -1665,9 +1665,9 @@ class ModuleController extends Controller
                 'layout_name' => 'Default',
             ],
             [
-                'paper_size' => 'legal',
+                'paper_size' => 'letter',
                 'paper_width' => 816,
-                'paper_height' => 1248,
+                'paper_height' => 1056,
                 'template_url' => asset('images/bir_2307_bg.png'),
                 'print_template' => true,
                 'positions' => json_encode($layout),
@@ -4175,10 +4175,23 @@ class ModuleController extends Controller
             $rows[0]['tax_withheld'] += $expectedTax - $rowTax;
         }
 
-        $pages = array_chunk($rows, 10);
-        if (empty($pages)) {
-            $pages = [[]];
+        if (count($rows) > 10) {
+            $overflowRows = array_slice($rows, 9);
+            $overflow = [
+                'description' => 'Other withholding tax items',
+                'atc_code' => '',
+                'months' => [0.0, 0.0, 0.0],
+                'tax_withheld' => 0.0,
+            ];
+            foreach ($overflowRows as $overflowRow) {
+                foreach ($overflowRow['months'] as $month => $monthAmount) {
+                    $overflow['months'][$month] += $monthAmount;
+                }
+                $overflow['tax_withheld'] += $overflowRow['tax_withheld'];
+            }
+            $rows = array_merge(array_slice($rows, 0, 9), [$overflow]);
         }
+        $pages = [$rows];
 
         return [
             'form' => [

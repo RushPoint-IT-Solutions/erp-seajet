@@ -89,25 +89,28 @@
         .bir-matrix-toolbar .bir-toolbar-actions { width: 100%; margin-left: 0; }
     }
     @media print {
-        @page { size: 8.5in 13in; margin: 0; }
-        html, body { width: 8.5in; margin: 0 !important; padding: 0 !important; background: #fff !important; }
+        @page { size: letter portrait; margin: 0; }
+        html, body { width: 8.5in; height: 11in; margin: 0 !important; padding: 0 !important; overflow: hidden; background: #fff !important; }
         .erp-sidebar, .erp-topbar, .no-print { display: none !important; }
         .erp-main { margin: 0 !important; }
         .erp-main > section { padding: 0 !important; }
-        .bir-2307-wrap { overflow: hidden; padding: 0; background: #fff; }
+        .bir-2307-wrap { position: relative; width: 8.5in; height: 11in; overflow: hidden; padding: 0; background: #fff; }
         .bir-2307-page {
+            position: absolute;
+            inset: 0 auto auto 0;
             width: 8.5in;
             height: 13in;
             margin: 0;
             box-shadow: none;
-            transform: translate(12px, 12px) scale(.97);
+            transform: scaleY(0.8461538462);
             transform-origin: top left;
-            page-break-after: always;
-            break-after: page;
+            page-break-after: avoid;
+            page-break-inside: avoid;
+            break-after: avoid-page;
+            break-inside: avoid-page;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
-        .bir-2307-page:last-child { page-break-after: auto; break-after: auto; }
         .bir-2307-background { width: 8.5in; height: 13in; }
         .bir-field, .bir-field:hover, .bir-field.is-selected { outline: none !important; background: transparent !important; }
     }
