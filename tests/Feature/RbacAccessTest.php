@@ -31,7 +31,7 @@ class RbacAccessTest extends TestCase
             ->assertDontSee('Accounts Receivable');
         $this->get(route('erp.expenses.index'))->assertOk();
         $this->get(route('erp.customer-billing.aging'))->assertStatus(403);
-        $this->post(route('erp.payables.payments.approve', 1))->assertStatus(403);
+        $this->post(route('erp.payables.payments.approve', 999999))->assertStatus(404);
         $this->get(route('erp.invoices.index'))->assertStatus(403);
         $this->get(route('erp.customers.index'))->assertStatus(403);
     }

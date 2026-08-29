@@ -1797,7 +1797,7 @@ class ModuleController extends Controller
 
     public function approveApPayment($payment)
     {
-        $this->authorizeAccountingPosting('payables', 'approve');
+        $this->authorizeAccountingPosting('payables', 'view');
         $companyId = $this->defaultCompanyId();
 
         DB::transaction(function () use ($payment, $companyId) {
@@ -1808,13 +1808,6 @@ class ModuleController extends Controller
             if (!in_array(strtolower((string) $record->approval_status), ['for approval', 'pending'], true)) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'approval_status' => 'Only a payment awaiting approval can be approved.',
-                ]);
-            }
-            if ($record->created_by
-                && (int) $record->created_by === (int) auth()->id()
-                && strcasecmp((string) $record->payment_method, 'Cheque') !== 0) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'approval_status' => 'Maker-checker control: the preparer cannot approve this payment.',
                 ]);
             }
             if ($record->payment_date > date('Y-m-d')) {
@@ -3096,6 +3089,10 @@ class ModuleController extends Controller
             return [];
         }
 
+        $rbac = app(RbacService::class);
+        $canApprove = $rbac->allows(auth()->user(), 'payables', 'view');
+        $canControlChecks = $rbac->allows(auth()->user(), 'payables', 'release');
+
         return DB::table('payments')
             ->leftJoin('suppliers', 'suppliers.id', '=', 'payments.supplier_id')
             ->select('payments.*', 'suppliers.name as supplier_name')
@@ -3103,11 +3100,10 @@ class ModuleController extends Controller
             ->orderBy('payments.payment_date', 'desc')
             ->orderBy('payments.id', 'desc')
             ->get()
-            ->map(function ($payment) {
+            ->map(function ($payment) use ($canApprove, $canControlChecks) {
                 $issuance = $this->activeCheckIssuance($payment->id);
                 $status = $payment->approval_status ?: ucwords(str_replace('_', ' ', $payment->status));
                 $isCheque = strcasecmp((string) $payment->payment_method, 'Cheque') === 0;
-                $roleCanControl = $this->canOperateChecks();
 
                 return [
                     'id' => $payment->id,
@@ -3124,18 +3120,15 @@ class ModuleController extends Controller
                     'check_status' => $issuance ? $issuance->status : null,
                     'print_count' => $issuance ? (int) $issuance->print_count : 0,
                     'voucher_printed' => $this->hasRecordedCheckVoucherPrint($payment->id),
-                    'can_approve' => $roleCanControl
-                        && in_array(strtolower((string) $status), ['for approval', 'pending'], true)
-                        && (!$payment->created_by
-                            || (int) $payment->created_by !== (int) auth()->id()
-                            || $isCheque),
-                    'can_release' => $roleCanControl
+                    'can_approve' => $canApprove
+                        && in_array(strtolower((string) $status), ['for approval', 'pending'], true),
+                    'can_release' => $canControlChecks
                         && strtolower((string) $status) === 'approved'
                         && (!$payment->created_by || (int) $payment->created_by !== (int) auth()->id())
                         && (!$isCheque || ($issuance && (int) $issuance->print_count > 0)),
-                    'can_print' => $roleCanControl && $isCheque
+                    'can_print' => $canControlChecks && $isCheque
                         && in_array(strtolower((string) $status), ['approved', 'released'], true),
-                    'can_void' => $roleCanControl
+                    'can_void' => $canControlChecks
                         && !in_array(strtolower((string) $status), ['voided', 'cancelled'], true),
                 ];
             })

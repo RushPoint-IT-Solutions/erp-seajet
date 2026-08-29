@@ -103,6 +103,9 @@ class PermissionAccess
         if (in_array($routeName, ['erp.users.status.review', 'erp.billings.status.review', 'erp.banking.reconciliation.review'], true)) {
             return 'edit';
         }
+        if ($routeName === 'erp.payables.payments.approve') {
+            return 'view';
+        }
         if (strpos($routeName, '.approve') !== false) {
             return 'approve';
         }

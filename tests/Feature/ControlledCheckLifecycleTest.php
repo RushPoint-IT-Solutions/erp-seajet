@@ -230,6 +230,82 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertSee('id="checkNumber" class="form-control" value="" required', false);
     }
 
+    public function test_preparer_with_approval_access_can_approve_own_payment()
+    {
+        list($bill, $bank) = $this->billAndBank();
+
+        $this->post(route('erp.payables.payments.review'), $this->paymentPayload($bill, $bank, [
+            'payment_method' => 'Bank',
+            'check_no' => null,
+            'amount' => '5.00',
+        ]))->assertOk();
+
+        $payment = DB::table('payments')->where('payment_no', 'PV-CONTROL-1001')->first();
+        $this->assertNotNull($payment);
+        $this->get(route('erp.payables.approvals'))
+            ->assertOk()
+            ->assertSee(route('erp.payables.payments.approve', $payment->id));
+        $this->post(route('erp.payables.payments.approve', $payment->id))
+            ->assertRedirect(route('erp.payables.approvals'));
+        $this->assertDatabaseHas('payments', [
+            'id' => $payment->id,
+            'approval_status' => 'Approved',
+            'approved_by' => 1,
+        ]);
+    }
+
+    public function test_custom_role_with_approve_access_can_approve_payment()
+    {
+        list($bill, $bank) = $this->billAndBank();
+
+        $this->post(route('erp.payables.payments.review'), $this->paymentPayload($bill, $bank, [
+            'payment_method' => 'Bank',
+            'check_no' => null,
+            'amount' => '5.00',
+        ]))->assertOk();
+
+        $payment = DB::table('payments')->where('payment_no', 'PV-CONTROL-1001')->first();
+        $roleId = DB::table('roles')->insertGetId([
+            'company_id' => $bill->company_id,
+            'name' => 'Custom AP Approver',
+            'slug' => 'custom_ap_approver',
+            'description' => 'Approval-only test role',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $permissionIds = DB::table('permissions')
+            ->where('slug', 'payables.view')
+            ->pluck('id');
+        foreach ($permissionIds as $permissionId) {
+            DB::table('permission_role')->insert([
+                'role_id' => $roleId,
+                'permission_id' => $permissionId,
+            ]);
+        }
+
+        $approver = new User();
+        $approver->id = 901;
+        $approver->name = 'Custom AP Approver';
+        $approver->email = 'custom.approver@seajet.test';
+        $approver->role = 'custom_ap_approver';
+        $approver->company_id = $bill->company_id;
+        $approver->is_active = true;
+        $this->actingAs($approver);
+
+        $this->get(route('erp.payables.approvals'))
+            ->assertOk()
+            ->assertSee(route('erp.payables.payments.approve', $payment->id))
+            ->assertDontSee(route('erp.payables.payments.release', $payment->id));
+        $this->post(route('erp.payables.payments.approve', $payment->id))
+            ->assertRedirect(route('erp.payables.approvals'));
+        $this->assertDatabaseHas('payments', [
+            'id' => $payment->id,
+            'approval_status' => 'Approved',
+            'approved_by' => 901,
+        ]);
+    }
+
     public function test_layout_saves_new_versions_and_keeps_only_latest_active()
     {
         $bank = DB::table('bank_accounts')->orderBy('id')->first();
