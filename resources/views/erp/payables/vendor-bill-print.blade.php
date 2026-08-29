@@ -56,8 +56,8 @@
         padding-top: 2px;
     }
     .bill-print-logo {
-        width: 190px;
-        height: 100px;
+        width: 250px;
+        height: 110px;
         object-fit: contain;
     }
     .bill-print-company {
@@ -228,8 +228,8 @@
         }
         .bill-print-logo {
             display: block;
-            width: 210px;
-            height: 88px;
+            width: 260px;
+            height: 100px;
             margin: 0 auto;
         }
         .bill-print-brand {
