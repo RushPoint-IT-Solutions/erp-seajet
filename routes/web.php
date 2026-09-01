@@ -59,6 +59,7 @@ Route::middleware(['auth', 'permission.access'])->group(function () {
     Route::post('/erp/payables/vendor-bills/print-2307/layout/save', 'Erp\ModuleController@saveVendorBill2307Layout')->name('erp.payables.vendor-bills.print-2307.layout.save');
     Route::get('/erp/payables/vendor-bills/print-2307/{bill}', 'Erp\ModuleController@vendorBill2307Print')->name('erp.payables.vendor-bills.print-2307');
     Route::post('/erp/payables/vendor-bills/{bill}/attachments', 'Erp\ModuleController@uploadVendorBillAttachments')->name('erp.payables.vendor-bills.attachments');
+    Route::delete('/erp/payables/vendor-bills/{bill}', 'Erp\ModuleController@deleteVendorBill')->name('erp.payables.vendor-bills.delete');
     Route::post('/erp/payables/vendor-bills/review', 'Erp\ModuleController@vendorBillReview')->name('erp.payables.vendor-bills.review');
     Route::get('/erp/expenses', 'Erp\ModuleController@expensesIndex')->name('erp.expenses.index');
     Route::get('/erp/payables/payments/create', 'Erp\ModuleController@apPaymentCreate')->name('erp.payables.payments.create');

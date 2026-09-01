@@ -145,7 +145,11 @@
                     <a href="{{ route('erp.expenses.index') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-search me-1"></i>Find</a>
                     <a href="{{ route('erp.payables.vendor-bills.create') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-plus-lg me-1"></i>New</a>
                     <button class="btn btn-sm btn-success" type="submit"><i class="bi bi-save me-1"></i>Save</button>
-                    <a href="{{ route('erp.expenses.index') }}" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg me-1"></i>Delete</a>
+                    @if(!empty($bill['id']))
+                        <button type="submit" form="deleteVendorBillForm" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Delete</button>
+                    @else
+                        <a href="{{ route('erp.expenses.index') }}" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg me-1"></i>Cancel</a>
+                    @endif
                     <button class="btn btn-sm btn-outline-secondary" type="button" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
                     <label class="btn btn-sm btn-outline-secondary mb-0"><i class="bi bi-paperclip me-1"></i>Attach File<input type="file" name="attachments[]" multiple class="d-none"></label>
                     <a href="{{ route('erp.suppliers.index') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-building me-1"></i>Select Vendor</a>
@@ -438,6 +442,12 @@
                 @endif
             </div>
         </form>
+        @if(!empty($bill['id']))
+            <form method="post" action="{{ route('erp.payables.vendor-bills.delete', $bill['id']) }}" id="deleteVendorBillForm" class="d-none" onsubmit="return confirm('Delete this vendor bill? This cannot be undone.');">
+                {{ csrf_field() }}
+                {{ method_field('DELETE') }}
+            </form>
+        @endif
     </div>
 @endsection
 

@@ -1677,6 +1677,96 @@ class ModuleController extends Controller
         ]);
     }
 
+    public function deleteVendorBill($bill)
+    {
+        $this->authorizeAccountingPosting('payables', 'delete');
+        $companyId = $this->defaultCompanyId();
+
+        $deleted = DB::transaction(function () use ($bill, $companyId) {
+            $query = DB::table('purchase_documents')
+                ->where('company_id', $companyId)
+                ->lockForUpdate();
+            $record = is_numeric($bill)
+                ? $query->where('id', $bill)->first()
+                : $query->where('document_no', $bill)->first();
+            abort_unless($record, 404);
+
+            $hasJournal = Schema::hasTable('journal_entries') && DB::table('journal_entries')
+                ->where('company_id', $companyId)
+                ->where('source_type', 'purchase_document')
+                ->where('source_id', $record->id)
+                ->exists();
+            $isPosted = in_array(strtolower((string) $record->status), ['posted', 'approved', 'paid'], true)
+                || ($record->posting_status ?? 'unposted') !== 'unposted'
+                || !empty($record->journal_entry_id)
+                || $hasJournal;
+            if ($isPosted) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'bill' => 'A posted vendor bill cannot be deleted because it has accounting entries.',
+                ]);
+            }
+
+            if ((float) $record->paid_total > 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'bill' => 'A paid or partially paid vendor bill cannot be deleted.',
+                ]);
+            }
+
+            $hasPaymentApplication = Schema::hasTable('payment_applications') && DB::table('payment_applications')
+                ->where('purchase_document_id', $record->id)
+                ->exists();
+            $hasPayment = Schema::hasTable('payments') && DB::table('payments')
+                ->where('company_id', $companyId)
+                ->where('bill_no', $record->document_no)
+                ->exists();
+            if ($hasPaymentApplication || $hasPayment) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'bill' => 'Delete or void the linked payment before deleting this vendor bill.',
+                ]);
+            }
+
+            $attachments = Schema::hasTable('document_attachments')
+                ? DB::table('document_attachments')
+                    ->where('document_type', 'purchase_document')
+                    ->where('document_id', $record->id)
+                    ->get()
+                : collect();
+
+            app(ActivityLogger::class)->log('deleted', 'purchase_document', $record->id, [
+                'document_no' => $record->document_no,
+                'status' => $record->status,
+                'grand_total' => $record->grand_total,
+            ], [], $companyId);
+
+            foreach (['vendor_bill_lines', 'purchase_document_lines'] as $lineTable) {
+                if (Schema::hasTable($lineTable)) {
+                    DB::table($lineTable)->where('purchase_document_id', $record->id)->delete();
+                }
+            }
+            if (Schema::hasTable('document_attachments')) {
+                DB::table('document_attachments')
+                    ->where('document_type', 'purchase_document')
+                    ->where('document_id', $record->id)
+                    ->delete();
+            }
+            DB::table('purchase_documents')->where('id', $record->id)->delete();
+
+            return ['record' => $record, 'attachments' => $attachments];
+        });
+
+        foreach ($deleted['attachments'] as $attachment) {
+            try {
+                Storage::disk($attachment->disk ?: 'local')->delete($attachment->path);
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+        }
+
+        return redirect()
+            ->route('erp.expenses.index')
+            ->with('status', 'Vendor bill '.$deleted['record']->document_no.' deleted.');
+    }
+
     public function uploadVendorBillAttachments($bill)
     {
         $record = is_numeric($bill) ? $this->apBillById($bill) : $this->apBillByNumber($bill);
