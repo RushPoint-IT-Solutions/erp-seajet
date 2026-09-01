@@ -29,6 +29,7 @@ return [
         ['label' => 'Vendors', 'icon' => 'bi-building-fill', 'route' => 'erp.suppliers.index', 'patterns' => ['erp/suppliers*'], 'permission' => 'vendors.view'],
         ['label' => 'Accounts Payable (AP)', 'icon' => 'bi-file-earmark-check-fill', 'route' => 'erp.expenses.index', 'patterns' => ['erp/expenses', 'erp/payables/vendor-bills*', 'erp/payables/payments/create*', 'erp/payables/aging'], 'permission' => 'payables.view'],
         ['label' => 'Check Preparation', 'icon' => 'bi-printer-fill', 'route' => 'erp.payables.approvals', 'patterns' => ['erp/payables/payment-approvals', 'erp/payables/check-register', 'erp/payables/check-voucher*', 'erp/payables/check/*'], 'permission' => 'payables.view'],
+        ['label' => 'Journal Entries', 'icon' => 'bi-journal-plus', 'route' => 'erp.accounting.journals', 'patterns' => ['erp/accounting/journal-entries*'], 'permission' => 'accounting.view'],
         [
             'label' => 'Reports',
             'icon' => 'bi-graph-up-arrow',

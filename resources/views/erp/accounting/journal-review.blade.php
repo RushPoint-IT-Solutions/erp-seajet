@@ -4,6 +4,9 @@
 @section('page-title', 'Journal Entry Posted')
 
 @section('content')
+    @if(session('status'))
+        <div class="alert alert-success"><i class="bi bi-check-circle me-1"></i>{{ session('status') }}</div>
+    @endif
     <div class="erp-card p-4">
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
             <div>

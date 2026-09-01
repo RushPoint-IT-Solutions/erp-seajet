@@ -102,6 +102,7 @@ Route::middleware(['auth', 'permission.access'])->group(function () {
     Route::post('/erp/accounting/chart-of-accounts/{account}/toggle-status', 'Erp\ModuleController@chartOfAccountsToggleStatus')->name('erp.accounting.coa.toggle-status');
     Route::get('/erp/accounting/journal-entries', 'Erp\ModuleController@journalEntries')->name('erp.accounting.journals');
     Route::post('/erp/accounting/journal-entries/review', 'Erp\ModuleController@journalEntryReview')->name('erp.accounting.journals.review');
+    Route::get('/erp/accounting/journal-entries/{journal}', 'Erp\ModuleController@journalEntryShow')->name('erp.accounting.journals.show');
 
     Route::get('/erp/statements/balance-sheet', 'Erp\ModuleController@balanceSheet')->name('erp.statements.balance-sheet');
     Route::get('/erp/statements/profit-loss', 'Erp\ModuleController@profitLoss')->name('erp.statements.profit-loss');
@@ -144,7 +145,9 @@ Route::middleware(['auth', 'permission.access'])->group(function () {
     Route::get('/erp/statement-of-account-a/preview', 'Erp\ModuleController@soaAPreview')->name('erp.soa-a.preview');
     Route::get('/erp/debit-note/preview', 'Erp\ModuleController@debitNotePreview')->name('erp.debit-note.preview');
     Route::get('/erp/official-receipt/preview', 'Erp\ModuleController@officialReceiptPreview')->name('erp.official-receipt.preview');
+    Route::post('/erp/official-receipt/print-layout/save', 'Erp\ModuleController@saveOfficialReceiptPrintLayout')->name('erp.official-receipt.layout.save');
     Route::get('/erp/acknowledgement-receipt/preview', 'Erp\ModuleController@acknowledgementReceiptPreview')->name('erp.acknowledgement-receipt.preview');
+    Route::post('/erp/acknowledgement-receipt/print-layout/save', 'Erp\ModuleController@saveAcknowledgementReceiptPrintLayout')->name('erp.acknowledgement-receipt.layout.save');
 
     Route::get('/erp/reports', 'Erp\ModuleController@reportsIndex')->name('erp.reports.index');
     Route::get('/erp/reports/trial-balance', 'Erp\ModuleController@trialBalanceReport')->name('erp.reports.trial-balance');

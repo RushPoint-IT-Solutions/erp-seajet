@@ -4,6 +4,13 @@
 @section('page-title', 'Journal Entry')
 
 @section('content')
+    @php
+        $oldAccounts = old('line_account', ['', '']);
+        $oldDescriptions = old('line_description', ['', '']);
+        $oldDebits = old('line_debit', ['', '']);
+        $oldCredits = old('line_credit', ['', '']);
+        $journalRowCount = max(2, count($oldAccounts));
+    @endphp
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
         <div>
             <h1 class="h3 fw-bold mb-1">Create Journal Entry</h1>
@@ -55,19 +62,19 @@
                 </tr>
                 </thead>
                 <tbody>
-                @for($i = 0; $i < 2; $i++)
+                @for($i = 0; $i < $journalRowCount; $i++)
                     <tr>
                         <td>
                             <select name="line_account[]" class="form-select journal-account-search">
                                 <option value=""></option>
                                 @foreach($accounts as $account)
-                                    <option value="{{ $account->id }}">{{ $account->label }}</option>
+                                    <option value="{{ $account->id }}" {{ (string) ($oldAccounts[$i] ?? '') === (string) $account->id ? 'selected' : '' }}>{{ $account->label }}</option>
                                 @endforeach
                             </select>
                         </td>
-                        <td><input name="line_description[]" class="form-control"></td>
-                        <td><input name="line_debit[]" class="form-control text-end line-debit" value=""></td>
-                        <td><input name="line_credit[]" class="form-control text-end line-credit" value=""></td>
+                        <td><input name="line_description[]" class="form-control" value="{{ $oldDescriptions[$i] ?? '' }}"></td>
+                        <td><input name="line_debit[]" class="form-control text-end line-debit" value="{{ $oldDebits[$i] ?? '' }}"></td>
+                        <td><input name="line_credit[]" class="form-control text-end line-credit" value="{{ $oldCredits[$i] ?? '' }}"></td>
                         <td class="text-center no-print"><button type="button" class="btn btn-sm btn-outline-danger remove-line"><i class="bi bi-trash"></i></button></td>
                     </tr>
                 @endfor
@@ -108,6 +115,7 @@
                     <th>Memo</th>
                     <th>Status</th>
                     <th class="text-end">Amount</th>
+                    <th class="text-end">Action</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -118,9 +126,10 @@
                         <td>{{ $entry->memo ?: '-' }}</td>
                         <td><span class="badge text-bg-success text-uppercase">{{ $entry->status }}</span></td>
                         <td class="text-end">{{ number_format($entry->amount, 2) }}</td>
+                        <td class="text-end"><a href="{{ route('erp.accounting.journals.show', $entry->id) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye me-1"></i>View</a></td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="text-center text-muted py-4">No journal entries have been posted yet.</td></tr>
+                    <tr><td colspan="6" class="text-center text-muted py-4">No journal entries have been posted yet.</td></tr>
                 @endforelse
                 </tbody>
             </table>

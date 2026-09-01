@@ -24,6 +24,44 @@
         position: relative;
         overflow: hidden;
     }
+    .receipt-adjustable-field {
+        position: relative;
+        z-index: 2;
+        display: inline-block;
+    }
+    .receipt-field-block {
+        display: block;
+    }
+    .receipt-field-hidden {
+        display: none !important;
+    }
+    .ar-sheet.is-adjusting .receipt-adjustable-field {
+        outline: 1px dashed #f97316;
+        outline-offset: 2px;
+        min-width: 5mm;
+        min-height: 3mm;
+        cursor: move;
+        touch-action: none;
+        user-select: none;
+    }
+    .ar-sheet.is-adjusting .receipt-adjustable-field.is-active {
+        outline: 2px solid #f97316;
+        background: rgba(255, 247, 237, .9);
+    }
+    .ar-sheet.is-adjusting.show-grid {
+        background-color: #f7f7f2;
+        background-image:
+            linear-gradient(rgba(249, 115, 22, .12) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(249, 115, 22, .12) 1px, transparent 1px);
+        background-size: 5mm 5mm;
+    }
+    .ar-sheet.fields-locked .receipt-adjustable-field {
+        cursor: default;
+    }
+    .receipt-layout-readout {
+        min-width: 210mm;
+        margin: 0 auto 12px;
+    }
     .ar-top {
         display: grid;
         grid-template-columns: 1fr 62mm;
@@ -169,17 +207,6 @@
         position: relative;
         top: 1mm;
     }
-    .ar-check.checked:after {
-        content: "";
-        position: absolute;
-        left: 1mm;
-        top: 0;
-        width: 2mm;
-        height: 4mm;
-        border: solid #111;
-        border-width: 0 1px 1px 0;
-        transform: rotate(45deg);
-    }
     .ar-total-row {
         display: grid;
         grid-template-columns: 1fr 58mm;
@@ -203,7 +230,7 @@
         line-height: 1.5;
         padding-top: 1mm;
     }
-    .ar-check-lines span {
+    .ar-check-lines .ar-line-value {
         display: inline-block;
         min-width: 43mm;
         border-bottom: 1px solid #222;
@@ -250,8 +277,29 @@
             margin: 0;
             border: 0;
             box-shadow: none;
-            background: #fff;
+            background: transparent !important;
             page-break-after: always;
+        }
+        .ar-template-only {
+            visibility: hidden !important;
+        }
+        .ar-meta td,
+        .ar-received,
+        .ar-transaction th,
+        .ar-transaction td,
+        .ar-check,
+        .ar-total-row,
+        .ar-total-row div + div,
+        .ar-check-lines .ar-line-value {
+            border-color: transparent !important;
+        }
+        .ar-received-value,
+        .ar-amount {
+            color: #000 !important;
+        }
+        .ar-sheet.is-adjusting .receipt-adjustable-field {
+            outline: 0 !important;
+            background: transparent !important;
         }
     }
 </style>
@@ -262,21 +310,67 @@
     $receipt = $receipt ?? [];
     $amount = (float) ($receipt['amount'] ?? 0);
     $currency = $receipt['currency'] ?? 'PHP';
-    $paymentMethod = strtolower($receipt['payment_method'] ?? '');
-    $isCheck = strpos($paymentMethod, 'check') !== false || strpos($paymentMethod, 'cheque') !== false;
-    $isCash = strpos($paymentMethod, 'cash') !== false;
-    $isOnline = strpos($paymentMethod, 'online') !== false || strpos($paymentMethod, 'bank') !== false || strpos($paymentMethod, 'transfer') !== false;
+    $receiptLayout = $receiptLayout ?? [];
+    $receiptFieldStyles = $receiptFieldStyles ?? [];
+    $receiptFontDefaults = $receiptFontDefaults ?? [];
+    $receiptFieldLabels = $receiptFieldLabels ?? [];
+    $receiptHiddenFields = $receiptHiddenFields ?? [];
+    $adjustLayout = $adjustLayout ?? false;
+    $fieldStyle = function ($field) use ($receiptLayout, $receiptFieldStyles, $receiptHiddenFields) {
+        $point = $receiptLayout[$field] ?? [0, 0];
+        $fontSize = $receiptFieldStyles[$field]['font_size'] ?? 9;
+        $hiddenStyle = in_array($field, $receiptHiddenFields, true) ? ' display: none;' : '';
+        return 'transform: translate('.((float) ($point[0] ?? 0)).'mm, '.((float) ($point[1] ?? 0)).'mm); font-size: '.((float) $fontSize).'pt;'.$hiddenStyle;
+    };
 @endphp
 
-    <div class="receipt-toolbar d-flex justify-content-end gap-2 no-print">
-        <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print Acknowledgement Receipt</button>
+    <div class="receipt-toolbar d-flex flex-wrap align-items-center justify-content-end gap-2 no-print">
+        @if($adjustLayout)
+            <form method="post" action="{{ route('erp.acknowledgement-receipt.layout.save') }}" id="receiptLayoutForm" class="d-inline">
+                @csrf
+                <input type="hidden" name="receipt_no" value="{{ $receipt['receipt_no'] ?? '' }}">
+                <input type="hidden" name="visibility_present" value="1">
+                @foreach($receiptLayout as $field => $point)
+                    <input type="hidden" name="layout_x[{{ $field }}]" id="layout_x_{{ $field }}" value="{{ $point[0] }}">
+                    <input type="hidden" name="layout_y[{{ $field }}]" id="layout_y_{{ $field }}" value="{{ $point[1] }}">
+                    <input type="hidden" name="font_size[{{ $field }}]" id="font_size_{{ $field }}" value="{{ $receiptFieldStyles[$field]['font_size'] }}" data-default="{{ $receiptFontDefaults[$field] }}">
+                @endforeach
+                <button type="submit" class="btn btn-success"><i class="bi bi-save me-1"></i> Save Layout</button>
+            </form>
+            <label class="small d-flex align-items-center gap-1 mb-0">
+                <span id="selectedReceiptField">Select a field</span>
+                <input type="number" id="receiptFontSize" class="form-control form-control-sm" min="6" max="36" step="0.25" style="width:74px" disabled>
+                pt
+            </label>
+            <label class="small d-flex align-items-center gap-1 mb-0">X <input type="number" id="receiptPositionX" class="form-control form-control-sm" min="-100" max="100" step="0.1" style="width:78px" disabled></label>
+            <label class="small d-flex align-items-center gap-1 mb-0">Y <input type="number" id="receiptPositionY" class="form-control form-control-sm" min="-100" max="100" step="0.1" style="width:78px" disabled></label>
+            <label class="small d-flex align-items-center gap-1 mb-0"><input type="checkbox" id="toggleReceiptGrid"> 5 mm grid</label>
+            <label class="small d-flex align-items-center gap-1 mb-0"><input type="checkbox" id="toggleReceiptLock"> Lock</label>
+            <button type="button" class="btn btn-outline-danger" id="deleteReceiptField" disabled><i class="bi bi-trash me-1"></i> Delete Selected</button>
+            <button type="button" class="btn btn-outline-secondary" id="resetReceiptPositions"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset</button>
+            <a href="{{ route('erp.acknowledgement-receipt.preview', request()->except('adjust')) }}" class="btn btn-primary"><i class="bi bi-check2 me-1"></i> Done</a>
+        @else
+            <a href="{{ route('erp.acknowledgement-receipt.preview', array_merge(request()->query(), ['adjust' => 1])) }}" class="btn btn-outline-primary"><i class="bi bi-sliders me-1"></i> Adjust Layout</a>
+        @endif
+        <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print Content Only</button>
         <a href="{{ route('erp.payments.create') }}" class="btn btn-primary"><i class="bi bi-arrow-left me-1"></i> Back to Payments</a>
     </div>
 
-    <div class="ar-sheet">
+    @if(session('status'))
+        <div class="receipt-layout-readout alert alert-success py-2 no-print">{{ session('status') }}</div>
+    @endif
+    @if($adjustLayout)
+        <div class="receipt-layout-readout alert alert-info py-2 no-print">
+            Select any printable field to change its font size and X/Y coordinates. Drag it, or use the arrow keys; hold Shift for smaller movements.
+            <span id="receiptPositionReadout" class="fw-bold ms-2"></span>
+        </div>
+        @include('erp.print._receipt-field-visibility')
+    @endif
+
+    <div class="ar-sheet {{ $adjustLayout ? 'is-adjusting' : '' }}" id="receiptLayoutSheet">
         <div class="ar-top">
             <div>
-                <div class="ar-brand-row">
+                <div class="ar-brand-row ar-template-only">
                     <img src="{{ asset('images/image.png') }}" class="ar-logo" alt="SeaJet logo">
                     <div>
                         <div class="ar-company-name">SEA-JET INTERNATIONAL FORWARDERS, INC.</div>
@@ -290,42 +384,42 @@
                 </div>
             </div>
             <div>
-                <div class="ar-title">Acknowledgement Receipt</div>
-                <div class="ar-number"><span>No.</span>{{ $receipt['receipt_no'] ?? '0007494' }}</div>
+                <div class="ar-title ar-template-only">Acknowledgement Receipt</div>
+                <div class="ar-number"><span class="ar-template-only">No.</span><span class="receipt-adjustable-field" tabindex="0" data-field-key="receipt_no" data-field-label="Receipt number" style="{{ $fieldStyle('receipt_no') }}">{{ $receipt['receipt_no'] ?? '0007494' }}</span></div>
                 <table class="ar-meta">
                     <tr>
-                        <td>Payment Date</td>
-                        <td>{{ $receipt['payment_date'] ?? date('M d, Y') }}</td>
+                        <td class="ar-template-only">Payment Date</td>
+                        <td><span class="receipt-adjustable-field" tabindex="0" data-field-key="payment_date" data-field-label="Payment date" style="{{ $fieldStyle('payment_date') }}">{{ $receipt['payment_date'] ?? date('M d, Y') }}</span></td>
                     </tr>
                     <tr>
-                        <td>Account No.</td>
-                        <td>{{ $receipt['account_no'] ?? '' }}</td>
+                        <td class="ar-template-only">Account No.</td>
+                        <td><span class="receipt-adjustable-field" tabindex="0" data-field-key="account_no" data-field-label="Account number" style="{{ $fieldStyle('account_no') }}">{{ $receipt['account_no'] ?? '' }}</span></td>
                     </tr>
                 </table>
             </div>
         </div>
 
-        <div class="ar-section-title mt-1">Received From</div>
+        <div class="ar-section-title mt-1 ar-template-only">Received From</div>
         <div class="ar-received">
-            <div class="ar-received-label">Registered Name</div>
-            <div class="ar-received-value">{{ $receipt['registered_name'] ?? '' }}</div>
-            <div class="ar-received-label">TIN</div>
-            <div class="ar-received-value">{{ $receipt['tin'] ?? '' }}</div>
-            <div class="ar-received-label">Business Address:</div>
-            <div class="ar-received-value">{{ $receipt['business_address'] ?? '' }}</div>
+            <div class="ar-received-label ar-template-only">Registered Name</div>
+            <div class="ar-received-value receipt-adjustable-field receipt-field-block" tabindex="0" data-field-key="registered_name" data-field-label="Registered name" style="{{ $fieldStyle('registered_name') }}">{{ $receipt['registered_name'] ?? '' }}</div>
+            <div class="ar-received-label ar-template-only">TIN</div>
+            <div class="ar-received-value receipt-adjustable-field receipt-field-block" tabindex="0" data-field-key="tin" data-field-label="TIN" style="{{ $fieldStyle('tin') }}">{{ $receipt['tin'] ?? '' }}</div>
+            <div class="ar-received-label ar-template-only">Business Address:</div>
+            <div class="ar-received-value receipt-adjustable-field receipt-field-block" tabindex="0" data-field-key="business_address" data-field-label="Business address" style="{{ $fieldStyle('business_address') }}">{{ $receipt['business_address'] ?? '' }}</div>
         </div>
 
         <table class="ar-transaction">
             <thead>
-                <tr>
+                <tr class="ar-template-only">
                     <th>Description of Transaction / Nature of Service</th>
                     <th>Amount</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td>{{ $receipt['description'] ?? '' }}</td>
-                    <td class="ar-amount">{{ number_format($amount, 2) }}</td>
+                    <td><div class="receipt-adjustable-field receipt-field-block" tabindex="0" data-field-key="description" data-field-label="Description" style="{{ $fieldStyle('description') }}">{{ $receipt['description'] ?? '' }}</div></td>
+                    <td class="ar-amount"><span class="receipt-adjustable-field" tabindex="0" data-field-key="amount" data-field-label="Transaction amount" style="{{ $fieldStyle('amount') }}">{{ number_format($amount, 2) }}</span></td>
                 </tr>
             </tbody>
         </table>
@@ -333,22 +427,22 @@
         <div class="ar-bottom-grid">
             <div>
                 <div class="ar-methods">
-                    <span><span class="ar-check {{ $isCheck ? 'checked' : '' }}"></span>Check</span>
-                    <span><span class="ar-check {{ $isCash ? 'checked' : '' }}"></span>Cash</span>
-                    <span><span class="ar-check {{ $isOnline ? 'checked' : '' }}"></span>Online</span>
+                    <span><span class="ar-check"></span><span class="ar-template-only">Check</span></span>
+                    <span><span class="ar-check"></span><span class="ar-template-only">Cash</span></span>
+                    <span><span class="ar-check"></span><span class="ar-template-only">Online</span></span>
                 </div>
                 <div class="ar-check-lines">
-                    No. <span>{{ $receipt['reference_no'] ?? '' }}</span><br>
-                    Bank: <span>{{ $receipt['bank'] ?? '' }}</span>
+                    <span class="ar-template-only">No.</span> <span class="ar-line-value receipt-adjustable-field" tabindex="0" data-field-key="reference_no" data-field-label="Reference number" style="{{ $fieldStyle('reference_no') }}">{{ $receipt['reference_no'] ?? '' }}</span><br>
+                    <span class="ar-template-only">Bank:</span> <span class="ar-line-value receipt-adjustable-field" tabindex="0" data-field-key="bank" data-field-label="Bank" style="{{ $fieldStyle('bank') }}">{{ $receipt['bank'] ?? '' }}</span>
                 </div>
             </div>
             <div class="ar-total-row">
-                <div>Total Paid Amount</div>
-                <div class="ar-amount">{{ $currency }} {{ number_format($amount, 2) }}</div>
+                <div class="ar-template-only">Total Paid Amount</div>
+                <div class="ar-amount"><span class="receipt-adjustable-field" tabindex="0" data-field-key="total_amount" data-field-label="Total paid amount" style="{{ $fieldStyle('total_amount') }}">{{ $currency }} {{ number_format($amount, 2) }}</span></div>
             </div>
         </div>
 
-        <div class="ar-printer">
+        <div class="ar-printer ar-template-only">
             20 PADS (50X3) &nbsp;&nbsp;&nbsp;&nbsp; 0007001 - 0008000<br>
             BIR ATP NO.: OCN05ZAU20240000010957<br>
             Date Issued: 09/23/2024<br>
@@ -357,10 +451,14 @@
             CB-ThisViewer - Brgy. Pinagbarilan, Baliuag, Bulacan<br>
             TIN: 200-589-800000
         </div>
-        <div class="ar-tax-note">"This document is not valid for claim of input tax"</div>
-        <div class="ar-signature">
+        <div class="ar-tax-note ar-template-only">"This document is not valid for claim of input tax"</div>
+        <div class="ar-signature ar-template-only">
             <div class="ar-signature-line"></div>
             Cashier/Authorized Representative
         </div>
     </div>
+
+    @if($adjustLayout)
+        @include('erp.print._receipt-layout-editor-script')
+    @endif
 @endsection

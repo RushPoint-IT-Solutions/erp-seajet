@@ -5081,10 +5081,26 @@ class ModuleController extends Controller
 
     public function journalEntryReview()
     {
-        $accountIds = (array) request('line_account', []);
-        $debits = (array) request('line_debit', []);
-        $credits = (array) request('line_credit', []);
-        $descriptions = (array) request('line_description', []);
+        $data = request()->validate([
+            'journal_no' => 'required|string|max:100',
+            'journal_date' => 'required|date',
+            'shipment_job_id' => 'nullable|string|max:100',
+            'reference_no' => 'nullable|string|max:100',
+            'memo' => 'nullable|string|max:2000',
+            'line_account' => 'required|array|min:2',
+            'line_account.*' => 'nullable|integer',
+            'line_description' => 'nullable|array',
+            'line_description.*' => 'nullable|string|max:255',
+            'line_debit' => 'nullable|array',
+            'line_debit.*' => 'nullable|string|max:50',
+            'line_credit' => 'nullable|array',
+            'line_credit.*' => 'nullable|string|max:50',
+        ]);
+
+        $accountIds = (array) ($data['line_account'] ?? []);
+        $debits = (array) ($data['line_debit'] ?? []);
+        $credits = (array) ($data['line_credit'] ?? []);
+        $descriptions = (array) ($data['line_description'] ?? []);
 
         $lines = [];
         $totalDebit = 0.0;
@@ -5123,20 +5139,35 @@ class ModuleController extends Controller
         }
 
         $companyId = $this->defaultCompanyId();
-        $this->authorizeAccountingPosting('accounting', 'approve');
-        app(PeriodLockService::class)->assertOpen($companyId, request('journal_date', date('Y-m-d')));
-        $journalNo = trim((string) request('journal_no')) ?: $this->nextDocumentNumber('journal_voucher', 'JV-', 5);
+        $validAccountIds = DB::table('accounts')
+            ->where('company_id', $companyId)
+            ->where('is_active', true)
+            ->whereIn('id', array_unique(array_column($lines, 'account_id')))
+            ->pluck('id')
+            ->map(function ($id) { return (int) $id; })
+            ->all();
+        $invalidAccountIds = array_diff(array_unique(array_column($lines, 'account_id')), $validAccountIds);
+        if (!empty($invalidAccountIds)) {
+            return back()->withInput()->withErrors(['lines' => 'One or more selected accounts are inactive or do not belong to this company.']);
+        }
 
-        $journalId = DB::transaction(function () use ($companyId, $journalNo, $lines) {
+        $this->authorizeAccountingPosting('accounting', 'approve');
+        app(PeriodLockService::class)->assertOpen($companyId, $data['journal_date']);
+        $journalNo = trim((string) $data['journal_no']);
+        if (DB::table('journal_entries')->where('company_id', $companyId)->where('journal_no', $journalNo)->exists()) {
+            return back()->withInput()->withErrors(['journal_no' => 'This journal number already exists.']);
+        }
+
+        $journalId = DB::transaction(function () use ($companyId, $journalNo, $lines, $data) {
             $id = DB::table('journal_entries')->insertGetId($this->tablePayload('journal_entries', [
                 'company_id' => $companyId,
                 'branch_id' => DB::table('branches')->where('company_id', $companyId)->orderBy('id')->value('id'),
                 'journal_no' => $journalNo,
-                'journal_date' => request('journal_date', date('Y-m-d')),
+                'journal_date' => $data['journal_date'],
                 'source_module' => 'GL',
-                'reference_no' => request('reference_no'),
-                'shipment_job_id' => request('shipment_job_id'),
-                'memo' => request('memo'),
+                'reference_no' => $data['reference_no'] ?? null,
+                'shipment_job_id' => $data['shipment_job_id'] ?? null,
+                'memo' => $data['memo'] ?? null,
                 'status' => 'posted',
                 'created_by' => auth()->id(),
                 'posted_at' => now(),
@@ -5159,13 +5190,6 @@ class ModuleController extends Controller
             return $id;
         });
 
-        $posted = DB::table('journal_entries')->where('id', $journalId)->first();
-        $postedLines = DB::table('journal_entry_lines')
-            ->leftJoin('accounts', 'accounts.id', '=', 'journal_entry_lines.account_id')
-            ->where('journal_entry_id', $journalId)
-            ->select('journal_entry_lines.*', 'accounts.code as account_code', 'accounts.name as account_name')
-            ->get();
-
         app(ActivityLogger::class)->log('posted', 'journal_entry', $journalId, [], [
             'journal_no' => $journalNo,
             'source_module' => 'GL',
@@ -5173,11 +5197,31 @@ class ModuleController extends Controller
             'total_credit' => $totalCredit,
         ], $companyId);
 
+        return redirect()
+            ->route('erp.accounting.journals.show', $journalId)
+            ->with('status', 'Journal entry '.$journalNo.' was posted successfully.');
+    }
+
+    public function journalEntryShow($journal)
+    {
+        $entry = DB::table('journal_entries')
+            ->where('company_id', $this->defaultCompanyId())
+            ->where('id', $journal)
+            ->first();
+        abort_unless($entry, 404);
+
+        $lines = DB::table('journal_entry_lines')
+            ->leftJoin('accounts', 'accounts.id', '=', 'journal_entry_lines.account_id')
+            ->where('journal_entry_id', $entry->id)
+            ->select('journal_entry_lines.*', 'accounts.code as account_code', 'accounts.name as account_name')
+            ->orderBy('journal_entry_lines.id')
+            ->get();
+
         return view('erp.accounting.journal-review', [
-            'journal' => $posted,
-            'lines' => $postedLines,
-            'totalDebit' => $totalDebit,
-            'totalCredit' => $totalCredit,
+            'journal' => $entry,
+            'lines' => $lines,
+            'totalDebit' => (float) $lines->sum('debit'),
+            'totalCredit' => (float) $lines->sum('credit'),
         ]);
     }
 
@@ -8270,7 +8314,18 @@ class ModuleController extends Controller
     {
         return view('erp.print.official-receipt', [
             'receipt' => $this->officialReceiptPrintData(request('receipt_no') ?: request('receipt'), 'or'),
+            'receiptLayout' => $this->receiptPrintLayout('or'),
+            'receiptFieldStyles' => $this->receiptPrintFieldStyles('or'),
+            'receiptFontDefaults' => $this->receiptPrintFontDefaults(),
+            'receiptFieldLabels' => $this->receiptPrintFieldLabels(),
+            'receiptHiddenFields' => $this->receiptPrintHiddenFields('or'),
+            'adjustLayout' => request('adjust') === '1',
         ]);
+    }
+
+    public function saveOfficialReceiptPrintLayout()
+    {
+        return $this->saveReceiptPrintLayout('or');
     }
 
     private function officialReceiptPrintData($receiptRef = null, $documentKind = 'or')
@@ -8400,7 +8455,215 @@ class ModuleController extends Controller
     {
         return view('erp.print.acknowledgement-receipt', [
             'receipt' => $this->officialReceiptPrintData(request('receipt_no') ?: request('receipt'), 'ar'),
+            'receiptLayout' => $this->receiptPrintLayout('ar'),
+            'receiptFieldStyles' => $this->receiptPrintFieldStyles('ar'),
+            'receiptFontDefaults' => $this->receiptPrintFontDefaults(),
+            'receiptFieldLabels' => $this->receiptPrintFieldLabels(),
+            'receiptHiddenFields' => $this->receiptPrintHiddenFields('ar'),
+            'adjustLayout' => request('adjust') === '1',
         ]);
+    }
+
+    public function saveAcknowledgementReceiptPrintLayout()
+    {
+        return $this->saveReceiptPrintLayout('ar');
+    }
+
+    private function receiptPrintFieldKeys()
+    {
+        return array_keys($this->receiptPrintFieldLabels());
+    }
+
+    private function receiptPrintFieldLabels()
+    {
+        return [
+            'receipt_no' => 'Receipt number',
+            'payment_date' => 'Payment date',
+            'account_no' => 'Account number',
+            'registered_name' => 'Registered name',
+            'tin' => 'TIN',
+            'business_address' => 'Business address',
+            'description' => 'Description',
+            'amount' => 'Transaction amount',
+            'reference_no' => 'Reference number',
+            'bank' => 'Bank',
+            'total_amount' => 'Total paid amount',
+        ];
+    }
+
+    private function receiptPrintLayoutStoragePath($documentKind)
+    {
+        return $documentKind === 'ar'
+            ? 'erp/acknowledgement_receipt_print_layout.json'
+            : 'erp/collection_receipt_print_layout.json';
+    }
+
+    private function receiptPrintDocumentType($documentKind)
+    {
+        return $documentKind === 'ar' ? 'acknowledgement_receipt' : 'collection_receipt';
+    }
+
+    private function savedReceiptPrintLayout($documentKind)
+    {
+        $storageLayout = [];
+        $path = $this->receiptPrintLayoutStoragePath($documentKind);
+        if (Storage::exists($path)) {
+            $stored = json_decode(Storage::get($path), true);
+            $storageLayout = is_array($stored) ? $stored : [];
+        }
+
+        try {
+            if (Schema::hasTable('print_layouts')) {
+                $record = DB::table('print_layouts')
+                    ->whereNull('company_id')
+                    ->where('document_type', $this->receiptPrintDocumentType($documentKind))
+                    ->where('layout_name', 'Default')
+                    ->first();
+
+                if ($record) {
+                    return [
+                        'positions' => json_decode($record->positions ?: '[]', true) ?: [],
+                        'field_styles' => json_decode($record->field_styles ?: '[]', true) ?: [],
+                        'hidden_fields' => Schema::hasColumn('print_layouts', 'hidden_fields')
+                            ? (json_decode($record->hidden_fields ?: '[]', true) ?: [])
+                            : ($storageLayout['hidden_fields'] ?? []),
+                    ];
+                }
+            }
+        } catch (\Exception $exception) {
+            // Fall back to local storage when the configured database is unavailable.
+        }
+
+        return $storageLayout;
+    }
+
+    private function receiptPrintLayout($documentKind)
+    {
+        $saved = $this->savedReceiptPrintLayout($documentKind);
+        $savedPositions = $saved['positions'] ?? $saved;
+        $layout = [];
+
+        foreach ($this->receiptPrintFieldKeys() as $field) {
+            $point = isset($savedPositions[$field]) && is_array($savedPositions[$field]) ? $savedPositions[$field] : [0, 0];
+            $layout[$field] = [
+                max(-100, min(100, round((float) ($point[0] ?? 0), 2))),
+                max(-100, min(100, round((float) ($point[1] ?? 0), 2))),
+            ];
+        }
+
+        return $layout;
+    }
+
+    private function receiptPrintFontDefaults()
+    {
+        return [
+            'receipt_no' => 15,
+            'payment_date' => 8.25,
+            'account_no' => 8.25,
+            'registered_name' => 8.25,
+            'tin' => 8.25,
+            'business_address' => 8.25,
+            'description' => 9,
+            'amount' => 9,
+            'reference_no' => 7.5,
+            'bank' => 7.5,
+            'total_amount' => 9,
+        ];
+    }
+
+    private function receiptPrintFieldStyles($documentKind)
+    {
+        $saved = $this->savedReceiptPrintLayout($documentKind);
+        $savedFontSizes = $saved['field_styles']['font_sizes'] ?? [];
+        $styles = [];
+
+        foreach ($this->receiptPrintFontDefaults() as $field => $defaultFontSize) {
+            $styles[$field] = [
+                'font_size' => max(6, min(36, round((float) ($savedFontSizes[$field] ?? $defaultFontSize), 2))),
+            ];
+        }
+
+        return $styles;
+    }
+
+    private function receiptPrintHiddenFields($documentKind)
+    {
+        $saved = $this->savedReceiptPrintLayout($documentKind);
+        $knownFields = $this->receiptPrintFieldKeys();
+        $hiddenFields = isset($saved['hidden_fields']) && is_array($saved['hidden_fields'])
+            ? $saved['hidden_fields']
+            : [];
+
+        return array_values(array_intersect($knownFields, $hiddenFields));
+    }
+
+    private function saveReceiptPrintLayout($documentKind)
+    {
+        $submittedX = (array) request('layout_x', []);
+        $submittedY = (array) request('layout_y', []);
+        $submittedFontSizes = (array) request('font_size', []);
+        $fontDefaults = $this->receiptPrintFontDefaults();
+        $visibleFields = request()->has('visibility_present') ? (array) request('visible_field', []) : $this->receiptPrintFieldKeys();
+        $visibleFields = array_intersect($this->receiptPrintFieldKeys(), $visibleFields);
+        $hiddenFields = array_values(array_diff($this->receiptPrintFieldKeys(), $visibleFields));
+        $positions = [];
+        $fontSizes = [];
+
+        foreach ($this->receiptPrintFieldKeys() as $field) {
+            $positions[$field] = [
+                max(-100, min(100, round((float) ($submittedX[$field] ?? 0), 2))),
+                max(-100, min(100, round((float) ($submittedY[$field] ?? 0), 2))),
+            ];
+            $fontSizes[$field] = max(6, min(36, round((float) ($submittedFontSizes[$field] ?? $fontDefaults[$field]), 2)));
+        }
+
+        try {
+            if (Schema::hasTable('print_layouts')) {
+                $updates = [
+                    'paper_size' => 'a5_landscape',
+                    'paper_width' => 794,
+                    'paper_height' => 561,
+                    'template_url' => null,
+                    'print_template' => false,
+                    'positions' => json_encode($positions),
+                    'field_styles' => json_encode(['font_sizes' => $fontSizes]),
+                    'custom_fields' => json_encode([]),
+                    'is_default' => true,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ];
+                if (Schema::hasColumn('print_layouts', 'hidden_fields')) {
+                    $updates['hidden_fields'] = json_encode($hiddenFields);
+                }
+
+                DB::table('print_layouts')->updateOrInsert(
+                    [
+                        'company_id' => null,
+                        'document_type' => $this->receiptPrintDocumentType($documentKind),
+                        'layout_name' => 'Default',
+                    ],
+                    $updates
+                );
+            }
+        } catch (\Exception $exception) {
+            // Keep layout editing usable even if the database is unavailable.
+        }
+
+        Storage::put($this->receiptPrintLayoutStoragePath($documentKind), json_encode([
+            'positions' => $positions,
+            'field_styles' => ['font_sizes' => $fontSizes],
+            'hidden_fields' => $hiddenFields,
+        ], JSON_PRETTY_PRINT));
+
+        $route = $documentKind === 'ar'
+            ? 'erp.acknowledgement-receipt.preview'
+            : 'erp.official-receipt.preview';
+        $query = ['adjust' => 1];
+        if (request('receipt_no')) {
+            $query['receipt_no'] = request('receipt_no');
+        }
+
+        return redirect()->route($route, $query)->with('status', 'Receipt print positions saved.');
     }
 
     public function publicInvoice($token)

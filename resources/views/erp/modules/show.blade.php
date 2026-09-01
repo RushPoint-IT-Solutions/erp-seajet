@@ -34,7 +34,7 @@
                         'Aging Report' => route('erp.customer-billing.aging'),
                         'SOA A Collection' => route('erp.payments.create', ['type' => 'soa-a']),
                         'Deposit Collection' => route('erp.action', 'deposit-collection'),
-                        'New Journal Entry' => route('erp.action', 'new-journal-entry'),
+                        'New Journal Entry' => route('erp.accounting.journals'),
                         'Journal Entries' => route('erp.accounting.journals'),
                         'Chart of Accounts' => route('erp.accounting.coa'),
                         'Import Opening Balances' => route('erp.action', 'import-opening-balances'),
