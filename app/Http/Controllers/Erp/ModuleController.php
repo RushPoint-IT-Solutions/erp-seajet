@@ -3283,6 +3283,7 @@ class ModuleController extends Controller
                 return [
                     'id' => $payment->id,
                     'payment_no' => $payment->payment_no,
+                    'check_voucher' => $payment->voucher_no ?: '-',
                     'supplier' => $payment->payee_snapshot ?: ($payment->supplier_name ?: '-'),
                     'shipment_job_id' => $payment->shipment_job_id ?: '-',
                     'check_no' => $issuance && trim((string) $issuance->check_no) !== ''
