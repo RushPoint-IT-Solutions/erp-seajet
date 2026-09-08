@@ -94,6 +94,7 @@ class BillingInvoicePrintFlowTest extends TestCase
         $soaPrint->assertSee('PHP 50.00');
         $soaPrint->assertSee('TOTAL INVOICE AMOUNT');
         $soaPrint->assertSee('PHP 112.00');
+        $soaPrint->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif;', false);
         $soaPrint->assertSee('PLEASE PAY THIS AMOUNT');
         $soaPrint->assertDontSee('PHP 162.00');
         $this->assertRegExp('/PLEASE PAY THIS AMOUNT<\/span><span>PHP 50\.00<\/span>/', $soaPrint->getContent());

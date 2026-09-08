@@ -19,7 +19,7 @@
         @endif
         border: 1px solid #2f3542;
         box-shadow: 0 10px 30px rgba(15, 23, 42, .14);
-        font-family: Arial, sans-serif;
+        font-family: Calibri, Arial, Helvetica, sans-serif;
         color: #1f2937;
         overflow: hidden;
     }
