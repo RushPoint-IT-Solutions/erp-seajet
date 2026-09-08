@@ -6742,6 +6742,10 @@ class ModuleController extends Controller
         if (!isset($fontOptions[$fontFamily])) {
             $fontFamily = 'arial';
         }
+        $savedBoldAll = $savedSettings['bold_all'] ?? ($saved['field_styles']['_bold_all'] ?? true);
+        $boldAll = request()->has('bold_all')
+            ? request('bold_all') === '1'
+            : filter_var($savedBoldAll, FILTER_VALIDATE_BOOLEAN);
 
         return [
             'paper_size' => $paper,
@@ -6752,6 +6756,8 @@ class ModuleController extends Controller
             'print_template' => $printTemplate,
             'font_family' => $fontFamily,
             'font_stack' => $fontOptions[$fontFamily]['stack'],
+            'bold_all' => $boldAll,
+            'font_weight' => $boldAll ? 700 : 400,
         ];
     }
 
@@ -6842,6 +6848,7 @@ class ModuleController extends Controller
         }
 
         $styles['_font_family'] = $this->invoicePrintSettings()['font_family'];
+        $styles['_bold_all'] = $this->invoicePrintSettings()['bold_all'];
 
         return $styles;
     }

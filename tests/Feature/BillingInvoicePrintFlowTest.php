@@ -185,6 +185,9 @@ class BillingInvoicePrintFlowTest extends TestCase
         $layout->assertSee('name="font_family"', false);
         $layout->assertSee('Arial (Agenture)');
         $layout->assertSee('Times New Roman');
+        $layout->assertSee('id="allFontSizeControl"', false);
+        $layout->assertSee('id="boldAllControl"', false);
+        $layout->assertSee("setHiddenValue(this.getAttribute('data-field'), 'fs', fontSize, this.getAttribute('data-kind'));", false);
 
         $response = $this->post('/erp/invoices/review', $this->payload([
             'customer_id' => 'CUST-001',
@@ -234,6 +237,11 @@ class BillingInvoicePrintFlowTest extends TestCase
         $calibriPrint->assertStatus(200);
         $calibriPrint->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif;', false);
         $calibriPrint->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif !important;', false);
+
+        $regularPrint = $this->get('/erp/billings/print/invoice?invoice=BI-TEST-001&bold_all=0');
+        $regularPrint->assertStatus(200);
+        $this->assertRegExp('/\.bi-field\s*\{[^}]*font-weight:\s*400;/s', $regularPrint->getContent());
+        $this->assertRegExp('/\.print-field-prepared_by\s*\{[^}]*font-weight:\s*400\s*!important;/s', $regularPrint->getContent());
     }
 
     public function test_billing_invoice_rejects_invalid_withholding_percentage()

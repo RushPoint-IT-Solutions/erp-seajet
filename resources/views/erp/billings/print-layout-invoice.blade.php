@@ -425,6 +425,23 @@
                     <div class="form-text">Applies to the layout preview and printed Billing Invoice.</div>
                 </div>
 
+                <div class="row g-2 mb-3 align-items-end">
+                    <div class="col-6">
+                        <label class="form-label small text-muted" for="allFontSizeControl">All Font Size px</label>
+                        <input type="number" class="form-control form-control-sm" id="allFontSizeControl" min="6" max="48" value="{{ $fieldStyles['line_description']['font_size'] ?? 12 }}">
+                    </div>
+                    <div class="col-6 pb-1">
+                        <input type="hidden" name="bold_all" value="0">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="boldAllControl" name="bold_all" value="1" {{ $settings['bold_all'] ? 'checked' : '' }}>
+                            <label class="form-check-label small" for="boldAllControl">Bold all text</label>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="form-text">Font size updates every printable field together. You can still resize one selected field afterward.</div>
+                    </div>
+                </div>
+
                 <div class="row g-2 mb-3">
                     <div class="col-6">
                         <label class="form-label small text-muted">Width px</label>
@@ -817,6 +834,7 @@
             var selectedFont = $('#fontFamilyControl option:selected');
             var fontFamily = $('#fontFamilyControl').val() || 'arial';
             var fontStack = selectedFont.data('stack') || 'Arial, Helvetica, sans-serif';
+            var fontWeight = $('#boldAllControl').is(':checked') ? '700' : '400';
 
             width = Math.max(400, Math.min(width, 1600));
             height = Math.max(400, Math.min(height, 2200));
@@ -832,6 +850,10 @@
             sheet.style.width = width + 'px';
             sheet.style.height = height + 'px';
             sheet.style.fontFamily = fontStack;
+            sheet.style.fontWeight = fontWeight;
+            $('.drag-field').each(function () {
+                this.style.fontWeight = fontWeight;
+            });
             if (previewUrl) {
                 sheet.style.backgroundImage = 'url("' + previewUrl.replace(/"/g, '\\"') + '")';
                 sheet.style.backgroundSize = '100% 100%';
@@ -862,7 +884,7 @@
             applyPaperAndTemplate();
         });
 
-        $('#templateUrlControl, #printTemplateControl, #fontFamilyControl').on('input change', applyPaperAndTemplate);
+        $('#templateUrlControl, #printTemplateControl, #fontFamilyControl, #boldAllControl').on('input change', applyPaperAndTemplate);
         $('#applyTemplateSettings').on('click', applyPaperAndTemplate);
         $('#templateFileControl').on('change', function () {
             var file = this.files && this.files[0] ? this.files[0] : null;
@@ -882,6 +904,20 @@
 
         $('.drag-field').each(function () {
             bindDrag(this);
+        });
+
+        $('#allFontSizeControl').on('input change', function () {
+            var fontSize = Math.max(6, Math.min(parseInt(this.value, 10) || 12, 48));
+            this.value = fontSize;
+
+            $('.drag-field').each(function () {
+                this.style.fontSize = fontSize + 'px';
+                setHiddenValue(this.getAttribute('data-field'), 'fs', fontSize, this.getAttribute('data-kind'));
+            });
+
+            if (selectedField) {
+                $('#fieldFontControl').val(fontSize);
+            }
         });
         var lineDescriptionElement = $('[data-field="line_description"].drag-field')[0];
         if (lineDescriptionElement) {

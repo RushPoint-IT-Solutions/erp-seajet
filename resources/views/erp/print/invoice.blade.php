@@ -53,7 +53,7 @@
         overflow-wrap: anywhere;
         word-break: break-word;
         color: #000;
-        font-weight: 700;
+        font-weight: {{ $settings['font_weight'] }};
         letter-spacing: .25px;
     }
     .bi-field.fit-single-line {
@@ -87,7 +87,7 @@
         justify-content: flex-end;
     }
     .bi-field.header-value {
-        font-weight: 700;
+        font-weight: {{ $settings['font_weight'] }};
         color: #9c1c1c;
     }
     .print-field-vatable_sales,
@@ -103,7 +103,7 @@
     .print-field-amount_due,
     .print-field-prepared_by {
         color: #000 !important;
-        font-weight: 700 !important;
+        font-weight: {{ $settings['font_weight'] }} !important;
     }
     .bi-label-preview {
         position: absolute;
