@@ -8007,15 +8007,27 @@ class ModuleController extends Controller
         $billingLineIndex = $billingLineIndexes[0];
         $billingDescriptions = [];
         $billingAmounts = [];
+        $billingLines = [];
         foreach ($billingLineIndexes as $index) {
             $description = trim((string) $lineValue($descriptions, $index));
+            $quantity = $lineValue($quantities, $index, '');
+            $unitPrice = $this->moneyToFloat($lineValue($unitPrices, $index));
             $amount = $this->moneyToFloat($lineValue($lineAmounts, $index));
+            if ($amount === 0.0 && $unitPrice !== 0.0) {
+                $amount = $unitPrice * max(1, $this->moneyToFloat($quantity));
+            }
             if ($description !== '') {
                 $billingDescriptions[] = $description;
             }
             if ($amount !== 0.0) {
                 $billingAmounts[] = number_format($amount, 2);
             }
+            $billingLines[] = [
+                'description' => $description !== '' ? $description : trim((string) $lineValue($items, $index)),
+                'quantity' => $quantity,
+                'unit_price' => $unitPrice,
+                'amount' => $amount,
+            ];
         }
 
         $lineDescription = trim(implode("\n", $billingDescriptions));
@@ -8060,6 +8072,7 @@ class ModuleController extends Controller
             'line_qty' => $lineValue($quantities, $billingLineIndex, $firstLineValue('qty', '')),
             'line_unit_price' => $this->moneyToFloat($lineValue($unitPrices, $billingLineIndex, $firstLineValue('unit_price', '0'))),
             'line_amount' => $this->moneyToFloat($lineValue($lineAmounts, $billingLineIndex, $firstLineValue('line_amount', '0'))),
+            'billing_lines' => $billingLines,
             'billing_amounts' => implode("\n", $billingAmounts),
             'soa_particulars' => implode("\n", $soaParticulars),
             'soa_amounts' => implode("\n", $soaAmounts),

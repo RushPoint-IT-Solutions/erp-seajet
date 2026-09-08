@@ -171,6 +171,7 @@
             ? $print['soa_amounts']
             : number_format((float) ($print['reimbursement_total'] ?? 0), 2);
         $billingInvoiceAmount = (float) ($print['billing_total'] ?? 0);
+        $soaBTotal = (float) ($print['reimbursement_total'] ?? 0);
         $paymentNoteLeft = $p['payment_note'][0];
         $paymentNoteTop = $p['payment_note'][1];
         $paymentNoteWidth = $s['payment_note']['width'];
@@ -227,12 +228,12 @@
             <span>REIMBURSEMENT CHARGES</span><span>{{ $money($print['reimbursement_total'] ?? 0) }}</span>
         </div>
         <div class="soa-payment-note-line soa-payment-note-amount d-flex justify-content-between" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + 45 }}px; width: {{ $paymentNoteWidth }}px">
-            <span>PLEASE PAY THIS AMOUNT</span><span>{{ $money($print['soa_total'] ?? 0) }}</span>
+            <span>PLEASE PAY THIS AMOUNT</span><span>{{ $money($soaBTotal) }}</span>
         </div>
         <div class="soa-payment-note-line soa-payment-note-small" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + 63 }}px; width: {{ $paymentNoteWidth }}px; font-style: italic">
             PLEASE DO NOT DEDUCT 2% WITHHOLDING TAX ON REIMBURSEMENT CHARGES.
         </div>
-        <div class="print-field fit-single-line amount print-field-total_reimbursement" data-fit-text style="left: {{ $p['total_reimbursement'][0] }}px; top: {{ $p['total_reimbursement'][1] }}px; {{ $fieldStyle('total_reimbursement') }}">{{ number_format((float) ($print['soa_total'] ?? 0), 2) }}</div>
+        <div class="print-field fit-single-line amount print-field-total_reimbursement" data-fit-text style="left: {{ $p['total_reimbursement'][0] }}px; top: {{ $p['total_reimbursement'][1] }}px; {{ $fieldStyle('total_reimbursement') }}">{{ number_format($soaBTotal, 2) }}</div>
         <div class="print-field fit-single-line print-field-prepared_by" data-fit-text style="left: {{ $p['prepared_by'][0] }}px; top: {{ $p['prepared_by'][1] }}px; {{ $fieldStyle('prepared_by') }}; text-align: center">{{ $print['prepared_by'] ?: (auth()->user()->name ?? 'User') }}</div>
         <div class="print-field fit-multiline print-field-remarks" data-fit-text data-min-font="6" style="left: {{ $p['remarks'][0] }}px; top: {{ $p['remarks'][1] }}px; {{ $fieldStyle('remarks') }}">{{ $print['remarks'] ?? '' }}</div>
         @foreach($customFields as $custom)

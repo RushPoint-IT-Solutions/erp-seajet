@@ -95,7 +95,8 @@ class BillingInvoicePrintFlowTest extends TestCase
         $soaPrint->assertSee('TOTAL INVOICE AMOUNT');
         $soaPrint->assertSee('PHP 112.00');
         $soaPrint->assertSee('PLEASE PAY THIS AMOUNT');
-        $soaPrint->assertSee('PHP 162.00');
+        $soaPrint->assertDontSee('PHP 162.00');
+        $this->assertRegExp('/PLEASE PAY THIS AMOUNT<\/span><span>PHP 50\.00<\/span>/', $soaPrint->getContent());
     }
 
     public function test_guest_or_non_tax_billing_review_can_print_soa_a_only()
@@ -153,6 +154,35 @@ class BillingInvoicePrintFlowTest extends TestCase
         $print->assertStatus(200);
         $print->assertSee('PHP 2.00');
         $print->assertSee('PHP 110.00');
+    }
+
+    public function test_billing_invoice_prints_each_item_as_a_separate_line_with_its_amount()
+    {
+        $response = $this->post('/erp/invoices/review', $this->payload([
+            'customer_id' => 'CUST-001',
+            'customer_name' => 'North Harbor Trading',
+            'vat_classification' => '12%',
+            'ar_account' => 'A/Trade-Billing Invoice',
+            'invoice_template' => 'Billing Invoice',
+            'customer_tax_code' => 'VAT12',
+            'item' => ['Documentation VAT', 'Handling Fee'],
+            'item_description' => ['DOCUMENTATION SERVICE', 'SPECIAL HANDLING SERVICE'],
+            'qty' => ['1', '3'],
+            'unit_price' => ['100.00', '79.15'],
+            'line_class' => ['MANILA', 'MANILA'],
+            'tax_category' => ['12%', '12%'],
+            'line_amount' => ['100.00', '237.45'],
+        ]));
+
+        $response->assertRedirect();
+
+        $print = $this->get('/erp/billings/print/invoice?invoice=BI-TEST-001');
+        $print->assertStatus(200);
+        $print->assertSee('DOCUMENTATION SERVICE');
+        $print->assertSee('SPECIAL HANDLING SERVICE');
+        $print->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif;', false);
+        $this->assertRegExp('/print-field-line_amount[^>]*>100\.00<\/div>/', $print->getContent());
+        $this->assertRegExp('/print-field-line_amount[^>]*>237\.45<\/div>/', $print->getContent());
     }
 
     public function test_billing_invoice_rejects_invalid_withholding_percentage()

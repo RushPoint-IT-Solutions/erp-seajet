@@ -20,7 +20,7 @@
         @endif
         border: 1px solid #222;
         box-shadow: 0 10px 30px rgba(15, 23, 42, .12);
-        font-family: Arial, sans-serif;
+        font-family: Calibri, Arial, Helvetica, sans-serif;
         color: #1f2937;
         overflow: hidden;
     }
@@ -182,6 +182,7 @@
             return number_format((float) $amount, 2);
         };
         $lineDescription = $print['line_description'] ?? '';
+        $billingLines = $print['billing_lines'] ?? [];
     @endphp
 
     <div class="bi-print-sheet">
@@ -243,13 +244,40 @@
         <div class="bi-field fit-multiline print-field-origin_dest" data-fit-text style="left: {{ $p['origin_dest'][0] }}px; top: {{ $p['origin_dest'][1] }}px; {{ $fieldStyle('origin_dest') }}">{{ $print['origin_dest'] }}</div>
         <div class="bi-field fit-multiline print-field-commodity" data-fit-text style="left: {{ $p['commodity'][0] }}px; top: {{ $p['commodity'][1] }}px; {{ $fieldStyle('commodity') }}">{{ $print['commodity'] }}</div>
 
-        <div class="bi-field fit-multiline print-field-line_description" data-fit-text data-min-font="6" style="left: {{ $p['line_description'][0] }}px; top: {{ $p['line_description'][1] }}px; {{ $fieldStyle('line_description') }}">{{ $lineDescription }}</div>
-        <div class="bi-field fit-single-line print-field-soa_no" data-fit-text style="left: {{ $p['soa_no'][0] }}px; top: {{ $p['soa_no'][1] }}px; {{ $fieldStyle('soa_no') }}">SOA# {{ $print['soa_no'] }}</div>
-        <div class="bi-field fit-multiline print-field-remarks" data-fit-text data-min-font="6" style="left: {{ $p['remarks'][0] }}px; top: {{ $p['remarks'][1] }}px; {{ $fieldStyle('remarks') }}">{{ $print['remarks'] ?? '' }}</div>
-        <div class="bi-field fit-single-line amount print-field-line_qty" data-fit-text style="left: {{ $p['line_qty'][0] }}px; top: {{ $p['line_qty'][1] }}px; {{ $fieldStyle('line_qty') }}">{{ $print['line_qty'] }}</div>
-        <div class="bi-field fit-single-line amount print-field-line_unit_price" data-fit-text style="left: {{ $p['line_unit_price'][0] }}px; top: {{ $p['line_unit_price'][1] }}px; {{ $fieldStyle('line_unit_price') }}">{{ $plainAmount($print['line_unit_price']) }}</div>
-        <div class="bi-field fit-single-line amount print-field-line_amount" data-fit-text style="left: {{ $p['line_amount'][0] }}px; top: {{ $p['line_amount'][1] }}px; {{ $fieldStyle('line_amount') }}">{{ $plainAmount($print['line_amount']) }}</div>
-
+        @if(!empty($billingLines))
+            @php
+                $lineOffset = 0;
+            @endphp
+            @foreach($billingLines as $line)
+                @php
+                    $descriptionLines = preg_split('/\r\n|\r|\n/', (string) ($line['description'] ?? '')) ?: [''];
+                    $visualLineCount = 0;
+                    foreach ($descriptionLines as $descriptionLine) {
+                        $visualLineCount += max(1, (int) ceil(max(1, strlen($descriptionLine)) / 48));
+                    }
+                    $rowHeight = max(28, ($visualLineCount * 16) + 8);
+                @endphp
+                <div class="bi-field fit-multiline print-field-line_description" data-fit-text data-min-font="6" style="left: {{ $p['line_description'][0] }}px; top: {{ $p['line_description'][1] + $lineOffset }}px; height: {{ $rowHeight }}px; {{ $fieldStyle('line_description') }}">{{ $line['description'] }}</div>
+                <div class="bi-field fit-single-line amount print-field-line_qty" data-fit-text style="left: {{ $p['line_qty'][0] }}px; top: {{ $p['line_qty'][1] + $lineOffset }}px; {{ $fieldStyle('line_qty') }}">{{ $line['quantity'] }}</div>
+                <div class="bi-field fit-single-line amount print-field-line_unit_price" data-fit-text style="left: {{ $p['line_unit_price'][0] }}px; top: {{ $p['line_unit_price'][1] + $lineOffset }}px; {{ $fieldStyle('line_unit_price') }}">{{ $plainAmount($line['unit_price']) }}</div>
+                <div class="bi-field fit-single-line amount print-field-line_amount" data-fit-text style="left: {{ $p['line_amount'][0] }}px; top: {{ $p['line_amount'][1] + $lineOffset }}px; {{ $fieldStyle('line_amount') }}">{{ $plainAmount($line['amount']) }}</div>
+                @php
+                    $lineOffset += $rowHeight;
+                @endphp
+            @endforeach
+        @else
+            <div class="bi-field fit-multiline print-field-line_description" data-fit-text data-min-font="6" style="left: {{ $p['line_description'][0] }}px; top: {{ $p['line_description'][1] }}px; {{ $fieldStyle('line_description') }}">{{ $lineDescription }}</div>
+            <div class="bi-field fit-single-line amount print-field-line_qty" data-fit-text style="left: {{ $p['line_qty'][0] }}px; top: {{ $p['line_qty'][1] }}px; {{ $fieldStyle('line_qty') }}">{{ $print['line_qty'] }}</div>
+            <div class="bi-field fit-single-line amount print-field-line_unit_price" data-fit-text style="left: {{ $p['line_unit_price'][0] }}px; top: {{ $p['line_unit_price'][1] }}px; {{ $fieldStyle('line_unit_price') }}">{{ $plainAmount($print['line_unit_price']) }}</div>
+            <div class="bi-field fit-single-line amount print-field-line_amount" data-fit-text style="left: {{ $p['line_amount'][0] }}px; top: {{ $p['line_amount'][1] }}px; {{ $fieldStyle('line_amount') }}">{{ $plainAmount($print['line_amount']) }}</div>
+        @endif
+        @php
+            $printedLinesBottom = !empty($billingLines) ? $p['line_description'][1] + $lineOffset : $p['line_description'][1] + 28;
+            $soaTop = max($p['soa_no'][1], $printedLinesBottom + 8);
+            $remarksTop = max($p['remarks'][1], $soaTop + 30);
+        @endphp
+        <div class="bi-field fit-single-line print-field-soa_no" data-fit-text style="left: {{ $p['soa_no'][0] }}px; top: {{ $soaTop }}px; {{ $fieldStyle('soa_no') }}">SOA# {{ $print['soa_no'] }}</div>
+        <div class="bi-field fit-multiline print-field-remarks" data-fit-text data-min-font="6" style="left: {{ $p['remarks'][0] }}px; top: {{ $remarksTop }}px; {{ $fieldStyle('remarks') }}">{{ $print['remarks'] ?? '' }}</div>
         <div class="bi-field fit-single-line amount print-field-vatable_sales" data-fit-text style="left: {{ $p['vatable_sales'][0] }}px; top: {{ $p['vatable_sales'][1] }}px; {{ $fieldStyle('vatable_sales') }}">{{ $money($print['vatable_sales']) }}</div>
         <div class="bi-field fit-single-line amount print-field-vat" data-fit-text style="left: {{ $p['vat'][0] }}px; top: {{ $p['vat'][1] }}px; {{ $fieldStyle('vat') }}">{{ $money($print['vat_amount']) }}</div>
         <div class="bi-field fit-single-line amount print-field-zero_rated_sales" data-fit-text style="left: {{ $p['zero_rated_sales'][0] }}px; top: {{ $p['zero_rated_sales'][1] }}px; {{ $fieldStyle('zero_rated_sales') }}">{{ $plainAmount($print['zero_rated_sales']) }}</div>
