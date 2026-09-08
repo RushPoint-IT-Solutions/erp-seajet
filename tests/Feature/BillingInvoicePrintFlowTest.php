@@ -211,6 +211,7 @@ class BillingInvoicePrintFlowTest extends TestCase
         $print->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif;', false);
         $print->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif !important;', false);
         $print->assertSee('font-weight: 700;', false);
+        $this->assertRegExp('/\.print-field-prepared_by\s*\{[^}]*font-weight:\s*800\s*!important;/s', $print->getContent());
         preg_match_all('/data-line-row="0" data-line-top="(\d+)"/', $print->getContent(), $firstRowTops);
         preg_match_all('/data-line-row="1" data-line-top="(\d+)"/', $print->getContent(), $secondRowTops);
         $this->assertCount(4, $firstRowTops[1]);

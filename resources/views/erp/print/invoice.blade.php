@@ -89,6 +89,21 @@
         font-weight: 700;
         color: #9c1c1c;
     }
+    .print-field-vatable_sales,
+    .print-field-vat,
+    .print-field-zero_rated_sales,
+    .print-field-vat_exempt_sales,
+    .print-field-total_sales,
+    .print-field-less_vat,
+    .print-field-amount_net_vat,
+    .print-field-discount,
+    .print-field-add_vat,
+    .print-field-withholding_tax,
+    .print-field-amount_due,
+    .print-field-prepared_by {
+        color: #000 !important;
+        font-weight: 800 !important;
+    }
     .bi-label-preview {
         position: absolute;
         font-size: 11px;
