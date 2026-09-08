@@ -6261,6 +6261,7 @@ class ModuleController extends Controller
         return view('erp.billings.print-layout-invoice', [
             'positions' => $this->invoicePrintPositions(),
             'settings' => $this->invoicePrintSettings(),
+            'fontOptions' => $this->invoicePrintFontOptions(),
             'fieldStyles' => $this->invoicePrintFieldStyles(),
             'customFields' => $this->invoicePrintCustomFields(),
             'hiddenFields' => $this->invoicePrintHiddenFields(),
@@ -6690,6 +6691,17 @@ class ModuleController extends Controller
         ];
     }
 
+    private function invoicePrintFontOptions()
+    {
+        return [
+            'arial' => ['label' => 'Arial (Agenture)', 'stack' => 'Arial, Helvetica, sans-serif'],
+            'calibri' => ['label' => 'Calibri', 'stack' => 'Calibri, Arial, Helvetica, sans-serif'],
+            'times_new_roman' => ['label' => 'Times New Roman', 'stack' => '"Times New Roman", Times, serif'],
+            'verdana' => ['label' => 'Verdana', 'stack' => 'Verdana, Geneva, sans-serif'],
+            'tahoma' => ['label' => 'Tahoma', 'stack' => 'Tahoma, Arial, sans-serif'],
+        ];
+    }
+
     private function invoicePrintSettings()
     {
         $presets = [
@@ -6701,6 +6713,7 @@ class ModuleController extends Controller
 
         $saved = $this->savedInvoicePrintLayout();
         $savedSettings = $saved['settings'] ?? [];
+        $fontOptions = $this->invoicePrintFontOptions();
         $defaultTemplateUrl = asset('images/billing-invoice-template.svg');
 
         $paper = request('paper_size', $savedSettings['paper_size'] ?? 'letter');
@@ -6724,6 +6737,11 @@ class ModuleController extends Controller
         $printTemplate = request()->has('print_template')
             ? request('print_template') === '1'
             : (array_key_exists('print_template', $savedSettings) ? (bool) $savedSettings['print_template'] : true);
+        $savedFontFamily = $savedSettings['font_family'] ?? ($saved['field_styles']['_font_family'] ?? 'arial');
+        $fontFamily = strtolower(trim((string) request('font_family', $savedFontFamily)));
+        if (!isset($fontOptions[$fontFamily])) {
+            $fontFamily = 'arial';
+        }
 
         return [
             'paper_size' => $paper,
@@ -6732,6 +6750,8 @@ class ModuleController extends Controller
             'page_css' => $paper === 'custom' ? ($width.'px '.$height.'px') : $presets[$paper]['page_css'],
             'template_url' => $templateUrl,
             'print_template' => $printTemplate,
+            'font_family' => $fontFamily,
+            'font_stack' => $fontOptions[$fontFamily]['stack'],
         ];
     }
 
@@ -6820,6 +6840,8 @@ class ModuleController extends Controller
                 'font_size' => max(6, min(48, (int) request('fs_'.$key, $savedStyle['font_size'] ?? ($key === 'address' ? 10 : 12)))),
             ];
         }
+
+        $styles['_font_family'] = $this->invoicePrintSettings()['font_family'];
 
         return $styles;
     }

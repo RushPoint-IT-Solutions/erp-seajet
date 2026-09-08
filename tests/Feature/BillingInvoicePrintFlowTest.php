@@ -181,6 +181,10 @@ class BillingInvoicePrintFlowTest extends TestCase
         $layout = $this->get('/erp/billings/print-layout/invoice');
         $layout->assertStatus(200);
         $layout->assertSee("var invoiceLineFields = ['line_description', 'line_qty', 'line_unit_price', 'line_amount'];", false);
+        $layout->assertSee('id="fontFamilyControl"', false);
+        $layout->assertSee('name="font_family"', false);
+        $layout->assertSee('Arial (Agenture)');
+        $layout->assertSee('Times New Roman');
 
         $response = $this->post('/erp/invoices/review', $this->payload([
             'customer_id' => 'CUST-001',
@@ -207,8 +211,8 @@ class BillingInvoicePrintFlowTest extends TestCase
         $print->assertSee('SPECIAL HANDLING SERVICE');
         $print->assertSee('data-item-gap="0"', false);
         $print->assertSee("First memo paragraph.\n\nSecond memo paragraph.");
-        $print->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif;', false);
-        $print->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif !important;', false);
+        $print->assertSee('font-family: Arial, Helvetica, sans-serif;', false);
+        $print->assertSee('font-family: Arial, Helvetica, sans-serif !important;', false);
         $print->assertSee('font-weight: 700;', false);
         $this->assertRegExp('/\.print-field-prepared_by\s*\{[^}]*font-weight:\s*700\s*!important;/s', $print->getContent());
         $this->assertRegExp('/\.bi-field\s*\{[^}]*line-height:\s*1\.15;/s', $print->getContent());
@@ -225,6 +229,11 @@ class BillingInvoicePrintFlowTest extends TestCase
         $this->assertRegExp('/print-field-remarks[^>]*data-items-shift="[1-9]\d*"/', $print->getContent());
         $this->assertRegExp('/print-field-line_amount[^>]*>100\.00<\/div>/', $print->getContent());
         $this->assertRegExp('/print-field-line_amount[^>]*>237\.45<\/div>/', $print->getContent());
+
+        $calibriPrint = $this->get('/erp/billings/print/invoice?invoice=BI-TEST-001&font_family=calibri');
+        $calibriPrint->assertStatus(200);
+        $calibriPrint->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif;', false);
+        $calibriPrint->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif !important;', false);
     }
 
     public function test_billing_invoice_rejects_invalid_withholding_percentage()

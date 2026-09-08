@@ -20,13 +20,13 @@
         @endif
         border: 1px solid #222;
         box-shadow: 0 10px 30px rgba(15, 23, 42, .12);
-        font-family: Calibri, Arial, Helvetica, sans-serif;
+        font-family: {{ $settings['font_stack'] }};
         color: #1f2937;
         overflow: hidden;
     }
     .bi-print-sheet,
     .bi-print-sheet * {
-        font-family: Calibri, Arial, Helvetica, sans-serif !important;
+        font-family: {{ $settings['font_stack'] }} !important;
     }
     .bi-template-guide,
     .bi-guide-line,

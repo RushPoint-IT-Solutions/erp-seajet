@@ -33,7 +33,7 @@
         @endif
         border: 1px solid #222;
         box-shadow: 0 10px 30px rgba(15, 23, 42, .16);
-        font-family: Arial, sans-serif;
+        font-family: {{ $settings['font_stack'] }};
         color: #1f2937;
         overflow: hidden;
         user-select: none;
@@ -413,6 +413,16 @@
                         <option value="a4" data-width="794" data-height="1123" {{ $settings['paper_size'] === 'a4' ? 'selected' : '' }}>A4</option>
                         <option value="custom" data-width="{{ $settings['paper_width'] }}" data-height="{{ $settings['paper_height'] }}" {{ $settings['paper_size'] === 'custom' ? 'selected' : '' }}>Custom</option>
                     </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small text-muted" for="fontFamilyControl">Print Font</label>
+                    <select class="form-select form-select-sm" id="fontFamilyControl" name="font_family">
+                        @foreach($fontOptions as $fontKey => $fontOption)
+                            <option value="{{ $fontKey }}" data-stack="{{ $fontOption['stack'] }}" {{ $settings['font_family'] === $fontKey ? 'selected' : '' }}>{{ $fontOption['label'] }}</option>
+                        @endforeach
+                    </select>
+                    <div class="form-text">Applies to the layout preview and printed Billing Invoice.</div>
                 </div>
 
                 <div class="row g-2 mb-3">
@@ -804,6 +814,9 @@
             var templateUrl = $('#templateUrlControl').val();
             var previewUrl = uploadedTemplatePreviewUrl || templateUrl;
             var printTemplate = $('#printTemplateControl').is(':checked') ? '1' : '0';
+            var selectedFont = $('#fontFamilyControl option:selected');
+            var fontFamily = $('#fontFamilyControl').val() || 'arial';
+            var fontStack = selectedFont.data('stack') || 'Arial, Helvetica, sans-serif';
 
             width = Math.max(400, Math.min(width, 1600));
             height = Math.max(400, Math.min(height, 2200));
@@ -813,12 +826,12 @@
             $('#paper_height_hidden').val(height);
             $('#template_url_hidden').val(templateUrl);
             $('#print_template_hidden').val(printTemplate);
-
             $('#paperWidthControl').val(width);
             $('#paperHeightControl').val(height);
 
             sheet.style.width = width + 'px';
             sheet.style.height = height + 'px';
+            sheet.style.fontFamily = fontStack;
             if (previewUrl) {
                 sheet.style.backgroundImage = 'url("' + previewUrl.replace(/"/g, '\\"') + '")';
                 sheet.style.backgroundSize = '100% 100%';
@@ -849,7 +862,7 @@
             applyPaperAndTemplate();
         });
 
-        $('#templateUrlControl, #printTemplateControl').on('input change', applyPaperAndTemplate);
+        $('#templateUrlControl, #printTemplateControl, #fontFamilyControl').on('input change', applyPaperAndTemplate);
         $('#applyTemplateSettings').on('click', applyPaperAndTemplate);
         $('#templateFileControl').on('change', function () {
             var file = this.files && this.files[0] ? this.files[0] : null;
