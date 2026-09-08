@@ -18,6 +18,7 @@ class SeaJetProductionDataSeeder extends Seeder
             $this->taxCodes($companyId, $accounts, $now);
             $this->customers($companyId, $now);
             $this->suppliers($companyId, $accounts, $now);
+            $this->vendorNumberSeries($companyId, $now);
             $this->items($companyId, $now);
             $this->associateAdmin($companyId, $branches['MAIN'], $now);
         });
@@ -224,6 +225,37 @@ class SeaJetProductionDataSeeder extends Seeder
                 'updated_at' => $now,
             ]);
         }
+    }
+
+    private function vendorNumberSeries($companyId, $now)
+    {
+        if (!Schema::hasTable('number_series') || DB::table('number_series')
+            ->where('company_id', $companyId)
+            ->where('document_type', 'vendor')
+            ->exists()) {
+            return;
+        }
+
+        $currentNumber = DB::table('suppliers')
+            ->where('company_id', $companyId)
+            ->where('code', 'like', 'VND-%')
+            ->pluck('code')
+            ->reduce(function ($highest, $code) {
+                $suffix = substr((string) $code, 4);
+
+                return ctype_digit($suffix) ? max($highest, (int) $suffix) : $highest;
+            }, 0);
+
+        DB::table('number_series')->insert([
+            'company_id' => $companyId,
+            'document_type' => 'vendor',
+            'prefix' => 'VND-',
+            'current_number' => $currentNumber,
+            'padding' => 4,
+            'is_active' => true,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
     }
 
     private function items($companyId, $now)

@@ -37,8 +37,9 @@
         <div class="row g-3">
             <div class="col-md-3">
                 <label class="form-label">Vendor ID</label>
-                <input name="supplier_id" class="form-control {{ $errors->has('supplier_id') ? 'is-invalid' : '' }}" value="{{ $vendorValue('supplier_id', 'code', $nextSupplierCode) }}" required>
+                <input name="supplier_id" class="form-control {{ $errors->has('supplier_id') ? 'is-invalid' : '' }}" value="{{ $vendorValue('supplier_id', 'code', $nextSupplierCode) }}" {{ $isEdit ? 'required' : '' }}>
                 @if($errors->has('supplier_id'))<div class="invalid-feedback">{{ $errors->first('supplier_id') }}</div>@endif
+                @if(!$isEdit)<div class="form-text">Leave blank to generate the next Vendor ID automatically.</div>@endif
             </div>
             <div class="col-md-5">
                 <label class="form-label">Vendor Name</label>

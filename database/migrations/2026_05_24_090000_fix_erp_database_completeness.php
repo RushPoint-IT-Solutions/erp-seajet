@@ -274,6 +274,7 @@ class FixErpDatabaseCompleteness extends Migration
             ['debit_note', 'DN-', 17741, 6],
             ['official_receipt', 'OR-', 618, 5],
             ['acknowledgement_receipt', 'AR-', 7496, 6],
+            ['vendor', 'VND-', 0, 4],
             ['vendor_bill', 'BILL-', 492, 5],
             ['payment_voucher', 'PV-', 312, 5],
             ['check_voucher', 'CV-', 418, 5],

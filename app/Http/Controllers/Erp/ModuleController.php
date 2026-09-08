@@ -864,10 +864,8 @@ class ModuleController extends Controller
 
     public function supplierCreate()
     {
-        $nextSupplierNumber = ((int) DB::table('suppliers')->max('id')) + 1;
-
         return view('erp.suppliers.create', [
-            'nextSupplierCode' => 'SUP-'.str_pad($nextSupplierNumber, 3, '0', STR_PAD_LEFT),
+            'nextSupplierCode' => $this->nextDocumentNumber('vendor', 'VND-', 4, false),
             'expenseAccounts' => $this->expenseAccountOptions(),
         ]);
     }
@@ -875,7 +873,7 @@ class ModuleController extends Controller
     public function supplierStore()
     {
         $data = request()->validate([
-            'supplier_id' => 'required|string|max:50',
+            'supplier_id' => 'nullable|string|max:50',
             'name' => 'required|string|max:255',
             'tin' => 'nullable|string|max:255',
             'tax_classification' => 'required|string|max:255',
@@ -894,7 +892,10 @@ class ModuleController extends Controller
         ]);
 
         $companyId = $this->defaultCompanyId();
-        $code = strtoupper(trim($data['supplier_id']));
+        $requestedCode = strtoupper(trim((string) ($data['supplier_id'] ?? '')));
+        $code = $requestedCode !== ''
+            ? $requestedCode
+            : $this->nextDocumentNumber('vendor', 'VND-', 4);
         $exists = DB::table('suppliers')
             ->where('company_id', $companyId)
             ->where('code', $code)
@@ -927,6 +928,8 @@ class ModuleController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        $this->syncDocumentNumberSeries('vendor', $code);
 
         return redirect()->route('erp.suppliers.index')->with('success', 'Vendor '.$code.' was saved to the database.');
     }
@@ -2992,10 +2995,11 @@ class ModuleController extends Controller
             return $supplier->id;
         }
 
-        return DB::table('suppliers')->insertGetId($this->tablePayload('suppliers', [
+        $code = $supplierCode ?: $this->nextDocumentNumber('vendor', 'VND-', 4);
+        $supplierId = DB::table('suppliers')->insertGetId($this->tablePayload('suppliers', [
             'company_id' => $companyId,
-            'code' => $supplierCode ?: 'SUP-'.date('YmdHis'),
-            'name' => $supplierName ?: $supplierCode,
+            'code' => $code,
+            'name' => $supplierName ?: $code,
             'address' => $data['supplier_address'] ?? null,
             'payment_terms' => $data['terms'] ?? 'COD',
             'payment_term_days' => $this->paymentTermDays($data['terms'] ?? 'COD'),
@@ -3004,6 +3008,10 @@ class ModuleController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]));
+
+        $this->syncDocumentNumberSeries('vendor', $code);
+
+        return $supplierId;
     }
 
     private function openApBills()
@@ -4647,6 +4655,7 @@ class ModuleController extends Controller
     private function documentNumberExists($documentType, $companyId, $number)
     {
         $targets = [
+            'vendor' => ['suppliers', 'code'],
             'vendor_bill' => ['purchase_documents', 'document_no'],
             'payment_voucher' => ['payments', 'payment_no'],
             'check_voucher' => ['payments', 'voucher_no'],
@@ -4666,6 +4675,40 @@ class ModuleController extends Controller
             ->where('company_id', $companyId)
             ->where($column, $number)
             ->exists();
+    }
+
+    private function syncDocumentNumberSeries($documentType, $number)
+    {
+        if (!Schema::hasTable('number_series')) {
+            return;
+        }
+
+        $series = DB::table('number_series')
+            ->where('company_id', $this->defaultCompanyId())
+            ->where('document_type', $documentType)
+            ->first();
+
+        if (!$series || !$series->prefix) {
+            return;
+        }
+
+        $prefix = (string) $series->prefix;
+        if (strpos($number, $prefix) !== 0) {
+            return;
+        }
+
+        $suffix = substr($number, strlen($prefix));
+        if ($suffix === '' || !ctype_digit($suffix)) {
+            return;
+        }
+
+        $currentNumber = (int) $suffix;
+        if ($currentNumber > (int) $series->current_number) {
+            DB::table('number_series')->where('id', $series->id)->update([
+                'current_number' => $currentNumber,
+                'updated_at' => now(),
+            ]);
+        }
     }
 
     private function tablePayload($table, array $payload)
