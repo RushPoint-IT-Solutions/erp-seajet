@@ -165,20 +165,20 @@
                 <div class="cv-layout-sheet {{ $settings['print_template'] ? '' : 'cv-template-muted' }}" id="layoutSheet">
                     <div class="cv-guide-box" data-box="payee" style="left: 46px; top: 190px; width: 292px; height: {{ $boxHeights['payee'] }}px;"></div>
                     <div class="cv-guide-line" style="left: 46px; top: 236px; width: 292px;"></div>
-                    <div class="cv-guide-box" data-box="amount" style="left: 46px; top: 348px; width: 748px; height: {{ $boxHeights['amount'] }}px;"></div>
-                    <div class="cv-guide-line" style="left: 46px; top: 378px; width: 748px;"></div>
+                    <div class="cv-guide-box" data-box="amount" style="left: 46px; top: 502px; width: 748px; height: {{ $boxHeights['amount'] }}px;"></div>
+                    <div class="cv-guide-line" style="left: 46px; top: 532px; width: 748px;"></div>
                     <div class="cv-guide-box" data-box="description" style="left: 46px; top: 428px; width: 748px; height: {{ $boxHeights['description'] }}px;"></div>
-                    <div class="cv-guide-box" data-box="accounting" style="left: 48px; top: 502px; width: 744px; height: {{ $boxHeights['accounting'] }}px;"></div>
-                    <div class="cv-guide-line" style="left: 48px; top: 530px; width: 744px;"></div>
-                    <div class="cv-guide-line" style="left: 48px; top: 642px; width: 744px;"></div>
-                    <div class="cv-guide-vline" data-box="accounting" style="left: 504px; top: 502px; height: {{ $boxHeights['accounting'] }}px;"></div>
-                    <div class="cv-guide-vline" data-box="accounting" style="left: 650px; top: 502px; height: {{ $boxHeights['accounting'] }}px;"></div>
-                    <div class="cv-guide-box" data-box="signatures" style="left: 48px; top: 672px; width: 744px; height: {{ $boxHeights['signatures'] }}px;"></div>
-                    <div class="cv-guide-vline" data-box="signatures" style="left: 214px; top: 672px; height: {{ $boxHeights['signatures'] }}px;"></div>
-                    <div class="cv-guide-vline" data-box="signatures" style="left: 386px; top: 672px; height: {{ $boxHeights['signatures'] }}px;"></div>
-                    <div class="cv-guide-vline" data-box="signatures" style="left: 592px; top: 672px; height: {{ $boxHeights['signatures'] }}px;"></div>
-                    <div class="cv-guide-line" style="left: 48px; top: 708px; width: 744px;"></div>
-                    <div class="cv-guide-line" style="left: 48px; top: 794px; width: 744px;"></div>
+                    <div class="cv-guide-box" data-box="accounting" style="left: 48px; top: 318px; width: 744px; height: {{ $boxHeights['accounting'] }}px;"></div>
+                    <div class="cv-guide-line" style="left: 48px; top: 346px; width: 744px;"></div>
+                    <div class="cv-guide-line" style="left: 48px; top: 400px; width: 744px;"></div>
+                    <div class="cv-guide-vline" data-box="accounting" style="left: 504px; top: 318px; height: {{ $boxHeights['accounting'] }}px;"></div>
+                    <div class="cv-guide-vline" data-box="accounting" style="left: 650px; top: 318px; height: {{ $boxHeights['accounting'] }}px;"></div>
+                    <div class="cv-guide-box" data-box="signatures" style="left: 48px; top: 582px; width: 744px; height: {{ $boxHeights['signatures'] }}px;"></div>
+                    <div class="cv-guide-vline" data-box="signatures" style="left: 214px; top: 582px; height: {{ $boxHeights['signatures'] }}px;"></div>
+                    <div class="cv-guide-vline" data-box="signatures" style="left: 386px; top: 582px; height: {{ $boxHeights['signatures'] }}px;"></div>
+                    <div class="cv-guide-vline" data-box="signatures" style="left: 592px; top: 582px; height: {{ $boxHeights['signatures'] }}px;"></div>
+                    <div class="cv-guide-line" style="left: 48px; top: 618px; width: 744px;"></div>
+                    <div class="cv-guide-line" style="left: 48px; top: 704px; width: 744px;"></div>
 
                     @foreach($positions as $field => $point)
                         @php($classes = (in_array($field, ['company_name', 'form_title']) ? ' header-text' : '').($field === 'logo_mark' ? ' logo-mark' : '').(in_array($field, ['amount', 'debit_amount', 'credit_amount', 'total_debit', 'total_credit']) ? ' amount' : '').(strpos($field, 'label') !== false || strpos($field, 'header') !== false ? ' label' : ''))

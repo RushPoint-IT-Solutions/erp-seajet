@@ -3712,6 +3712,41 @@ class ModuleController extends Controller
 
         $savedPositions = $saved['positions'] ?? [];
         $savedStyles = $saved['field_styles'] ?? [];
+        $needsSectionSwap = !$fromRequest && empty($savedStyles['_accounting_before_description']);
+        $needsSwappedSectionSpacing = !$fromRequest && empty($savedStyles['_spaced_swapped_sections']);
+        $swappedSectionY = [
+            'account_title_header' => 326,
+            'debit_header' => 326,
+            'credit_header' => 326,
+            'debit_account_title' => 356,
+            'debit_amount' => 356,
+            'credit_account_title' => 380,
+            'credit_amount' => 380,
+            'total_label' => 404,
+            'total_debit' => 404,
+            'total_credit' => 404,
+            'description_label' => 436,
+            'description' => 436,
+            'amount_header' => 510,
+            'account_name_label' => 510,
+            'account_name' => 510,
+            'amount' => 510,
+            'account_no_label' => 540,
+            'account_no' => 540,
+            'amount_words' => 540,
+            'prepared_by_label' => 592,
+            'prepared_by' => 678,
+            'prepared_date_label' => 708,
+            'checked_by_label' => 592,
+            'checked_by' => 678,
+            'checked_date_label' => 708,
+            'approved_by_label' => 592,
+            'approved_by' => 678,
+            'approved_date_label' => 708,
+            'received_by_label' => 592,
+            'received_by' => 662,
+            'received_date_label' => 708,
+        ];
         $legacyCompactPositions = [
             'payment_info_title' => [58, 374],
             'amount_header' => [432, 382],
@@ -3732,6 +3767,7 @@ class ModuleController extends Controller
             'signatures' => 145,
         ];
         $legacyBoxHeights = ['amount' => 96, 'description' => 104, 'accounting' => 176, 'signatures' => 150];
+        $swappedBoxHeights = ['amount' => 70, 'accounting' => 100, 'signatures' => 145];
         $savedBoxHeights = isset($savedStyles['_box_heights']) && is_array($savedStyles['_box_heights'])
             ? $savedStyles['_box_heights']
             : [];
@@ -3739,6 +3775,12 @@ class ModuleController extends Controller
         $layout['box_heights'] = [];
         foreach ($defaultBoxHeights as $box => $height) {
             $savedHeight = $savedBoxHeights[$box] ?? $height;
+            if ($needsSectionSwap && isset($swappedBoxHeights[$box])) {
+                $savedHeight = $swappedBoxHeights[$box];
+            }
+            if ($needsSwappedSectionSpacing && $box === 'accounting') {
+                $savedHeight = $swappedBoxHeights['accounting'];
+            }
             if (!$fromRequest && isset($legacyBoxHeights[$box]) && (int) $savedHeight === $legacyBoxHeights[$box]) {
                 $savedHeight = $height;
             }
@@ -3750,6 +3792,9 @@ class ModuleController extends Controller
 
         foreach ($defaults as $field => $point) {
             $savedPoint = $savedPositions[$field] ?? $point;
+            if ($needsSectionSwap && isset($swappedSectionY[$field]) && ($savedPoint[0] ?? 0) >= 0 && ($savedPoint[1] ?? 0) >= 0) {
+                $savedPoint[1] = $swappedSectionY[$field];
+            }
             if (isset($legacyCompactPositions[$field])
                 && array_map('intval', (array) $savedPoint) === $legacyCompactPositions[$field]) {
                 $savedPoint = $point;
@@ -3779,7 +3824,7 @@ class ModuleController extends Controller
             }
         }
 
-        if (empty($savedStyles['_compact_sections']) && !$fromRequest) {
+        if (empty($savedStyles['_compact_sections']) && !$fromRequest && !$needsSectionSwap) {
             $sectionOffsets = [
                 'payment_info_title' => -26,
                 'amount_header' => -40,
@@ -3823,6 +3868,8 @@ class ModuleController extends Controller
 
         $layout['field_styles']['_box_heights'] = $layout['box_heights'];
         $layout['field_styles']['_compact_sections'] = true;
+        $layout['field_styles']['_accounting_before_description'] = true;
+        $layout['field_styles']['_spaced_swapped_sections'] = true;
 
         return $layout;
     }
