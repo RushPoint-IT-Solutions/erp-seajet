@@ -582,6 +582,7 @@
         var selectedField = null;
         var customCounter = {{ count($customFields) + 1 }};
         var uploadedTemplatePreviewUrl = '';
+        var invoiceLineFields = ['line_description', 'line_qty', 'line_unit_price', 'line_amount'];
 
         $('#saveLayout').on('click', function () {
             applyPaperAndTemplate();
@@ -622,6 +623,19 @@
             }
         }
 
+        function alignInvoiceLineFields(y) {
+            invoiceLineFields.forEach(function (lineField) {
+                var lineElement = $('[data-field="' + lineField + '"].drag-field')[0];
+                if (!lineElement) {
+                    return;
+                }
+
+                lineElement.style.top = y + 'px';
+                setHiddenValue(lineField, 'y', y, 'standard');
+                $('#pos_' + lineField).text((parseInt(lineElement.style.left, 10) || 0) + ', ' + y);
+            });
+        }
+
         function updatePosition(el, x, y) {
             var maxX = sheet.clientWidth - el.offsetWidth;
             var maxY = sheet.clientHeight - el.offsetHeight;
@@ -634,6 +648,9 @@
             var kind = el.getAttribute('data-kind');
             setHiddenValue(field, 'x', x, kind);
             setHiddenValue(field, 'y', y, kind);
+            if (kind === 'standard' && invoiceLineFields.indexOf(field) !== -1) {
+                alignInvoiceLineFields(y);
+            }
             $('#pos_' + field).text(x + ', ' + y);
             if (selectedField === field) {
                 $('#fieldXControl').val(x);
@@ -853,6 +870,10 @@
         $('.drag-field').each(function () {
             bindDrag(this);
         });
+        var lineDescriptionElement = $('[data-field="line_description"].drag-field')[0];
+        if (lineDescriptionElement) {
+            alignInvoiceLineFields(parseInt(lineDescriptionElement.style.top, 10) || 0);
+        }
         $('.field-resize-handle').each(function () {
             bindResizeHandle(this);
         });

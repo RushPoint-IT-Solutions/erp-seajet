@@ -7261,6 +7261,8 @@ class ModuleController extends Controller
         $classes = (array) ($data['line_class'] ?? []);
         $accounts = (array) ($data['line_ar_account'] ?? []);
         $taxCategories = (array) ($data['tax_category'] ?? []);
+        $withholdingRates = (array) ($data['line_withholding_rate'] ?? []);
+        $defaultWithholdingRate = min(100, max(0, $this->moneyToFloat($data['withholding_tax_rate'] ?? 0)));
         $count = max(count($items), count($descriptions), count($quantities), count($unitPrices));
 
         for ($index = 0; $index < $count; $index++) {
@@ -7268,6 +7270,12 @@ class ModuleController extends Controller
             $item = trim((string) ($items[$index] ?? ''));
             $quantity = $this->moneyToFloat($quantities[$index] ?? 0);
             $unitPrice = $this->moneyToFloat($unitPrices[$index] ?? 0);
+            $lineTotal = $unitPrice * ($quantity ?: 1);
+            $isReimbursement = $this->isReimbursableInvoiceLine($data, $index);
+            $withholdingRate = trim((string) ($withholdingRates[$index] ?? '')) === ''
+                ? $defaultWithholdingRate
+                : min(100, max(0, $this->moneyToFloat($withholdingRates[$index])));
+            $withholdingAmount = $isReimbursement ? 0 : $lineTotal * ($withholdingRate / 100);
 
             if ($description === '' && $item === '' && $quantity === 0.0 && $unitPrice === 0.0) {
                 continue;
@@ -7281,7 +7289,7 @@ class ModuleController extends Controller
                 'unit_price' => $unitPrice,
                 'discount_amount' => 0,
                 'tax_code_id' => $this->taxCodeId($taxCategories[$index] ?? null),
-                'line_total' => $unitPrice * ($quantity ?: 1),
+                'line_total' => $lineTotal,
                 'class_code' => $classes[$index] ?? null,
                 'tax_category' => $taxCategories[$index] ?? null,
                 'created_at' => now(),
@@ -7290,6 +7298,12 @@ class ModuleController extends Controller
 
             if (Schema::hasColumn('sales_document_lines', 'ar_account_code')) {
                 $payload['ar_account_code'] = $this->arAccountCode($accounts[$index] ?? ($data['ar_account'] ?? null));
+            }
+            if (Schema::hasColumn('sales_document_lines', 'withholding_tax_rate')) {
+                $payload['withholding_tax_rate'] = $isReimbursement ? 0 : $withholdingRate;
+            }
+            if (Schema::hasColumn('sales_document_lines', 'withholding_tax_amount')) {
+                $payload['withholding_tax_amount'] = $withholdingAmount;
             }
 
             DB::table('sales_document_lines')->insert($payload);
@@ -7621,6 +7635,16 @@ class ModuleController extends Controller
                             $data['tax_category'] = $lines->map(function ($line) use ($invoice) {
                                 return (property_exists($line, 'tax_category') && $line->tax_category) ? $line->tax_category : ($invoice->vat_classification ?? '12%');
                             })->all();
+                            $data['line_withholding_rate'] = $lines->map(function ($line) use ($invoice) {
+                                return property_exists($line, 'withholding_tax_rate') && $line->withholding_tax_rate !== null
+                                    ? rtrim(rtrim(number_format((float) $line->withholding_tax_rate, 4, '.', ''), '0'), '.')
+                                    : (string) ($invoice->withholding_tax_rate ?? 0);
+                            })->all();
+                            $data['line_withholding_amount'] = $lines->map(function ($line) {
+                                return property_exists($line, 'withholding_tax_amount') && $line->withholding_tax_amount !== null
+                                    ? number_format((float) $line->withholding_tax_amount, 2, '.', '')
+                                    : '0.00';
+                            })->all();
                             $data['line_class'] = $lines->map(function ($line) use ($invoice) {
                                 return (property_exists($line, 'class_code') && $line->class_code) ? $line->class_code : ($invoice->class_code ?? '');
                             })->all();
@@ -7654,6 +7678,8 @@ class ModuleController extends Controller
                                     $data['unit_price'][] = $fallback['unit_price'][$index] ?? '0.00';
                                     $data['line_amount'][] = $fallback['line_amount'][$index] ?? '0.00';
                                     $data['tax_category'][] = $fallback['tax_category'][$index] ?? 'exempt';
+                                    $data['line_withholding_rate'][] = '0';
+                                    $data['line_withholding_amount'][] = '0.00';
                                     $data['line_ar_account'][] = $fallback['line_ar_account'][$index] ?? 'A/R-Reimbursable Charges';
                                 }
                             }
@@ -7676,8 +7702,8 @@ class ModuleController extends Controller
         $totals = $this->billingTotals($resolved);
         $resolved['vatable_sales'] = number_format($totals['vatable_sales'], 2, '.', '');
         $resolved['vat_amount'] = number_format($totals['vat_amount'], 2, '.', '');
-        $resolved['withholding_tax_rate'] = number_format($this->moneyToFloat($resolved['withholding_tax_rate'] ?? 0), 2, '.', '');
-        $resolved['withholding_tax_amount'] = number_format($this->moneyToFloat($resolved['withholding_tax_amount'] ?? 0), 2, '.', '');
+        $resolved['withholding_tax_rate'] = number_format($totals['withholding_tax_rate'], 2, '.', '');
+        $resolved['withholding_tax_amount'] = number_format($totals['withholding_tax_amount'], 2, '.', '');
         $resolved['withholding_tax'] = $resolved['withholding_tax_amount'];
         $resolved['billing_total'] = number_format($totals['billing_total'], 2, '.', '');
         $resolved['reimbursement_total'] = number_format($totals['reimbursement_total'], 2, '.', '');
@@ -7799,8 +7825,12 @@ class ModuleController extends Controller
             'qty' => (array) $value('qty', []),
             'unit_price' => (array) $value('unit_price', []),
             'tax_category' => (array) $value('tax_category', []),
+            'line_withholding_rate' => (array) $value('line_withholding_rate', []),
+            'line_withholding_amount' => (array) $value('line_withholding_amount', []),
             'line_amount' => (array) $value('line_amount', []),
             'line_ar_account' => (array) $value('line_ar_account', []),
+            'withholding_tax_rate' => isset($totals['withholding_tax_rate']) ? number_format($totals['withholding_tax_rate'], 4, '.', '') : null,
+            'withholding_tax' => isset($totals['withholding_tax_amount']) ? number_format($totals['withholding_tax_amount'], 2, '.', '') : null,
             'billing_total' => isset($totals['billing_total']) ? number_format($totals['billing_total'], 2, '.', '') : null,
             'reimbursement_total' => isset($totals['reimbursement_total']) ? number_format($totals['reimbursement_total'], 2, '.', '') : null,
             'soa_total' => isset($totals['soa_total']) ? number_format($totals['soa_total'], 2, '.', '') : null,
@@ -7848,6 +7878,10 @@ class ModuleController extends Controller
         $billingSubtotal = 0.0;
         $reimbursementTotal = 0.0;
         $vatAmount = 0.0;
+        $withholdingTaxAmount = 0.0;
+        $withholdingBase = 0.0;
+        $lineWithholdingRates = (array) ($data['line_withholding_rate'] ?? []);
+        $defaultWithholdingRate = min(100, max(0, $this->moneyToFloat($data['withholding_tax_rate'] ?? 0)));
 
         foreach (($data['line_amount'] ?? []) as $index => $amount) {
             $lineAmount = $this->moneyToFloat($amount);
@@ -7859,14 +7893,21 @@ class ModuleController extends Controller
             }
 
             $billingSubtotal += $lineAmount;
+            $lineRate = trim((string) ($lineWithholdingRates[$index] ?? '')) === ''
+                ? $defaultWithholdingRate
+                : min(100, max(0, $this->moneyToFloat($lineWithholdingRates[$index])));
+            $withholdingBase += $lineAmount;
+            $withholdingTaxAmount += $lineAmount * ($lineRate / 100);
             $taxCategory = strtolower(trim((string) ($data['tax_category'][$index] ?? '')));
             if ($taxCategory === '12%' || $taxCategory === 'vatable') {
                 $vatAmount += $lineAmount * 0.12;
             }
         }
 
-        $withholdingTaxRate = min(100, max(0, $this->moneyToFloat($data['withholding_tax_rate'] ?? 0)));
-        $withholdingTaxAmount = round($billingSubtotal * ($withholdingTaxRate / 100), 4);
+        $withholdingTaxAmount = round($withholdingTaxAmount, 4);
+        $withholdingTaxRate = $withholdingBase > 0
+            ? round(($withholdingTaxAmount / $withholdingBase) * 100, 4)
+            : 0;
 
         return [
             'vatable_sales' => $billingSubtotal,
@@ -8135,12 +8176,16 @@ class ModuleController extends Controller
             'line_class',
             'line_ar_account',
             'tax_category',
+            'line_withholding_rate',
+            'line_withholding_amount',
             'line_amount',
             'original_invoice_no',
         ]);
 
         request()->validate([
             'withholding_tax_rate' => 'nullable|numeric|min:0|max:100',
+            'line_withholding_rate' => 'nullable|array',
+            'line_withholding_rate.*' => 'nullable|numeric|min:0|max:100',
         ]);
 
         $originalInvoiceNo = trim((string) ($data['original_invoice_no'] ?? ''));

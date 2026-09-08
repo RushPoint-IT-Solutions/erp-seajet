@@ -337,12 +337,12 @@
                                 <input name="exchange_rate" id="exchangeRateInput" class="form-control invoice-field text-end" value="1.000000">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label text-muted">Withholding Tax %</label>
+                                <label class="form-label text-muted">Default WHT %</label>
                                 <div class="input-group">
                                     <input name="withholding_tax_rate" id="withholdingTaxRate" type="number" min="0" max="100" step="0.01" class="form-control invoice-field text-end" value="0">
                                     <span class="input-group-text">%</span>
                                 </div>
-                                <div class="form-text">Computed on sales net of VAT; reimbursements excluded.</div>
+                                <div class="form-text">Used only when an item's WHT % is blank; reimbursements excluded.</div>
                             </div>
                         </div>
                     </div>
@@ -366,6 +366,7 @@
                             <th class="text-end" style="width: 100px">Qty</th>
                             <th style="width: 150px">Class</th>
                             <th class="text-end" style="width: 150px">Total</th>
+                            <th class="text-end" style="width: 105px">WHT %</th>
                             <th style="width: 140px">Tax</th>
                             <th class="text-center no-print" style="width: 52px"></th>
                         </tr>
@@ -409,6 +410,7 @@
                                 </select>
                             </td>
                             <td><input name="line_amount[]" class="form-control text-end line-total" value="" readonly></td>
+                            <td><input name="line_withholding_rate[]" type="number" min="0" max="100" step="0.01" class="form-control text-end line-wht-rate" value=""></td>
                             <td>
                                 <select name="tax_category[]" class="form-select line-tax">
                                     <option value=""></option>
@@ -624,6 +626,8 @@
             var billingSubtotal = 0;
             var reimbursement = 0;
             var tax = 0;
+            var defaultWithholdingRate = Math.min(100, Math.max(0, numberValue($('#withholdingTaxRate').val())));
+            var withholdingTax = 0;
 
             $('#invoiceLines tbody tr').each(function () {
                 var row = $(this);
@@ -644,6 +648,11 @@
                 }
 
                 billingSubtotal += line;
+                var lineRateValue = row.find('.line-wht-rate').val();
+                var lineWithholdingRate = lineRateValue === ''
+                    ? defaultWithholdingRate
+                    : Math.min(100, Math.max(0, numberValue(lineRateValue)));
+                withholdingTax += line * (lineWithholdingRate / 100);
                 if (category === '12%') {
                     tax += line * 0.12;
                 }
@@ -651,13 +660,11 @@
 
             var billingTotal = billingSubtotal + tax;
             var soaTotal = billingTotal + reimbursement;
-            var withholdingRate = Math.min(100, Math.max(0, numberValue($('#withholdingTaxRate').val())));
-            var withholdingTax = billingSubtotal * (withholdingRate / 100);
             var netAmountDue = Math.max(0, soaTotal - withholdingTax);
             $('#subtotalText').text(currency() + ' ' + money(billingSubtotal));
             $('#taxText').text(currency() + ' ' + money(tax));
             $('#balanceText').text(currency() + ' ' + money(soaTotal));
-            $('#withholdingRateText').text(money(withholdingRate).replace(/\.00$/, '') + '%');
+            $('#withholdingRateText').text('per item');
             $('#withholdingTaxText').text(currency() + ' ' + money(withholdingTax));
             $('#netAmountDueText').text(currency() + ' ' + money(netAmountDue));
             $('#amountInput').val(soaTotal.toFixed(2));
@@ -668,7 +675,7 @@
             $('#phpEquivalentText').text('PHP ' + money(soaTotal * exchangeRate));
         }
 
-        function setLine(index, item, description, rate, qty, lineClass, taxCategory, account) {
+        function setLine(index, item, description, rate, qty, lineClass, taxCategory, account, withholdingRate) {
             while ($('#invoiceLines tbody tr').length <= index) {
                 $('#addLine').trigger('click');
             }
@@ -683,6 +690,7 @@
             row.find('select[name="line_class[]"]').val(lineClass);
             row.find('.line-tax').val(taxCategory);
             row.find('.line-account').val(account || $('#arAccount').val() || '');
+            row.find('.line-wht-rate').val(withholdingRate === undefined || withholdingRate === null ? '' : withholdingRate);
             syncDocumentAccount();
         }
 
@@ -802,6 +810,7 @@
             var classes = editInvoice.line_class || [];
             var taxes = editInvoice.tax_category || [];
             var accounts = editInvoice.line_ar_account || [];
+            var withholdingRates = editInvoice.line_withholding_rate || [];
             var count = Math.max(items.length, descriptions.length, rates.length, quantities.length, 1);
 
             for (var i = 0; i < count; i++) {
@@ -813,7 +822,8 @@
                     quantities[i] || '1',
                     classes[i] || editInvoice.class_code || '',
                     taxes[i] || editInvoice.vat_classification || '',
-                    accounts[i] || editInvoice.ar_account || ''
+                    accounts[i] || editInvoice.ar_account || '',
+                    withholdingRates[i] === undefined ? editInvoice.withholding_tax_rate || '' : withholdingRates[i]
                 );
             }
 
@@ -840,7 +850,7 @@
             syncDocumentAccount();
             syncInvoiceNumbers($('#invoiceNo').val() ? 'invoice' : 'transaction');
         });
-        $('#invoiceLines').on('input change', '.line-unit, .line-qty, .line-tax', recalc);
+        $('#invoiceLines').on('input change', '.line-unit, .line-qty, .line-tax, .line-wht-rate', recalc);
         $('#exchangeRateInput').on('input', recalc);
         $('#withholdingTaxRate').on('input change', recalc);
         $('#invoiceLines').on('change', '.line-account', syncDocumentAccount);
@@ -862,6 +872,7 @@
             row.find('.line-unit').val('');
             row.find('.line-qty').val('');
             row.find('.line-total').val('');
+            row.find('.line-wht-rate').val('');
             row.find('.line-account').val($('#arAccount').val() || '');
             row.find('.item-account-tag').text('').addClass('d-none');
             $('#invoiceLines tbody').append(row);

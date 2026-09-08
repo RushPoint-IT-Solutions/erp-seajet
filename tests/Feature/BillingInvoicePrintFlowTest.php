@@ -32,7 +32,8 @@ class BillingInvoicePrintFlowTest extends TestCase
         $response->assertSee('SOA A');
         $response->assertSee('SOA B');
         $response->assertSee('Billing Invoice');
-        $response->assertSee('Withholding Tax %');
+        $response->assertSee('Default WHT %');
+        $response->assertSee('name="line_withholding_rate[]"', false);
         $response->assertSee('Print SOA B + Billing Invoice');
         $response->assertSee('Print SOA A');
         $response->assertSee('<textarea name="memo"', false);
@@ -136,36 +137,51 @@ class BillingInvoicePrintFlowTest extends TestCase
             'invoice_template' => 'Billing Invoice',
             'customer_tax_code' => 'VAT12',
             'withholding_tax_rate' => '2',
-            'item' => ['Documentation VAT', 'Reimbursable Charges'],
-            'item_description' => ['DOC / IDENTIFICATION FEE', 'REIMBURSABLE CHARGES'],
-            'qty' => ['1', '1'],
-            'unit_price' => ['100.00', '50.00'],
-            'line_class' => ['MANILA', 'MANILA'],
-            'line_ar_account' => ['A/Trade-Billing Invoice', 'A/R-Reimbursable Charges'],
-            'tax_category' => ['12%', 'exempt'],
-            'line_amount' => ['100.00', '50.00'],
+            'item' => ['Documentation VAT', 'Handling Fee', 'Reimbursable Charges'],
+            'item_description' => ['DOC / IDENTIFICATION FEE', 'SPECIAL HANDLING', 'REIMBURSABLE CHARGES'],
+            'qty' => ['1', '1', '1'],
+            'unit_price' => ['100.00', '200.00', '50.00'],
+            'line_class' => ['MANILA', 'MANILA', 'MANILA'],
+            'line_ar_account' => ['A/Trade-Billing Invoice', 'A/Trade-Billing Invoice', 'A/R-Reimbursable Charges'],
+            'line_withholding_rate' => ['2', '5', '99'],
+            'tax_category' => ['12%', '12%', 'exempt'],
+            'line_amount' => ['100.00', '200.00', '50.00'],
         ]));
 
         $response->assertRedirect();
         $document = DB::table('sales_documents')->where('document_no', 'BI-TEST-001')->first();
         $this->assertNotNull($document);
-        $this->assertEquals(2.0, (float) $document->withholding_tax_rate);
-        $this->assertEquals(2.0, (float) $document->withholding_tax_amount);
-        $this->assertEquals(162.0, (float) $document->grand_total);
+        $this->assertEquals(4.0, (float) $document->withholding_tax_rate);
+        $this->assertEquals(12.0, (float) $document->withholding_tax_amount);
+        $this->assertEquals(386.0, (float) $document->grand_total);
+
+        $lineWithholding = DB::table('sales_document_lines')
+            ->where('sales_document_id', $document->id)
+            ->orderBy('id')
+            ->pluck('withholding_tax_amount')
+            ->map(function ($amount) {
+                return (float) $amount;
+            })
+            ->all();
+        $this->assertEquals([2.0, 10.0, 0.0], $lineWithholding);
 
         $show = $this->get($response->headers->get('Location'));
         $show->assertStatus(200);
         $show->assertSee('Less Withholding Tax');
-        $show->assertSee('PHP 160.00');
+        $show->assertSee('PHP 374.00');
 
         $print = $this->get('/erp/billings/print/invoice?invoice=BI-TEST-001');
         $print->assertStatus(200);
-        $print->assertSee('PHP 2.00');
-        $print->assertSee('PHP 110.00');
+        $print->assertSee('PHP 12.00');
+        $print->assertSee('PHP 324.00');
     }
 
     public function test_billing_invoice_prints_each_item_as_a_separate_line_with_its_amount()
     {
+        $layout = $this->get('/erp/billings/print-layout/invoice');
+        $layout->assertStatus(200);
+        $layout->assertSee("var invoiceLineFields = ['line_description', 'line_qty', 'line_unit_price', 'line_amount'];", false);
+
         $response = $this->post('/erp/invoices/review', $this->payload([
             'customer_id' => 'CUST-001',
             'customer_name' => 'North Harbor Trading',
@@ -190,11 +206,19 @@ class BillingInvoicePrintFlowTest extends TestCase
         $print->assertSee('DOCUMENTATION SERVICE');
         $print->assertSee('SPECIAL HANDLING SERVICE');
         $print->assertSee('height: 14px;', false);
-        $print->assertSee('data-item-gap="7"', false);
+        $print->assertSee('data-item-gap="3"', false);
         $print->assertSee("First memo paragraph.\n\nSecond memo paragraph.");
         $print->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif;', false);
         $print->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif !important;', false);
         $print->assertSee('font-weight: 700;', false);
+        preg_match_all('/data-line-row="0" data-line-top="(\d+)"/', $print->getContent(), $firstRowTops);
+        preg_match_all('/data-line-row="1" data-line-top="(\d+)"/', $print->getContent(), $secondRowTops);
+        $this->assertCount(4, $firstRowTops[1]);
+        $this->assertCount(4, $secondRowTops[1]);
+        $this->assertCount(1, array_unique($firstRowTops[1]));
+        $this->assertCount(1, array_unique($secondRowTops[1]));
+        $this->assertRegExp('/print-field-soa_no[^>]*data-items-shift="[1-9]\d*"/', $print->getContent());
+        $this->assertRegExp('/print-field-remarks[^>]*data-items-shift="[1-9]\d*"/', $print->getContent());
         $this->assertRegExp('/print-field-line_amount[^>]*>100\.00<\/div>/', $print->getContent());
         $this->assertRegExp('/print-field-line_amount[^>]*>237\.45<\/div>/', $print->getContent());
     }
