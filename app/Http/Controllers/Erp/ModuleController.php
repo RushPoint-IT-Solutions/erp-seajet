@@ -6993,7 +6993,7 @@ class ModuleController extends Controller
                     $tax = $tax === '12%' ? '12%' : 'exempt';
                 }
 
-                $description = trim((string) preg_replace('/\s+(RE|VAT|ZERO|SOA\s*A)$/i', '', $name));
+                $description = trim((string) ($item->description ?? ''));
                 if ($description === '') {
                     $description = $name;
                 }
