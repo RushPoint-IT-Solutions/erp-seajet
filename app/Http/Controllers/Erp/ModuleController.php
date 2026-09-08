@@ -3714,14 +3714,15 @@ class ModuleController extends Controller
         $savedStyles = $saved['field_styles'] ?? [];
         $needsSectionSwap = !$fromRequest && empty($savedStyles['_accounting_before_description']);
         $needsSwappedSectionSpacing = !$fromRequest && empty($savedStyles['_spaced_swapped_sections']);
+        $needsPayeeGap = !$fromRequest && empty($savedStyles['_payee_gap_10']);
         $swappedSectionY = [
-            'account_title_header' => 326,
-            'debit_header' => 326,
-            'credit_header' => 326,
-            'debit_account_title' => 356,
-            'debit_amount' => 356,
-            'credit_account_title' => 380,
-            'credit_amount' => 380,
+            'account_title_header' => 334,
+            'debit_header' => 334,
+            'credit_header' => 334,
+            'debit_account_title' => 362,
+            'debit_amount' => 362,
+            'credit_account_title' => 382,
+            'credit_amount' => 382,
             'total_label' => 404,
             'total_debit' => 404,
             'total_credit' => 404,
@@ -3767,7 +3768,7 @@ class ModuleController extends Controller
             'signatures' => 145,
         ];
         $legacyBoxHeights = ['amount' => 96, 'description' => 104, 'accounting' => 176, 'signatures' => 150];
-        $swappedBoxHeights = ['amount' => 70, 'accounting' => 100, 'signatures' => 145];
+        $swappedBoxHeights = ['amount' => 70, 'accounting' => 92, 'signatures' => 145];
         $savedBoxHeights = isset($savedStyles['_box_heights']) && is_array($savedStyles['_box_heights'])
             ? $savedStyles['_box_heights']
             : [];
@@ -3781,6 +3782,9 @@ class ModuleController extends Controller
             if ($needsSwappedSectionSpacing && $box === 'accounting') {
                 $savedHeight = $swappedBoxHeights['accounting'];
             }
+            if ($needsPayeeGap && $box === 'accounting') {
+                $savedHeight = $swappedBoxHeights['accounting'];
+            }
             if (!$fromRequest && isset($legacyBoxHeights[$box]) && (int) $savedHeight === $legacyBoxHeights[$box]) {
                 $savedHeight = $height;
             }
@@ -3792,7 +3796,15 @@ class ModuleController extends Controller
 
         foreach ($defaults as $field => $point) {
             $savedPoint = $savedPositions[$field] ?? $point;
-            if ($needsSectionSwap && isset($swappedSectionY[$field]) && ($savedPoint[0] ?? 0) >= 0 && ($savedPoint[1] ?? 0) >= 0) {
+            $isAccountingField = in_array($field, [
+                'account_title_header', 'debit_header', 'credit_header',
+                'debit_account_title', 'debit_amount', 'credit_account_title', 'credit_amount',
+                'total_label', 'total_debit', 'total_credit',
+            ], true);
+            if (($needsSectionSwap || ($needsPayeeGap && $isAccountingField))
+                && isset($swappedSectionY[$field])
+                && ($savedPoint[0] ?? 0) >= 0
+                && ($savedPoint[1] ?? 0) >= 0) {
                 $savedPoint[1] = $swappedSectionY[$field];
             }
             if (isset($legacyCompactPositions[$field])
@@ -3870,6 +3882,7 @@ class ModuleController extends Controller
         $layout['field_styles']['_compact_sections'] = true;
         $layout['field_styles']['_accounting_before_description'] = true;
         $layout['field_styles']['_spaced_swapped_sections'] = true;
+        $layout['field_styles']['_payee_gap_10'] = true;
 
         return $layout;
     }
