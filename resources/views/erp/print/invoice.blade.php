@@ -271,7 +271,7 @@
         @if(!empty($billingLines))
             @php
                 $lineOffset = 0;
-                $itemGap = 1;
+                $itemGap = 0;
                 $firstRowAdvance = 0;
             @endphp
             @foreach($billingLines as $line)
@@ -283,7 +283,7 @@
                     }
                     $lineFontSize = max(6, (int) ($s['line_description']['font_size'] ?? 12));
                     $lineTextHeight = (int) ceil($lineFontSize * 1.15);
-                    $rowHeight = max($lineTextHeight + 2, ($visualLineCount * $lineTextHeight) + 1);
+                    $rowHeight = max($lineTextHeight, $visualLineCount * $lineTextHeight);
                     $lineTop = $p['line_description'][1] + $lineOffset;
                     $rowAdvance = $rowHeight + $itemGap;
                     if ($loop->first) {

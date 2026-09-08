@@ -205,7 +205,7 @@ class BillingInvoicePrintFlowTest extends TestCase
         $print->assertStatus(200);
         $print->assertSee('DOCUMENTATION SERVICE');
         $print->assertSee('SPECIAL HANDLING SERVICE');
-        $print->assertSee('data-item-gap="1"', false);
+        $print->assertSee('data-item-gap="0"', false);
         $print->assertSee("First memo paragraph.\n\nSecond memo paragraph.");
         $print->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif;', false);
         $print->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif !important;', false);
