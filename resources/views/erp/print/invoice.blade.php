@@ -54,6 +54,7 @@
         word-break: break-word;
         color: #000;
         font-weight: 700;
+        letter-spacing: .25px;
     }
     .bi-field.fit-single-line {
         align-items: center;

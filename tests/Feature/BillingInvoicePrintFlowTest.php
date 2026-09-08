@@ -212,6 +212,7 @@ class BillingInvoicePrintFlowTest extends TestCase
         $print->assertSee('font-weight: 700;', false);
         $this->assertRegExp('/\.print-field-prepared_by\s*\{[^}]*font-weight:\s*700\s*!important;/s', $print->getContent());
         $this->assertRegExp('/\.bi-field\s*\{[^}]*line-height:\s*1\.15;/s', $print->getContent());
+        $this->assertRegExp('/\.bi-field\s*\{[^}]*letter-spacing:\s*\.25px;/s', $print->getContent());
         $print->assertDontSee('current -= 0.5', false);
         preg_match_all('/data-line-row="0" data-line-top="(\d+)"/', $print->getContent(), $firstRowTops);
         preg_match_all('/data-line-row="1" data-line-top="(\d+)"/', $print->getContent(), $secondRowTops);
