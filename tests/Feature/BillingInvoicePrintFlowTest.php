@@ -98,6 +98,7 @@ class BillingInvoicePrintFlowTest extends TestCase
         $soaPrint->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif;', false);
         $soaPrint->assertSee('PLEASE PAY THIS AMOUNT');
         $soaPrint->assertDontSee('PHP 162.00');
+        $soaPrint->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif !important;', false);
         $this->assertRegExp('/\.print-field\s*\{[^}]*font-weight:\s*700;/s', $soaPrint->getContent());
         $this->assertRegExp('/print-field-particulars[^>]*font-size:\s*22px/', $soaPrint->getContent());
         $this->assertRegExp('/print-field-amounts[^>]*font-size:\s*20px/', $soaPrint->getContent());
@@ -192,6 +193,7 @@ class BillingInvoicePrintFlowTest extends TestCase
         $print->assertSee('data-item-gap="7"', false);
         $print->assertSee("First memo paragraph.\n\nSecond memo paragraph.");
         $print->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif;', false);
+        $print->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif !important;', false);
         $print->assertSee('font-weight: 700;', false);
         $this->assertRegExp('/print-field-line_amount[^>]*>100\.00<\/div>/', $print->getContent());
         $this->assertRegExp('/print-field-line_amount[^>]*>237\.45<\/div>/', $print->getContent());

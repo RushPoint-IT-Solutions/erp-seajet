@@ -24,6 +24,10 @@
         color: #1f2937;
         overflow: hidden;
     }
+    .bi-print-sheet,
+    .bi-print-sheet * {
+        font-family: Calibri, Arial, Helvetica, sans-serif !important;
+    }
     .bi-template-guide,
     .bi-guide-line,
     .bi-guide-vline,

@@ -23,6 +23,10 @@
         color: #000;
         overflow: hidden;
     }
+    .form-sheet,
+    .form-sheet * {
+        font-family: Calibri, Arial, Helvetica, sans-serif !important;
+    }
     .template-line,
     .template-box,
     .template-label,
