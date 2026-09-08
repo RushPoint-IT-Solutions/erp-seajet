@@ -248,6 +248,7 @@
         @if(!empty($billingLines))
             @php
                 $lineOffset = 0;
+                $itemGap = 7;
             @endphp
             @foreach($billingLines as $line)
                 @php
@@ -256,14 +257,14 @@
                     foreach ($descriptionLines as $descriptionLine) {
                         $visualLineCount += max(1, (int) ceil(max(1, strlen($descriptionLine)) / 48));
                     }
-                    $rowHeight = max(20, ($visualLineCount * 13) + 3);
+                    $rowHeight = max(14, ($visualLineCount * 12) + 1);
                 @endphp
-                <div class="bi-field fit-multiline print-field-line_description" data-fit-text data-min-font="6" style="left: {{ $p['line_description'][0] }}px; top: {{ $p['line_description'][1] + $lineOffset }}px; height: {{ $rowHeight }}px; {{ $fieldStyle('line_description') }}">{{ $line['description'] }}</div>
+                <div class="bi-field fit-multiline print-field-line_description" data-fit-text data-min-font="6" data-item-gap="{{ $itemGap }}" style="left: {{ $p['line_description'][0] }}px; top: {{ $p['line_description'][1] + $lineOffset }}px; height: {{ $rowHeight }}px; {{ $fieldStyle('line_description') }}">{{ $line['description'] }}</div>
                 <div class="bi-field fit-single-line amount print-field-line_qty" data-fit-text style="left: {{ $p['line_qty'][0] }}px; top: {{ $p['line_qty'][1] + $lineOffset }}px; {{ $fieldStyle('line_qty') }}">{{ $line['quantity'] }}</div>
                 <div class="bi-field fit-single-line amount print-field-line_unit_price" data-fit-text style="left: {{ $p['line_unit_price'][0] }}px; top: {{ $p['line_unit_price'][1] + $lineOffset }}px; {{ $fieldStyle('line_unit_price') }}">{{ $plainAmount($line['unit_price']) }}</div>
                 <div class="bi-field fit-single-line amount print-field-line_amount" data-fit-text style="left: {{ $p['line_amount'][0] }}px; top: {{ $p['line_amount'][1] + $lineOffset }}px; {{ $fieldStyle('line_amount') }}">{{ $plainAmount($line['amount']) }}</div>
                 @php
-                    $lineOffset += $rowHeight;
+                    $lineOffset += $rowHeight + $itemGap;
                 @endphp
             @endforeach
         @else

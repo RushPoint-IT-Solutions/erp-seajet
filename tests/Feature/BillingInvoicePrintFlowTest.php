@@ -89,7 +89,7 @@ class BillingInvoicePrintFlowTest extends TestCase
         $invoicePrint->assertSee('PHP 112.00');
         $invoicePrint->assertDontSee('PHP 162.00');
 
-        $soaPrint = $this->get('/erp/billings/print/statement-of-account?customer=North%20Harbor%20Trading&invoice_no=BI-TEST-001&invoice_date=2026-05-26&soa_no=SOA-TEST-001&billing_total=112.00&reimbursement_total=50.00&soa_total=162.00&vatable_sales=100.00&vat_amount=12.00');
+        $soaPrint = $this->get('/erp/billings/print/statement-of-account?customer=North%20Harbor%20Trading&invoice_no=BI-TEST-001&invoice_date=2026-05-26&soa_no=SOA-TEST-001&billing_total=112.00&reimbursement_total=50.00&soa_total=162.00&vatable_sales=100.00&vat_amount=12.00&fs_particulars=22&fs_amounts=20&fs_payment_note=18');
         $soaPrint->assertStatus(200);
         $soaPrint->assertSee('REIMBURSEMENT CHARGES');
         $soaPrint->assertSee('PHP 50.00');
@@ -99,6 +99,10 @@ class BillingInvoicePrintFlowTest extends TestCase
         $soaPrint->assertSee('PLEASE PAY THIS AMOUNT');
         $soaPrint->assertDontSee('PHP 162.00');
         $this->assertRegExp('/\.print-field\s*\{[^}]*font-weight:\s*700;/s', $soaPrint->getContent());
+        $this->assertRegExp('/print-field-particulars[^>]*font-size:\s*22px/', $soaPrint->getContent());
+        $this->assertRegExp('/print-field-amounts[^>]*font-size:\s*20px/', $soaPrint->getContent());
+        $this->assertRegExp('/soa-payment-note-amount[^>]*font-size:\s*16px/', $soaPrint->getContent());
+        $soaPrint->assertDontSee('current -= 0.5', false);
         $this->assertRegExp('/PLEASE PAY THIS AMOUNT<\/span><span>PHP 50\.00<\/span>/', $soaPrint->getContent());
     }
 
@@ -184,7 +188,8 @@ class BillingInvoicePrintFlowTest extends TestCase
         $print->assertStatus(200);
         $print->assertSee('DOCUMENTATION SERVICE');
         $print->assertSee('SPECIAL HANDLING SERVICE');
-        $print->assertSee('height: 20px;', false);
+        $print->assertSee('height: 14px;', false);
+        $print->assertSee('data-item-gap="7"', false);
         $print->assertSee("First memo paragraph.\n\nSecond memo paragraph.");
         $print->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif;', false);
         $print->assertSee('font-weight: 700;', false);

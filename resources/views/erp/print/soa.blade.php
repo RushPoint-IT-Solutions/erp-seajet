@@ -178,6 +178,10 @@
         $paymentNoteLeft = $p['payment_note'][0];
         $paymentNoteTop = $p['payment_note'][1];
         $paymentNoteWidth = $s['payment_note']['width'];
+        $paymentNoteFontSize = (int) $s['payment_note']['font_size'];
+        $paymentNoteSmallFontSize = max(6, $paymentNoteFontSize - 4);
+        $paymentNoteAmountFontSize = max(6, $paymentNoteFontSize - 2);
+        $paymentNoteLineStep = max(15, $paymentNoteFontSize + 3);
     @endphp
 
     <div class="d-flex justify-content-end gap-2 mb-3 no-print">
@@ -221,19 +225,19 @@
         <div class="print-field fit-single-line print-field-date" data-fit-text style="left: {{ $p['date'][0] }}px; top: {{ $p['date'][1] }}px; {{ $fieldStyle('date') }}">{{ $print['invoice_date'] }}</div>
         <div class="print-field fit-multiline print-field-particulars" data-fit-text data-min-font="6" style="left: {{ $p['particulars'][0] }}px; top: {{ $p['particulars'][1] }}px; {{ $fieldStyle('particulars') }}">{{ $soaParticulars }}</div>
         <div class="print-field fit-multiline amount print-field-amounts" data-fit-text data-min-font="6" style="left: {{ $p['amounts'][0] }}px; top: {{ $p['amounts'][1] }}px; {{ $fieldStyle('amounts') }}">{{ $soaAmounts }}</div>
-        <div class="soa-payment-note-line soa-payment-note-small print-field-payment_note" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop }}px; width: {{ $paymentNoteWidth }}px">
+        <div class="soa-payment-note-line soa-payment-note-small print-field-payment_note" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop }}px; width: {{ $paymentNoteWidth }}px; font-size: {{ $paymentNoteSmallFontSize }}px">
             PLEASE PAY THIS REIMBURSEMENT CHARGES TOGETHER WITH INVOICE NUMBER {{ $print['invoice_no'] ?? '' }}
         </div>
-        <div class="soa-payment-note-line soa-payment-note-amount d-flex justify-content-between" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + 15 }}px; width: {{ $paymentNoteWidth }}px">
+        <div class="soa-payment-note-line soa-payment-note-amount d-flex justify-content-between" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + $paymentNoteLineStep }}px; width: {{ $paymentNoteWidth }}px; font-size: {{ $paymentNoteAmountFontSize }}px">
             <span>TOTAL INVOICE AMOUNT</span><span>{{ $money($billingInvoiceAmount) }}</span>
         </div>
-        <div class="soa-payment-note-line soa-payment-note-amount d-flex justify-content-between" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + 30 }}px; width: {{ $paymentNoteWidth }}px">
+        <div class="soa-payment-note-line soa-payment-note-amount d-flex justify-content-between" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + ($paymentNoteLineStep * 2) }}px; width: {{ $paymentNoteWidth }}px; font-size: {{ $paymentNoteAmountFontSize }}px">
             <span>REIMBURSEMENT CHARGES</span><span>{{ $money($print['reimbursement_total'] ?? 0) }}</span>
         </div>
-        <div class="soa-payment-note-line soa-payment-note-amount d-flex justify-content-between" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + 45 }}px; width: {{ $paymentNoteWidth }}px">
+        <div class="soa-payment-note-line soa-payment-note-amount d-flex justify-content-between" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + ($paymentNoteLineStep * 3) }}px; width: {{ $paymentNoteWidth }}px; font-size: {{ $paymentNoteAmountFontSize }}px">
             <span>PLEASE PAY THIS AMOUNT</span><span>{{ $money($soaBTotal) }}</span>
         </div>
-        <div class="soa-payment-note-line soa-payment-note-small" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + 63 }}px; width: {{ $paymentNoteWidth }}px; font-style: italic">
+        <div class="soa-payment-note-line soa-payment-note-small" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + ($paymentNoteLineStep * 4) + 3 }}px; width: {{ $paymentNoteWidth }}px; font-size: {{ $paymentNoteSmallFontSize }}px; font-style: italic">
             PLEASE DO NOT DEDUCT 2% WITHHOLDING TAX ON REIMBURSEMENT CHARGES.
         </div>
         <div class="print-field fit-single-line amount print-field-total_reimbursement" data-fit-text style="left: {{ $p['total_reimbursement'][0] }}px; top: {{ $p['total_reimbursement'][1] }}px; {{ $fieldStyle('total_reimbursement') }}">{{ number_format($soaBTotal, 2) }}</div>
@@ -247,16 +251,9 @@
         (function () {
             function fitPrintableText() {
                 document.querySelectorAll('[data-fit-text]').forEach(function (field) {
-                    var base = parseFloat(field.dataset.baseFont || window.getComputedStyle(field).fontSize);
-                    var min = parseFloat(field.dataset.minFont || 7);
-                    field.dataset.baseFont = base;
-                    field.style.fontSize = base + 'px';
-
-                    var current = base;
-                    while (current > min && (field.scrollWidth > field.clientWidth + 1 || field.scrollHeight > field.clientHeight + 1)) {
-                        current -= 0.5;
-                        field.style.fontSize = current + 'px';
-                    }
+                    var configured = parseFloat(field.dataset.configuredFont || field.style.fontSize || window.getComputedStyle(field).fontSize);
+                    field.dataset.configuredFont = configured;
+                    field.style.fontSize = configured + 'px';
                 });
             }
 
