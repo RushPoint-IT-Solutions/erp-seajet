@@ -205,13 +205,14 @@ class BillingInvoicePrintFlowTest extends TestCase
         $print->assertStatus(200);
         $print->assertSee('DOCUMENTATION SERVICE');
         $print->assertSee('SPECIAL HANDLING SERVICE');
-        $print->assertSee('height: 14px;', false);
         $print->assertSee('data-item-gap="3"', false);
         $print->assertSee("First memo paragraph.\n\nSecond memo paragraph.");
         $print->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif;', false);
         $print->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif !important;', false);
         $print->assertSee('font-weight: 700;', false);
-        $this->assertRegExp('/\.print-field-prepared_by\s*\{[^}]*font-weight:\s*800\s*!important;/s', $print->getContent());
+        $this->assertRegExp('/\.print-field-prepared_by\s*\{[^}]*font-weight:\s*700\s*!important;/s', $print->getContent());
+        $this->assertRegExp('/\.bi-field\s*\{[^}]*line-height:\s*1\.15;/s', $print->getContent());
+        $print->assertDontSee('current -= 0.5', false);
         preg_match_all('/data-line-row="0" data-line-top="(\d+)"/', $print->getContent(), $firstRowTops);
         preg_match_all('/data-line-row="1" data-line-top="(\d+)"/', $print->getContent(), $secondRowTops);
         $this->assertCount(4, $firstRowTops[1]);

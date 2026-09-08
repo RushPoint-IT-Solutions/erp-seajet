@@ -47,7 +47,7 @@
         display: flex;
         align-items: flex-start;
         justify-content: flex-start;
-        line-height: .92;
+        line-height: 1.15;
         white-space: pre-line;
         overflow: hidden;
         overflow-wrap: anywhere;
@@ -63,7 +63,7 @@
         word-break: normal;
     }
     .bi-field.fit-multiline {
-        line-height: 1.08;
+        line-height: 1.15;
     }
     .print-field-customer,
     .print-field-address {
@@ -102,7 +102,7 @@
     .print-field-amount_due,
     .print-field-prepared_by {
         color: #000 !important;
-        font-weight: 800 !important;
+        font-weight: 700 !important;
     }
     .bi-label-preview {
         position: absolute;
@@ -277,7 +277,9 @@
                     foreach ($descriptionLines as $descriptionLine) {
                         $visualLineCount += max(1, (int) ceil(max(1, strlen($descriptionLine)) / 48));
                     }
-                    $rowHeight = max(14, ($visualLineCount * 12) + 1);
+                    $lineFontSize = max(6, (int) ($s['line_description']['font_size'] ?? 12));
+                    $lineTextHeight = (int) ceil($lineFontSize * 1.15);
+                    $rowHeight = max($lineTextHeight + 2, ($visualLineCount * $lineTextHeight) + 1);
                     $lineTop = $p['line_description'][1] + $lineOffset;
                     $rowAdvance = $rowHeight + $itemGap;
                     if ($loop->first) {
@@ -328,17 +330,10 @@
         (function () {
             function fitPrintableText() {
                 document.querySelectorAll('[data-fit-text]').forEach(function (field) {
-                    var base = parseFloat(field.dataset.baseFont || window.getComputedStyle(field).fontSize);
-                    var min = parseFloat(field.dataset.minFont || 7);
-                    field.dataset.baseFont = base;
-                    field.style.fontSize = base + 'px';
+                    var configured = parseFloat(field.dataset.configuredFont || field.style.fontSize || window.getComputedStyle(field).fontSize);
+                    field.dataset.configuredFont = configured;
+                    field.style.fontSize = configured + 'px';
                     field.style.transform = '';
-
-                    var current = base;
-                    while (current > min && (field.scrollWidth > field.clientWidth + 1 || field.scrollHeight > field.clientHeight + 1)) {
-                        current -= 0.5;
-                        field.style.fontSize = current + 'px';
-                    }
                 });
             }
 
