@@ -35,6 +35,7 @@ class BillingInvoicePrintFlowTest extends TestCase
         $response->assertSee('Withholding Tax %');
         $response->assertSee('Print SOA B + Billing Invoice');
         $response->assertSee('Print SOA A');
+        $response->assertSee('<textarea name="memo"', false);
     }
 
     public function test_vatable_billing_review_can_print_soa_b_and_billing_invoice()
@@ -97,6 +98,7 @@ class BillingInvoicePrintFlowTest extends TestCase
         $soaPrint->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif;', false);
         $soaPrint->assertSee('PLEASE PAY THIS AMOUNT');
         $soaPrint->assertDontSee('PHP 162.00');
+        $this->assertRegExp('/\.print-field\s*\{[^}]*font-weight:\s*700;/s', $soaPrint->getContent());
         $this->assertRegExp('/PLEASE PAY THIS AMOUNT<\/span><span>PHP 50\.00<\/span>/', $soaPrint->getContent());
     }
 
@@ -166,6 +168,7 @@ class BillingInvoicePrintFlowTest extends TestCase
             'ar_account' => 'A/Trade-Billing Invoice',
             'invoice_template' => 'Billing Invoice',
             'customer_tax_code' => 'VAT12',
+            'memo' => "First memo paragraph.\n\nSecond memo paragraph.",
             'item' => ['Documentation VAT', 'Handling Fee'],
             'item_description' => ['DOCUMENTATION SERVICE', 'SPECIAL HANDLING SERVICE'],
             'qty' => ['1', '3'],
@@ -181,7 +184,10 @@ class BillingInvoicePrintFlowTest extends TestCase
         $print->assertStatus(200);
         $print->assertSee('DOCUMENTATION SERVICE');
         $print->assertSee('SPECIAL HANDLING SERVICE');
+        $print->assertSee('height: 20px;', false);
+        $print->assertSee("First memo paragraph.\n\nSecond memo paragraph.");
         $print->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif;', false);
+        $print->assertSee('font-weight: 700;', false);
         $this->assertRegExp('/print-field-line_amount[^>]*>100\.00<\/div>/', $print->getContent());
         $this->assertRegExp('/print-field-line_amount[^>]*>237\.45<\/div>/', $print->getContent());
     }

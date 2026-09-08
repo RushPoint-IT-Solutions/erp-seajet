@@ -48,6 +48,8 @@
         overflow: hidden;
         overflow-wrap: anywhere;
         word-break: break-word;
+        color: #000;
+        font-weight: 700;
     }
     .bi-field.fit-single-line {
         align-items: center;
@@ -78,7 +80,6 @@
     .bi-field.amount {
         text-align: right;
         justify-content: flex-end;
-        font-weight: 600;
     }
     .bi-field.header-value {
         font-weight: 700;
@@ -255,7 +256,7 @@
                     foreach ($descriptionLines as $descriptionLine) {
                         $visualLineCount += max(1, (int) ceil(max(1, strlen($descriptionLine)) / 48));
                     }
-                    $rowHeight = max(28, ($visualLineCount * 16) + 8);
+                    $rowHeight = max(20, ($visualLineCount * 13) + 3);
                 @endphp
                 <div class="bi-field fit-multiline print-field-line_description" data-fit-text data-min-font="6" style="left: {{ $p['line_description'][0] }}px; top: {{ $p['line_description'][1] + $lineOffset }}px; height: {{ $rowHeight }}px; {{ $fieldStyle('line_description') }}">{{ $line['description'] }}</div>
                 <div class="bi-field fit-single-line amount print-field-line_qty" data-fit-text style="left: {{ $p['line_qty'][0] }}px; top: {{ $p['line_qty'][1] + $lineOffset }}px; {{ $fieldStyle('line_qty') }}">{{ $line['quantity'] }}</div>

@@ -267,7 +267,7 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label text-muted">Memo</label>
-                                <input name="memo" class="form-control invoice-field" value="">
+                                <textarea name="memo" class="form-control invoice-field" rows="4">{{ old('memo', '') }}</textarea>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label text-muted">Customer Tax Code</label>
@@ -697,7 +697,7 @@
             $('input[name="date_shipped"]').val('2026-06-07');
             $('input[name="commodity"]').val('Consolidated sea freight cargo');
             $('select[name="customer_message"]').val('Payment is due based on agreed credit terms.');
-            $('input[name="memo"]').val('Sample invoice generated for testing');
+            $('textarea[name="memo"]').val('Sample invoice generated for testing');
             $('input[name="invoice_date"]').val('2026-06-07');
             $('input[name="due_date"]').val('2026-07-07');
             $('#invoiceNo').val('BI-2026-0501');
@@ -780,7 +780,7 @@
             $('input[name="date_shipped"]').val(dateValue(editInvoice.date_shipped));
             $('input[name="commodity"]').val(editInvoice.commodity || '');
             $('select[name="customer_message"]').val(editInvoice.customer_message || '');
-            $('input[name="memo"]').val(editInvoice.memo || '');
+            $('textarea[name="memo"]').val(editInvoice.memo || '');
             $('input[name="invoice_date"]').val(dateValue(editInvoice.invoice_date));
             $('input[name="due_date"]').val(dateValue(editInvoice.due_date));
             $('#invoiceNo').val(editInvoice.invoice_no || '');

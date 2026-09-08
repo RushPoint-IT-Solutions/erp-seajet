@@ -20,7 +20,7 @@
         border: 1px solid #2f3542;
         box-shadow: 0 10px 30px rgba(15, 23, 42, .14);
         font-family: Calibri, Arial, Helvetica, sans-serif;
-        color: #1f2937;
+        color: #000;
         overflow: hidden;
     }
     .template-line,
@@ -70,6 +70,8 @@
     .print-field {
         position: absolute;
         font-size: 12px;
+        color: #000;
+        font-weight: 700;
         line-height: 1.35;
         white-space: pre-line;
         box-sizing: border-box;
@@ -100,6 +102,8 @@
     .soa-payment-note-line {
         position: absolute;
         box-sizing: border-box;
+        color: #000;
+        font-weight: 700;
         overflow: hidden;
         white-space: nowrap;
         line-height: 1.1;
@@ -119,7 +123,6 @@
     @endforeach
     .print-field.amount {
         text-align: right;
-        font-weight: 600;
     }
     .serial {
         color: #991b1b;
