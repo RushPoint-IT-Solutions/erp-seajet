@@ -168,6 +168,9 @@
             @endif
             margin: 0;
         }
+        .bi-field {
+            letter-spacing: .25px !important;
+        }
         .bi-template-guide,
         .bi-guide-line,
         .bi-guide-vline,
@@ -268,7 +271,7 @@
         @if(!empty($billingLines))
             @php
                 $lineOffset = 0;
-                $itemGap = 3;
+                $itemGap = 1;
                 $firstRowAdvance = 0;
             @endphp
             @foreach($billingLines as $line)
