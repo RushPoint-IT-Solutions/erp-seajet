@@ -83,6 +83,14 @@
                 <input name="opening_balance" class="form-control text-end {{ $errors->has('opening_balance') ? 'is-invalid' : '' }}" value="{{ old('opening_balance', $isEdit ? number_format((float) $account->opening_balance, 2, '.', '') : '0.00') }}">
                 @if($errors->has('opening_balance'))<div class="invalid-feedback">{{ $errors->first('opening_balance') }}</div>@endif
             </div>
+            <div class="col-12">
+                <label class="form-check">
+                    <input type="checkbox" name="show_in_ap" value="1" class="form-check-input" id="showInAp"
+                           {{ old('show_in_ap', $isEdit && !empty($account->show_in_ap) ? '1' : '') ? 'checked' : '' }}>
+                    <span class="form-check-label fw-semibold">Show in AP Item Account dropdown</span>
+                </label>
+                <div class="form-text" id="showInApHelp">Controls whether this account appears for line items in AP vendor bills. Expense and Asset accounts may be enabled, including reimbursable asset accounts.</div>
+            </div>
         </div>
         <div class="d-flex justify-content-end gap-2 mt-4">
             <a href="{{ route('erp.accounting.coa') }}" class="btn btn-outline-secondary">Cancel</a>
@@ -90,3 +98,23 @@
         </div>
     </form>
 @endsection
+
+@push('scripts')
+<script>
+    (function () {
+        var typeInput = document.querySelector('[name="type"]');
+        var apCheckbox = document.getElementById('showInAp');
+        var allowedTypes = ['Expense', 'Other Expense', 'Other Current Asset', 'Fixed Asset', 'Other Asset'];
+
+        function syncApAvailability() {
+            var isExpense = allowedTypes.indexOf(typeInput.value.trim()) !== -1;
+            apCheckbox.disabled = !isExpense;
+            if (!isExpense) apCheckbox.checked = false;
+        }
+
+        typeInput.addEventListener('input', syncApAvailability);
+        typeInput.addEventListener('change', syncApAvailability);
+        syncApAvailability();
+    })();
+</script>
+@endpush

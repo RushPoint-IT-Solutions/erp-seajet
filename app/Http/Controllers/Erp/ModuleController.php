@@ -1072,7 +1072,7 @@ class ModuleController extends Controller
             return collect();
         }
 
-        return DB::table('accounts')
+        $query = DB::table('accounts')
             ->leftJoin('account_categories', 'account_categories.id', '=', 'accounts.account_category_id')
             ->select(
                 'accounts.id',
@@ -1084,14 +1084,13 @@ class ModuleController extends Controller
             )
             ->where('accounts.is_active', true)
             ->where('accounts.company_id', $this->defaultCompanyId())
-            ->where(function ($query) {
-                $query->where('account_categories.name', 'like', '%Expense%')
-                    ->orWhere('account_categories.name', 'like', '%Cost%')
-                    ->orWhere('account_categories.name', 'like', '%Asset%')
-                    ->orWhere('accounts.name', 'like', '%Expense%')
-                    ->orWhere('accounts.name', 'like', '%Cost%')
-                    ->orWhere('accounts.type', 'like', '%Asset%');
-            })
+            ->whereIn('accounts.type', $this->apItemAccountTypes());
+
+        if (Schema::hasColumn('accounts', 'show_in_ap')) {
+            $query->where('accounts.show_in_ap', true);
+        }
+
+        return $query
             ->orderBy('accounts.code')
             ->get()
             ->map(function ($account) {
@@ -1107,6 +1106,11 @@ class ModuleController extends Controller
                     'withholding_rate' => $this->withholdingRatePercent($account->withholding_rate),
                 ];
             });
+    }
+
+    private function apItemAccountTypes()
+    {
+        return ['Expense', 'Other Expense', 'Other Current Asset', 'Fixed Asset', 'Other Asset'];
     }
 
     private function glAccountOptions()
@@ -5076,10 +5080,12 @@ class ModuleController extends Controller
                     'accounts.id',
                     'accounts.code',
                     'accounts.name',
+                    'accounts.type',
                     'account_categories.name as category',
                     'parent_accounts.code as parent_code',
                     'account_categories.normal_balance',
                     'accounts.opening_balance',
+                    'accounts.show_in_ap',
                     'accounts.is_active'
                 )
                 ->orderBy('accounts.code')
@@ -5089,10 +5095,12 @@ class ModuleController extends Controller
                         'id' => $account->id,
                         'code' => $account->code,
                         'name' => $account->name,
+                        'type' => $account->type,
                         'category' => $account->category ?: '-',
                         'parent_code' => $account->parent_code ?: '-',
                         'normal_balance' => ucfirst($account->normal_balance ?: '-'),
                         'opening_balance' => number_format((float) $account->opening_balance, 2),
+                        'show_in_ap' => (bool) $account->show_in_ap,
                         'is_active' => (bool) $account->is_active,
                     ];
                 })
@@ -5151,6 +5159,7 @@ class ModuleController extends Controller
             'account_category_id' => 'required|exists:account_categories,id',
             'parent_id' => 'nullable|exists:accounts,id',
             'type' => 'required|string|max:100',
+            'show_in_ap' => 'nullable|string',
             'opening_balance' => 'nullable|numeric',
         ]);
     }
@@ -5173,6 +5182,8 @@ class ModuleController extends Controller
                 ->withErrors(['code' => 'This account code already exists.']);
         }
 
+        $showInAp = isset($data['show_in_ap']) && in_array($data['type'], $this->apItemAccountTypes(), true);
+
         DB::table('accounts')->insert([
             'company_id' => $companyId,
             'account_category_id' => $data['account_category_id'],
@@ -5180,6 +5191,7 @@ class ModuleController extends Controller
             'code' => $code,
             'name' => trim($data['name']),
             'type' => $data['type'],
+            'show_in_ap' => $showInAp,
             'opening_balance' => $this->moneyToFloat($data['opening_balance'] ?? 0),
             'is_active' => true,
             'created_at' => now(),
@@ -5234,12 +5246,15 @@ class ModuleController extends Controller
                 ->withErrors(['parent_id' => 'An account cannot be its own parent.']);
         }
 
+        $showInAp = isset($data['show_in_ap']) && in_array($data['type'], $this->apItemAccountTypes(), true);
+
         DB::table('accounts')->where('id', $record->id)->update([
             'account_category_id' => $data['account_category_id'],
             'parent_id' => $data['parent_id'] ?? null,
             'code' => $code,
             'name' => trim($data['name']),
             'type' => $data['type'],
+            'show_in_ap' => $showInAp,
             'opening_balance' => $this->moneyToFloat($data['opening_balance'] ?? 0),
             'updated_at' => now(),
         ]);
@@ -6977,22 +6992,7 @@ class ModuleController extends Controller
             ->get()
             ->map(function ($item) {
                 $name = $item->name;
-                $lower = strtolower($name);
-                $tax = 'exempt';
-                $account = 'A/Trade-Billing Invoice';
-
-                if (strpos($lower, 'zero') !== false || strpos($lower, 'soa a') !== false) {
-                    $tax = 'zero-rated';
-                    $account = 'A/R Trade-SOA A';
-                } elseif (strpos($lower, 'vat') !== false) {
-                    $tax = '12%';
-                }
-
-                if (strpos($lower, 'reimburs') !== false || preg_match('/\bre\b/', $lower)) {
-                    $account = 'A/R-Reimbursable Charges';
-                    $tax = $tax === '12%' ? '12%' : 'exempt';
-                }
-
+                $accountMeta = $this->invoiceItemAccountMeta($item->account_name ?? '', $item->tax_type ?? '');
                 $description = trim((string) ($item->description ?? ''));
                 if ($description === '') {
                     $description = $name;
@@ -7006,10 +7006,69 @@ class ModuleController extends Controller
                     'rate' => (float) ($item->selling_price ?? 0),
                     'qty' => 1,
                     'class' => 'MANILA',
-                    'account' => $account,
-                    'tax' => $tax,
+                    'account_name' => $accountMeta['source_account'],
+                    'account_tag' => $accountMeta['tag'],
+                    'account' => $accountMeta['invoice_account'],
+                    'tax' => $accountMeta['tax_category'],
                 ];
             });
+    }
+
+    private function invoiceItemAccountMeta($accountName, $taxType = '')
+    {
+        $accountName = trim((string) $accountName);
+        $normalized = strtolower(preg_replace('/\s+/', ' ', $accountName));
+        $taxType = strtolower(trim((string) $taxType));
+
+        if (strpos($normalized, 'reimburs') !== false) {
+            $isVat = strpos($taxType, 'vat') !== false && strpos($taxType, 'non') === false;
+
+            return [
+                'source_account' => $accountName ?: 'Reimbursable charges',
+                'tag' => 'Reimbursable',
+                'invoice_account' => 'A/R-Reimbursable Charges',
+                'tax_category' => $isVat ? '12%' : 'exempt',
+                'tax_type' => $isVat ? 'VAT' : 'Non',
+            ];
+        }
+
+        if (strpos($normalized, 'soa a') !== false) {
+            return [
+                'source_account' => $accountName ?: 'Service Income-SOA A',
+                'tag' => 'SOA A',
+                'invoice_account' => 'A/R Trade-SOA A',
+                'tax_category' => 'zero-rated',
+                'tax_type' => 'Non',
+            ];
+        }
+
+        if (strpos($normalized, 'zero') !== false) {
+            return [
+                'source_account' => $accountName ?: 'Service Income-Zero rated',
+                'tag' => 'Zero-rated',
+                'invoice_account' => 'A/Trade-Billing Invoice',
+                'tax_category' => 'zero-rated',
+                'tax_type' => 'Non',
+            ];
+        }
+
+        if (strpos($normalized, 'vatable') !== false || strpos($taxType, 'vat') !== false) {
+            return [
+                'source_account' => $accountName ?: 'Service Income- Vatable',
+                'tag' => 'Vatable',
+                'invoice_account' => 'A/Trade-Billing Invoice',
+                'tax_category' => '12%',
+                'tax_type' => 'VAT',
+            ];
+        }
+
+        return [
+            'source_account' => $accountName,
+            'tag' => 'Unclassified',
+            'invoice_account' => 'A/Trade-Billing Invoice',
+            'tax_category' => 'exempt',
+            'tax_type' => $taxType ?: 'Non',
+        ];
     }
 
     private function invoiceAgingRows()
@@ -10523,7 +10582,9 @@ class ModuleController extends Controller
             'id' => 'nullable|integer',
             'sku' => 'required|string|max:100',
             'name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:2000',
             'category' => 'nullable|string|max:255',
+            'account_name' => 'required|string|in:Reimbursable charges,Service Income-SOA A,Service Income- Vatable,Service Income-Zero rated',
             'unit_of_measure' => 'required|string|max:50',
             'standard_cost' => 'nullable',
             'selling_price' => 'nullable',
@@ -10534,7 +10595,10 @@ class ModuleController extends Controller
             'company_id' => $this->defaultCompanyId(),
             'sku' => strtoupper($data['sku']),
             'name' => $data['name'],
+            'description' => $data['description'] ?? null,
             'category' => $data['category'] ?? null,
+            'account_name' => $data['account_name'],
+            'tax_type' => $this->invoiceItemAccountMeta($data['account_name'])['tax_type'],
             'unit_of_measure' => $data['unit_of_measure'],
             'standard_cost' => $this->moneyToFloat($data['standard_cost'] ?? 0),
             'selling_price' => $this->moneyToFloat($data['selling_price'] ?? 0),
@@ -10750,7 +10814,14 @@ class ModuleController extends Controller
         return DB::table('items')
             ->where('company_id', $companyId)
             ->orderBy('sku')
-            ->get();
+            ->get()
+            ->map(function ($item) {
+                $meta = $this->invoiceItemAccountMeta($item->account_name ?? '', $item->tax_type ?? '');
+                $item->account_tag = $meta['tag'];
+                $item->invoice_tax_category = $meta['tax_category'];
+
+                return $item;
+            });
     }
 
     private function financeNumberSeries($companyId)

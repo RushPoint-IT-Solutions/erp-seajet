@@ -27,11 +27,13 @@
                 <tr>
                     <th>Account Code</th>
                     <th>Account Name</th>
+                    <th>Type</th>
                     <th>Category</th>
                     <th>Parent Account</th>
                     <th>Normal Balance</th>
                     <th class="text-end">Beginning Balance</th>
                     <th>Status</th>
+                    <th>AP Items</th>
                     <th class="text-end no-print">Actions</th>
                 </tr>
                 </thead>
@@ -40,11 +42,13 @@
                     <tr>
                         <td class="fw-semibold">{{ $account['code'] }}</td>
                         <td>{{ $account['name'] }}</td>
+                        <td>{{ $account['type'] }}</td>
                         <td>{{ $account['category'] }}</td>
                         <td>{{ $account['parent_code'] }}</td>
                         <td>{{ $account['normal_balance'] }}</td>
                         <td class="text-end">{{ $account['opening_balance'] }}</td>
                         <td><span class="badge {{ $account['is_active'] ? 'badge-soft' : 'bg-secondary' }}">{{ $account['is_active'] ? 'Active' : 'Inactive' }}</span></td>
+                        <td><span class="badge {{ $account['show_in_ap'] ? 'text-bg-success' : 'text-bg-light' }}">{{ $account['show_in_ap'] ? 'Shown' : 'Hidden' }}</span></td>
                         <td class="text-end no-print">
                             <div class="d-inline-flex gap-1">
                                 <a href="{{ route('erp.accounting.coa.edit', $account['id']) }}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil-square"></i></a>

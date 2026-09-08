@@ -378,13 +378,15 @@
                                     @foreach($items ?? [] as $item)
                                         <option value="{{ $item->name }}"
                                                 data-description="{{ $item->description }}"
+                                                data-account-tag="{{ $item->account_tag }}"
                                                 data-rate="{{ $item->rate }}"
                                                 data-qty="{{ $item->qty }}"
                                                 data-class="{{ $item->class }}"
                                                 data-account="{{ $item->account }}"
-                                                data-tax="{{ $item->tax }}">{{ $item->name }}</option>
+                                                data-tax="{{ $item->tax }}">{{ $item->name }} [{{ $item->account_tag }}]</option>
                                     @endforeach
                                 </select>
+                                <span class="badge badge-soft item-account-tag d-none mt-1"></span>
                             </td>
                             <td>
                                 <select name="line_ar_account[]" class="form-select line-account">
@@ -603,9 +605,11 @@
         function syncItem(row) {
             var option = row.find('.item-select option:selected');
             if (!option.val()) {
+                row.find('.item-account-tag').text('').addClass('d-none');
                 return;
             }
 
+            row.find('.item-account-tag').text(option.data('account-tag') || '').toggleClass('d-none', !option.data('account-tag'));
             row.find('textarea[name="item_description[]"]').val(option.data('description') || '');
             row.find('.line-unit').val(option.data('rate') || '');
             row.find('.line-qty').val(option.data('qty') || '1');
@@ -671,6 +675,8 @@
 
             var row = $('#invoiceLines tbody tr').eq(index);
             row.find('.item-select').val(item).trigger('change.select2');
+            var accountTag = row.find('.item-select option:selected').data('account-tag') || '';
+            row.find('.item-account-tag').text(accountTag).toggleClass('d-none', !accountTag);
             row.find('textarea[name="item_description[]"]').val(description);
             row.find('.line-unit').val(rate);
             row.find('.line-qty').val(qty);
@@ -857,6 +863,7 @@
             row.find('.line-qty').val('');
             row.find('.line-total').val('');
             row.find('.line-account').val($('#arAccount').val() || '');
+            row.find('.item-account-tag').text('').addClass('d-none');
             $('#invoiceLines tbody').append(row);
             initItemSelects(row);
             syncDocumentAccount();

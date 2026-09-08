@@ -212,7 +212,9 @@
                     <div class="col-md-3"><label class="form-label small text-muted">SKU</label><input name="sku" class="form-control form-control-sm" required></div>
                     <div class="col-md-5"><label class="form-label small text-muted">Name</label><input name="name" class="form-control form-control-sm" required></div>
                     <div class="col-md-4"><label class="form-label small text-muted">Category</label><input name="category" class="form-control form-control-sm"></div>
-                    <div class="col-md-3"><label class="form-label small text-muted">UOM</label><input name="unit_of_measure" class="form-control form-control-sm" value="pcs" required></div>
+                    <div class="col-md-6"><label class="form-label small text-muted">Description</label><input name="description" class="form-control form-control-sm"></div>
+                    <div class="col-md-4"><label class="form-label small text-muted">Item Account</label><select name="account_name" class="form-select form-select-sm" required><option value="">Select account...</option><option>Reimbursable charges</option><option>Service Income-SOA A</option><option>Service Income- Vatable</option><option>Service Income-Zero rated</option></select></div>
+                    <div class="col-md-2"><label class="form-label small text-muted">UOM</label><input name="unit_of_measure" class="form-control form-control-sm" value="pcs" required></div>
                     <div class="col-md-3"><label class="form-label small text-muted">Cost</label><input name="standard_cost" class="form-control form-control-sm text-end"></div>
                     <div class="col-md-3"><label class="form-label small text-muted">Price</label><input name="selling_price" class="form-control form-control-sm text-end"></div>
                     <div class="col-md-3 d-flex align-items-end"><label class="form-check mb-2"><input type="checkbox" name="is_active" value="1" class="form-check-input" checked> <span class="form-check-label">Active</span></label></div>
@@ -221,15 +223,15 @@
             </form>
             <div class="settings-table table-responsive">
                 <table class="table table-sm table-hover align-middle mb-0">
-                    <thead><tr><th>SKU</th><th>Name</th><th>Category</th><th>UOM</th><th class="text-end">Price</th><th>Status</th><th></th></tr></thead>
+                    <thead><tr><th>SKU</th><th>Name</th><th>Description</th><th>Item Account</th><th>Tag</th><th>Category</th><th>UOM</th><th class="text-end">Price</th><th>Status</th><th></th></tr></thead>
                     <tbody>
                     @forelse($items as $item)
                         <tr>
-                            <td class="fw-semibold">{{ $item->sku }}</td><td>{{ $item->name }}</td><td>{{ $item->category }}</td><td>{{ $item->unit_of_measure }}</td><td class="text-end">{{ number_format((float) $item->selling_price, 2) }}</td><td>{{ $item->is_active ? 'Active' : 'Inactive' }}</td>
+                            <td class="fw-semibold">{{ $item->sku }}</td><td>{{ $item->name }}</td><td>{{ $item->description }}</td><td>{{ $item->account_name ?: '-' }}</td><td><span class="badge badge-soft">{{ $item->account_tag }}</span></td><td>{{ $item->category }}</td><td>{{ $item->unit_of_measure }}</td><td class="text-end">{{ number_format((float) $item->selling_price, 2) }}</td><td>{{ $item->is_active ? 'Active' : 'Inactive' }}</td>
                             <td class="text-end"><button type="button" class="btn btn-sm btn-outline-secondary edit-row" data-form="#item-list form" data-row='@json($item)'><i class="bi bi-pencil"></i></button></td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="text-center text-muted">No items yet.</td></tr>
+                        <tr><td colspan="10" class="text-center text-muted">No items yet.</td></tr>
                     @endforelse
                     </tbody>
                 </table>
