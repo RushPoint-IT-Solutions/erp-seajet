@@ -8691,6 +8691,17 @@ class ModuleController extends Controller
             return $fallback;
         }
 
+        $usesSqlite = DB::connection()->getDriverName() === 'sqlite';
+        $invoiceNumbersSql = $usesSqlite
+            ? 'GROUP_CONCAT(DISTINCT sales_documents.document_no) as invoice_numbers'
+            : 'GROUP_CONCAT(DISTINCT sales_documents.document_no ORDER BY sales_documents.document_no SEPARATOR ", ") as invoice_numbers';
+        $soaNumbersSql = $usesSqlite
+            ? 'GROUP_CONCAT(DISTINCT NULLIF(sales_documents.soa_no, \'\')) as soa_numbers'
+            : 'GROUP_CONCAT(DISTINCT NULLIF(sales_documents.soa_no, \'\') ORDER BY sales_documents.document_no SEPARATOR ", ") as soa_numbers';
+        $invoiceRemarksSql = $usesSqlite
+            ? 'GROUP_CONCAT(DISTINCT sales_documents.remarks) as invoice_remarks'
+            : 'GROUP_CONCAT(DISTINCT sales_documents.remarks ORDER BY sales_documents.document_no SEPARATOR "\n") as invoice_remarks';
+
         $query = DB::table('receipts')
             ->leftJoin('customers', 'customers.id', '=', 'receipts.customer_id')
             ->leftJoin('receipt_applications', 'receipt_applications.receipt_id', '=', 'receipts.id')
@@ -8706,9 +8717,37 @@ class ModuleController extends Controller
                 'customers.name as customer_name',
                 'customers.tin as customer_tin',
                 'customers.billing_address',
-                DB::raw('GROUP_CONCAT(DISTINCT sales_documents.document_no ORDER BY sales_documents.document_no SEPARATOR ", ") as invoice_numbers'),
-                DB::raw('GROUP_CONCAT(DISTINCT NULLIF(sales_documents.soa_no, \'\') ORDER BY sales_documents.document_no SEPARATOR ", ") as soa_numbers'),
-                DB::raw('GROUP_CONCAT(DISTINCT sales_documents.remarks ORDER BY sales_documents.document_no SEPARATOR "\n") as invoice_remarks')
+                DB::raw($invoiceNumbersSql),
+                DB::raw($soaNumbersSql),
+                DB::raw($invoiceRemarksSql),
+                DB::raw('COUNT(receipt_applications.id) as application_count'),
+                DB::raw('SUM(CASE
+                    WHEN sales_documents.id IS NULL THEN 0
+                    WHEN COALESCE(sales_documents.invoice_amount, 0) > 0 THEN sales_documents.invoice_amount
+                    WHEN COALESCE(sales_documents.freight_total, 0) > 0
+                        THEN CASE
+                            WHEN COALESCE(sales_documents.grand_total, 0) > COALESCE(sales_documents.freight_total, 0)
+                                THEN sales_documents.grand_total - sales_documents.freight_total
+                            ELSE 0
+                        END
+                    ELSE COALESCE(sales_documents.grand_total, 0)
+                END) as invoice_amount_total'),
+                DB::raw('SUM(CASE
+                    WHEN sales_documents.id IS NULL THEN 0
+                    WHEN COALESCE(sales_documents.invoice_amount, 0) > 0
+                        THEN CASE
+                            WHEN COALESCE(sales_documents.grand_total, 0) > sales_documents.invoice_amount
+                                THEN sales_documents.grand_total - sales_documents.invoice_amount
+                            ELSE 0
+                        END
+                    WHEN COALESCE(sales_documents.freight_total, 0) > 0
+                        THEN CASE
+                            WHEN COALESCE(sales_documents.grand_total, 0) > sales_documents.freight_total
+                                THEN sales_documents.freight_total
+                            ELSE COALESCE(sales_documents.grand_total, 0)
+                        END
+                    ELSE 0
+                END) as soa_amount_total')
             );
 
         $receiptColumns = Schema::getColumnListing('receipts');
@@ -8774,6 +8813,9 @@ class ModuleController extends Controller
             $documentNumbers ? $documentPrefix . ' ' . $documentNumbers : null,
             property_exists($dbReceipt, 'job_shipment_id') && $dbReceipt->job_shipment_id ? 'JOB ' . $dbReceipt->job_shipment_id : null,
         ]);
+        $printAmount = (int) $dbReceipt->application_count > 0
+            ? (float) ($isAcknowledgement ? $dbReceipt->soa_amount_total : $dbReceipt->invoice_amount_total)
+            : (float) $dbReceipt->amount;
 
         return [
             'receipt_no' => $numericReceiptNo ? str_pad($numericReceiptNo, 7, '0', STR_PAD_LEFT) : $dbReceipt->receipt_no,
@@ -8784,7 +8826,7 @@ class ModuleController extends Controller
             'business_address' => $dbReceipt->billing_address ?: '',
             'description' => implode("\n", $descriptionParts),
             'currency' => property_exists($dbReceipt, 'currency') && $dbReceipt->currency ? $dbReceipt->currency : 'PHP',
-            'amount' => (float) $dbReceipt->amount,
+            'amount' => $printAmount,
             'payment_method' => $dbReceipt->payment_method ?: 'Check',
             'reference_no' => $dbReceipt->reference_no ?: '',
             'bank' => '',
