@@ -8363,14 +8363,9 @@ class ModuleController extends Controller
             $invoiceNumbers = DB::connection()->getDriverName() === 'sqlite'
                 ? DB::raw('GROUP_CONCAT(sales_documents.document_no, ", ") as invoice_numbers')
                 : DB::raw('GROUP_CONCAT(sales_documents.document_no ORDER BY sales_documents.document_no SEPARATOR ", ") as invoice_numbers');
-            $billingInvoiceAmount = 'CASE WHEN COALESCE(sales_documents.invoice_amount, 0) > 0 '
-                .'THEN sales_documents.invoice_amount '
-                .'WHEN COALESCE(sales_documents.grand_total, 0) - COALESCE(sales_documents.freight_total, 0) > 0 '
-                .'THEN sales_documents.grand_total - COALESCE(sales_documents.freight_total, 0) '
-                .'ELSE COALESCE(sales_documents.grand_total, 0) END';
             $forPaymentAmount = DB::raw('COALESCE(SUM(CASE WHEN sales_documents.id IS NULL THEN 0 '
-                .'WHEN ('.$billingInvoiceAmount.' - COALESCE(sales_documents.withholding_tax_amount, 0)) > 0 '
-                .'THEN '.$billingInvoiceAmount.' - COALESCE(sales_documents.withholding_tax_amount, 0) '
+                .'WHEN (COALESCE(sales_documents.grand_total, 0) - COALESCE(sales_documents.withholding_tax_amount, 0)) > 0 '
+                .'THEN COALESCE(sales_documents.grand_total, 0) - COALESCE(sales_documents.withholding_tax_amount, 0) '
                 .'ELSE 0 END), 0) as for_payment');
 
             return DB::table('receipts')

@@ -86,6 +86,6 @@ class RecordPaymentPayableTest extends TestCase
         $this->get(route('erp.payments.create'))
             ->assertOk()
             ->assertSeeInOrder(['For Payment', 'Paid Amount'])
-            ->assertSee('PHP 110.00');
+            ->assertSee('PHP 160.00');
     }
 }
