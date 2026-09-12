@@ -177,7 +177,7 @@
         $soaAmounts = trim($print['soa_amounts'] ?? '') !== ''
             ? $print['soa_amounts']
             : number_format((float) ($print['reimbursement_total'] ?? 0), 2);
-        $billingInvoiceAmount = (float) ($print['billing_total'] ?? 0);
+        $billingInvoiceAmount = max(0, (float) ($print['billing_total'] ?? 0) - (float) ($print['withholding_tax'] ?? 0));
         $soaBTotal = (float) ($print['reimbursement_total'] ?? 0);
         $combinedPayableTotal = $billingInvoiceAmount + $soaBTotal;
         $paymentNoteLeft = $p['payment_note'][0];

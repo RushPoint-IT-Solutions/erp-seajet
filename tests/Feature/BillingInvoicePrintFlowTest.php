@@ -175,6 +175,12 @@ class BillingInvoicePrintFlowTest extends TestCase
         $print->assertStatus(200);
         $print->assertSee('PHP 12.00');
         $print->assertSee('PHP 324.00');
+
+        $soa = $this->get('/erp/billings/print/statement-of-account?billing_total=336.00&reimbursement_total=50.00&withholding_tax=12.00');
+        $soa->assertStatus(200);
+        $this->assertRegExp('/TOTAL INVOICE AMOUNT<\/span><span>PHP 324\.00<\/span>/', $soa->getContent());
+        $this->assertRegExp('/PLEASE PAY THIS AMOUNT<\/span><span>PHP 374\.00<\/span>/', $soa->getContent());
+        $this->assertRegExp('/print-field-total_reimbursement[^>]*>50\.00<\/div>/', $soa->getContent());
     }
 
     public function test_billing_invoice_prints_non_zero_zero_rated_sales_and_hides_zero_amount()
@@ -187,6 +193,9 @@ class BillingInvoicePrintFlowTest extends TestCase
         $withoutZeroRatedSales = $this->get('/erp/billings/print/invoice?vatable_sales=0&zero_rated_sales=0&billing_total=0');
         $withoutZeroRatedSales->assertStatus(200);
         $this->assertNotRegExp('/<div class="[^"]*print-field-zero_rated_sales[^"]*"/', $withoutZeroRatedSales->getContent());
+        foreach (['total_sales', 'less_vat', 'amount_net_vat', 'discount', 'add_vat', 'withholding_tax', 'amount_due'] as $field) {
+            $this->assertNotRegExp('/<div class="[^"]*print-field-'.$field.'(?:\s|")/', $withoutZeroRatedSales->getContent());
+        }
     }
 
     public function test_billing_invoice_prints_the_applicable_tax_total_on_the_left_and_hides_zero_tax_fields()
@@ -204,6 +213,14 @@ class BillingInvoicePrintFlowTest extends TestCase
         $this->assertNotRegExp('/<div class="[^"]*print-field-vatable_sales[^"]*"/', $vatExempt->getContent());
         $this->assertNotRegExp('/<div class="[^"]*print-field-vat(?:\s|")/', $vatExempt->getContent());
         $this->assertNotRegExp('/<div class="[^"]*print-field-zero_rated_sales[^"]*"/', $vatExempt->getContent());
+
+        $legacyZeroRated = $this->get('/erp/billings/print/invoice?vat_classification=zero-rated&billing_total=47813.39&vat_amount=0');
+        $legacyZeroRated->assertStatus(200);
+        $this->assertRegExp('/<div class="[^"]*print-field-zero_rated_sales[^"]*"[^>]*>PHP 47,813\.39<\/div>/', $legacyZeroRated->getContent());
+
+        $legacyVatExempt = $this->get('/erp/billings/print/invoice?vat_classification=exempt&billing_total=47813.39&vat_amount=0');
+        $legacyVatExempt->assertStatus(200);
+        $this->assertRegExp('/<div class="[^"]*print-field-vat_exempt_sales[^"]*"[^>]*>PHP 47,813\.39<\/div>/', $legacyVatExempt->getContent());
     }
 
     public function test_zero_rated_and_vat_exempt_sales_are_not_saved_as_vatable_sales()
@@ -231,6 +248,49 @@ class BillingInvoicePrintFlowTest extends TestCase
         $this->assertEquals(100.0, (float) $vatExempt->subtotal);
         $this->assertEquals(0.0, (float) $vatExempt->vatable_amount);
         $this->assertEquals(100.0, (float) $vatExempt->vat_exempt_amount);
+    }
+
+    public function test_mixed_zero_rated_invoice_and_exempt_reimbursements_print_the_zero_rated_total()
+    {
+        $items = [
+            'C.O-ZERO', 'Trucking ZERO', 'Chassis ZERO', 'Documentation ZERO',
+            'Handling ZERO', 'O. freight ZERO', 'Seal ZERO', 'ETRACC ZERO',
+            'Arrastre RE',
+        ];
+        $descriptions = [
+            'CERTIFICATE OF ORIGIN', 'TRUCKING CHARGES', 'CHASSIS RENTAL', 'DOCUMENTATION FEE',
+            'HANDLING FEE', 'OCEAN FREIGHT CHARGES', 'SEAL FEE', 'ETRACC',
+            'ARRASTRE AND AFS',
+        ];
+        $amounts = [
+            '2000.00', '32500.00', '2500.00', '5500.00',
+            '1500.00', '2513.39', '350.00', '950.00',
+            '5381.60',
+        ];
+
+        $this->post('/erp/invoices/review', $this->payload([
+            'invoice_no' => 'BI-MIXED-ZERO-001',
+            'transaction_no' => 'BI-MIXED-ZERO-001',
+            'vat_classification' => 'zero-rated',
+            'item' => $items,
+            'item_description' => $descriptions,
+            'qty' => array_fill(0, count($items), '1'),
+            'unit_price' => $amounts,
+            'line_amount' => $amounts,
+            'tax_category' => array_merge(array_fill(0, 8, 'zero-rated'), ['exempt']),
+            'line_ar_account' => array_merge(array_fill(0, 8, 'A/Trade-Billing Invoice'), ['A/R-Reimbursable Charges']),
+        ]))->assertRedirect();
+
+        $document = DB::table('sales_documents')->where('document_no', 'BI-MIXED-ZERO-001')->first();
+        $this->assertEquals(0.0, (float) $document->vatable_amount);
+        $this->assertEquals(47813.39, (float) $document->zero_rated_amount);
+        $this->assertEquals(5381.60, (float) $document->freight_total);
+
+        $print = $this->get('/erp/billings/print/invoice?invoice=BI-MIXED-ZERO-001');
+        $print->assertStatus(200);
+        $this->assertRegExp('/<div class="[^"]*print-field-zero_rated_sales[^"]*"[^>]*>PHP 47,813\.39<\/div>/', $print->getContent());
+        $this->assertNotRegExp('/<div class="[^"]*print-field-vatable_sales[^"]*"/', $print->getContent());
+        $this->assertNotRegExp('/<div class="[^"]*print-field-vat_exempt_sales[^"]*"/', $print->getContent());
     }
 
     public function test_billing_invoice_prints_each_item_as_a_separate_line_with_its_amount()

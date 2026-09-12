@@ -7631,7 +7631,9 @@ class ModuleController extends Controller
                         'customer_message' => $column('customer_message', $fallback['customer_message'] ?? ''),
                         'memo' => $column('memo', $fallback['memo'] ?? ''),
                         'job_shipment_id' => $column('job_shipment_id', $column('shipment_job_id', $fallback['job_shipment_id'] ?? '')),
-                        'vatable_sales' => number_format($subtotal, 2, '.', ''),
+                        'vatable_sales' => number_format((float) $column('vatable_amount', $subtotal), 2, '.', ''),
+                        'zero_rated_sales' => number_format((float) $column('zero_rated_amount', 0), 2, '.', ''),
+                        'vat_exempt_sales' => number_format((float) $column('vat_exempt_amount', 0), 2, '.', ''),
                         'vat_amount' => number_format($taxTotal, 2, '.', ''),
                         'withholding_tax_rate' => $column('withholding_tax_rate', 0),
                         'withholding_tax_amount' => number_format((float) $column('withholding_tax_amount', 0), 2, '.', ''),
@@ -8143,6 +8145,31 @@ class ModuleController extends Controller
             }
         }
 
+        $resolvedVatableSales = request()->has('vatable_sales')
+            ? $this->moneyToFloat($read('vatable_sales', '0'))
+            : max($vatableSales, $this->moneyToFloat($invoiceData['vatable_sales'] ?? 0));
+        $resolvedZeroRatedSales = request()->has('zero_rated_sales')
+            ? $this->moneyToFloat($read('zero_rated_sales', '0'))
+            : max($zeroRatedSales, $this->moneyToFloat($invoiceData['zero_rated_sales'] ?? 0));
+        $resolvedVatExemptSales = request()->has('vat_exempt_sales')
+            ? $this->moneyToFloat($read('vat_exempt_sales', '0'))
+            : max($vatExemptSales, $this->moneyToFloat($invoiceData['vat_exempt_sales'] ?? 0));
+
+        // Older invoices may have a total but no populated tax buckets or line tax category.
+        // Rebuild the applicable bucket from the document-level VAT classification.
+        if (($resolvedVatableSales + $resolvedZeroRatedSales + $resolvedVatExemptSales) <= 0 && $billingTotal > 0) {
+            $taxClassification = strtolower(trim((string) $read('vat_classification', '')));
+            $taxableBase = max(0, $billingTotal - $this->moneyToFloat($read('vat_amount', '0')));
+
+            if (strpos($taxClassification, 'zero') !== false) {
+                $resolvedZeroRatedSales = $taxableBase;
+            } elseif (strpos($taxClassification, 'exempt') !== false || strpos($taxClassification, 'non-vat') !== false) {
+                $resolvedVatExemptSales = $taxableBase;
+            } else {
+                $resolvedVatableSales = $taxableBase;
+            }
+        }
+
         return [
             'customer' => $read('customer', ''),
             'invoice_no' => $read('invoice_no', $read('invoice', '')),
@@ -8166,10 +8193,10 @@ class ModuleController extends Controller
             'billing_amounts' => implode("\n", $billingAmounts),
             'soa_particulars' => implode("\n", $soaParticulars),
             'soa_amounts' => implode("\n", $soaAmounts),
-            'vatable_sales' => request()->has('vatable_sales') ? $this->moneyToFloat($read('vatable_sales', '0')) : $vatableSales,
+            'vatable_sales' => $resolvedVatableSales,
             'vat_amount' => $this->moneyToFloat($read('vat_amount', '0')),
-            'zero_rated_sales' => request()->has('zero_rated_sales') || array_key_exists('zero_rated_sales', $invoiceData) ? $this->moneyToFloat($read('zero_rated_sales')) : $zeroRatedSales,
-            'vat_exempt_sales' => request()->has('vat_exempt_sales') || array_key_exists('vat_exempt_sales', $invoiceData) ? $this->moneyToFloat($read('vat_exempt_sales')) : $vatExemptSales,
+            'zero_rated_sales' => $resolvedZeroRatedSales,
+            'vat_exempt_sales' => $resolvedVatExemptSales,
             'discount' => $this->moneyToFloat($read('discount', '0')),
             'withholding_tax' => $this->moneyToFloat($read('withholding_tax', '0')),
             'prepared_by' => trim((string) $read('prepared_by', '')) !== '' ? $read('prepared_by', '') : (auth()->user()->name ?? 'User'),
