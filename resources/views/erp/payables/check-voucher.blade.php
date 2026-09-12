@@ -9,6 +9,7 @@
     $fieldStyles = $layout['field_styles'];
     $customFields = $layout['custom_fields'];
     $boxHeights = $layout['box_heights'];
+    $boxPositions = $layout['box_positions'];
     $boxHeights['amount'] = max($boxHeights['amount'], 41 + $fieldStyles['amount_words']['height']);
     $boxHeights['description'] = max($boxHeights['description'], 8 + $fieldStyles['description']['height']);
     $formattedAmount = number_format($voucher['net'], 2);
@@ -94,6 +95,7 @@
     .cv-box { position: absolute; border: 1px solid #111827; }
     .cv-line { position: absolute; border-top: 1px solid #111827; }
     .cv-vline { position: absolute; border-left: 1px solid #111827; }
+    .cv-accounting-table { position: absolute; width: 748px; border: 1px solid #111827; }
     .cv-amount-box {
         position: absolute;
         left: 46px;
@@ -149,11 +151,12 @@
                 <div class="cv-box" style="left: 46px; top: 190px; width: 292px; height: {{ $boxHeights['payee'] }}px;"></div>
                 <div class="cv-line" style="left: 46px; top: 236px; width: 292px;"></div>
                 <div class="cv-box" style="left: 46px; top: 428px; width: 748px; height: {{ $boxHeights['description'] }}px;"></div>
-                <div class="cv-box" style="left: 46px; top: 326px; width: 748px; height: {{ $boxHeights['accounting'] }}px;"></div>
-                <div class="cv-line" style="left: 46px; top: 354px; width: 748px;"></div>
-                <div class="cv-line" style="left: 46px; top: 400px; width: 748px;"></div>
-                <div class="cv-vline" style="left: 504px; top: 326px; height: {{ $boxHeights['accounting'] }}px;"></div>
-                <div class="cv-vline" style="left: 650px; top: 326px; height: {{ $boxHeights['accounting'] }}px;"></div>
+                <div class="cv-accounting-table" style="left: {{ $boxPositions['accounting'][0] }}px; top: {{ $boxPositions['accounting'][1] }}px; height: {{ $boxHeights['accounting'] }}px;">
+                    <div class="cv-line" style="left: 0; top: 27px; width: 100%;"></div>
+                    <div class="cv-line" style="left: 0; top: 73px; width: 100%;"></div>
+                    <div class="cv-vline" style="left: 457px; top: 0; height: 100%;"></div>
+                    <div class="cv-vline" style="left: 603px; top: 0; height: 100%;"></div>
+                </div>
                 <div class="cv-box" style="left: 46px; top: 582px; width: 748px; height: {{ $boxHeights['signatures'] }}px;"></div>
                 <div class="cv-vline" style="left: 214px; top: 582px; height: {{ $boxHeights['signatures'] }}px;"></div>
                 <div class="cv-vline" style="left: 386px; top: 582px; height: {{ $boxHeights['signatures'] }}px;"></div>

@@ -9,6 +9,7 @@
     $fieldStyles = $layout['field_styles'];
     $customFields = $layout['custom_fields'];
     $boxHeights = $layout['box_heights'];
+    $boxPositions = $layout['box_positions'];
     $boxHeights['amount'] = max($boxHeights['amount'], 41 + $fieldStyles['amount_words']['height']);
     $boxHeights['description'] = max($boxHeights['description'], 8 + $fieldStyles['description']['height']);
     $formattedAmount = number_format($sample['net'], 2);
@@ -83,6 +84,8 @@
     .cv-guide-box { position: absolute; pointer-events: none; border: 1px solid rgba(17, 24, 39, .5); }
     .cv-guide-line { position: absolute; pointer-events: none; border-top: 1px solid rgba(17, 24, 39, .5); }
     .cv-guide-vline { position: absolute; pointer-events: none; border-left: 1px solid rgba(17, 24, 39, .5); }
+    .movable-table-guide { position: absolute; border: 2px dashed #0d6efd; cursor: move; touch-action: none; z-index: 1; }
+    .movable-table-guide::after { content: 'Move Accounting Table'; position: absolute; right: 4px; top: 3px; padding: 1px 5px; border-radius: 3px; background: #0d6efd; color: #fff; font-size: 9px; pointer-events: none; }
     .drag-field {
         position: absolute;
         box-sizing: border-box;
@@ -147,6 +150,8 @@
         @foreach($boxHeights as $box => $height)
             <input type="hidden" name="box_height_{{ $box }}" id="box_height_{{ $box }}" value="{{ $height }}">
         @endforeach
+        <input type="hidden" name="box_x_accounting" id="box_x_accounting" value="{{ $boxPositions['accounting'][0] }}">
+        <input type="hidden" name="box_y_accounting" id="box_y_accounting" value="{{ $boxPositions['accounting'][1] }}">
         <div id="customHiddenInputs">
             @foreach($customFields as $custom)
                 <input type="hidden" name="custom_key[]" id="custom_key_{{ $custom['key'] }}" value="{{ $custom['key'] }}">
@@ -168,11 +173,12 @@
                     <div class="cv-guide-box" data-box="amount" style="left: 46px; top: 502px; width: 748px; height: {{ $boxHeights['amount'] }}px;"></div>
                     <div class="cv-guide-line" style="left: 46px; top: 532px; width: 748px;"></div>
                     <div class="cv-guide-box" data-box="description" style="left: 46px; top: 428px; width: 748px; height: {{ $boxHeights['description'] }}px;"></div>
-                    <div class="cv-guide-box" data-box="accounting" style="left: 46px; top: 326px; width: 748px; height: {{ $boxHeights['accounting'] }}px;"></div>
-                    <div class="cv-guide-line" style="left: 46px; top: 354px; width: 748px;"></div>
-                    <div class="cv-guide-line" style="left: 46px; top: 400px; width: 748px;"></div>
-                    <div class="cv-guide-vline" data-box="accounting" style="left: 504px; top: 326px; height: {{ $boxHeights['accounting'] }}px;"></div>
-                    <div class="cv-guide-vline" data-box="accounting" style="left: 650px; top: 326px; height: {{ $boxHeights['accounting'] }}px;"></div>
+                    <div class="movable-table-guide" id="accountingTableGuide" data-box="accounting" style="left: {{ $boxPositions['accounting'][0] }}px; top: {{ $boxPositions['accounting'][1] }}px; width: 748px; height: {{ $boxHeights['accounting'] }}px;">
+                        <div class="cv-guide-line" style="left: 0; top: 27px; width: 100%;"></div>
+                        <div class="cv-guide-line" style="left: 0; top: 73px; width: 100%;"></div>
+                        <div class="cv-guide-vline" style="left: 457px; top: 0; height: 100%;"></div>
+                        <div class="cv-guide-vline" style="left: 603px; top: 0; height: 100%;"></div>
+                    </div>
                     <div class="cv-guide-box" data-box="signatures" style="left: 46px; top: 582px; width: 748px; height: {{ $boxHeights['signatures'] }}px;"></div>
                     <div class="cv-guide-vline" data-box="signatures" style="left: 214px; top: 582px; height: {{ $boxHeights['signatures'] }}px;"></div>
                     <div class="cv-guide-vline" data-box="signatures" style="left: 386px; top: 582px; height: {{ $boxHeights['signatures'] }}px;"></div>
@@ -270,6 +276,16 @@
                             <input type="number" min="40" max="600" class="form-control form-control-sm box-height-control" data-box="{{ $box }}" value="{{ $boxHeights[$box] }}">
                         </div>
                     @endforeach
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small text-muted">Accounting Table X</label>
+                        <input type="number" min="0" class="form-control form-control-sm" id="accountingTableXControl" value="{{ $boxPositions['accounting'][0] }}">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small text-muted">Accounting Table Y</label>
+                        <input type="number" min="0" class="form-control form-control-sm" id="accountingTableYControl" value="{{ $boxPositions['accounting'][1] }}">
+                    </div>
                 </div>
 
                 <hr>
@@ -395,6 +411,40 @@
             });
         }
 
+        function updateAccountingTablePosition(x, y) {
+            x = Math.max(0, parseInt(x, 10) || 0);
+            y = Math.max(0, parseInt(y, 10) || 0);
+            $('#accountingTableGuide').css({ left: x + 'px', top: y + 'px' });
+            $('#box_x_accounting, #accountingTableXControl').val(x);
+            $('#box_y_accounting, #accountingTableYControl').val(y);
+        }
+
+        function bindAccountingTableDrag(el) {
+            var drag = null;
+            el.addEventListener('pointerdown', function (event) {
+                event.preventDefault();
+                drag = {
+                    pointerId: event.pointerId,
+                    startX: event.clientX,
+                    startY: event.clientY,
+                    left: parseInt(el.style.left, 10) || 0,
+                    top: parseInt(el.style.top, 10) || 0
+                };
+                el.setPointerCapture(event.pointerId);
+            });
+            el.addEventListener('pointermove', function (event) {
+                if (!drag || drag.pointerId !== event.pointerId) return;
+                updateAccountingTablePosition(
+                    drag.left + event.clientX - drag.startX,
+                    drag.top + event.clientY - drag.startY
+                );
+            });
+            el.addEventListener('pointerup', function (event) {
+                if (drag && drag.pointerId === event.pointerId) drag = null;
+            });
+            el.addEventListener('pointercancel', function () { drag = null; });
+        }
+
         function bindResize(handle) {
             var resize = null;
             handle.addEventListener('pointerdown', function (event) {
@@ -444,6 +494,7 @@
         }
 
         $('.drag-field').each(function () { bindDrag(this); });
+        bindAccountingTableDrag(document.getElementById('accountingTableGuide'));
         $('.field-resize').each(function () { bindResize(this); });
         $('.field-focus').on('click', function () { setActive($(this).data('field')); });
         $('#fieldXControl, #fieldYControl').on('input', function () {
@@ -453,6 +504,9 @@
         $('#fieldWidthControl, #fieldHeightControl, #fieldFontControl').on('input', function () {
             var el = selectedElement();
             if (el) updateSize(el, $('#fieldWidthControl').val(), $('#fieldHeightControl').val(), $('#fieldFontControl').val());
+        });
+        $('#accountingTableXControl, #accountingTableYControl').on('input', function () {
+            updateAccountingTablePosition($('#accountingTableXControl').val(), $('#accountingTableYControl').val());
         });
         $('.box-height-control').on('input', function () {
             var box = $(this).data('box');

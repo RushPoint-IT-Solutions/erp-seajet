@@ -3776,6 +3776,9 @@ class ModuleController extends Controller
         $savedBoxHeights = isset($savedStyles['_box_heights']) && is_array($savedStyles['_box_heights'])
             ? $savedStyles['_box_heights']
             : [];
+        $savedBoxPositions = isset($savedStyles['_box_positions']) && is_array($savedStyles['_box_positions'])
+            ? $savedStyles['_box_positions']
+            : [];
 
         $layout['box_heights'] = [];
         foreach ($defaultBoxHeights as $box => $height) {
@@ -3797,6 +3800,14 @@ class ModuleController extends Controller
                 $savedHeight
             )));
         }
+
+        $accountingBoxPosition = $savedBoxPositions['accounting'] ?? [46, 326];
+        $layout['box_positions'] = [
+            'accounting' => [
+                max(0, min($layout['settings']['paper_width'] - 100, (int) request('box_x_accounting', $accountingBoxPosition[0] ?? 46))),
+                max(0, min($layout['settings']['paper_height'] - 40, (int) request('box_y_accounting', $accountingBoxPosition[1] ?? 326))),
+            ],
+        ];
 
         foreach ($defaults as $field => $point) {
             $savedPoint = $savedPositions[$field] ?? $point;
@@ -3883,6 +3894,7 @@ class ModuleController extends Controller
         }
 
         $layout['field_styles']['_box_heights'] = $layout['box_heights'];
+        $layout['field_styles']['_box_positions'] = $layout['box_positions'];
         $layout['field_styles']['_compact_sections'] = true;
         $layout['field_styles']['_accounting_before_description'] = true;
         $layout['field_styles']['_spaced_swapped_sections'] = true;

@@ -331,6 +331,10 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertOk()
             ->assertSee('id="fieldHeightControl"', false)
             ->assertSee('id="box_height_accounting"', false)
+            ->assertSee('id="accountingTableGuide"', false)
+            ->assertSee('Move Accounting Table')
+            ->assertSee('id="box_x_accounting"', false)
+            ->assertSee('id="box_y_accounting"', false)
             ->assertDontSee('cv-guide-muted');
 
         $this->post(route('erp.payables.check-voucher.layout.save'), [
@@ -345,6 +349,8 @@ class ControlledCheckLifecycleTest extends TestCase
             'x_amount_words' => 410,
             'y_amount_words' => 438,
             'box_height_accounting' => 220,
+            'box_x_accounting' => 72,
+            'box_y_accounting' => 345,
         ])->assertRedirect(route('erp.payables.check-voucher.layout'));
 
         $styles = json_decode(DB::table('print_layouts')
@@ -352,6 +358,7 @@ class ControlledCheckLifecycleTest extends TestCase
             ->value('field_styles'), true);
         $this->assertSame(60, $styles['description']['height']);
         $this->assertSame(220, $styles['_box_heights']['accounting']);
+        $this->assertSame([72, 345], $styles['_box_positions']['accounting']);
 
         $this->get(route('erp.payables.check-voucher'))
             ->assertOk()
@@ -361,6 +368,7 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertSee('left: 410px; top: 438px', false)
             ->assertSee('height: 60px', false)
             ->assertSee('height: 220px', false)
+            ->assertSee('class="cv-accounting-table" style="left: 72px; top: 345px; height: 220px;"', false)
             ->assertDontSee('cv-muted-line');
     }
 
