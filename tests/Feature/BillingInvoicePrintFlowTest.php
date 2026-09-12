@@ -305,6 +305,7 @@ class BillingInvoicePrintFlowTest extends TestCase
         $layout->assertSee('id="fontFamilyControl"', false);
         $layout->assertSee('name="font_family"', false);
         $layout->assertSee('Arial (Agenture)');
+        $layout->assertSee('Sans Serif (Epson)');
         $layout->assertSee('Times New Roman');
         $layout->assertSee('id="allFontSizeControl"', false);
         $layout->assertSee('id="boldAllControl"', false);
@@ -358,6 +359,11 @@ class BillingInvoicePrintFlowTest extends TestCase
         $calibriPrint->assertStatus(200);
         $calibriPrint->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif;', false);
         $calibriPrint->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif !important;', false);
+
+        $sansSerifPrint = $this->get('/erp/billings/print/invoice?invoice=BI-TEST-001&font_family=sans_serif');
+        $sansSerifPrint->assertStatus(200);
+        $sansSerifPrint->assertSee('font-family: &quot;Epson Sans Serif&quot;, &quot;MS Sans Serif&quot;, Arial, Helvetica, sans-serif;', false);
+        $sansSerifPrint->assertSee('font-family: &quot;Epson Sans Serif&quot;, &quot;MS Sans Serif&quot;, Arial, Helvetica, sans-serif !important;', false);
 
         $regularPrint = $this->get('/erp/billings/print/invoice?invoice=BI-TEST-001&bold_all=0');
         $regularPrint->assertStatus(200);

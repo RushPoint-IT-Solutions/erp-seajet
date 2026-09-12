@@ -6695,6 +6695,7 @@ class ModuleController extends Controller
     {
         return [
             'arial' => ['label' => 'Arial (Agenture)', 'stack' => 'Arial, Helvetica, sans-serif'],
+            'sans_serif' => ['label' => 'Sans Serif (Epson)', 'stack' => '"Epson Sans Serif", "MS Sans Serif", Arial, Helvetica, sans-serif'],
             'calibri' => ['label' => 'Calibri', 'stack' => 'Calibri, Arial, Helvetica, sans-serif'],
             'times_new_roman' => ['label' => 'Times New Roman', 'stack' => '"Times New Roman", Times, serif'],
             'verdana' => ['label' => 'Verdana', 'stack' => 'Verdana, Geneva, sans-serif'],
