@@ -251,6 +251,7 @@
             if (option.data('balance')) {
                 form.find('.payment-amount-input').val(option.data('balance'));
             }
+            form.find('.payment-cwt-input').val(option.data('cwt-balance') || '0.00');
         }
 
         $('#invoiceViewPaymentModal .payment-customer-select').on('change', function () {

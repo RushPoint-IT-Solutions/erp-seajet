@@ -25,7 +25,8 @@
                                         data-customer-id="{{ $invoice['customer_id'] }}"
                                         data-customer-name="{{ $invoice['customer_name'] }}"
                                         data-currency="{{ $invoice['currency'] }}"
-                                        data-balance="{{ number_format($invoice['balance'], 2, '.', '') }}">
+                                        data-balance="{{ number_format($invoice['balance'], 2, '.', '') }}"
+                                        data-cwt-balance="{{ number_format($invoice['cwt_balance'], 2, '.', '') }}">
                                     {{ $invoice['document_no'] }} - {{ $invoice['customer_name'] }} - {{ $invoice['currency'] }} {{ number_format($invoice['balance'], 2) }}
                                 </option>
                             @endforeach
@@ -80,9 +81,9 @@
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">Amount</label>
+                        <label class="form-label">Payable Amount</label>
                         <input name="amount" class="form-control text-end payment-amount-input" value="" required>
-                        <div class="form-text">Cash or bank amount actually received.</div>
+                        <div class="form-text">Billing Invoice amount less withholding tax.</div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Exchange Rate to PHP</label>

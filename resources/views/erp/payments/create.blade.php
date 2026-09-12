@@ -120,7 +120,8 @@
                     <th>Method</th>
                     <th>Reference</th>
                     <th>Date</th>
-                    <th class="text-end">Amount</th>
+                    <th class="text-end">For Payment</th>
+                    <th class="text-end">Paid Amount</th>
                     <th class="text-end">Action</th>
                 </tr>
                 </thead>
@@ -154,6 +155,7 @@
                         <td>{{ $payment['payment_method'] ?: '-' }}</td>
                         <td>{{ $payment['reference_no'] ?: '-' }}</td>
                         <td>{{ $payment['date'] ? \Carbon\Carbon::parse($payment['date'])->format('d/M/Y') : '-' }}</td>
+                        <td class="text-end">{{ $payment['currency'] === 'PHP' ? 'PHP' : $payment['currency'] }} {{ $payment['for_payment'] }}</td>
                         <td class="text-end">{{ $payment['currency'] === 'PHP' ? 'PHP' : $payment['currency'] }} {{ $payment['amount'] }}</td>
                         <td class="text-end">
                             <div class="d-inline-flex gap-1">
@@ -172,7 +174,7 @@
                 @endforeach
                 @if(count($payments) === 0)
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-5">No payment records found.</td>
+                        <td colspan="10" class="text-center text-muted py-5">No payment records found.</td>
                     </tr>
                 @endif
                 </tbody>
@@ -210,6 +212,7 @@
             if (option.data('balance')) {
                 form.find('.payment-amount-input').val(option.data('balance'));
             }
+            form.find('.payment-cwt-input').val(option.data('cwt-balance') || '0.00');
         }
 
         $('.payment-customer-select').on('change', function () {

@@ -8363,6 +8363,15 @@ class ModuleController extends Controller
             $invoiceNumbers = DB::connection()->getDriverName() === 'sqlite'
                 ? DB::raw('GROUP_CONCAT(sales_documents.document_no, ", ") as invoice_numbers')
                 : DB::raw('GROUP_CONCAT(sales_documents.document_no ORDER BY sales_documents.document_no SEPARATOR ", ") as invoice_numbers');
+            $billingInvoiceAmount = 'CASE WHEN COALESCE(sales_documents.invoice_amount, 0) > 0 '
+                .'THEN sales_documents.invoice_amount '
+                .'WHEN COALESCE(sales_documents.grand_total, 0) - COALESCE(sales_documents.freight_total, 0) > 0 '
+                .'THEN sales_documents.grand_total - COALESCE(sales_documents.freight_total, 0) '
+                .'ELSE COALESCE(sales_documents.grand_total, 0) END';
+            $forPaymentAmount = DB::raw('COALESCE(SUM(CASE WHEN sales_documents.id IS NULL THEN 0 '
+                .'WHEN ('.$billingInvoiceAmount.' - COALESCE(sales_documents.withholding_tax_amount, 0)) > 0 '
+                .'THEN '.$billingInvoiceAmount.' - COALESCE(sales_documents.withholding_tax_amount, 0) '
+                .'ELSE 0 END), 0) as for_payment');
 
             return DB::table('receipts')
                 ->leftJoin('customers', 'customers.id', '=', 'receipts.customer_id')
@@ -8378,7 +8387,8 @@ class ModuleController extends Controller
                     'receipts.payment_method',
                     'receipts.reference_no',
                     'customers.name as customer_name',
-                    $invoiceNumbers
+                    $invoiceNumbers,
+                    $forPaymentAmount
                 )
                 ->where('receipts.company_id', $this->defaultCompanyId())
                 ->groupBy(
@@ -8403,6 +8413,7 @@ class ModuleController extends Controller
                         'number' => $payment->receipt_no,
                         'client' => $payment->customer_name ?: 'Unassigned Customer',
                         'currency' => $payment->currency ?: 'PHP',
+                        'for_payment' => number_format((float) $payment->for_payment, 2),
                         'amount' => number_format((float) $payment->amount, 2),
                         'invoice_number' => $payment->invoice_numbers ?: '',
                         'date' => $payment->receipt_date,
@@ -8446,37 +8457,84 @@ class ModuleController extends Controller
             return [];
         }
 
-        return DB::table('sales_documents')
+        $invoices = DB::table('sales_documents')
             ->leftJoin('customers', 'customers.id', '=', 'sales_documents.customer_id')
             ->select(
                 'sales_documents.id',
                 'sales_documents.document_no',
                 'sales_documents.currency',
                 'sales_documents.grand_total',
+                'sales_documents.invoice_amount',
+                'sales_documents.freight_total',
+                'sales_documents.withholding_tax_amount',
                 'sales_documents.paid_total',
                 'sales_documents.customer_id',
                 'customers.name as customer_name'
             )
             ->where('sales_documents.company_id', $this->defaultCompanyId())
             ->whereIn('sales_documents.document_type', ['invoice', 'billing_invoice', 'soa', 'soa_a', 'statement_of_account_a', 'debit_note'])
-            ->whereNotIn('sales_documents.status', ['cancelled', 'voided'])
-            ->whereRaw('(sales_documents.grand_total - sales_documents.paid_total) > 0')
+            ->whereNotIn('sales_documents.status', ['cancelled', 'voided', 'paid'])
             ->orderBy('sales_documents.document_date', 'desc')
-            ->limit(150)
-            ->get()
-            ->map(function ($invoice) {
+            ->limit(300)
+            ->get();
+
+        $appliedCwt = collect();
+        if (Schema::hasTable('receipt_applications') && Schema::hasTable('receipts') && Schema::hasColumn('receipts', 'cwt_amount')) {
+            $appliedCwt = DB::table('receipt_applications')
+                ->join('receipts', 'receipts.id', '=', 'receipt_applications.receipt_id')
+                ->whereIn('receipt_applications.sales_document_id', $invoices->pluck('id')->all())
+                ->whereNotIn('receipts.status', ['cancelled', 'voided'])
+                ->groupBy('receipt_applications.sales_document_id')
+                ->selectRaw('receipt_applications.sales_document_id, COALESCE(SUM(receipts.cwt_amount), 0) as cwt_total')
+                ->pluck('cwt_total', 'sales_document_id');
+        }
+
+        return $invoices
+            ->map(function ($invoice) use ($appliedCwt) {
+                $amounts = $this->paymentInvoiceAmounts($invoice, (float) $appliedCwt->get($invoice->id, 0));
+
                 return [
                     'id' => $invoice->id,
                     'document_no' => $invoice->document_no,
                     'currency' => $invoice->currency ?: 'PHP',
                     'grand_total' => (float) $invoice->grand_total,
                     'paid_total' => (float) $invoice->paid_total,
-                    'balance' => max(0, (float) $invoice->grand_total - (float) $invoice->paid_total),
+                    'balance' => $amounts['cash_balance'],
+                    'cwt_balance' => $amounts['cwt_balance'],
                     'customer_id' => $invoice->customer_id,
                     'customer_name' => $invoice->customer_name ?: 'Guest / Non-tax Client',
                 ];
             })
+            ->filter(function ($invoice) {
+                return $invoice['balance'] > 0.005 || $invoice['cwt_balance'] > 0.005;
+            })
+            ->take(150)
+            ->values()
             ->all();
+    }
+
+    private function paymentInvoiceAmounts($invoice, $appliedCwt = 0)
+    {
+        $grandTotal = max(0, (float) ($invoice->grand_total ?? 0));
+        $invoiceTotal = max(0, (float) ($invoice->invoice_amount ?? 0));
+        if ($invoiceTotal <= 0) {
+            $invoiceTotal = max(0, $grandTotal - max(0, (float) ($invoice->freight_total ?? 0)));
+        }
+        if ($invoiceTotal <= 0) {
+            $invoiceTotal = $grandTotal;
+        }
+
+        $paidTotal = max(0, (float) ($invoice->paid_total ?? 0));
+        $settlementBalance = max(0, $invoiceTotal - $paidTotal);
+        $withholdingTotal = min($invoiceTotal, max(0, (float) ($invoice->withholding_tax_amount ?? 0)));
+        $cwtBalance = min($settlementBalance, max(0, $withholdingTotal - max(0, (float) $appliedCwt)));
+
+        return [
+            'invoice_total' => $invoiceTotal,
+            'settlement_balance' => $settlementBalance,
+            'cwt_balance' => $cwtBalance,
+            'cash_balance' => max(0, $settlementBalance - $cwtBalance),
+        ];
     }
 
     public function paymentReceipt()
@@ -8554,17 +8612,28 @@ class ModuleController extends Controller
         $receiptNo = request('receipt_no') ?: $this->nextReceiptNumber($companyId);
 
         $settlementAmount = $amount + $cwtAmount;
+        $invoiceAmounts = null;
         if ($invoice) {
-            $outstanding = max(0, (float) $invoice->grand_total - (float) $invoice->paid_total);
-            if ($settlementAmount - $outstanding > 0.005) {
-                return back()->withInput()->withErrors(['amount' => 'Cash plus CWT cannot exceed the selected invoice balance.']);
+            $appliedCwt = Schema::hasTable('receipt_applications') && Schema::hasColumn('receipts', 'cwt_amount')
+                ? (float) DB::table('receipt_applications')
+                    ->join('receipts', 'receipts.id', '=', 'receipt_applications.receipt_id')
+                    ->where('receipt_applications.sales_document_id', $invoice->id)
+                    ->whereNotIn('receipts.status', ['cancelled', 'voided'])
+                    ->sum('receipts.cwt_amount')
+                : 0;
+            $invoiceAmounts = $this->paymentInvoiceAmounts($invoice, $appliedCwt);
+            if ($invoiceAmounts['settlement_balance'] <= 0.005) {
+                return back()->withInput()->withErrors(['invoice_no' => 'The selected invoice is already fully paid.']);
+            }
+            if ($settlementAmount - $invoiceAmounts['settlement_balance'] > 0.005) {
+                return back()->withInput()->withErrors(['amount' => 'Cash plus CWT cannot exceed the selected Billing Invoice balance.']);
             }
         }
 
         $currency = strtoupper($data['currency']);
         $exchangeRate = $currency === 'PHP' ? 1 : max(0.000001, $this->moneyToFloat($data['exchange_rate'] ?? 1));
 
-        $receiptId = DB::transaction(function () use ($customer, $companyId, $invoice, $receiptNo, $amount, $cwtAmount, $settlementAmount, $currency, $exchangeRate, $data) {
+        $receiptId = DB::transaction(function () use ($customer, $companyId, $invoice, $invoiceAmounts, $receiptNo, $amount, $cwtAmount, $settlementAmount, $currency, $exchangeRate, $data) {
             $receiptId = DB::table('receipts')->insertGetId([
                 'company_id' => $companyId,
                 'customer_id' => $customer->id,
@@ -8593,14 +8662,17 @@ class ModuleController extends Controller
                 DB::table('receipt_applications')->insert([
                     'receipt_id' => $receiptId,
                     'sales_document_id' => $invoice->id,
-                    'amount_applied' => min($settlementAmount, max(0, (float) $invoice->grand_total - (float) $invoice->paid_total)),
+                    'amount_applied' => min($settlementAmount, $invoiceAmounts['settlement_balance']),
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
 
+                $paidTotal = min($invoiceAmounts['invoice_total'], (float) $invoice->paid_total + $settlementAmount);
                 DB::table('sales_documents')->where('id', $invoice->id)->update([
-                    'paid_total' => min((float) $invoice->grand_total, (float) $invoice->paid_total + $settlementAmount),
-                    'status' => ((float) $invoice->paid_total + $settlementAmount) >= (float) $invoice->grand_total ? 'paid' : 'partial',
+                    'paid_total' => $paidTotal,
+                    'total_payment' => $paidTotal,
+                    'balance_due' => max(0, $invoiceAmounts['invoice_total'] - $paidTotal),
+                    'status' => $paidTotal >= $invoiceAmounts['invoice_total'] - 0.005 ? 'paid' : 'partial',
                     'updated_at' => now(),
                 ]);
             }
