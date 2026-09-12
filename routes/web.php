@@ -149,6 +149,8 @@ Route::middleware(['auth', 'permission.access'])->group(function () {
     Route::post('/erp/official-receipt/print-layout/save', 'Erp\ModuleController@saveOfficialReceiptPrintLayout')->name('erp.official-receipt.layout.save');
     Route::get('/erp/acknowledgement-receipt/preview', 'Erp\ModuleController@acknowledgementReceiptPreview')->name('erp.acknowledgement-receipt.preview');
     Route::post('/erp/acknowledgement-receipt/print-layout/save', 'Erp\ModuleController@saveAcknowledgementReceiptPrintLayout')->name('erp.acknowledgement-receipt.layout.save');
+    Route::get('/erp/non-vat-acknowledgement-report/preview', 'Erp\ModuleController@nonVatAcknowledgementPreview')->name('erp.non-vat-acknowledgement.preview');
+    Route::post('/erp/non-vat-acknowledgement-report/print-layout/save', 'Erp\ModuleController@saveNonVatAcknowledgementPrintLayout')->name('erp.non-vat-acknowledgement.layout.save');
 
     Route::get('/erp/reports', 'Erp\ModuleController@reportsIndex')->name('erp.reports.index');
     Route::get('/erp/reports/trial-balance', 'Erp\ModuleController@trialBalanceReport')->name('erp.reports.trial-balance');

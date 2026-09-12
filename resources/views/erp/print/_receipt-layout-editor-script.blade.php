@@ -166,7 +166,8 @@
 
         field.addEventListener('pointermove', function (event) {
             if (!drag || drag.field !== field || drag.pointerId !== event.pointerId) return;
-            var pixelsPerMm = sheet.getBoundingClientRect().width / 210;
+            var sheetWidthMm = parseFloat(sheet.dataset.sheetWidthMm || '210');
+            var pixelsPerMm = sheet.getBoundingClientRect().width / sheetWidthMm;
             applyPosition(field, drag.x + ((event.clientX - drag.startX) / pixelsPerMm), drag.y + ((event.clientY - drag.startY) / pixelsPerMm));
         });
 

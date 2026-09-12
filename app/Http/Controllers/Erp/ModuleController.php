@@ -8834,10 +8834,12 @@ class ModuleController extends Controller
             'description' => ($isAcknowledgement ? 'PAYMENT FOR REIMBURSABLE CHARGES' : 'PAYMENT FOR LOCAL CHARGES') . "\n" . ($isAcknowledgement ? 'SOA#5923' : 'BI# 0000007'),
             'currency' => request('currency', 'PHP'),
             'amount' => (float) str_replace(',', '', request('amount', $isAcknowledgement ? 63839.24 : 30680)),
+            'collected_amount' => (float) str_replace(',', '', request('amount', $isAcknowledgement ? 63839.24 : 30680)),
             'payment_method' => request('payment_method', 'Check'),
             'reference_no' => request('reference_no', ''),
             'bank' => '',
             'printed_by' => auth()->user()->name ?? 'User',
+            'is_non_vat' => $this->isNonVatCollection(request('tax_classification', request('vat_classification', ''))),
         ];
 
         if (!Schema::hasTable('receipts')) {
@@ -8870,9 +8872,11 @@ class ModuleController extends Controller
                 'customers.name as customer_name',
                 'customers.tin as customer_tin',
                 'customers.billing_address',
+                'customers.tax_classification as customer_tax_classification',
                 DB::raw($invoiceNumbersSql),
                 DB::raw($soaNumbersSql),
                 DB::raw($invoiceRemarksSql),
+                DB::raw('MAX(sales_documents.vat_classification) as invoice_vat_classification'),
                 DB::raw('COUNT(receipt_applications.id) as application_count'),
                 DB::raw('SUM(CASE
                     WHEN sales_documents.id IS NULL THEN 0
@@ -8935,7 +8939,8 @@ class ModuleController extends Controller
                 'customers.code',
                 'customers.name',
                 'customers.tin',
-                'customers.billing_address'
+                'customers.billing_address',
+                'customers.tax_classification'
             )
             ->when(in_array('currency', $receiptColumns, true), function ($grouped) {
                 return $grouped->groupBy('receipts.currency');
@@ -8977,22 +8982,41 @@ class ModuleController extends Controller
             'description' => implode("\n", $descriptionParts),
             'currency' => property_exists($dbReceipt, 'currency') && $dbReceipt->currency ? $dbReceipt->currency : 'PHP',
             'amount' => $printAmount,
+            'collected_amount' => (float) $dbReceipt->amount,
             'payment_method' => $dbReceipt->payment_method ?: 'Check',
             'reference_no' => $dbReceipt->reference_no ?: '',
             'bank' => '',
             'printed_by' => auth()->user()->name ?? 'User',
+            'is_non_vat' => $this->isNonVatCollection($dbReceipt->customer_tax_classification)
+                || $this->isNonVatCollection($dbReceipt->invoice_vat_classification),
         ];
+    }
+
+    private function isNonVatCollection($classification)
+    {
+        $classification = strtolower(str_replace(['_', '–', '—'], [' ', '-', '-'], trim((string) $classification)));
+
+        return strpos($classification, 'non-vat') !== false
+            || strpos($classification, 'non vat') !== false
+            || strpos($classification, 'vat-exempt') !== false
+            || strpos($classification, 'vat exempt') !== false
+            || $classification === 'exempt';
     }
 
     public function acknowledgementReceiptPreview()
     {
+        $receipt = $this->officialReceiptPrintData(request('receipt_no') ?: request('receipt'), 'ar');
+        if (!empty($receipt['is_non_vat'])) {
+            return $this->nonVatAcknowledgementView($receipt);
+        }
+
         return view('erp.print.acknowledgement-receipt', [
-            'receipt' => $this->officialReceiptPrintData(request('receipt_no') ?: request('receipt'), 'ar'),
+            'receipt' => $receipt,
             'receiptLayout' => $this->receiptPrintLayout('ar'),
             'receiptFieldStyles' => $this->receiptPrintFieldStyles('ar'),
             'receiptFontDefaults' => $this->receiptPrintFontDefaults(),
             'receiptFontOptions' => $this->receiptPrintFontOptions(),
-            'receiptFieldLabels' => $this->receiptPrintFieldLabels(),
+            'receiptFieldLabels' => $this->receiptPrintFieldLabels('ar'),
             'receiptHiddenFields' => $this->receiptPrintHiddenFields('ar'),
             'adjustLayout' => request('adjust') === '1',
         ]);
@@ -9003,14 +9027,43 @@ class ModuleController extends Controller
         return $this->saveReceiptPrintLayout('ar');
     }
 
-    private function receiptPrintFieldKeys()
+    public function nonVatAcknowledgementPreview()
     {
-        return array_keys($this->receiptPrintFieldLabels());
+        return $this->nonVatAcknowledgementView(
+            $this->officialReceiptPrintData(request('receipt_no') ?: request('receipt'), 'ar')
+        );
     }
 
-    private function receiptPrintFieldLabels()
+    private function nonVatAcknowledgementView(array $receipt)
     {
-        return [
+        $receipt['amount'] = (float) ($receipt['collected_amount'] ?? $receipt['amount'] ?? 0);
+
+        return view('erp.print.non-vat-acknowledgement-report', [
+            'receipt' => $receipt,
+            'receiptLayout' => $this->receiptPrintLayout('ar_non_vat'),
+            'receiptFieldStyles' => $this->receiptPrintFieldStyles('ar_non_vat'),
+            'receiptFontDefaults' => $this->receiptPrintFontDefaults('ar_non_vat'),
+            'receiptFontOptions' => $this->receiptPrintFontOptions(),
+            'receiptFieldLabels' => $this->receiptPrintFieldLabels('ar_non_vat'),
+            'receiptHiddenFields' => $this->receiptPrintHiddenFields('ar_non_vat'),
+            'receiptContent' => $this->receiptPrintContent('ar_non_vat'),
+            'adjustLayout' => request('adjust') === '1',
+        ]);
+    }
+
+    public function saveNonVatAcknowledgementPrintLayout()
+    {
+        return $this->saveReceiptPrintLayout('ar_non_vat');
+    }
+
+    private function receiptPrintFieldKeys($documentKind = null)
+    {
+        return array_keys($this->receiptPrintFieldLabels($documentKind));
+    }
+
+    private function receiptPrintFieldLabels($documentKind = null)
+    {
+        $labels = [
             'receipt_no' => 'Receipt number',
             'payment_date' => 'Payment date',
             'account_no' => 'Account number',
@@ -9024,10 +9077,25 @@ class ModuleController extends Controller
             'total_amount' => 'Total paid amount',
             'printed_by' => 'Printed by',
         ];
+
+        if ($documentKind === 'ar_non_vat') {
+            return array_merge([
+                'report_header' => 'Report header',
+                'intro_text' => 'Introduction text',
+            ], $labels, [
+                'footer_text' => 'Footer text',
+            ]);
+        }
+
+        return $labels;
     }
 
     private function receiptPrintLayoutStoragePath($documentKind)
     {
+        if ($documentKind === 'ar_non_vat') {
+            return 'erp/non_vat_acknowledgement_report_print_layout.json';
+        }
+
         return $documentKind === 'ar'
             ? 'erp/acknowledgement_receipt_print_layout.json'
             : 'erp/collection_receipt_print_layout.json';
@@ -9035,6 +9103,10 @@ class ModuleController extends Controller
 
     private function receiptPrintDocumentType($documentKind)
     {
+        if ($documentKind === 'ar_non_vat') {
+            return 'non_vat_acknowledgement_report';
+        }
+
         return $documentKind === 'ar' ? 'acknowledgement_receipt' : 'collection_receipt';
     }
 
@@ -9059,6 +9131,7 @@ class ModuleController extends Controller
                     return [
                         'positions' => json_decode($record->positions ?: '[]', true) ?: [],
                         'field_styles' => json_decode($record->field_styles ?: '[]', true) ?: [],
+                        'content' => json_decode($record->custom_fields ?: '[]', true) ?: [],
                         'hidden_fields' => Schema::hasColumn('print_layouts', 'hidden_fields')
                             ? (json_decode($record->hidden_fields ?: '[]', true) ?: [])
                             : ($storageLayout['hidden_fields'] ?? []),
@@ -9078,7 +9151,7 @@ class ModuleController extends Controller
         $savedPositions = $saved['positions'] ?? $saved;
         $layout = [];
 
-        foreach ($this->receiptPrintFieldKeys() as $field) {
+        foreach ($this->receiptPrintFieldKeys($documentKind) as $field) {
             $point = isset($savedPositions[$field]) && is_array($savedPositions[$field]) ? $savedPositions[$field] : [0, 0];
             $layout[$field] = [
                 max(-100, min(100, round((float) ($point[0] ?? 0), 2))),
@@ -9089,9 +9162,9 @@ class ModuleController extends Controller
         return $layout;
     }
 
-    private function receiptPrintFontDefaults()
+    private function receiptPrintFontDefaults($documentKind = null)
     {
-        return [
+        $defaults = [
             'receipt_no' => 15,
             'payment_date' => 8.25,
             'account_no' => 8.25,
@@ -9105,6 +9178,38 @@ class ModuleController extends Controller
             'total_amount' => 9,
             'printed_by' => 7.5,
         ];
+
+        if ($documentKind === 'ar_non_vat') {
+            return array_merge([
+                'report_header' => 18,
+                'intro_text' => 11,
+            ], $defaults, [
+                'footer_text' => 10,
+            ]);
+        }
+
+        return $defaults;
+    }
+
+    private function receiptPrintContentDefaults()
+    {
+        return [
+            'report_header' => 'ACKNOWLEDGEMENT REPORT',
+            'intro_text' => 'This is to acknowledge receipt of payment from:',
+            'footer_text' => 'This acknowledgement is issued for a Non-VAT collection.',
+        ];
+    }
+
+    private function receiptPrintContent($documentKind)
+    {
+        if ($documentKind !== 'ar_non_vat') {
+            return [];
+        }
+
+        $saved = $this->savedReceiptPrintLayout($documentKind);
+        $content = isset($saved['content']) && is_array($saved['content']) ? $saved['content'] : [];
+
+        return array_merge($this->receiptPrintContentDefaults(), array_intersect_key($content, $this->receiptPrintContentDefaults()));
     }
 
     private function receiptPrintFontOptions()
@@ -9129,7 +9234,7 @@ class ModuleController extends Controller
         $fontOptions = $this->receiptPrintFontOptions();
         $styles = [];
 
-        foreach ($this->receiptPrintFontDefaults() as $field => $defaultFontSize) {
+        foreach ($this->receiptPrintFontDefaults($documentKind) as $field => $defaultFontSize) {
             $fontFamily = (string) ($savedFontFamilies[$field] ?? 'arial');
             if (!isset($fontOptions[$fontFamily])) {
                 $fontFamily = 'arial';
@@ -9149,7 +9254,7 @@ class ModuleController extends Controller
     private function receiptPrintHiddenFields($documentKind)
     {
         $saved = $this->savedReceiptPrintLayout($documentKind);
-        $knownFields = $this->receiptPrintFieldKeys();
+        $knownFields = $this->receiptPrintFieldKeys($documentKind);
         $hiddenFields = isset($saved['hidden_fields']) && is_array($saved['hidden_fields'])
             ? $saved['hidden_fields']
             : [];
@@ -9164,17 +9269,18 @@ class ModuleController extends Controller
         $submittedFontSizes = (array) request('font_size', []);
         $submittedFontFamilies = (array) request('font_family', []);
         $submittedBoldFields = (array) request('bold_field', []);
-        $fontDefaults = $this->receiptPrintFontDefaults();
+        $fontDefaults = $this->receiptPrintFontDefaults($documentKind);
         $fontOptions = $this->receiptPrintFontOptions();
-        $visibleFields = request()->has('visibility_present') ? (array) request('visible_field', []) : $this->receiptPrintFieldKeys();
-        $visibleFields = array_intersect($this->receiptPrintFieldKeys(), $visibleFields);
-        $hiddenFields = array_values(array_diff($this->receiptPrintFieldKeys(), $visibleFields));
+        $fieldKeys = $this->receiptPrintFieldKeys($documentKind);
+        $visibleFields = request()->has('visibility_present') ? (array) request('visible_field', []) : $fieldKeys;
+        $visibleFields = array_intersect($fieldKeys, $visibleFields);
+        $hiddenFields = array_values(array_diff($fieldKeys, $visibleFields));
         $positions = [];
         $fontSizes = [];
         $fontFamilies = [];
         $boldFields = [];
 
-        foreach ($this->receiptPrintFieldKeys() as $field) {
+        foreach ($fieldKeys as $field) {
             $positions[$field] = [
                 max(-100, min(100, round((float) ($submittedX[$field] ?? 0), 2))),
                 max(-100, min(100, round((float) ($submittedY[$field] ?? 0), 2))),
@@ -9192,18 +9298,25 @@ class ModuleController extends Controller
             'font_families' => $fontFamilies,
             'bold_fields' => $boldFields,
         ];
+        $content = [];
+        if ($documentKind === 'ar_non_vat') {
+            $submittedContent = (array) request('field_content', []);
+            foreach ($this->receiptPrintContentDefaults() as $field => $defaultContent) {
+                $content[$field] = substr(trim((string) ($submittedContent[$field] ?? $defaultContent)), 0, 2000);
+            }
+        }
 
         try {
             if (Schema::hasTable('print_layouts')) {
                 $updates = [
-                    'paper_size' => 'a5_landscape',
-                    'paper_width' => 794,
-                    'paper_height' => 561,
+                    'paper_size' => $documentKind === 'ar_non_vat' ? 'letter' : 'a5_landscape',
+                    'paper_width' => $documentKind === 'ar_non_vat' ? 816 : 794,
+                    'paper_height' => $documentKind === 'ar_non_vat' ? 1056 : 561,
                     'template_url' => null,
                     'print_template' => false,
                     'positions' => json_encode($positions),
                     'field_styles' => json_encode($fieldStyles),
-                    'custom_fields' => json_encode([]),
+                    'custom_fields' => json_encode($content),
                     'is_default' => true,
                     'updated_at' => now(),
                     'created_at' => now(),
@@ -9229,11 +9342,12 @@ class ModuleController extends Controller
             'positions' => $positions,
             'field_styles' => $fieldStyles,
             'hidden_fields' => $hiddenFields,
+            'content' => $content,
         ], JSON_PRETTY_PRINT));
 
-        $route = $documentKind === 'ar'
-            ? 'erp.acknowledgement-receipt.preview'
-            : 'erp.official-receipt.preview';
+        $route = $documentKind === 'ar_non_vat'
+            ? 'erp.non-vat-acknowledgement.preview'
+            : ($documentKind === 'ar' ? 'erp.acknowledgement-receipt.preview' : 'erp.official-receipt.preview');
         $query = ['adjust' => 1];
         if (request('receipt_no')) {
             $query['receipt_no'] = request('receipt_no');
