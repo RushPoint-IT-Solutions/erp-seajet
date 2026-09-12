@@ -178,7 +178,7 @@
             ? $print['soa_amounts']
             : number_format((float) ($print['reimbursement_total'] ?? 0), 2);
         $billingInvoiceAmount = (float) ($print['billing_total'] ?? 0);
-        $soaBTotal = (float) ($print['reimbursement_total'] ?? 0);
+        $soaBTotal = $billingInvoiceAmount + (float) ($print['reimbursement_total'] ?? 0);
         $paymentNoteLeft = $p['payment_note'][0];
         $paymentNoteTop = $p['payment_note'][1];
         $paymentNoteWidth = $s['payment_note']['width'];

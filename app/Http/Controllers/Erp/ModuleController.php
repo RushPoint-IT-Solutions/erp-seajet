@@ -7220,10 +7220,10 @@ class ModuleController extends Controller
                 'credit_term_days' => (int) ($data['credit_term_days'] ?: 0),
                 'currency' => $data['currency'] ?: 'PHP',
                 'exchange_rate' => $exchangeRate,
-                'subtotal' => $totals['vatable_sales'],
+                'subtotal' => $totals['billing_subtotal'],
                 'vatable_amount' => $totals['vatable_sales'],
-                'zero_rated_amount' => ($data['vat_classification'] ?? '') === 'zero-rated' ? $totals['vatable_sales'] : 0,
-                'vat_exempt_amount' => ($data['vat_classification'] ?? '') === 'exempt' ? $totals['vatable_sales'] : 0,
+                'zero_rated_amount' => $totals['zero_rated_sales'],
+                'vat_exempt_amount' => $totals['vat_exempt_sales'],
                 'tax_total' => $totals['vat_amount'],
                 'withholding_tax_rate' => $totals['withholding_tax_rate'],
                 'withholding_tax_amount' => $totals['withholding_tax_amount'],
@@ -7730,6 +7730,8 @@ class ModuleController extends Controller
 
         $totals = $this->billingTotals($resolved);
         $resolved['vatable_sales'] = number_format($totals['vatable_sales'], 2, '.', '');
+        $resolved['zero_rated_sales'] = number_format($totals['zero_rated_sales'], 2, '.', '');
+        $resolved['vat_exempt_sales'] = number_format($totals['vat_exempt_sales'], 2, '.', '');
         $resolved['vat_amount'] = number_format($totals['vat_amount'], 2, '.', '');
         $resolved['withholding_tax_rate'] = number_format($totals['withholding_tax_rate'], 2, '.', '');
         $resolved['withholding_tax_amount'] = number_format($totals['withholding_tax_amount'], 2, '.', '');
@@ -7905,6 +7907,9 @@ class ModuleController extends Controller
     private function billingTotals(array $data)
     {
         $billingSubtotal = 0.0;
+        $vatableSales = 0.0;
+        $zeroRatedSales = 0.0;
+        $vatExemptSales = 0.0;
         $reimbursementTotal = 0.0;
         $vatAmount = 0.0;
         $withholdingTaxAmount = 0.0;
@@ -7928,6 +7933,18 @@ class ModuleController extends Controller
             $withholdingBase += $lineAmount;
             $withholdingTaxAmount += $lineAmount * ($lineRate / 100);
             $taxCategory = strtolower(trim((string) ($data['tax_category'][$index] ?? '')));
+            if ($taxCategory === '') {
+                $taxCategory = strtolower(trim((string) ($data['vat_classification'] ?? '')));
+            }
+
+            if (strpos($taxCategory, 'zero') !== false) {
+                $zeroRatedSales += $lineAmount;
+            } elseif (strpos($taxCategory, 'exempt') !== false) {
+                $vatExemptSales += $lineAmount;
+            } else {
+                $vatableSales += $lineAmount;
+            }
+
             if ($taxCategory === '12%' || $taxCategory === 'vatable') {
                 $vatAmount += $lineAmount * 0.12;
             }
@@ -7939,7 +7956,10 @@ class ModuleController extends Controller
             : 0;
 
         return [
-            'vatable_sales' => $billingSubtotal,
+            'billing_subtotal' => $billingSubtotal,
+            'vatable_sales' => $vatableSales,
+            'zero_rated_sales' => $zeroRatedSales,
+            'vat_exempt_sales' => $vatExemptSales,
             'vat_amount' => $vatAmount,
             'withholding_tax_rate' => $withholdingTaxRate,
             'withholding_tax_amount' => $withholdingTaxAmount,

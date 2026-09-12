@@ -98,14 +98,14 @@ class BillingInvoicePrintFlowTest extends TestCase
         $soaPrint->assertSee('PHP 112.00');
         $soaPrint->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif;', false);
         $soaPrint->assertSee('PLEASE PAY THIS AMOUNT');
-        $soaPrint->assertDontSee('PHP 162.00');
+        $soaPrint->assertSee('PHP 162.00');
         $soaPrint->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif !important;', false);
         $this->assertRegExp('/\.print-field\s*\{[^}]*font-weight:\s*700;/s', $soaPrint->getContent());
         $this->assertRegExp('/print-field-particulars[^>]*font-size:\s*22px/', $soaPrint->getContent());
         $this->assertRegExp('/print-field-amounts[^>]*font-size:\s*20px/', $soaPrint->getContent());
         $this->assertRegExp('/soa-payment-note-amount[^>]*font-size:\s*16px/', $soaPrint->getContent());
         $soaPrint->assertDontSee('current -= 0.5', false);
-        $this->assertRegExp('/PLEASE PAY THIS AMOUNT<\/span><span>PHP 50\.00<\/span>/', $soaPrint->getContent());
+        $this->assertRegExp('/PLEASE PAY THIS AMOUNT<\/span><span>PHP 162\.00<\/span>/', $soaPrint->getContent());
     }
 
     public function test_guest_or_non_tax_billing_review_can_print_soa_a_only()
@@ -178,13 +178,41 @@ class BillingInvoicePrintFlowTest extends TestCase
 
     public function test_billing_invoice_prints_non_zero_zero_rated_sales_and_hides_zero_amount()
     {
-        $withZeroRatedSales = $this->get('/erp/billings/print/invoice?zero_rated_sales=47813.39&billing_total=47813.39');
+        $withZeroRatedSales = $this->get('/erp/billings/print/invoice?vatable_sales=0&zero_rated_sales=47813.39&billing_total=47813.39');
         $withZeroRatedSales->assertStatus(200);
         $this->assertRegExp('/<div class="[^"]*print-field-zero_rated_sales[^"]*"[^>]*>PHP 47,813\.39<\/div>/', $withZeroRatedSales->getContent());
+        $this->assertNotRegExp('/<div class="[^"]*print-field-vatable_sales[^"]*"/', $withZeroRatedSales->getContent());
 
-        $withoutZeroRatedSales = $this->get('/erp/billings/print/invoice?zero_rated_sales=0&billing_total=0');
+        $withoutZeroRatedSales = $this->get('/erp/billings/print/invoice?vatable_sales=0&zero_rated_sales=0&billing_total=0');
         $withoutZeroRatedSales->assertStatus(200);
         $this->assertNotRegExp('/<div class="[^"]*print-field-zero_rated_sales[^"]*"/', $withoutZeroRatedSales->getContent());
+    }
+
+    public function test_zero_rated_and_vat_exempt_sales_are_not_saved_as_vatable_sales()
+    {
+        $this->post('/erp/invoices/review', $this->payload([
+            'invoice_no' => 'BI-ZERO-001',
+            'transaction_no' => 'BI-ZERO-001',
+            'vat_classification' => 'zero-rated',
+            'tax_category' => ['zero-rated'],
+        ]))->assertRedirect();
+
+        $zeroRated = DB::table('sales_documents')->where('document_no', 'BI-ZERO-001')->first();
+        $this->assertEquals(100.0, (float) $zeroRated->subtotal);
+        $this->assertEquals(0.0, (float) $zeroRated->vatable_amount);
+        $this->assertEquals(100.0, (float) $zeroRated->zero_rated_amount);
+
+        $this->post('/erp/invoices/review', $this->payload([
+            'invoice_no' => 'BI-EXEMPT-001',
+            'transaction_no' => 'BI-EXEMPT-001',
+            'vat_classification' => 'exempt',
+            'tax_category' => ['exempt'],
+        ]))->assertRedirect();
+
+        $vatExempt = DB::table('sales_documents')->where('document_no', 'BI-EXEMPT-001')->first();
+        $this->assertEquals(100.0, (float) $vatExempt->subtotal);
+        $this->assertEquals(0.0, (float) $vatExempt->vatable_amount);
+        $this->assertEquals(100.0, (float) $vatExempt->vat_exempt_amount);
     }
 
     public function test_billing_invoice_prints_each_item_as_a_separate_line_with_its_amount()

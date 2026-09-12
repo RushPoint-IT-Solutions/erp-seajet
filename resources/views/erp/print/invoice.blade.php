@@ -312,7 +312,9 @@
         @endphp
         <div class="bi-field fit-single-line print-field-soa_no" data-fit-text data-items-shift="{{ $additionalItemsOffset }}" style="left: {{ $p['soa_no'][0] }}px; top: {{ $soaTop }}px; {{ $fieldStyle('soa_no') }}">SOA# {{ $print['soa_no'] }}</div>
         <div class="bi-field fit-multiline print-field-remarks" data-fit-text data-min-font="6" data-items-shift="{{ $additionalItemsOffset }}" style="left: {{ $p['remarks'][0] }}px; top: {{ $remarksTop }}px; {{ $fieldStyle('remarks') }}">{{ $print['remarks'] ?? '' }}</div>
-        <div class="bi-field fit-single-line amount print-field-vatable_sales" data-fit-text style="left: {{ $p['vatable_sales'][0] }}px; top: {{ $p['vatable_sales'][1] }}px; {{ $fieldStyle('vatable_sales') }}">{{ $money($print['vatable_sales']) }}</div>
+        @if((float) ($print['vatable_sales'] ?? 0) > 0)
+            <div class="bi-field fit-single-line amount print-field-vatable_sales" data-fit-text style="left: {{ $p['vatable_sales'][0] }}px; top: {{ $p['vatable_sales'][1] }}px; {{ $fieldStyle('vatable_sales') }}">{{ $money($print['vatable_sales']) }}</div>
+        @endif
         <div class="bi-field fit-single-line amount print-field-vat" data-fit-text style="left: {{ $p['vat'][0] }}px; top: {{ $p['vat'][1] }}px; {{ $fieldStyle('vat') }}">{{ $money($print['vat_amount']) }}</div>
         @if((float) ($print['zero_rated_sales'] ?? 0) > 0)
             <div class="bi-field fit-single-line amount print-field-zero_rated_sales" data-fit-text style="left: {{ $p['zero_rated_sales'][0] }}px; top: {{ $p['zero_rated_sales'][1] }}px; {{ $fieldStyle('zero_rated_sales') }}">{{ $money($print['zero_rated_sales']) }}</div>
