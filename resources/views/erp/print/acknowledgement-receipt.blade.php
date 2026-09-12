@@ -331,7 +331,7 @@
         $fontStack = $receiptFieldStyles[$field]['font_stack'] ?? 'Arial, Helvetica, sans-serif';
         $fontWeight = !empty($receiptFieldStyles[$field]['bold']) ? 700 : 400;
         $hiddenStyle = in_array($field, $receiptHiddenFields, true) ? ' display: none;' : '';
-        return 'transform: translate('.((float) ($point[0] ?? 0)).'mm, '.((float) ($point[1] ?? 0)).'mm); font-size: '.((float) $fontSize).'pt; font-family: '.$fontStack.'; font-weight: '.$fontWeight.';'.$hiddenStyle;
+        return 'transform: translate('.((float) ($point[0] ?? 0)).'mm, '.((float) ($point[1] ?? 0)).'mm); font-size: '.((float) $fontSize).'pt; font-family: '.$fontStack.'; font-weight: '.$fontWeight.' !important;'.$hiddenStyle;
     };
 @endphp
 

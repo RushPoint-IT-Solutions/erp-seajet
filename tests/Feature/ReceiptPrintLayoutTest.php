@@ -62,8 +62,8 @@ class ReceiptPrintLayoutTest extends TestCase
             ->assertStatus(200)
             ->assertSee('transform: translate(3.5mm, -2mm)', false)
             ->assertSee('font-size: 12.5pt', false)
-            ->assertSee('font-family: Georgia, &quot;Times New Roman&quot;, serif; font-weight: 700', false)
-            ->assertSee('font-size: 8.25pt; font-family: Arial, Helvetica, sans-serif; font-weight: 400; display: none;', false)
+            ->assertSee('font-family: Georgia, &quot;Times New Roman&quot;, serif; font-weight: 700 !important', false)
+            ->assertSee('font-size: 8.25pt; font-family: Arial, Helvetica, sans-serif; font-weight: 400 !important; display: none;', false)
             ->assertSee('Print Content Only');
     }
 
@@ -74,6 +74,7 @@ class ReceiptPrintLayoutTest extends TestCase
             'layout_y' => ['total_amount' => 4.75],
             'font_size' => ['total_amount' => 14],
             'font_family' => ['total_amount' => 'courier_new'],
+            'bold_field' => ['printed_by'],
         ])->assertRedirect();
 
         $this->get(route('erp.acknowledgement-receipt.preview', ['adjust' => 1]))
@@ -83,7 +84,12 @@ class ReceiptPrintLayoutTest extends TestCase
             ->assertSee('Printed by: QA Admin')
             ->assertSee('transform: translate(-1.25mm, 4.75mm)', false)
             ->assertSee('font-size: 14pt', false)
-            ->assertSee('font-family: &quot;Courier New&quot;, Courier, monospace; font-weight: 400', false)
+            ->assertSee('font-family: &quot;Courier New&quot;, Courier, monospace; font-weight: 400 !important', false)
             ->assertSee('Reset');
+
+        $this->assertRegExp(
+            '/data-field-key="printed_by"[^>]*font-weight:\s*700\s*!important/i',
+            $this->get(route('erp.acknowledgement-receipt.preview'))->getContent()
+        );
     }
 }

@@ -101,7 +101,7 @@
     function applyBold(field, bold) {
         var key = field.dataset.fieldKey;
         boldField(key).checked = bold;
-        field.style.fontWeight = bold ? '700' : '400';
+        field.style.setProperty('font-weight', bold ? '700' : '400', 'important');
         if (selectedField === field) boldInput.checked = bold;
     }
 
