@@ -26,6 +26,7 @@
         position: relative;
         overflow: hidden;
     }
+    .nonvat-sheet + .nonvat-sheet { margin-top: 12mm; }
     .nonvat-sheet::before {
         content: '';
         display: block;
@@ -157,6 +158,8 @@
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
+        .nonvat-sheet + .nonvat-sheet { margin-top: 0; }
+        .nonvat-sheet--client { break-after: page; page-break-after: always; }
         .nonvat-sheet.is-adjusting .receipt-adjustable-field { outline: 0 !important; background: transparent !important; }
     }
 </style>
@@ -224,34 +227,8 @@
     @include('erp.print._receipt-field-visibility')
 @endif
 
-<div class="nonvat-sheet {{ $adjustLayout ? 'is-adjusting' : '' }}" id="receiptLayoutSheet" data-sheet-width-mm="215.9">
-    <div class="nonvat-header">
-        <img class="nonvat-logo" src="{{ asset('images/gen_off_seajetlogo.webp') }}" alt="Sea-Jet International Forwarders, Inc.">
-        <span class="receipt-adjustable-field" tabindex="0" data-field-key="report_header" data-field-label="Report header" style="{{ $fieldStyle('report_header') }}">{{ $receiptContent['report_header'] }}</span>
-        <div class="nonvat-title-rule"></div>
-    </div>
-    <div class="nonvat-intro"><span class="receipt-adjustable-field receipt-field-block" tabindex="0" data-field-key="intro_text" data-field-label="Introduction text" style="{{ $fieldStyle('intro_text') }}">{{ $receiptContent['intro_text'] }}</span></div>
-
-    <div class="nonvat-section-label">Payment Details</div>
-    <table class="nonvat-details">
-        <tr><td>Date</td><td><span class="receipt-adjustable-field" tabindex="0" data-field-key="payment_date" data-field-label="Payment date" style="{{ $fieldStyle('payment_date') }}">{{ $receipt['payment_date'] ?? '' }}</span></td></tr>
-        <tr><td>Received From</td><td><span class="receipt-adjustable-field receipt-field-block" tabindex="0" data-field-key="registered_name" data-field-label="Registered name" style="{{ $fieldStyle('registered_name') }}">{{ $receipt['registered_name'] ?? '' }}</span></td></tr>
-        <tr><td>Address</td><td><span class="receipt-adjustable-field receipt-field-block" tabindex="0" data-field-key="business_address" data-field-label="Business address" style="{{ $fieldStyle('business_address') }}">{{ $receipt['business_address'] ?? '' }}</span></td></tr>
-        <tr><td>Amount Received</td><td class="nonvat-amount"><span class="receipt-adjustable-field" tabindex="0" data-field-key="amount" data-field-label="Transaction amount" style="{{ $fieldStyle('amount') }}">{{ $currency }} {{ number_format($amount, 2) }}</span></td></tr>
-        <tr><td>Payment Method</td><td>{{ $receipt['payment_method'] ?? '' }}</td></tr>
-        <tr class="nonvat-total-row"><td>Total Amount Received</td><td class="nonvat-amount"><span class="receipt-adjustable-field" tabindex="0" data-field-key="total_amount" data-field-label="Total paid amount" style="{{ $fieldStyle('total_amount') }}">{{ $currency }} {{ number_format($amount, 2) }}</span></td></tr>
-    </table>
-
-    <div class="nonvat-certification">
-        <div class="nonvat-signature">
-            <div class="nonvat-signature-space"></div>
-            <div class="nonvat-signature-line">Authorized Representative</div>
-            <div class="nonvat-signature-caption">Signature over printed name</div>
-        </div>
-    </div>
-    <div class="nonvat-printed-by receipt-adjustable-field" tabindex="0" data-field-key="printed_by" data-field-label="Printed by" style="{{ $fieldStyle('printed_by') }}">Printed by: {{ $receipt['printed_by'] ?? (auth()->user()->name ?? 'User') }}</div>
-    <div class="nonvat-document-footer">Client Copy &bull; Non-VAT Collection</div>
-</div>
+@include('erp.print._non-vat-acknowledgement-copy', ['copyLabel' => 'Client Copy', 'copyClass' => 'nonvat-sheet--client', 'editableCopy' => true])
+@include('erp.print._non-vat-acknowledgement-copy', ['copyLabel' => 'Company Copy', 'copyClass' => 'nonvat-sheet--company', 'editableCopy' => false])
 
 @if($adjustLayout)
     @include('erp.print._receipt-layout-editor-script')
