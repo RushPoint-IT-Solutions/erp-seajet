@@ -66,6 +66,10 @@
     .bi-field.fit-multiline {
         line-height: 1.15;
     }
+    .bi-print-sheet.print-pitch-10 .bi-field {
+        font-size: 12pt !important;
+        letter-spacing: 0 !important;
+    }
     .print-field-customer,
     .print-field-address {
         max-height: 42px;
@@ -209,7 +213,7 @@
         $billingLines = $print['billing_lines'] ?? [];
     @endphp
 
-    <div class="bi-print-sheet">
+    <div class="bi-print-sheet {{ $settings['font_family'] === 'sans_serif' ? 'print-pitch-10' : '' }}">
         <img src="{{ asset('images/image.png') }}" class="bi-logo-preview" alt="SeaJet logo">
         <div class="bi-company-preview">
             SEA-JET INTERNATIONAL FORWARDERS, INC.<br>

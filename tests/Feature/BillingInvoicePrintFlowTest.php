@@ -305,7 +305,8 @@ class BillingInvoicePrintFlowTest extends TestCase
         $layout->assertSee('id="fontFamilyControl"', false);
         $layout->assertSee('name="font_family"', false);
         $layout->assertSee('Arial (Agenture)');
-        $layout->assertSee('Sans Serif (Epson)');
+        $layout->assertSee('Sans Serif (Epson 10 CPI)');
+        $layout->assertSee('fixed-width 12 pt text for 10 CPI output');
         $layout->assertSee('Times New Roman');
         $layout->assertSee('id="allFontSizeControl"', false);
         $layout->assertSee('id="boldAllControl"', false);
@@ -362,8 +363,10 @@ class BillingInvoicePrintFlowTest extends TestCase
 
         $sansSerifPrint = $this->get('/erp/billings/print/invoice?invoice=BI-TEST-001&font_family=sans_serif');
         $sansSerifPrint->assertStatus(200);
-        $sansSerifPrint->assertSee('font-family: &quot;Epson Sans Serif&quot;, &quot;MS Sans Serif&quot;, Arial, Helvetica, sans-serif;', false);
-        $sansSerifPrint->assertSee('font-family: &quot;Epson Sans Serif&quot;, &quot;MS Sans Serif&quot;, Arial, Helvetica, sans-serif !important;', false);
+        $sansSerifPrint->assertSee('font-family: &quot;Epson Sans Serif&quot;, &quot;Courier New&quot;, &quot;Lucida Console&quot;, monospace;', false);
+        $sansSerifPrint->assertSee('font-family: &quot;Epson Sans Serif&quot;, &quot;Courier New&quot;, &quot;Lucida Console&quot;, monospace !important;', false);
+        $sansSerifPrint->assertSee('bi-print-sheet print-pitch-10', false);
+        $this->assertRegExp('/\.bi-print-sheet\.print-pitch-10 \.bi-field\s*\{[^}]*font-size:\s*12pt\s*!important;[^}]*letter-spacing:\s*0\s*!important;/s', $sansSerifPrint->getContent());
 
         $regularPrint = $this->get('/erp/billings/print/invoice?invoice=BI-TEST-001&bold_all=0');
         $regularPrint->assertStatus(200);

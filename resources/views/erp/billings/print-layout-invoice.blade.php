@@ -38,6 +38,10 @@
         overflow: hidden;
         user-select: none;
     }
+    .layout-sheet.print-pitch-10 .drag-field {
+        font-size: 12pt !important;
+        letter-spacing: 0 !important;
+    }
     .layout-template-guide {
         position: absolute;
         left: 48px;
@@ -327,7 +331,7 @@
 
         <div class="layout-editor-shell">
             <div class="layout-sheet-wrap">
-                <div class="layout-sheet" id="layoutSheet">
+                <div class="layout-sheet {{ $settings['font_family'] === 'sans_serif' ? 'print-pitch-10' : '' }}" id="layoutSheet">
                     <img src="{{ asset('images/image.png') }}" class="layout-logo-preview" alt="SeaJet logo">
                     <div class="layout-company-preview">
                         SEA-JET INTERNATIONAL FORWARDERS, INC.<br>
@@ -422,7 +426,7 @@
                             <option value="{{ $fontKey }}" data-stack="{{ $fontOption['stack'] }}" {{ $settings['font_family'] === $fontKey ? 'selected' : '' }}>{{ $fontOption['label'] }}</option>
                         @endforeach
                     </select>
-                    <div class="form-text">Applies to the layout preview and printed Billing Invoice.</div>
+                    <div class="form-text">Applies to the layout preview and printed Billing Invoice. Epson Sans Serif uses fixed-width 12 pt text for 10 CPI output.</div>
                 </div>
 
                 <div class="row g-2 mb-3 align-items-end">
@@ -851,6 +855,7 @@
             sheet.style.height = height + 'px';
             sheet.style.fontFamily = fontStack;
             sheet.style.fontWeight = fontWeight;
+            sheet.classList.toggle('print-pitch-10', fontFamily === 'sans_serif');
             $('.drag-field').each(function () {
                 this.style.fontWeight = fontWeight;
             });
