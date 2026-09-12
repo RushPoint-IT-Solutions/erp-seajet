@@ -95,7 +95,7 @@
     .cv-box { position: absolute; border: 1px solid #111827; }
     .cv-line { position: absolute; border-top: 1px solid #111827; }
     .cv-vline { position: absolute; border-left: 1px solid #111827; }
-    .cv-accounting-table { position: absolute; width: 748px; border: 1px solid #111827; }
+    .cv-table-box { position: absolute; border: 1px solid #111827; }
     .cv-amount-box {
         position: absolute;
         left: 46px;
@@ -148,24 +148,26 @@
     <div class="cv-print-wrap">
         <div class="cv-print-sheet">
             @if(!$settings['template_url'] || !$settings['print_template'])
-                <div class="cv-box" style="left: 46px; top: 190px; width: 292px; height: {{ $boxHeights['payee'] }}px;"></div>
-                <div class="cv-line" style="left: 46px; top: 236px; width: 292px;"></div>
-                <div class="cv-box" style="left: 46px; top: 428px; width: 748px; height: {{ $boxHeights['description'] }}px;"></div>
-                <div class="cv-accounting-table" style="left: {{ $boxPositions['accounting'][0] }}px; top: {{ $boxPositions['accounting'][1] }}px; height: {{ $boxHeights['accounting'] }}px;">
+                <div class="cv-table-box cv-payee-table" style="left: {{ $boxPositions['payee'][0] }}px; top: {{ $boxPositions['payee'][1] }}px; width: 292px; height: {{ $boxHeights['payee'] }}px;">
+                    <div class="cv-line" style="left: 0; top: 45px; width: 100%;"></div>
+                </div>
+                <div class="cv-table-box cv-description-table" style="left: {{ $boxPositions['description'][0] }}px; top: {{ $boxPositions['description'][1] }}px; width: 748px; height: {{ $boxHeights['description'] }}px;"></div>
+                <div class="cv-table-box cv-accounting-table" style="left: {{ $boxPositions['accounting'][0] }}px; top: {{ $boxPositions['accounting'][1] }}px; width: 748px; height: {{ $boxHeights['accounting'] }}px;">
                     <div class="cv-line" style="left: 0; top: 27px; width: 100%;"></div>
                     <div class="cv-line" style="left: 0; top: 73px; width: 100%;"></div>
                     <div class="cv-vline" style="left: 457px; top: 0; height: 100%;"></div>
                     <div class="cv-vline" style="left: 603px; top: 0; height: 100%;"></div>
                 </div>
-                <div class="cv-box" style="left: 46px; top: 582px; width: 748px; height: {{ $boxHeights['signatures'] }}px;"></div>
-                <div class="cv-vline" style="left: 214px; top: 582px; height: {{ $boxHeights['signatures'] }}px;"></div>
-                <div class="cv-vline" style="left: 386px; top: 582px; height: {{ $boxHeights['signatures'] }}px;"></div>
-                <div class="cv-vline" style="left: 592px; top: 582px; height: {{ $boxHeights['signatures'] }}px;"></div>
-                <div class="cv-line" style="left: 46px; top: 618px; width: 748px;"></div>
-                <div class="cv-line" style="left: 46px; top: 704px; width: 748px;"></div>
+                <div class="cv-table-box cv-signatures-table" style="left: {{ $boxPositions['signatures'][0] }}px; top: {{ $boxPositions['signatures'][1] }}px; width: 748px; height: {{ $boxHeights['signatures'] }}px;">
+                    <div class="cv-vline" style="left: 167px; top: 0; height: 100%;"></div>
+                    <div class="cv-vline" style="left: 339px; top: 0; height: 100%;"></div>
+                    <div class="cv-vline" style="left: 545px; top: 0; height: 100%;"></div>
+                    <div class="cv-line" style="left: 0; top: 35px; width: 100%;"></div>
+                    <div class="cv-line" style="left: 0; top: 121px; width: 100%;"></div>
+                </div>
             @endif
 
-            <div class="cv-amount-box"><div class="cv-amount-box-line"></div></div>
+            <div class="cv-table-box cv-amount-box" style="left: {{ $boxPositions['amount'][0] }}px; top: {{ $boxPositions['amount'][1] }}px; width: 748px; height: {{ $boxHeights['amount'] }}px;"><div class="cv-amount-box-line"></div></div>
 
             @foreach($positions as $field => $point)
                 @continue(($point[0] ?? 0) < 0 || ($point[1] ?? 0) < 0)

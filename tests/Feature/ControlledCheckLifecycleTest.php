@@ -333,8 +333,16 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertSee('id="box_height_accounting"', false)
             ->assertSee('id="accountingTableGuide"', false)
             ->assertSee('Move Accounting Table')
+            ->assertSee('Move Payee Table')
+            ->assertSee('Move Description Table')
+            ->assertSee('Move Amount Table')
+            ->assertSee('Move Signatures Table')
             ->assertSee('id="box_x_accounting"', false)
             ->assertSee('id="box_y_accounting"', false)
+            ->assertSee('id="box_x_payee"', false)
+            ->assertSee('id="box_x_description"', false)
+            ->assertSee('id="box_x_amount"', false)
+            ->assertSee('id="box_x_signatures"', false)
             ->assertDontSee('cv-guide-muted');
 
         $this->post(route('erp.payables.check-voucher.layout.save'), [
@@ -351,6 +359,14 @@ class ControlledCheckLifecycleTest extends TestCase
             'box_height_accounting' => 220,
             'box_x_accounting' => 72,
             'box_y_accounting' => 345,
+            'box_x_payee' => 55,
+            'box_y_payee' => 180,
+            'box_x_description' => 65,
+            'box_y_description' => 450,
+            'box_x_amount' => 75,
+            'box_y_amount' => 525,
+            'box_x_signatures' => 85,
+            'box_y_signatures' => 610,
         ])->assertRedirect(route('erp.payables.check-voucher.layout'));
 
         $styles = json_decode(DB::table('print_layouts')
@@ -359,6 +375,10 @@ class ControlledCheckLifecycleTest extends TestCase
         $this->assertSame(60, $styles['description']['height']);
         $this->assertSame(220, $styles['_box_heights']['accounting']);
         $this->assertSame([72, 345], $styles['_box_positions']['accounting']);
+        $this->assertSame([55, 180], $styles['_box_positions']['payee']);
+        $this->assertSame([65, 450], $styles['_box_positions']['description']);
+        $this->assertSame([75, 525], $styles['_box_positions']['amount']);
+        $this->assertSame([85, 610], $styles['_box_positions']['signatures']);
 
         $this->get(route('erp.payables.check-voucher'))
             ->assertOk()
@@ -368,7 +388,11 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertSee('left: 410px; top: 438px', false)
             ->assertSee('height: 60px', false)
             ->assertSee('height: 220px', false)
-            ->assertSee('class="cv-accounting-table" style="left: 72px; top: 345px; height: 220px;"', false)
+            ->assertSee('cv-accounting-table" style="left: 72px; top: 345px;', false)
+            ->assertSee('cv-payee-table" style="left: 55px; top: 180px;', false)
+            ->assertSee('cv-description-table" style="left: 65px; top: 450px;', false)
+            ->assertSee('cv-amount-box" style="left: 75px; top: 525px;', false)
+            ->assertSee('cv-signatures-table" style="left: 85px; top: 610px;', false)
             ->assertDontSee('cv-muted-line');
     }
 

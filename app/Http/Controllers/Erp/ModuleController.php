@@ -3801,13 +3801,21 @@ class ModuleController extends Controller
             )));
         }
 
-        $accountingBoxPosition = $savedBoxPositions['accounting'] ?? [46, 326];
-        $layout['box_positions'] = [
-            'accounting' => [
-                max(0, min($layout['settings']['paper_width'] - 100, (int) request('box_x_accounting', $accountingBoxPosition[0] ?? 46))),
-                max(0, min($layout['settings']['paper_height'] - 40, (int) request('box_y_accounting', $accountingBoxPosition[1] ?? 326))),
-            ],
+        $defaultBoxPositions = [
+            'payee' => [46, 190],
+            'accounting' => [46, 326],
+            'description' => [46, 428],
+            'amount' => [46, 502],
+            'signatures' => [46, 582],
         ];
+        $layout['box_positions'] = [];
+        foreach ($defaultBoxPositions as $box => $defaultPosition) {
+            $savedPosition = $savedBoxPositions[$box] ?? $defaultPosition;
+            $layout['box_positions'][$box] = [
+                max(0, min($layout['settings']['paper_width'] - 100, (int) request('box_x_'.$box, $savedPosition[0] ?? $defaultPosition[0]))),
+                max(0, min($layout['settings']['paper_height'] - 40, (int) request('box_y_'.$box, $savedPosition[1] ?? $defaultPosition[1]))),
+            ];
+        }
 
         foreach ($defaults as $field => $point) {
             $savedPoint = $savedPositions[$field] ?? $point;
