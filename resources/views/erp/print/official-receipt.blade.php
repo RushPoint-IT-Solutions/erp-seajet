@@ -373,6 +373,10 @@
         @else
             <a href="{{ route('erp.official-receipt.preview', array_merge(request()->query(), ['adjust' => 1])) }}" class="btn btn-outline-primary"><i class="bi bi-sliders me-1"></i> Adjust Layout</a>
         @endif
+        <div class="btn-group" role="group" aria-label="OR tax print type">
+            <a href="{{ route('erp.official-receipt.preview', array_merge(request()->query(), ['tax_print' => 'vat'])) }}" class="btn btn-primary">VAT Print</a>
+            <a href="{{ route('erp.official-receipt.preview', array_merge(request()->query(), ['tax_print' => 'non_vat'])) }}" class="btn btn-outline-primary">Non-VAT Print</a>
+        </div>
         <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print Content Only</button>
         <a href="{{ route('erp.payments.create') }}" class="btn btn-primary"><i class="bi bi-arrow-left me-1"></i> Back to Payments</a>
     </div>

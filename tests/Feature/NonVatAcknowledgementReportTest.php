@@ -58,7 +58,16 @@ class NonVatAcknowledgementReportTest extends TestCase
             ->assertSee('size: Letter portrait;', false)
             ->assertSee('Edit Content &amp; Layout', false)
             ->assertSee('data-field-key="report_header"', false)
-            ->assertSee('PHP 160.00');
+            ->assertSee('PHP 160.00')
+            ->assertSee('VAT Print')
+            ->assertSee('Non-VAT Print');
+
+        $this->get(route('erp.acknowledgement-receipt.preview', [
+            'receipt_no' => 'NONVAT-AR-001',
+            'tax_print' => 'vat',
+        ]))->assertOk()
+            ->assertSee('Acknowledgement Receipt')
+            ->assertDontSee('Non-VAT Acknowledgement Report');
     }
 
     public function test_non_vat_content_and_layout_save_separately_from_existing_ar()
@@ -87,5 +96,29 @@ class NonVatAcknowledgementReportTest extends TestCase
             ->assertOk()
             ->assertSee('Acknowledgement Receipt')
             ->assertDontSee('CUSTOM NON-VAT ACKNOWLEDGEMENT');
+    }
+
+    public function test_or_and_ar_offer_manual_vat_and_non_vat_print_choices()
+    {
+        $this->get(route('erp.official-receipt.preview'))
+            ->assertOk()
+            ->assertSee('aria-label="OR tax print type"', false)
+            ->assertSee('VAT Print')
+            ->assertSee('Non-VAT Print');
+
+        $this->get(route('erp.official-receipt.preview', ['tax_print' => 'non_vat']))
+            ->assertOk()
+            ->assertSee('Non-VAT Acknowledgement Report')
+            ->assertSee('aria-label="OR tax print type"', false);
+
+        $this->get(route('erp.acknowledgement-receipt.preview', ['tax_print' => 'vat']))
+            ->assertOk()
+            ->assertSee('aria-label="AR tax print type"', false)
+            ->assertSee('Acknowledgement Receipt');
+
+        $this->get(route('erp.acknowledgement-receipt.preview', ['tax_print' => 'non_vat']))
+            ->assertOk()
+            ->assertSee('Non-VAT Acknowledgement Report')
+            ->assertSee('aria-label="AR tax print type"', false);
     }
 }

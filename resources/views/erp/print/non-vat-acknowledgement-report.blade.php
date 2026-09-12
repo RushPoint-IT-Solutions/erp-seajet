@@ -77,6 +77,7 @@
         <form method="post" action="{{ route('erp.non-vat-acknowledgement.layout.save') }}" id="receiptLayoutForm" class="d-inline">
             @csrf
             <input type="hidden" name="receipt_no" value="{{ $receipt['receipt_no'] ?? '' }}">
+            <input type="hidden" name="source_document" value="{{ $sourceDocument }}">
             <input type="hidden" name="visibility_present" value="1">
             @foreach($receiptLayout as $field => $point)
                 <input type="hidden" name="layout_x[{{ $field }}]" id="layout_x_{{ $field }}" value="{{ $point[0] }}">
@@ -96,10 +97,14 @@
         <label class="small d-flex align-items-center gap-1 mb-0"><input type="checkbox" id="toggleReceiptLock"> Lock</label>
         <button type="button" class="btn btn-outline-danger" id="deleteReceiptField" disabled>Delete Selected</button>
         <button type="button" class="btn btn-outline-secondary" id="resetReceiptPositions">Reset</button>
-        <a href="{{ route('erp.non-vat-acknowledgement.preview', request()->except('adjust')) }}" class="btn btn-primary">Done</a>
+        <a href="{{ route('erp.non-vat-acknowledgement.preview', array_merge(request()->except('adjust'), ['source_document' => $sourceDocument])) }}" class="btn btn-primary">Done</a>
     @else
-        <a href="{{ route('erp.non-vat-acknowledgement.preview', array_merge(request()->query(), ['adjust' => 1])) }}" class="btn btn-outline-primary"><i class="bi bi-sliders me-1"></i> Edit Content &amp; Layout</a>
+        <a href="{{ route('erp.non-vat-acknowledgement.preview', array_merge(request()->query(), ['adjust' => 1, 'source_document' => $sourceDocument])) }}" class="btn btn-outline-primary"><i class="bi bi-sliders me-1"></i> Edit Content &amp; Layout</a>
     @endif
+    <div class="btn-group" role="group" aria-label="{{ strtoupper($sourceDocument) }} tax print type">
+        <a href="{{ route($sourceDocument === 'or' ? 'erp.official-receipt.preview' : 'erp.acknowledgement-receipt.preview', array_merge(request()->except(['adjust', 'source_document']), ['tax_print' => 'vat'])) }}" class="btn btn-outline-primary">VAT Print</a>
+        <a href="{{ route('erp.non-vat-acknowledgement.preview', array_merge(request()->query(), ['source_document' => $sourceDocument, 'tax_print' => 'non_vat'])) }}" class="btn btn-primary">Non-VAT Print</a>
+    </div>
     <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print Letter</button>
     <a href="{{ route('erp.payments.create') }}" class="btn btn-primary">Back to Payments</a>
 </div>
