@@ -57,10 +57,21 @@ class NonVatAcknowledgementReportTest extends TestCase
             ->assertSee('ACKNOWLEDGEMENT REPORT')
             ->assertSee('images/gen_off_seajetlogo.webp')
             ->assertSee('class="nonvat-logo"', false)
+            ->assertSee('Payment Details')
+            ->assertSee('Total Amount Received')
+            ->assertSee('Signature over printed name')
+            ->assertSee('Client Copy &bull; Non-VAT Collection', false)
             ->assertSee('size: Letter portrait;', false)
             ->assertSee('Edit Content &amp; Layout', false)
             ->assertSee('data-field-key="report_header"', false)
             ->assertSee('PHP 160.00')
+            ->assertDontSee('>Report No.<', false)
+            ->assertDontSee('>Account No.<', false)
+            ->assertDontSee('>TIN<', false)
+            ->assertDontSee('>Description<', false)
+            ->assertDontSee('>Reference No.<', false)
+            ->assertDontSee('>Bank<', false)
+            ->assertDontSee('This acknowledgement is issued for a Non-VAT collection.')
             ->assertSee('VAT Print')
             ->assertSee('Non-VAT Print');
 
@@ -83,7 +94,6 @@ class NonVatAcknowledgementReportTest extends TestCase
             'field_content' => [
                 'report_header' => 'CUSTOM NON-VAT ACKNOWLEDGEMENT',
                 'intro_text' => 'We acknowledge the following collection:',
-                'footer_text' => 'Non-VAT collection confirmed.',
             ],
         ])->assertRedirect(route('erp.non-vat-acknowledgement.preview', ['adjust' => 1]));
 

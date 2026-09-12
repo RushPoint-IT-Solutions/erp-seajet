@@ -5,40 +5,125 @@
 
 @push('styles')
 <style>
+    :root {
+        --nonvat-ink: #172033;
+        --nonvat-muted: #5b6473;
+        --nonvat-line: #9aa3b2;
+        --nonvat-soft: #f2f4f7;
+        --nonvat-accent: #213b67;
+    }
     .nonvat-toolbar, .nonvat-editor-note, .nonvat-content-editor { max-width: 215.9mm; margin-left: auto; margin-right: auto; }
     .nonvat-sheet {
         width: 215.9mm;
         min-height: 279.4mm;
         margin: 0 auto;
-        padding: 20mm 18mm;
+        padding: 15mm 18mm 18mm;
         background: #fff;
         border: 1px solid #cbd5e1;
         box-shadow: 0 12px 32px rgba(15, 23, 42, .14);
-        color: #111827;
+        color: var(--nonvat-ink);
         font-family: Arial, Helvetica, sans-serif;
         position: relative;
         overflow: hidden;
     }
-    .nonvat-header { text-align: center; margin-bottom: 18mm; }
+    .nonvat-sheet::before {
+        content: '';
+        display: block;
+        height: 2.2mm;
+        margin: -15mm -18mm 10mm;
+        background: var(--nonvat-accent);
+    }
+    .nonvat-header { text-align: center; margin-bottom: 12mm; }
     .nonvat-logo {
         display: block;
-        width: 320px;
+        width: 300px;
         height: 82px;
         max-width: 100%;
-        margin: 0 auto 7mm;
+        margin: 0 auto 5mm;
         object-fit: contain;
     }
-    .nonvat-header .receipt-adjustable-field { text-transform: uppercase; letter-spacing: .8px; }
-    .nonvat-intro { margin-bottom: 10mm; line-height: 1.6; }
-    .nonvat-details { width: 100%; border-collapse: collapse; margin-bottom: 12mm; }
-    .nonvat-details td { border: 1px solid #334155; padding: 3mm; vertical-align: top; }
-    .nonvat-details td:first-child { width: 42mm; font-weight: 700; }
-    .nonvat-description { min-height: 35mm; white-space: pre-line; }
-    .nonvat-amount { font-size: 16px; text-align: right; white-space: nowrap; }
-    .nonvat-footer { margin-top: 18mm; line-height: 1.6; }
-    .nonvat-signature { width: 72mm; margin: 28mm 0 0 auto; text-align: center; }
-    .nonvat-signature-line { border-top: 1px solid #111827; padding-top: 2mm; }
-    .nonvat-printed-by { position: absolute; left: 18mm; bottom: 14mm; }
+    .nonvat-title-rule { width: 24mm; border-top: .7mm solid var(--nonvat-accent); margin: 4mm auto 0; }
+    .nonvat-header .receipt-adjustable-field {
+        text-transform: uppercase;
+        letter-spacing: 1.4px;
+        line-height: 1.2;
+    }
+    .nonvat-intro {
+        margin-bottom: 6mm;
+        color: var(--nonvat-muted);
+        line-height: 1.55;
+        text-align: center;
+    }
+    .nonvat-section-label {
+        margin-bottom: 2.5mm;
+        color: var(--nonvat-accent);
+        font-size: 8pt;
+        font-weight: 700;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+    }
+    .nonvat-details {
+        width: 100%;
+        border: 1px solid var(--nonvat-line);
+        border-collapse: collapse;
+        margin-bottom: 11mm;
+    }
+    .nonvat-details td {
+        border-bottom: 1px solid #c7ccd4;
+        padding: 3.6mm 4mm;
+        vertical-align: middle;
+        line-height: 1.4;
+    }
+    .nonvat-details tr:last-child td { border-bottom: 0; }
+    .nonvat-details td:first-child {
+        width: 45mm;
+        background: var(--nonvat-soft);
+        color: #404958;
+        font-size: 8pt;
+        font-weight: 700;
+        letter-spacing: .45px;
+        text-transform: uppercase;
+    }
+    .nonvat-details td:last-child { font-size: 10pt; }
+    .nonvat-details .nonvat-total-row td {
+        border-top: .7mm solid var(--nonvat-accent);
+        background: #fff;
+        color: var(--nonvat-ink);
+        font-weight: 700;
+    }
+    .nonvat-details .nonvat-total-row td:first-child {
+        background: var(--nonvat-accent);
+        color: #fff;
+        font-size: 9pt;
+    }
+    .nonvat-amount { font-size: 11pt !important; text-align: right; white-space: nowrap; }
+    .nonvat-total-row .nonvat-amount { font-size: 14pt !important; }
+    .nonvat-certification {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 17mm;
+    }
+    .nonvat-signature { width: 76mm; text-align: center; color: var(--nonvat-muted); font-size: 8pt; }
+    .nonvat-signature-space { height: 20mm; }
+    .nonvat-signature-line {
+        border-top: 1px solid var(--nonvat-ink);
+        padding-top: 2.5mm;
+        color: var(--nonvat-ink);
+        font-size: 9pt;
+        font-weight: 700;
+        letter-spacing: .35px;
+        text-transform: uppercase;
+    }
+    .nonvat-signature-caption { margin-top: 1.5mm; }
+    .nonvat-document-footer {
+        position: absolute;
+        right: 18mm;
+        bottom: 13mm;
+        color: var(--nonvat-muted);
+        font-size: 7pt;
+        letter-spacing: .25px;
+    }
+    .nonvat-printed-by { position: absolute; left: 18mm; bottom: 13mm; color: var(--nonvat-muted); }
     .receipt-adjustable-field { position: relative; z-index: 2; display: inline-block; }
     .receipt-field-block { display: block; }
     .receipt-field-hidden { display: none !important; }
@@ -62,7 +147,16 @@
         body { background: #fff !important; }
         .no-print, .nonvat-toolbar, .erp-sidebar, .erp-topbar { display: none !important; }
         .erp-main, .erp-content, main { margin: 0 !important; padding: 0 !important; width: 100% !important; }
-        .nonvat-sheet { width: 215.9mm; height: 279.4mm; min-height: 279.4mm; margin: 0; border: 0; box-shadow: none; }
+        .nonvat-sheet {
+            width: 215.9mm;
+            height: 279.4mm;
+            min-height: 279.4mm;
+            margin: 0;
+            border: 0;
+            box-shadow: none;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+        }
         .nonvat-sheet.is-adjusting .receipt-adjustable-field { outline: 0 !important; background: transparent !important; }
     }
 </style>
@@ -122,8 +216,8 @@
     <div class="alert alert-info nonvat-editor-note no-print">Edit the report wording below. Select or drag any printable field to change its position, font, size, bold style, or visibility.</div>
     <div class="erp-card p-3 mb-3 nonvat-content-editor no-print">
         <div class="row g-3">
-            @foreach(['report_header' => 'Centered header', 'intro_text' => 'Introduction', 'footer_text' => 'Footer note'] as $field => $label)
-                <div class="col-md-4"><label class="form-label">{{ $label }}</label><textarea class="form-control nonvat-content-input" rows="2" name="field_content[{{ $field }}]" form="receiptLayoutForm" data-content-target="{{ $field }}">{{ $receiptContent[$field] }}</textarea></div>
+            @foreach(['report_header' => 'Centered header', 'intro_text' => 'Introduction'] as $field => $label)
+                <div class="col-md-6"><label class="form-label">{{ $label }}</label><textarea class="form-control nonvat-content-input" rows="2" name="field_content[{{ $field }}]" form="receiptLayoutForm" data-content-target="{{ $field }}">{{ $receiptContent[$field] }}</textarea></div>
             @endforeach
         </div>
     </div>
@@ -134,27 +228,29 @@
     <div class="nonvat-header">
         <img class="nonvat-logo" src="{{ asset('images/gen_off_seajetlogo.webp') }}" alt="Sea-Jet International Forwarders, Inc.">
         <span class="receipt-adjustable-field" tabindex="0" data-field-key="report_header" data-field-label="Report header" style="{{ $fieldStyle('report_header') }}">{{ $receiptContent['report_header'] }}</span>
+        <div class="nonvat-title-rule"></div>
     </div>
     <div class="nonvat-intro"><span class="receipt-adjustable-field receipt-field-block" tabindex="0" data-field-key="intro_text" data-field-label="Introduction text" style="{{ $fieldStyle('intro_text') }}">{{ $receiptContent['intro_text'] }}</span></div>
 
+    <div class="nonvat-section-label">Payment Details</div>
     <table class="nonvat-details">
-        <tr><td>Report No.</td><td><span class="receipt-adjustable-field" tabindex="0" data-field-key="receipt_no" data-field-label="Receipt number" style="{{ $fieldStyle('receipt_no') }}">{{ $receipt['receipt_no'] ?? '' }}</span></td></tr>
         <tr><td>Date</td><td><span class="receipt-adjustable-field" tabindex="0" data-field-key="payment_date" data-field-label="Payment date" style="{{ $fieldStyle('payment_date') }}">{{ $receipt['payment_date'] ?? '' }}</span></td></tr>
-        <tr><td>Account No.</td><td><span class="receipt-adjustable-field" tabindex="0" data-field-key="account_no" data-field-label="Account number" style="{{ $fieldStyle('account_no') }}">{{ $receipt['account_no'] ?? '' }}</span></td></tr>
         <tr><td>Received From</td><td><span class="receipt-adjustable-field receipt-field-block" tabindex="0" data-field-key="registered_name" data-field-label="Registered name" style="{{ $fieldStyle('registered_name') }}">{{ $receipt['registered_name'] ?? '' }}</span></td></tr>
-        <tr><td>TIN</td><td><span class="receipt-adjustable-field" tabindex="0" data-field-key="tin" data-field-label="TIN" style="{{ $fieldStyle('tin') }}">{{ $receipt['tin'] ?? '' }}</span></td></tr>
         <tr><td>Address</td><td><span class="receipt-adjustable-field receipt-field-block" tabindex="0" data-field-key="business_address" data-field-label="Business address" style="{{ $fieldStyle('business_address') }}">{{ $receipt['business_address'] ?? '' }}</span></td></tr>
-        <tr><td>Description</td><td class="nonvat-description"><span class="receipt-adjustable-field receipt-field-block" tabindex="0" data-field-key="description" data-field-label="Description" style="{{ $fieldStyle('description') }}">{{ $receipt['description'] ?? '' }}</span></td></tr>
         <tr><td>Amount Received</td><td class="nonvat-amount"><span class="receipt-adjustable-field" tabindex="0" data-field-key="amount" data-field-label="Transaction amount" style="{{ $fieldStyle('amount') }}">{{ $currency }} {{ number_format($amount, 2) }}</span></td></tr>
         <tr><td>Payment Method</td><td>{{ $receipt['payment_method'] ?? '' }}</td></tr>
-        <tr><td>Reference No.</td><td><span class="receipt-adjustable-field" tabindex="0" data-field-key="reference_no" data-field-label="Reference number" style="{{ $fieldStyle('reference_no') }}">{{ $receipt['reference_no'] ?? '' }}</span></td></tr>
-        <tr><td>Bank</td><td><span class="receipt-adjustable-field" tabindex="0" data-field-key="bank" data-field-label="Bank" style="{{ $fieldStyle('bank') }}">{{ $receipt['bank'] ?? '' }}</span></td></tr>
-        <tr><td>Total</td><td class="nonvat-amount"><span class="receipt-adjustable-field" tabindex="0" data-field-key="total_amount" data-field-label="Total paid amount" style="{{ $fieldStyle('total_amount') }}">{{ $currency }} {{ number_format($amount, 2) }}</span></td></tr>
+        <tr class="nonvat-total-row"><td>Total Amount Received</td><td class="nonvat-amount"><span class="receipt-adjustable-field" tabindex="0" data-field-key="total_amount" data-field-label="Total paid amount" style="{{ $fieldStyle('total_amount') }}">{{ $currency }} {{ number_format($amount, 2) }}</span></td></tr>
     </table>
 
-    <div class="nonvat-footer"><span class="receipt-adjustable-field receipt-field-block" tabindex="0" data-field-key="footer_text" data-field-label="Footer text" style="{{ $fieldStyle('footer_text') }}">{{ $receiptContent['footer_text'] }}</span></div>
-    <div class="nonvat-signature"><div class="nonvat-signature-line">Authorized Representative</div></div>
+    <div class="nonvat-certification">
+        <div class="nonvat-signature">
+            <div class="nonvat-signature-space"></div>
+            <div class="nonvat-signature-line">Authorized Representative</div>
+            <div class="nonvat-signature-caption">Signature over printed name</div>
+        </div>
+    </div>
     <div class="nonvat-printed-by receipt-adjustable-field" tabindex="0" data-field-key="printed_by" data-field-label="Printed by" style="{{ $fieldStyle('printed_by') }}">Printed by: {{ $receipt['printed_by'] ?? (auth()->user()->name ?? 'User') }}</div>
+    <div class="nonvat-document-footer">Client Copy &bull; Non-VAT Collection</div>
 </div>
 
 @if($adjustLayout)

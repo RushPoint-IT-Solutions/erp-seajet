@@ -9103,12 +9103,16 @@ class ModuleController extends Controller
         ];
 
         if ($documentKind === 'ar_non_vat') {
-            return array_merge([
+            return [
                 'report_header' => 'Report header',
                 'intro_text' => 'Introduction text',
-            ], $labels, [
-                'footer_text' => 'Footer text',
-            ]);
+                'payment_date' => 'Payment date',
+                'registered_name' => 'Registered name',
+                'business_address' => 'Business address',
+                'amount' => 'Transaction amount',
+                'total_amount' => 'Total paid amount',
+                'printed_by' => 'Printed by',
+            ];
         }
 
         return $labels;
@@ -9204,12 +9208,16 @@ class ModuleController extends Controller
         ];
 
         if ($documentKind === 'ar_non_vat') {
-            return array_merge([
+            return [
                 'report_header' => 18,
                 'intro_text' => 11,
-            ], $defaults, [
-                'footer_text' => 10,
-            ]);
+                'payment_date' => $defaults['payment_date'],
+                'registered_name' => $defaults['registered_name'],
+                'business_address' => $defaults['business_address'],
+                'amount' => $defaults['amount'],
+                'total_amount' => $defaults['total_amount'],
+                'printed_by' => $defaults['printed_by'],
+            ];
         }
 
         return $defaults;
@@ -9220,7 +9228,6 @@ class ModuleController extends Controller
         return [
             'report_header' => 'ACKNOWLEDGEMENT REPORT',
             'intro_text' => 'This is to acknowledge receipt of payment from:',
-            'footer_text' => 'This acknowledgement is issued for a Non-VAT collection.',
         ];
     }
 
