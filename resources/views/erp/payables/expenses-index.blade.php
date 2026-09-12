@@ -38,6 +38,21 @@
         @endforeach
     </div>
 
+    @php
+        $apStatusCounts = collect($expenses)->groupBy('status_group')->map->count();
+    @endphp
+    <ul class="nav nav-tabs mb-3 ap-status-tabs" role="tablist" aria-label="AP status filter">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" type="button" data-status-group="approved">Approved <span class="badge text-bg-light ms-1">{{ $apStatusCounts->get('approved', 0) }}</span></button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" type="button" data-status-group="for_approval">For Approval <span class="badge text-bg-light ms-1">{{ $apStatusCounts->get('for_approval', 0) }}</span></button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" type="button" data-status-group="cancelled_voided">Cancelled / Voided <span class="badge text-bg-light ms-1">{{ $apStatusCounts->get('cancelled_voided', 0) }}</span></button>
+        </li>
+    </ul>
+
     <div class="row g-3 mb-4">
         <div class="col-12">
             <div class="erp-card p-3 h-100">
@@ -65,7 +80,7 @@
                         </thead>
                         <tbody>
                         @foreach($expenses as $expense)
-                            <tr>
+                            <tr data-status-group="{{ $expense['status_group'] }}">
                                 <td class="fw-semibold">{{ $expense[0] }}</td>
                                 <td>{{ $expense[1] }}</td>
                                 <td>{{ $expense[2] }}</td>
@@ -91,10 +106,30 @@
 
 @push('scripts')
 <script>
-    $('.module-table').DataTable({
+    (function () {
+    var tableElement = document.querySelector('.module-table');
+    var activeStatusGroup = 'for_approval';
+
+    $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
+        if (settings.nTable !== tableElement) {
+            return true;
+        }
+        return $(settings.aoData[dataIndex].nTr).data('status-group') === activeStatusGroup;
+    });
+
+    var table = $('.module-table').DataTable({
         pageLength: 10,
         lengthChange: false,
         language: { search: '', searchPlaceholder: 'Search expenses' }
     });
+
+    table.draw();
+    $('.ap-status-tabs [data-status-group]').on('click', function () {
+        activeStatusGroup = $(this).data('status-group');
+        $('.ap-status-tabs .nav-link').removeClass('active');
+        $(this).addClass('active');
+        table.draw();
+    });
+    })();
 </script>
 @endpush

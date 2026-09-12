@@ -459,11 +459,11 @@ class ModuleController extends Controller
                 ],
             ],
             'email-official-receipt' => [
-                'title' => 'Email Collection Receipt',
-                'subtitle' => 'Prepare a supplementary collection receipt email with PDF attachment and delivery audit trail.',
-                'primary' => ['label' => 'Collection Receipt', 'route' => route('erp.official-receipt.preview'), 'icon' => 'bi-receipt'],
+                'title' => 'Email Official Receipt',
+                'subtitle' => 'Prepare a supplementary official receipt email with PDF attachment and delivery audit trail.',
+                'primary' => ['label' => 'Official Receipt', 'route' => route('erp.official-receipt.preview'), 'icon' => 'bi-receipt'],
                 'cards' => [['Queued Emails', '2'], ['Sent Today', '9'], ['PDF Attached', 'Yes'], ['Audit Trail', 'Enabled']],
-                'steps' => ['Review customer email', 'Attach Collection Receipt PDF', 'Add email message', 'Send and log delivery status'],
+                'steps' => ['Review customer email', 'Attach Official Receipt PDF', 'Add email message', 'Send and log delivery status'],
                 'columns' => ['Receipt No.', 'Customer', 'Email', 'Amount', 'Status'],
                 'rows' => [
                     ['OR-2026-00618', 'North Harbor Trading', 'billing@northharbor.test', '43,200.00', 'Ready'],
@@ -2682,9 +2682,25 @@ class ModuleController extends Controller
                     $bill->approval_status ?: ucwords(str_replace('_', ' ', $bill->status)),
                     $bill->document_date,
                     'id' => $bill->id,
+                    'status_group' => $this->apWorkflowStatusGroup($bill->approval_status ?: $bill->status),
                 ];
             })
             ->all();
+    }
+
+    private function apWorkflowStatusGroup($status)
+    {
+        $status = strtolower(trim(str_replace('_', ' ', (string) $status)));
+
+        if (in_array($status, ['cancelled', 'canceled', 'voided', 'void'], true)) {
+            return 'cancelled_voided';
+        }
+
+        if (in_array($status, ['for approval', 'pending', 'draft'], true)) {
+            return 'for_approval';
+        }
+
+        return 'approved';
     }
 
     private function openApTotalByCurrency($currency)
@@ -3296,6 +3312,7 @@ class ModuleController extends Controller
                     'currency' => $payment->currency ?: 'PHP',
                     'amount' => number_format((float) $payment->amount, 2),
                     'status' => $status,
+                    'status_group' => $this->apWorkflowStatusGroup($status),
                     'payment_method' => $payment->payment_method,
                     'check_status' => $issuance ? $issuance->status : null,
                     'print_count' => $issuance ? (int) $issuance->print_count : 0,
@@ -8695,7 +8712,7 @@ class ModuleController extends Controller
         return view('erp.payments.receipt', [
             'payment' => $payment,
             'receiptDocuments' => [
-                ['label' => 'Print Collection Receipt', 'route' => route('erp.official-receipt.preview', $receiptQuery), 'icon' => 'bi-receipt'],
+                ['label' => 'Print Official Receipt', 'route' => route('erp.official-receipt.preview', $receiptQuery), 'icon' => 'bi-receipt'],
                 ['label' => 'Print Acknowledgement Receipt', 'route' => route('erp.acknowledgement-receipt.preview', $receiptQuery), 'icon' => 'bi-receipt-cutoff'],
             ],
         ]);
@@ -9406,7 +9423,7 @@ class ModuleController extends Controller
             ['Statement of Account', 'SOA-PREPRINT', 'A4', 'Yes', 'A/R Trade-SOA', 'PHP / USD'],
             ['Statement of Account A', 'SOAA-PLAIN', 'A4', 'No', 'A/R Trade-SOA A', 'PHP / USD'],
             ['Debit Note', 'DN-PREPRINT', 'A4', 'Yes', 'A/R Trade-Debit Note', 'PHP / USD'],
-            ['Collection Receipt (Supplementary)', 'CR-PREPRINT', 'A4 / Approved Form', 'Yes', 'A/Trade-Billing Invoice', 'PHP / USD'],
+            ['Official Receipt (Supplementary)', 'CR-PREPRINT', 'A4 / Approved Form', 'Yes', 'A/Trade-Billing Invoice', 'PHP / USD'],
             ['Acknowledgement Receipt', 'AR-PREPRINT', 'A4 / Official Form', 'Yes', 'A/R Reimbursable Charges', 'PHP / USD'],
         ];
 
@@ -9694,7 +9711,7 @@ class ModuleController extends Controller
                 'subtitle' => 'MANILA',
                 'icon' => 'bi-receipt',
                 'branch' => 'MANILA',
-                'columns' => ['DATE', 'COLLECTION RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
+                'columns' => ['DATE', 'OFFICIAL RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
             ],
             'crb-pampanga' => [
                 'label' => 'CRB-PAMPANGA',
@@ -9702,7 +9719,7 @@ class ModuleController extends Controller
                 'subtitle' => 'PAMPANGA',
                 'icon' => 'bi-receipt',
                 'branch' => 'PAMPANGA',
-                'columns' => ['DATE', 'COLLECTION RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
+                'columns' => ['DATE', 'OFFICIAL RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
             ],
             'crb-cebu' => [
                 'label' => 'CRB-CEBU',
@@ -9710,7 +9727,7 @@ class ModuleController extends Controller
                 'subtitle' => 'CEBU',
                 'icon' => 'bi-receipt',
                 'branch' => 'CEBU',
-                'columns' => ['DATE', 'COLLECTION RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
+                'columns' => ['DATE', 'OFFICIAL RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
             ],
             'sales-manila' => [
                 'label' => 'SALES-MANILA',
@@ -9780,7 +9797,7 @@ class ModuleController extends Controller
 
         return [
             ['label' => 'Sales Book', 'value' => 'PHP '.number_format($sales, 2), 'icon' => 'bi-graph-up-arrow', 'tone' => 'success'],
-            ['label' => 'Collection Receipts', 'value' => 'PHP '.number_format($receipts, 2), 'icon' => 'bi-receipt', 'tone' => 'primary'],
+            ['label' => 'Official Receipts', 'value' => 'PHP '.number_format($receipts, 2), 'icon' => 'bi-receipt', 'tone' => 'primary'],
             ['label' => 'Disbursements', 'value' => 'PHP '.number_format($payments, 2), 'icon' => 'bi-credit-card', 'tone' => 'danger'],
             ['label' => 'Journal Entries', 'value' => number_format($journals), 'icon' => 'bi-journal-check', 'tone' => 'warning'],
         ];
@@ -10433,7 +10450,7 @@ class ModuleController extends Controller
                 $isAcknowledgement = $receipt->receipt_type === 'acknowledgement_receipt';
                 return [
                     'DATE' => $receipt->receipt_date,
-                    'COLLECTION RECEIPT NUMBER' => $isAcknowledgement ? '' : $receipt->receipt_no,
+                    'OFFICIAL RECEIPT NUMBER' => $isAcknowledgement ? '' : $receipt->receipt_no,
                     'ACKNOWLEDGEMENT RECEIPT NUMBER' => $isAcknowledgement ? $receipt->receipt_no : '',
                     'CUSTOMER NAME' => $receipt->customer_name,
                     'A/R TRADE' => (float) $receipt->amount,
@@ -10760,7 +10777,7 @@ class ModuleController extends Controller
             ],
             'Billing & Item Setup' => [
                 ['name' => 'Item List', 'description' => 'Service, freight, documentation, terminal handling, reimbursable, and tax treatment defaults.', 'route' => route('erp.settings.index').'#item-list', 'icon' => 'bi-box-seam', 'status' => 'Required'],
-                ['name' => 'Invoice Templates', 'description' => 'Billing Invoice, SOA B, SOA A, Debit Note, Collection Receipt, and custom templates.', 'route' => route('erp.customer-billing.templates'), 'icon' => 'bi-file-earmark-text', 'status' => 'Active'],
+                ['name' => 'Invoice Templates', 'description' => 'Billing Invoice, SOA B, SOA A, Debit Note, Official Receipt, and custom templates.', 'route' => route('erp.customer-billing.templates'), 'icon' => 'bi-file-earmark-text', 'status' => 'Active'],
                 ['name' => 'Print Layouts', 'description' => 'Pre-printed form alignment, paper size, field positions, and custom printable fields.', 'route' => route('erp.billings.print-layout.invoice'), 'icon' => 'bi-sliders', 'status' => 'Active'],
             ],
             'Tax, Currency & Banking' => [
@@ -11336,12 +11353,12 @@ class ModuleController extends Controller
             ],
             'collections' => [
                 'title' => 'Collections / Receive Payment',
-                'subtitle' => 'Collection Receipts, Acknowledgement Receipts, SOA A collections, and payment allocation.',
-                'actions' => ['Collection Receipt', 'Acknowledgement Receipt', 'SOA A Collection', 'Deposit Collection'],
+                'subtitle' => 'Official Receipts, Acknowledgement Receipts, SOA A collections, and payment allocation.',
+                'actions' => ['Official Receipt', 'Acknowledgement Receipt', 'SOA A Collection', 'Deposit Collection'],
                 'features' => ['OR Pre-printed', 'AR Pre-printed', 'SOA A No Pre-printed Form', 'Cash', 'Check', 'Bank Transfer', 'Partial Payment', 'Multiple Invoice Payment'],
                 'columns' => ['Receipt Type', 'Receipt No.', 'Customer ID', 'Job/Shipment ID', 'Currency', 'Amount'],
                 'rows' => [
-                    ['Collection Receipt', 'OR-2026-00618', 'CUST-001', 'JOB-SEA-2026-0422', 'PHP', '43,200.00'],
+                    ['Official Receipt', 'OR-2026-00618', 'CUST-001', 'JOB-SEA-2026-0422', 'PHP', '43,200.00'],
                     ['Acknowledgement Receipt', 'AR-2026-00109', 'CUST-003', 'JOB-SEA-2026-0365', 'PHP', '12,800.00'],
                     ['SOA A Collection', 'COLA-2026-00031', 'CUST-002', 'JOB-SEA-2026-0398', 'USD', '1,840.00'],
                 ],

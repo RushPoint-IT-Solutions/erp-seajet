@@ -152,7 +152,7 @@ class DashboardController extends Controller
                     'receipts.receipt_date as date',
                     'receipts.receipt_no as ref',
                     'customers.name as party',
-                    DB::raw("'Collection Receipt' as type"),
+                    DB::raw("'Official Receipt' as type"),
                     'receipts.amount',
                     'receipts.status'
                 )

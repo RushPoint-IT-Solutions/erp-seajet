@@ -1,7 +1,7 @@
 @extends('erp.layout')
 
-@section('title', 'Collection Receipt Preview')
-@section('page-title', 'Collection Receipt')
+@section('title', 'Official Receipt Preview')
+@section('page-title', 'Official Receipt')
 
 @push('styles')
 <style>
@@ -405,7 +405,7 @@
                 </div>
             </div>
             <div>
-                <div class="or-title or-template-only">Collection Receipt</div>
+                <div class="or-title or-template-only">Official Receipt</div>
                 <div class="or-number"><span class="or-template-only">No.</span><span class="receipt-adjustable-field" tabindex="0" data-field-key="receipt_no" data-field-label="Receipt number" style="{{ $fieldStyle('receipt_no') }}">{{ $receipt['receipt_no'] ?? '0046043' }}</span></div>
                 <table class="or-meta">
                     <tr>

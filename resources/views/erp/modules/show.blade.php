@@ -28,7 +28,7 @@
                         'New SOA A' => route('erp.soa-a.preview'),
                         'Debit Note' => route('erp.debit-note.preview'),
                         'New Debit Note' => route('erp.debit-note.preview'),
-                        'Collection Receipt' => route('erp.official-receipt.preview'),
+                        'Official Receipt' => route('erp.official-receipt.preview'),
                         'Acknowledgement Receipt' => route('erp.acknowledgement-receipt.preview'),
                         'Templates' => route('erp.customer-billing.templates'),
                         'Aging Report' => route('erp.customer-billing.aging'),

@@ -128,7 +128,7 @@
                     </div>
                 </div>
                 <input type="hidden" name="payment_type" value="Customer Payment">
-                <input type="hidden" name="receipt_type" value="Collection Receipt">
+                <input type="hidden" name="receipt_type" value="Official Receipt">
                 <input type="hidden" name="receipt_no" value="">
             </div>
             <div class="modal-footer">

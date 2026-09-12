@@ -26,13 +26,28 @@
         <strong>Control sequence:</strong> another authorized user approves the preparer's payment; cheque payments must then be printed and recorded; release performs the accounting posting.
     </div>
 
+    @php
+        $approvalStatusCounts = collect($approvals)->groupBy('status_group')->map->count();
+    @endphp
+    <ul class="nav nav-tabs mb-3 check-preparation-status-tabs" role="tablist" aria-label="Check preparation status filter">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" type="button" data-status-group="approved">Approved <span class="badge text-bg-light ms-1">{{ $approvalStatusCounts->get('approved', 0) }}</span></button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" type="button" data-status-group="for_approval">For Approval <span class="badge text-bg-light ms-1">{{ $approvalStatusCounts->get('for_approval', 0) }}</span></button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" type="button" data-status-group="cancelled_voided">Cancelled / Voided <span class="badge text-bg-light ms-1">{{ $approvalStatusCounts->get('cancelled_voided', 0) }}</span></button>
+        </li>
+    </ul>
+
     <div class="erp-card p-3">
         <div class="table-responsive">
             <table class="table table-hover align-middle module-table w-100">
                 <thead><tr><th>Payment</th><th>Check Voucher</th><th>Supplier</th><th>Method</th><th>Check No.</th><th>Currency</th><th class="text-end">Amount</th><th>Status</th><th>Check Control</th><th class="text-end">Actions</th></tr></thead>
                 <tbody>
                 @foreach($approvals as $row)
-                    <tr>
+                    <tr data-status-group="{{ $row['status_group'] }}">
                         <td><div class="fw-semibold">{{ $row['payment_no'] }}</div><small class="text-muted">{{ $row['shipment_job_id'] }}</small></td>
                         <td><a href="{{ route('erp.payables.check-voucher', $row['id']) }}" class="fw-semibold text-decoration-none">{{ $row['check_voucher'] }}</a></td>
                         <td>{{ $row['supplier'] }}</td>
@@ -76,7 +91,22 @@
 
 @push('scripts')
 <script>
-    $('.module-table').DataTable({ pageLength: 10, lengthChange: false, order: [] });
+    var checkPreparationTableElement = document.querySelector('.module-table');
+    var activeCheckPreparationStatus = 'for_approval';
+    $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
+        if (settings.nTable !== checkPreparationTableElement) {
+            return true;
+        }
+        return $(settings.aoData[dataIndex].nTr).data('status-group') === activeCheckPreparationStatus;
+    });
+    var checkPreparationTable = $('.module-table').DataTable({ pageLength: 10, lengthChange: false, order: [] });
+    checkPreparationTable.draw();
+    $('.check-preparation-status-tabs [data-status-group]').on('click', function () {
+        activeCheckPreparationStatus = $(this).data('status-group');
+        $('.check-preparation-status-tabs .nav-link').removeClass('active');
+        $(this).addClass('active');
+        checkPreparationTable.draw();
+    });
     document.querySelectorAll('.void-payment-form').forEach(function (form) {
         form.addEventListener('submit', function (event) {
             var reason = window.prompt('Enter the payment void reason:') || '';
