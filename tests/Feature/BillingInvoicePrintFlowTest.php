@@ -189,6 +189,23 @@ class BillingInvoicePrintFlowTest extends TestCase
         $this->assertNotRegExp('/<div class="[^"]*print-field-zero_rated_sales[^"]*"/', $withoutZeroRatedSales->getContent());
     }
 
+    public function test_billing_invoice_prints_the_applicable_tax_total_on_the_left_and_hides_zero_tax_fields()
+    {
+        $zeroRated = $this->get('/erp/billings/print/invoice?vatable_sales=0&vat_amount=0&zero_rated_sales=47813.39&vat_exempt_sales=0&billing_total=47813.39');
+        $zeroRated->assertStatus(200);
+        $this->assertRegExp('/<div class="[^"]*print-field-zero_rated_sales[^"]*"[^>]*>PHP 47,813\.39<\/div>/', $zeroRated->getContent());
+        $this->assertNotRegExp('/<div class="[^"]*print-field-vatable_sales[^"]*"/', $zeroRated->getContent());
+        $this->assertNotRegExp('/<div class="[^"]*print-field-vat[^"]*"/', $zeroRated->getContent());
+        $this->assertNotRegExp('/<div class="[^"]*print-field-vat_exempt_sales[^"]*"/', $zeroRated->getContent());
+
+        $vatExempt = $this->get('/erp/billings/print/invoice?vatable_sales=0&vat_amount=0&zero_rated_sales=0&vat_exempt_sales=47813.39&billing_total=47813.39');
+        $vatExempt->assertStatus(200);
+        $this->assertRegExp('/<div class="[^"]*print-field-vat_exempt_sales[^"]*"[^>]*>PHP 47,813\.39<\/div>/', $vatExempt->getContent());
+        $this->assertNotRegExp('/<div class="[^"]*print-field-vatable_sales[^"]*"/', $vatExempt->getContent());
+        $this->assertNotRegExp('/<div class="[^"]*print-field-vat[^"]*"/', $vatExempt->getContent());
+        $this->assertNotRegExp('/<div class="[^"]*print-field-zero_rated_sales[^"]*"/', $vatExempt->getContent());
+    }
+
     public function test_zero_rated_and_vat_exempt_sales_are_not_saved_as_vatable_sales()
     {
         $this->post('/erp/invoices/review', $this->payload([

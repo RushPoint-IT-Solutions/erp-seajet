@@ -250,7 +250,7 @@
             'vatable_sales' => ['label' => 'VATable Sales', 'value' => 'PHP 19,388.25', 'class' => 'amount'],
             'vat' => ['label' => 'VAT', 'value' => 'PHP 2,326.59', 'class' => 'amount'],
             'zero_rated_sales' => ['label' => 'Zero-rated Sales', 'value' => 'PHP 47,813.39', 'class' => 'amount'],
-            'vat_exempt_sales' => ['label' => 'VAT-exempt Sales', 'value' => '0.00', 'class' => 'amount'],
+            'vat_exempt_sales' => ['label' => 'VAT-exempt Sales', 'value' => 'PHP 47,813.39', 'class' => 'amount'],
             'total_sales' => ['label' => 'Total Sales', 'value' => 'PHP 21,714.84', 'class' => 'amount'],
             'less_vat' => ['label' => 'Less VAT', 'value' => 'PHP 2,326.59', 'class' => 'amount'],
             'amount_net_vat' => ['label' => 'Amount Net of VAT', 'value' => 'PHP 19,388.25', 'class' => 'amount'],
