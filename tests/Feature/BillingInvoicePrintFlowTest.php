@@ -176,6 +176,17 @@ class BillingInvoicePrintFlowTest extends TestCase
         $print->assertSee('PHP 324.00');
     }
 
+    public function test_billing_invoice_prints_non_zero_zero_rated_sales_and_hides_zero_amount()
+    {
+        $withZeroRatedSales = $this->get('/erp/billings/print/invoice?zero_rated_sales=47813.39&billing_total=47813.39');
+        $withZeroRatedSales->assertStatus(200);
+        $this->assertRegExp('/<div class="[^"]*print-field-zero_rated_sales[^"]*"[^>]*>PHP 47,813\.39<\/div>/', $withZeroRatedSales->getContent());
+
+        $withoutZeroRatedSales = $this->get('/erp/billings/print/invoice?zero_rated_sales=0&billing_total=0');
+        $withoutZeroRatedSales->assertStatus(200);
+        $this->assertNotRegExp('/<div class="[^"]*print-field-zero_rated_sales[^"]*"/', $withoutZeroRatedSales->getContent());
+    }
+
     public function test_billing_invoice_prints_each_item_as_a_separate_line_with_its_amount()
     {
         $layout = $this->get('/erp/billings/print-layout/invoice');

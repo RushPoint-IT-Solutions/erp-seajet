@@ -314,7 +314,9 @@
         <div class="bi-field fit-multiline print-field-remarks" data-fit-text data-min-font="6" data-items-shift="{{ $additionalItemsOffset }}" style="left: {{ $p['remarks'][0] }}px; top: {{ $remarksTop }}px; {{ $fieldStyle('remarks') }}">{{ $print['remarks'] ?? '' }}</div>
         <div class="bi-field fit-single-line amount print-field-vatable_sales" data-fit-text style="left: {{ $p['vatable_sales'][0] }}px; top: {{ $p['vatable_sales'][1] }}px; {{ $fieldStyle('vatable_sales') }}">{{ $money($print['vatable_sales']) }}</div>
         <div class="bi-field fit-single-line amount print-field-vat" data-fit-text style="left: {{ $p['vat'][0] }}px; top: {{ $p['vat'][1] }}px; {{ $fieldStyle('vat') }}">{{ $money($print['vat_amount']) }}</div>
-        <div class="bi-field fit-single-line amount print-field-zero_rated_sales" data-fit-text style="left: {{ $p['zero_rated_sales'][0] }}px; top: {{ $p['zero_rated_sales'][1] }}px; {{ $fieldStyle('zero_rated_sales') }}">{{ $plainAmount($print['zero_rated_sales']) }}</div>
+        @if((float) ($print['zero_rated_sales'] ?? 0) > 0)
+            <div class="bi-field fit-single-line amount print-field-zero_rated_sales" data-fit-text style="left: {{ $p['zero_rated_sales'][0] }}px; top: {{ $p['zero_rated_sales'][1] }}px; {{ $fieldStyle('zero_rated_sales') }}">{{ $money($print['zero_rated_sales']) }}</div>
+        @endif
         <div class="bi-field fit-single-line amount print-field-vat_exempt_sales" data-fit-text style="left: {{ $p['vat_exempt_sales'][0] }}px; top: {{ $p['vat_exempt_sales'][1] }}px; {{ $fieldStyle('vat_exempt_sales') }}">{{ $plainAmount($print['vat_exempt_sales']) }}</div>
 
         <div class="bi-field fit-single-line amount print-field-total_sales" data-fit-text style="left: {{ $p['total_sales'][0] }}px; top: {{ $p['total_sales'][1] }}px; {{ $fieldStyle('total_sales') }}">{{ $money($print['billing_total']) }}</div>
