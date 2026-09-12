@@ -106,6 +106,7 @@ class BillingInvoicePrintFlowTest extends TestCase
         $this->assertRegExp('/soa-payment-note-amount[^>]*font-size:\s*16px/', $soaPrint->getContent());
         $soaPrint->assertDontSee('current -= 0.5', false);
         $this->assertRegExp('/PLEASE PAY THIS AMOUNT<\/span><span>PHP 162\.00<\/span>/', $soaPrint->getContent());
+        $this->assertRegExp('/print-field-total_reimbursement[^>]*>50\.00<\/div>/', $soaPrint->getContent());
     }
 
     public function test_guest_or_non_tax_billing_review_can_print_soa_a_only()
