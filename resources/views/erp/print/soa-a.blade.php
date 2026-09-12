@@ -19,7 +19,7 @@
         @endif
         border: 1px solid #111827;
         box-shadow: 0 10px 30px rgba(15, 23, 42, .14);
-        font-family: Arial, sans-serif;
+        font-family: {!! $settings['font_stack'] ?? 'Arial, sans-serif' !!};
         color: #111827;
         overflow: hidden;
     }

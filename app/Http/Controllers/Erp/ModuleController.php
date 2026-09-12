@@ -6399,6 +6399,7 @@ class ModuleController extends Controller
             'customFields' => $this->soaPrintCustomFields($type),
             'hiddenFields' => $this->soaPrintHiddenFields($type),
             'samples' => $this->soaPrintSamples($type),
+            'fontOptions' => $this->invoicePrintFontOptions(),
         ];
     }
 
@@ -6502,6 +6503,7 @@ class ModuleController extends Controller
         ];
         $saved = $this->savedSoaPrintLayout($type);
         $savedSettings = $saved['settings'] ?? [];
+        $fontOptions = $this->invoicePrintFontOptions();
         $paper = request('paper_size', $savedSettings['paper_size'] ?? 'letter');
         $paper = isset($presets[$paper]) ? $paper : 'letter';
         $width = (int) ($savedSettings['paper_width'] ?? $presets[$paper]['width']);
@@ -6514,6 +6516,12 @@ class ModuleController extends Controller
             $height = max(400, min(2200, (int) request('paper_height', $height)));
         }
 
+        $savedFontFamily = $saved['field_styles']['_font_family'] ?? 'arial';
+        $fontFamily = strtolower(trim((string) request('font_family', $savedFontFamily)));
+        if (!isset($fontOptions[$fontFamily])) {
+            $fontFamily = 'arial';
+        }
+
         return [
             'paper_size' => $paper,
             'paper_width' => $width,
@@ -6521,6 +6529,8 @@ class ModuleController extends Controller
             'page_css' => $paper === 'custom' ? ($width.'px '.$height.'px') : $presets[$paper]['page_css'],
             'template_url' => trim((string) request('template_url', $savedSettings['template_url'] ?? '')),
             'print_template' => request()->has('print_template') ? request('print_template') === '1' : (bool) ($savedSettings['print_template'] ?? false),
+            'font_family' => $fontFamily,
+            'font_stack' => $fontOptions[$fontFamily]['stack'],
         ];
     }
 
@@ -6592,6 +6602,10 @@ class ModuleController extends Controller
                 'width' => max(20, min(900, (int) request('w_'.$key, $savedStyle['width'] ?? $defaultWidth))),
                 'font_size' => max(6, min(48, (int) request('fs_'.$key, $savedStyle['font_size'] ?? ($key === 'serial' ? 18 : 12)))),
             ];
+        }
+
+        if ($type === 'soa_a') {
+            $styles['_font_family'] = $this->soaPrintSettings($type)['font_family'];
         }
 
         return $styles;
@@ -8803,8 +8817,13 @@ class ModuleController extends Controller
 
     public function officialReceiptPreview()
     {
+        $receipt = $this->officialReceiptPrintData(request('receipt_no') ?: request('receipt'), 'or');
+        if (request('tax_print') === 'non_vat') {
+            return $this->nonVatAcknowledgementView($receipt, 'or');
+        }
+
         return view('erp.print.official-receipt', [
-            'receipt' => $this->officialReceiptPrintData(request('receipt_no') ?: request('receipt'), 'or'),
+            'receipt' => $receipt,
             'receiptLayout' => $this->receiptPrintLayout('or'),
             'receiptFieldStyles' => $this->receiptPrintFieldStyles('or'),
             'receiptFontDefaults' => $this->receiptPrintFontDefaults(),
@@ -9006,8 +9025,9 @@ class ModuleController extends Controller
     public function acknowledgementReceiptPreview()
     {
         $receipt = $this->officialReceiptPrintData(request('receipt_no') ?: request('receipt'), 'ar');
-        if (!empty($receipt['is_non_vat'])) {
-            return $this->nonVatAcknowledgementView($receipt);
+        $taxPrint = request('tax_print');
+        if ($taxPrint === 'non_vat' || ($taxPrint !== 'vat' && !empty($receipt['is_non_vat']))) {
+            return $this->nonVatAcknowledgementView($receipt, 'ar');
         }
 
         return view('erp.print.acknowledgement-receipt', [
@@ -9030,11 +9050,12 @@ class ModuleController extends Controller
     public function nonVatAcknowledgementPreview()
     {
         return $this->nonVatAcknowledgementView(
-            $this->officialReceiptPrintData(request('receipt_no') ?: request('receipt'), 'ar')
+            $this->officialReceiptPrintData(request('receipt_no') ?: request('receipt'), request('source_document') === 'or' ? 'or' : 'ar'),
+            request('source_document') === 'or' ? 'or' : 'ar'
         );
     }
 
-    private function nonVatAcknowledgementView(array $receipt)
+    private function nonVatAcknowledgementView(array $receipt, $sourceDocument = 'ar')
     {
         $receipt['amount'] = (float) ($receipt['collected_amount'] ?? $receipt['amount'] ?? 0);
 
@@ -9047,6 +9068,7 @@ class ModuleController extends Controller
             'receiptFieldLabels' => $this->receiptPrintFieldLabels('ar_non_vat'),
             'receiptHiddenFields' => $this->receiptPrintHiddenFields('ar_non_vat'),
             'receiptContent' => $this->receiptPrintContent('ar_non_vat'),
+            'sourceDocument' => $sourceDocument === 'or' ? 'or' : 'ar',
             'adjustLayout' => request('adjust') === '1',
         ]);
     }
@@ -9351,6 +9373,9 @@ class ModuleController extends Controller
         $query = ['adjust' => 1];
         if (request('receipt_no')) {
             $query['receipt_no'] = request('receipt_no');
+        }
+        if ($documentKind === 'ar_non_vat' && in_array(request('source_document'), ['ar', 'or'], true)) {
+            $query['source_document'] = request('source_document');
         }
 
         return redirect()->route($route, $query)->with('status', 'Receipt print positions saved.');

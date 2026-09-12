@@ -16,7 +16,7 @@
         border: 1px solid #1f2937;
         box-shadow: 0 10px 30px rgba(15, 23, 42, .14);
         overflow: hidden;
-        font-family: Arial, sans-serif;
+        font-family: {!! $type === 'soa_a' ? $settings['font_stack'] : 'Arial, sans-serif' !!};
         @if($settings['template_url'])
         background-image: url('{{ $settings['template_url'] }}');
         background-size: 100% 100%;
@@ -85,6 +85,9 @@
         <input type="hidden" name="paper_height" id="paper_height_hidden" value="{{ $settings['paper_height'] }}">
         <input type="hidden" name="template_url" id="template_url_hidden" value="{{ $settings['template_url'] }}">
         <input type="hidden" name="print_template" id="print_template_hidden" value="{{ $settings['print_template'] ? '1' : '0' }}">
+        @if($type === 'soa_a')
+            <input type="hidden" name="font_family" id="font_family_hidden" value="{{ $settings['font_family'] }}">
+        @endif
         <input type="hidden" name="custom_fields_present" value="1">
         <input type="hidden" name="hidden_fields_present" value="1">
         <div id="hiddenStandardFields">
@@ -187,12 +190,30 @@
                 </div>
                 <button type="button" class="btn btn-outline-secondary btn-sm w-100 mb-3" id="applyTemplateSettings"><i class="bi bi-image me-1"></i>Update Sheet</button>
 
+                @if($type === 'soa_a')
+                    <hr>
+                    <h2 class="h6 fw-bold mb-2">SOA A Text</h2>
+                    <div class="mb-2">
+                        <label class="form-label small text-muted" for="fontFamilyControl">Font</label>
+                        <select class="form-select form-select-sm" id="fontFamilyControl">
+                            @foreach($fontOptions as $fontKey => $fontOption)
+                                <option value="{{ $fontKey }}" data-stack="{{ $fontOption['stack'] }}" {{ $settings['font_family'] === $fontKey ? 'selected' : '' }}>{{ $fontOption['label'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted" for="allFontSizeControl">Font Size</label>
+                        <input type="number" class="form-control form-control-sm" id="allFontSizeControl" min="6" max="48" value="{{ $fieldStyles['particulars']['font_size'] ?? 12 }}">
+                        <div class="form-text">Applies to all printable SOA A fields. You can still resize one selected field afterward.</div>
+                    </div>
+                @endif
+
                 <hr>
                 <h2 class="h6 fw-bold mb-1">Selected Field</h2>
                 <input type="text" class="form-control form-control-sm mb-2" id="selectedFieldLabel" value="None selected" readonly>
                 <div class="row g-2 mb-2">
                     <div class="col-6"><label class="form-label small text-muted">Width</label><input type="number" class="form-control form-control-sm" id="fieldWidthControl" value="160"></div>
-                    <div class="col-6"><label class="form-label small text-muted">Font</label><input type="number" class="form-control form-control-sm" id="fieldFontControl" value="12"></div>
+                    <div class="col-6"><label class="form-label small text-muted">Font Size</label><input type="number" class="form-control form-control-sm" id="fieldFontControl" value="12"></div>
                     <div class="col-6"><label class="form-label small text-muted">X</label><input type="number" class="form-control form-control-sm" id="fieldXControl" value="0"></div>
                     <div class="col-6"><label class="form-label small text-muted">Y</label><input type="number" class="form-control form-control-sm" id="fieldYControl" value="0"></div>
                 </div>
@@ -288,6 +309,12 @@ $(function () {
         $('#layoutSheet').css({ width: width + 'px', height: height + 'px', backgroundImage: url ? 'url("' + url + '")' : 'none' });
         $('#layoutSheet').toggleClass('template-muted', !$('#printTemplateControl').is(':checked'));
     }
+    function applySoaAFont() {
+        var control = $('#fontFamilyControl');
+        if (!control.length) return;
+        $('#font_family_hidden').val(control.val());
+        $('#layoutSheet').css('font-family', control.find(':selected').data('stack'));
+    }
     function hideOrDelete(field) {
         var el = $('.drag-field[data-field="' + field + '"]');
         if (!el.length) return;
@@ -322,6 +349,13 @@ $(function () {
         applyPaperAndTemplate();
     });
     $('#applyTemplateSettings, #printTemplateControl').on('click change', applyPaperAndTemplate);
+    $('#fontFamilyControl').on('change', applySoaAFont);
+    $('#allFontSizeControl').on('input', function () {
+        var fontSize = Math.max(6, Math.min(parseInt(this.value, 10) || 12, 48));
+        $('.drag-field').each(function () {
+            updateSize(this, parseInt(this.style.width, 10) || $(this).outerWidth(), fontSize);
+        });
+    });
     $('.field-focus').on('click', function () { setActive($(this).data('field')); });
     $('#layoutSheet').on('mousedown', '.drag-field', function (event) {
         if ($(event.target).closest('.field-remove, .field-resize').length) return;
@@ -373,6 +407,7 @@ $(function () {
         setActive(key);
     });
     applyPaperAndTemplate();
+    applySoaAFont();
 });
 </script>
 @endpush
