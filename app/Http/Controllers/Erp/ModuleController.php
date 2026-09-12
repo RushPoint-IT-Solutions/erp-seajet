@@ -8724,30 +8724,27 @@ class ModuleController extends Controller
                 DB::raw('COUNT(receipt_applications.id) as application_count'),
                 DB::raw('SUM(CASE
                     WHEN sales_documents.id IS NULL THEN 0
-                    WHEN COALESCE(sales_documents.invoice_amount, 0) > 0 THEN sales_documents.invoice_amount
-                    WHEN COALESCE(sales_documents.freight_total, 0) > 0
-                        THEN CASE
-                            WHEN COALESCE(sales_documents.grand_total, 0) > COALESCE(sales_documents.freight_total, 0)
-                                THEN sales_documents.grand_total - sales_documents.freight_total
-                            ELSE 0
-                        END
-                    ELSE COALESCE(sales_documents.grand_total, 0)
-                END) as invoice_amount_total'),
-                DB::raw('SUM(CASE
-                    WHEN sales_documents.id IS NULL THEN 0
                     WHEN COALESCE(sales_documents.invoice_amount, 0) > 0
                         THEN CASE
-                            WHEN COALESCE(sales_documents.grand_total, 0) > sales_documents.invoice_amount
-                                THEN sales_documents.grand_total - sales_documents.invoice_amount
+                            WHEN sales_documents.invoice_amount > COALESCE(sales_documents.withholding_tax_amount, 0)
+                                THEN sales_documents.invoice_amount - COALESCE(sales_documents.withholding_tax_amount, 0)
                             ELSE 0
                         END
                     WHEN COALESCE(sales_documents.freight_total, 0) > 0
                         THEN CASE
-                            WHEN COALESCE(sales_documents.grand_total, 0) > sales_documents.freight_total
-                                THEN sales_documents.freight_total
-                            ELSE COALESCE(sales_documents.grand_total, 0)
+                            WHEN COALESCE(sales_documents.grand_total, 0) > COALESCE(sales_documents.freight_total, 0) + COALESCE(sales_documents.withholding_tax_amount, 0)
+                                THEN sales_documents.grand_total - sales_documents.freight_total - COALESCE(sales_documents.withholding_tax_amount, 0)
+                            ELSE 0
                         END
+                    WHEN COALESCE(sales_documents.grand_total, 0) > COALESCE(sales_documents.withholding_tax_amount, 0)
+                        THEN sales_documents.grand_total - COALESCE(sales_documents.withholding_tax_amount, 0)
                     ELSE 0
+                END) as invoice_amount_total'),
+                // SOA B is the reimbursement component stored in freight_total.
+                // Do not infer it from grand_total because that can include unrelated adjustments.
+                DB::raw('SUM(CASE
+                    WHEN sales_documents.id IS NULL THEN 0
+                    ELSE COALESCE(sales_documents.freight_total, 0)
                 END) as soa_amount_total')
             );
 
