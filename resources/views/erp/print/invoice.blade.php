@@ -325,7 +325,7 @@
             <div class="bi-field fit-single-line amount print-field-vat_exempt_sales" data-fit-text style="left: {{ $p['vat_exempt_sales'][0] }}px; top: {{ $p['vat_exempt_sales'][1] }}px; {{ $fieldStyle('vat_exempt_sales') }}">{{ $money($print['vat_exempt_sales']) }}</div>
         @endif
 
-        @if((float) ($print['billing_total'] ?? 0) > 0)
+        @if((float) ($print['billing_total'] ?? 0) > 0 && (float) ($print['vat_amount'] ?? 0) > 0)
             <div class="bi-field fit-single-line amount print-field-total_sales" data-fit-text style="left: {{ $p['total_sales'][0] }}px; top: {{ $p['total_sales'][1] }}px; {{ $fieldStyle('total_sales') }}">{{ $money($print['billing_total']) }}</div>
         @endif
         @if((float) ($print['vat_amount'] ?? 0) > 0)

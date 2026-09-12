@@ -206,6 +206,8 @@ class BillingInvoicePrintFlowTest extends TestCase
         $this->assertNotRegExp('/<div class="[^"]*print-field-vatable_sales[^"]*"/', $zeroRated->getContent());
         $this->assertNotRegExp('/<div class="[^"]*print-field-vat(?:\s|")/', $zeroRated->getContent());
         $this->assertNotRegExp('/<div class="[^"]*print-field-vat_exempt_sales[^"]*"/', $zeroRated->getContent());
+        $this->assertNotRegExp('/<div class="[^"]*print-field-total_sales[^"]*"/', $zeroRated->getContent());
+        $this->assertRegExp('/<div class="[^"]*print-field-amount_net_vat[^"]*"[^>]*>PHP 47,813\.39<\/div>/', $zeroRated->getContent());
 
         $vatExempt = $this->get('/erp/billings/print/invoice?vatable_sales=0&vat_amount=0&zero_rated_sales=0&vat_exempt_sales=47813.39&billing_total=47813.39');
         $vatExempt->assertStatus(200);
@@ -213,6 +215,8 @@ class BillingInvoicePrintFlowTest extends TestCase
         $this->assertNotRegExp('/<div class="[^"]*print-field-vatable_sales[^"]*"/', $vatExempt->getContent());
         $this->assertNotRegExp('/<div class="[^"]*print-field-vat(?:\s|")/', $vatExempt->getContent());
         $this->assertNotRegExp('/<div class="[^"]*print-field-zero_rated_sales[^"]*"/', $vatExempt->getContent());
+        $this->assertNotRegExp('/<div class="[^"]*print-field-total_sales[^"]*"/', $vatExempt->getContent());
+        $this->assertRegExp('/<div class="[^"]*print-field-amount_net_vat[^"]*"[^>]*>PHP 47,813\.39<\/div>/', $vatExempt->getContent());
 
         $legacyZeroRated = $this->get('/erp/billings/print/invoice?vat_classification=zero-rated&billing_total=47813.39&vat_amount=0');
         $legacyZeroRated->assertStatus(200);
