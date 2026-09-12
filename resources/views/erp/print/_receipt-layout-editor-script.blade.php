@@ -7,6 +7,8 @@
     var readout = document.getElementById('receiptPositionReadout');
     var selectedLabel = document.getElementById('selectedReceiptField');
     var fontInput = document.getElementById('receiptFontSize');
+    var fontFamilyInput = document.getElementById('receiptFontFamily');
+    var boldInput = document.getElementById('receiptBold');
     var positionXInput = document.getElementById('receiptPositionX');
     var positionYInput = document.getElementById('receiptPositionY');
     var resetButton = document.getElementById('resetReceiptPositions');
@@ -31,6 +33,14 @@
         return document.getElementById('font_size_' + key);
     }
 
+    function fontFamilyField(key) {
+        return document.getElementById('font_family_' + key);
+    }
+
+    function boldField(key) {
+        return document.getElementById('bold_field_' + key);
+    }
+
     function point(field) {
         var key = field.dataset.fieldKey;
         return {
@@ -44,9 +54,13 @@
         var current = point(field);
         selectedLabel.textContent = field.dataset.fieldLabel || key;
         fontInput.disabled = false;
+        fontFamilyInput.disabled = false;
+        boldInput.disabled = false;
         positionXInput.disabled = false;
         positionYInput.disabled = false;
         fontInput.value = fontSizeInput(key).value;
+        fontFamilyInput.value = fontFamilyField(key).value;
+        boldInput.checked = boldField(key).checked;
         positionXInput.value = current.x;
         positionYInput.value = current.y;
     }
@@ -73,6 +87,22 @@
         fontSizeInput(key).value = size;
         field.style.fontSize = size + 'pt';
         if (selectedField === field) fontInput.value = size;
+    }
+
+    function applyFontFamily(field, family) {
+        var key = field.dataset.fieldKey;
+        var option = Array.prototype.find.call(fontFamilyInput.options, function (item) { return item.value === family; });
+        if (!option) return;
+        fontFamilyField(key).value = family;
+        field.style.fontFamily = option.dataset.stack;
+        if (selectedField === field) fontFamilyInput.value = family;
+    }
+
+    function applyBold(field, bold) {
+        var key = field.dataset.fieldKey;
+        boldField(key).checked = bold;
+        field.style.fontWeight = bold ? '700' : '400';
+        if (selectedField === field) boldInput.checked = bold;
     }
 
     function selectField(field) {
@@ -105,6 +135,8 @@
             selectedField = null;
             selectedLabel.textContent = 'Select a field';
             fontInput.disabled = true;
+            fontFamilyInput.disabled = true;
+            boldInput.disabled = true;
             positionXInput.disabled = true;
             positionYInput.disabled = true;
             if (deleteButton) deleteButton.disabled = true;
@@ -168,6 +200,16 @@
         applyFontSize(selectedField, size);
     });
 
+    fontFamilyInput.addEventListener('change', function () {
+        if (!selectedField) return;
+        applyFontFamily(selectedField, this.value);
+    });
+
+    boldInput.addEventListener('change', function () {
+        if (!selectedField) return;
+        applyBold(selectedField, this.checked);
+    });
+
     function applyCoordinateInput() {
         if (!selectedField) return;
         var x = parseFloat(positionXInput.value);
@@ -211,10 +253,12 @@
                 var fontControl = fontSizeInput(field.dataset.fieldKey);
                 applyPosition(field, 0, 0);
                 applyFontSize(field, parseFloat(fontControl.dataset.default || 9));
+                applyFontFamily(field, fontFamilyField(field.dataset.fieldKey).dataset.default || 'arial');
+                applyBold(field, false);
                 setFieldVisibility(field.dataset.fieldKey, true);
             });
             selectField(fields[0]);
-            if (readout) readout.textContent = 'Default positions and font sizes restored. Click Save Layout to keep them.';
+            if (readout) readout.textContent = 'Default positions and font styles restored. Click Save Layout to keep them.';
         });
     }
 

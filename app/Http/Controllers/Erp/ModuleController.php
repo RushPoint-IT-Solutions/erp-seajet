@@ -8657,6 +8657,7 @@ class ModuleController extends Controller
             'receiptLayout' => $this->receiptPrintLayout('or'),
             'receiptFieldStyles' => $this->receiptPrintFieldStyles('or'),
             'receiptFontDefaults' => $this->receiptPrintFontDefaults(),
+            'receiptFontOptions' => $this->receiptPrintFontOptions(),
             'receiptFieldLabels' => $this->receiptPrintFieldLabels(),
             'receiptHiddenFields' => $this->receiptPrintHiddenFields('or'),
             'adjustLayout' => request('adjust') === '1',
@@ -8840,6 +8841,7 @@ class ModuleController extends Controller
             'receiptLayout' => $this->receiptPrintLayout('ar'),
             'receiptFieldStyles' => $this->receiptPrintFieldStyles('ar'),
             'receiptFontDefaults' => $this->receiptPrintFontDefaults(),
+            'receiptFontOptions' => $this->receiptPrintFontOptions(),
             'receiptFieldLabels' => $this->receiptPrintFieldLabels(),
             'receiptHiddenFields' => $this->receiptPrintHiddenFields('ar'),
             'adjustLayout' => request('adjust') === '1',
@@ -8953,15 +8955,39 @@ class ModuleController extends Controller
         ];
     }
 
+    private function receiptPrintFontOptions()
+    {
+        return [
+            'arial' => ['label' => 'Arial', 'stack' => 'Arial, Helvetica, sans-serif'],
+            'calibri' => ['label' => 'Calibri', 'stack' => 'Calibri, Arial, sans-serif'],
+            'times_new_roman' => ['label' => 'Times New Roman', 'stack' => '"Times New Roman", Times, serif'],
+            'georgia' => ['label' => 'Georgia', 'stack' => 'Georgia, "Times New Roman", serif'],
+            'courier_new' => ['label' => 'Courier New', 'stack' => '"Courier New", Courier, monospace'],
+            'verdana' => ['label' => 'Verdana', 'stack' => 'Verdana, Geneva, sans-serif'],
+            'tahoma' => ['label' => 'Tahoma', 'stack' => 'Tahoma, Arial, sans-serif'],
+        ];
+    }
+
     private function receiptPrintFieldStyles($documentKind)
     {
         $saved = $this->savedReceiptPrintLayout($documentKind);
         $savedFontSizes = $saved['field_styles']['font_sizes'] ?? [];
+        $savedFontFamilies = $saved['field_styles']['font_families'] ?? [];
+        $savedBoldFields = $saved['field_styles']['bold_fields'] ?? [];
+        $fontOptions = $this->receiptPrintFontOptions();
         $styles = [];
 
         foreach ($this->receiptPrintFontDefaults() as $field => $defaultFontSize) {
+            $fontFamily = (string) ($savedFontFamilies[$field] ?? 'arial');
+            if (!isset($fontOptions[$fontFamily])) {
+                $fontFamily = 'arial';
+            }
+
             $styles[$field] = [
                 'font_size' => max(6, min(36, round((float) ($savedFontSizes[$field] ?? $defaultFontSize), 2))),
+                'font_family' => $fontFamily,
+                'font_stack' => $fontOptions[$fontFamily]['stack'],
+                'bold' => in_array($field, is_array($savedBoldFields) ? $savedBoldFields : [], true),
             ];
         }
 
@@ -8984,12 +9010,17 @@ class ModuleController extends Controller
         $submittedX = (array) request('layout_x', []);
         $submittedY = (array) request('layout_y', []);
         $submittedFontSizes = (array) request('font_size', []);
+        $submittedFontFamilies = (array) request('font_family', []);
+        $submittedBoldFields = (array) request('bold_field', []);
         $fontDefaults = $this->receiptPrintFontDefaults();
+        $fontOptions = $this->receiptPrintFontOptions();
         $visibleFields = request()->has('visibility_present') ? (array) request('visible_field', []) : $this->receiptPrintFieldKeys();
         $visibleFields = array_intersect($this->receiptPrintFieldKeys(), $visibleFields);
         $hiddenFields = array_values(array_diff($this->receiptPrintFieldKeys(), $visibleFields));
         $positions = [];
         $fontSizes = [];
+        $fontFamilies = [];
+        $boldFields = [];
 
         foreach ($this->receiptPrintFieldKeys() as $field) {
             $positions[$field] = [
@@ -8997,7 +9028,18 @@ class ModuleController extends Controller
                 max(-100, min(100, round((float) ($submittedY[$field] ?? 0), 2))),
             ];
             $fontSizes[$field] = max(6, min(36, round((float) ($submittedFontSizes[$field] ?? $fontDefaults[$field]), 2)));
+            $fontFamily = (string) ($submittedFontFamilies[$field] ?? 'arial');
+            $fontFamilies[$field] = isset($fontOptions[$fontFamily]) ? $fontFamily : 'arial';
+            if (in_array($field, $submittedBoldFields, true)) {
+                $boldFields[] = $field;
+            }
         }
+
+        $fieldStyles = [
+            'font_sizes' => $fontSizes,
+            'font_families' => $fontFamilies,
+            'bold_fields' => $boldFields,
+        ];
 
         try {
             if (Schema::hasTable('print_layouts')) {
@@ -9008,7 +9050,7 @@ class ModuleController extends Controller
                     'template_url' => null,
                     'print_template' => false,
                     'positions' => json_encode($positions),
-                    'field_styles' => json_encode(['font_sizes' => $fontSizes]),
+                    'field_styles' => json_encode($fieldStyles),
                     'custom_fields' => json_encode([]),
                     'is_default' => true,
                     'updated_at' => now(),
@@ -9033,7 +9075,7 @@ class ModuleController extends Controller
 
         Storage::put($this->receiptPrintLayoutStoragePath($documentKind), json_encode([
             'positions' => $positions,
-            'field_styles' => ['font_sizes' => $fontSizes],
+            'field_styles' => $fieldStyles,
             'hidden_fields' => $hiddenFields,
         ], JSON_PRETTY_PRINT));
 

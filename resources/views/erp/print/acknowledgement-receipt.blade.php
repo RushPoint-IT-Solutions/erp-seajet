@@ -313,14 +313,17 @@
     $receiptLayout = $receiptLayout ?? [];
     $receiptFieldStyles = $receiptFieldStyles ?? [];
     $receiptFontDefaults = $receiptFontDefaults ?? [];
+    $receiptFontOptions = $receiptFontOptions ?? [];
     $receiptFieldLabels = $receiptFieldLabels ?? [];
     $receiptHiddenFields = $receiptHiddenFields ?? [];
     $adjustLayout = $adjustLayout ?? false;
     $fieldStyle = function ($field) use ($receiptLayout, $receiptFieldStyles, $receiptHiddenFields) {
         $point = $receiptLayout[$field] ?? [0, 0];
         $fontSize = $receiptFieldStyles[$field]['font_size'] ?? 9;
+        $fontStack = $receiptFieldStyles[$field]['font_stack'] ?? 'Arial, Helvetica, sans-serif';
+        $fontWeight = !empty($receiptFieldStyles[$field]['bold']) ? 700 : 400;
         $hiddenStyle = in_array($field, $receiptHiddenFields, true) ? ' display: none;' : '';
-        return 'transform: translate('.((float) ($point[0] ?? 0)).'mm, '.((float) ($point[1] ?? 0)).'mm); font-size: '.((float) $fontSize).'pt;'.$hiddenStyle;
+        return 'transform: translate('.((float) ($point[0] ?? 0)).'mm, '.((float) ($point[1] ?? 0)).'mm); font-size: '.((float) $fontSize).'pt; font-family: '.$fontStack.'; font-weight: '.$fontWeight.';'.$hiddenStyle;
     };
 @endphp
 
@@ -334,6 +337,8 @@
                     <input type="hidden" name="layout_x[{{ $field }}]" id="layout_x_{{ $field }}" value="{{ $point[0] }}">
                     <input type="hidden" name="layout_y[{{ $field }}]" id="layout_y_{{ $field }}" value="{{ $point[1] }}">
                     <input type="hidden" name="font_size[{{ $field }}]" id="font_size_{{ $field }}" value="{{ $receiptFieldStyles[$field]['font_size'] }}" data-default="{{ $receiptFontDefaults[$field] }}">
+                    <input type="hidden" name="font_family[{{ $field }}]" id="font_family_{{ $field }}" value="{{ $receiptFieldStyles[$field]['font_family'] }}" data-default="arial">
+                    <input type="checkbox" name="bold_field[]" id="bold_field_{{ $field }}" value="{{ $field }}" class="d-none" {{ $receiptFieldStyles[$field]['bold'] ? 'checked' : '' }}>
                 @endforeach
                 <button type="submit" class="btn btn-success"><i class="bi bi-save me-1"></i> Save Layout</button>
             </form>
@@ -342,6 +347,15 @@
                 <input type="number" id="receiptFontSize" class="form-control form-control-sm" min="6" max="36" step="0.25" style="width:74px" disabled>
                 pt
             </label>
+            <label class="small d-flex align-items-center gap-1 mb-0">
+                Font
+                <select id="receiptFontFamily" class="form-select form-select-sm" style="width:150px" disabled>
+                    @foreach($receiptFontOptions as $fontKey => $fontOption)
+                        <option value="{{ $fontKey }}" data-stack="{{ $fontOption['stack'] }}">{{ $fontOption['label'] }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <label class="small d-flex align-items-center gap-1 mb-0"><input type="checkbox" id="receiptBold" disabled> Bold</label>
             <label class="small d-flex align-items-center gap-1 mb-0">X <input type="number" id="receiptPositionX" class="form-control form-control-sm" min="-100" max="100" step="0.1" style="width:78px" disabled></label>
             <label class="small d-flex align-items-center gap-1 mb-0">Y <input type="number" id="receiptPositionY" class="form-control form-control-sm" min="-100" max="100" step="0.1" style="width:78px" disabled></label>
             <label class="small d-flex align-items-center gap-1 mb-0"><input type="checkbox" id="toggleReceiptGrid"> 5 mm grid</label>
@@ -361,7 +375,7 @@
     @endif
     @if($adjustLayout)
         <div class="receipt-layout-readout alert alert-info py-2 no-print">
-            Select any printable field to change its font size and X/Y coordinates. Drag it, or use the arrow keys; hold Shift for smaller movements.
+            Select any printable field to change its font, font size, bold style, and X/Y coordinates. Drag it, or use the arrow keys; hold Shift for smaller movements.
             <span id="receiptPositionReadout" class="fw-bold ms-2"></span>
         </div>
         @include('erp.print._receipt-field-visibility')
