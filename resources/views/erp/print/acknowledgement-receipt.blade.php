@@ -266,6 +266,14 @@
         border-top: 1px solid #222;
         height: 8mm;
     }
+    .ar-printed-by {
+        position: absolute;
+        right: 18mm;
+        bottom: 2mm;
+        width: 58mm;
+        text-align: center;
+        white-space: nowrap;
+    }
     @media print {
         @page { size: A4 portrait; margin: 0; }
         body { background: #fff !important; }
@@ -470,6 +478,7 @@
             <div class="ar-signature-line"></div>
             Cashier/Authorized Representative
         </div>
+        <div class="ar-printed-by receipt-adjustable-field" tabindex="0" data-field-key="printed_by" data-field-label="Printed by" style="{{ $fieldStyle('printed_by') }}">Printed by: {{ $receipt['printed_by'] ?? (auth()->user()->name ?? 'User') }}</div>
     </div>
 
     @if($adjustLayout)

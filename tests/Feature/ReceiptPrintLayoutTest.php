@@ -39,6 +39,8 @@ class ReceiptPrintLayoutTest extends TestCase
             ->assertSee('id="receiptFontSize"', false)
             ->assertSee('id="receiptFontFamily"', false)
             ->assertSee('id="receiptBold"', false)
+            ->assertSee('data-field-key="printed_by"', false)
+            ->assertSee('Printed by: QA Admin')
             ->assertSee('data-field-key="registered_name"', false);
 
         $this->post(route('erp.official-receipt.layout.save'), [
@@ -52,6 +54,7 @@ class ReceiptPrintLayoutTest extends TestCase
                 'receipt_no', 'payment_date', 'account_no', 'registered_name',
                 'business_address', 'description', 'amount', 'reference_no',
                 'bank', 'total_amount',
+                'printed_by',
             ],
         ])->assertRedirect();
 
@@ -76,6 +79,8 @@ class ReceiptPrintLayoutTest extends TestCase
         $this->get(route('erp.acknowledgement-receipt.preview', ['adjust' => 1]))
             ->assertStatus(200)
             ->assertSee('data-field-key="total_amount"', false)
+            ->assertSee('data-field-key="printed_by"', false)
+            ->assertSee('Printed by: QA Admin')
             ->assertSee('transform: translate(-1.25mm, 4.75mm)', false)
             ->assertSee('font-size: 14pt', false)
             ->assertSee('font-family: &quot;Courier New&quot;, Courier, monospace; font-weight: 400', false)

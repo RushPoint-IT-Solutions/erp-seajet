@@ -8686,6 +8686,7 @@ class ModuleController extends Controller
             'payment_method' => request('payment_method', 'Check'),
             'reference_no' => request('reference_no', ''),
             'bank' => '',
+            'printed_by' => auth()->user()->name ?? 'User',
         ];
 
         if (!Schema::hasTable('receipts')) {
@@ -8828,6 +8829,7 @@ class ModuleController extends Controller
             'payment_method' => $dbReceipt->payment_method ?: 'Check',
             'reference_no' => $dbReceipt->reference_no ?: '',
             'bank' => '',
+            'printed_by' => auth()->user()->name ?? 'User',
         ];
     }
 
@@ -8869,6 +8871,7 @@ class ModuleController extends Controller
             'reference_no' => 'Reference number',
             'bank' => 'Bank',
             'total_amount' => 'Total paid amount',
+            'printed_by' => 'Printed by',
         ];
     }
 
@@ -8949,6 +8952,7 @@ class ModuleController extends Controller
             'reference_no' => 7.5,
             'bank' => 7.5,
             'total_amount' => 9,
+            'printed_by' => 7.5,
         ];
     }
 
