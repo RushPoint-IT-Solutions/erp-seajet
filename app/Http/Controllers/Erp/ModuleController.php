@@ -8726,8 +8726,10 @@ class ModuleController extends Controller
         return view('erp.payments.receipt', [
             'payment' => $payment,
             'receiptDocuments' => [
-                ['label' => 'Print Official Receipt', 'route' => route('erp.official-receipt.preview', $receiptQuery), 'icon' => 'bi-receipt'],
-                ['label' => 'Print Acknowledgement Receipt', 'route' => route('erp.acknowledgement-receipt.preview', $receiptQuery), 'icon' => 'bi-receipt-cutoff'],
+                ['label' => 'VAT Official Receipt', 'route' => route('erp.official-receipt.preview', array_merge($receiptQuery, ['tax_print' => 'vat'])), 'icon' => 'bi-receipt'],
+                ['label' => 'Non-VAT Official Receipt', 'route' => route('erp.official-receipt.preview', array_merge($receiptQuery, ['tax_print' => 'non_vat'])), 'icon' => 'bi-receipt'],
+                ['label' => 'VAT Acknowledgement Receipt', 'route' => route('erp.acknowledgement-receipt.preview', array_merge($receiptQuery, ['tax_print' => 'vat'])), 'icon' => 'bi-receipt-cutoff'],
+                ['label' => 'Non-VAT Acknowledgement Report', 'route' => route('erp.acknowledgement-receipt.preview', array_merge($receiptQuery, ['tax_print' => 'non_vat'])), 'icon' => 'bi-file-earmark-text'],
             ],
         ]);
     }

@@ -55,6 +55,8 @@ class NonVatAcknowledgementReportTest extends TestCase
             ->assertOk()
             ->assertSee('Non-VAT Acknowledgement Report')
             ->assertSee('ACKNOWLEDGEMENT REPORT')
+            ->assertSee('images/gen_off_seajetlogo.webp')
+            ->assertSee('class="nonvat-logo"', false)
             ->assertSee('size: Letter portrait;', false)
             ->assertSee('Edit Content &amp; Layout', false)
             ->assertSee('data-field-key="report_header"', false)

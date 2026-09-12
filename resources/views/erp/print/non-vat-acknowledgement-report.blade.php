@@ -20,6 +20,14 @@
         overflow: hidden;
     }
     .nonvat-header { text-align: center; margin-bottom: 18mm; }
+    .nonvat-logo {
+        display: block;
+        width: 320px;
+        height: 82px;
+        max-width: 100%;
+        margin: 0 auto 7mm;
+        object-fit: contain;
+    }
     .nonvat-header .receipt-adjustable-field { text-transform: uppercase; letter-spacing: .8px; }
     .nonvat-intro { margin-bottom: 10mm; line-height: 1.6; }
     .nonvat-details { width: 100%; border-collapse: collapse; margin-bottom: 12mm; }
@@ -123,7 +131,10 @@
 @endif
 
 <div class="nonvat-sheet {{ $adjustLayout ? 'is-adjusting' : '' }}" id="receiptLayoutSheet" data-sheet-width-mm="215.9">
-    <div class="nonvat-header"><span class="receipt-adjustable-field" tabindex="0" data-field-key="report_header" data-field-label="Report header" style="{{ $fieldStyle('report_header') }}">{{ $receiptContent['report_header'] }}</span></div>
+    <div class="nonvat-header">
+        <img class="nonvat-logo" src="{{ asset('images/gen_off_seajetlogo.webp') }}" alt="Sea-Jet International Forwarders, Inc.">
+        <span class="receipt-adjustable-field" tabindex="0" data-field-key="report_header" data-field-label="Report header" style="{{ $fieldStyle('report_header') }}">{{ $receiptContent['report_header'] }}</span>
+    </div>
     <div class="nonvat-intro"><span class="receipt-adjustable-field receipt-field-block" tabindex="0" data-field-key="intro_text" data-field-label="Introduction text" style="{{ $fieldStyle('intro_text') }}">{{ $receiptContent['intro_text'] }}</span></div>
 
     <table class="nonvat-details">

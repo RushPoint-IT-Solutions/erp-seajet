@@ -60,7 +60,7 @@ class RecordPaymentPayableTest extends TestCase
             'status' => 'posted',
         ]);
 
-        $this->post(route('erp.payments.receipt'), [
+        $response = $this->post(route('erp.payments.receipt'), [
             'customer_id' => (string) $invoice->customer_id,
             'invoice_no' => $invoice->document_no,
             'payment_date' => '2026-09-12',
@@ -69,7 +69,12 @@ class RecordPaymentPayableTest extends TestCase
             'exchange_rate' => 1,
             'amount' => '160.00',
             'cwt_amount' => '2.00',
-        ])->assertOk();
+        ]);
+        $response->assertOk()
+            ->assertSee('VAT Official Receipt')
+            ->assertSee('Non-VAT Official Receipt')
+            ->assertSee('VAT Acknowledgement Receipt')
+            ->assertSee('Non-VAT Acknowledgement Report');
 
         $updated = DB::table('sales_documents')->where('id', $invoice->id)->first();
         $receipt = DB::table('receipts')->orderBy('id', 'desc')->first();
@@ -86,7 +91,10 @@ class RecordPaymentPayableTest extends TestCase
         $this->get(route('erp.payments.create'))
             ->assertOk()
             ->assertSeeInOrder(['For Payment', 'Paid Amount'])
-            ->assertSee('PHP 160.00');
+            ->assertSee('PHP 160.00')
+            ->assertSee('>OR</button>', false)
+            ->assertSee('>AR</button>', false)
+            ->assertSee('Non-VAT Print');
     }
 
     public function test_overpayment_shows_a_warning_and_cannot_be_saved()
