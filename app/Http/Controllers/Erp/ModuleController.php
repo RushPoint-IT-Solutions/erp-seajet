@@ -8496,6 +8496,7 @@ class ModuleController extends Controller
                     'paid_total' => (float) $invoice->paid_total,
                     'balance' => $amounts['cash_balance'],
                     'cwt_balance' => $amounts['cwt_balance'],
+                    'settlement_balance' => $amounts['settlement_balance'],
                     'customer_id' => $invoice->customer_id,
                     'customer_name' => $invoice->customer_name ?: 'Guest / Non-tax Client',
                 ];
@@ -8511,12 +8512,10 @@ class ModuleController extends Controller
     private function paymentInvoiceAmounts($invoice, $appliedCwt = 0)
     {
         $grandTotal = max(0, (float) ($invoice->grand_total ?? 0));
-        $invoiceTotal = max(0, (float) ($invoice->invoice_amount ?? 0));
+        $invoiceTotal = $grandTotal;
         if ($invoiceTotal <= 0) {
-            $invoiceTotal = max(0, $grandTotal - max(0, (float) ($invoice->freight_total ?? 0)));
-        }
-        if ($invoiceTotal <= 0) {
-            $invoiceTotal = $grandTotal;
+            $invoiceTotal = max(0, (float) ($invoice->invoice_amount ?? 0))
+                + max(0, (float) ($invoice->freight_total ?? 0));
         }
 
         $paidTotal = max(0, (float) ($invoice->paid_total ?? 0));

@@ -36,8 +36,8 @@ class RecordPaymentPayableTest extends TestCase
         $this->get(route('erp.payments.create'))
             ->assertOk()
             ->assertSee('BI-2026-REIMB')
-            ->assertSee('PHP 110.00')
-            ->assertSee('data-balance="110.00"', false)
+            ->assertSee('PHP 160.00')
+            ->assertSee('data-balance="160.00"', false)
             ->assertSee('data-cwt-balance="2.00"', false);
 
         DB::table('sales_documents')->where('id', $invoice->id)->update([
@@ -67,19 +67,19 @@ class RecordPaymentPayableTest extends TestCase
             'payment_method' => 'Cash',
             'currency' => 'PHP',
             'exchange_rate' => 1,
-            'amount' => '110.00',
+            'amount' => '160.00',
             'cwt_amount' => '2.00',
         ])->assertOk();
 
         $updated = DB::table('sales_documents')->where('id', $invoice->id)->first();
         $receipt = DB::table('receipts')->orderBy('id', 'desc')->first();
 
-        $this->assertEquals(112.0, (float) $updated->paid_total);
+        $this->assertEquals(162.0, (float) $updated->paid_total);
         $this->assertEquals(0.0, (float) $updated->balance_due);
         $this->assertSame('paid', $updated->status);
-        $this->assertEquals(110.0, (float) $receipt->amount);
+        $this->assertEquals(160.0, (float) $receipt->amount);
         $this->assertEquals(2.0, (float) $receipt->cwt_amount);
-        $this->assertEquals(112.0, (float) DB::table('receipt_applications')
+        $this->assertEquals(162.0, (float) DB::table('receipt_applications')
             ->where('receipt_id', $receipt->id)
             ->value('amount_applied'));
 
@@ -87,5 +87,33 @@ class RecordPaymentPayableTest extends TestCase
             ->assertOk()
             ->assertSeeInOrder(['For Payment', 'Paid Amount'])
             ->assertSee('PHP 160.00');
+    }
+
+    public function test_overpayment_shows_a_warning_and_cannot_be_saved()
+    {
+        $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
+        DB::table('sales_documents')->where('id', $invoice->id)->update([
+            'invoice_amount' => 112,
+            'withholding_tax_amount' => 2,
+            'paid_total' => 0,
+            'status' => 'posted',
+        ]);
+
+        $this->get(route('erp.payments.create'))
+            ->assertOk()
+            ->assertSee('Warning: This overpays the invoice');
+
+        $this->from(route('erp.payments.create'))->post(route('erp.payments.receipt'), [
+            'customer_id' => (string) $invoice->customer_id,
+            'invoice_no' => $invoice->document_no,
+            'payment_date' => '2026-09-12',
+            'payment_method' => 'Cash',
+            'currency' => 'PHP',
+            'exchange_rate' => 1,
+            'amount' => '160.01',
+            'cwt_amount' => '2.00',
+        ])->assertRedirect(route('erp.payments.create'))->assertSessionHasErrors('amount');
+
+        $this->assertFalse(DB::table('receipts')->where('amount', 160.01)->exists());
     }
 }

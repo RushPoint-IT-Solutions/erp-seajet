@@ -26,7 +26,8 @@
                                         data-customer-name="{{ $invoice['customer_name'] }}"
                                         data-currency="{{ $invoice['currency'] }}"
                                         data-balance="{{ number_format($invoice['balance'], 2, '.', '') }}"
-                                        data-cwt-balance="{{ number_format($invoice['cwt_balance'], 2, '.', '') }}">
+                                        data-cwt-balance="{{ number_format($invoice['cwt_balance'], 2, '.', '') }}"
+                                        data-settlement-balance="{{ number_format($invoice['settlement_balance'], 2, '.', '') }}">
                                     {{ $invoice['document_no'] }} - {{ $invoice['customer_name'] }} - {{ $invoice['currency'] }} {{ number_format($invoice['balance'], 2) }}
                                 </option>
                             @endforeach
@@ -83,7 +84,7 @@
                     <div class="col-md-4">
                         <label class="form-label">Payable Amount</label>
                         <input name="amount" class="form-control text-end payment-amount-input" value="" required>
-                        <div class="form-text">Billing Invoice amount less withholding tax.</div>
+                        <div class="form-text">Billing Invoice plus SOA B, less withholding tax.</div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Exchange Rate to PHP</label>
@@ -150,6 +151,8 @@
             var alertBox = form.find('.payment-balance-alert');
             var balance = parseFloat(option.data('balance'));
             var amount = parseFloat(String(form.find('.payment-amount-input').val() || '').replace(/,/g, ''));
+            var cwt = parseFloat(String(form.find('.payment-cwt-input').val() || '0').replace(/,/g, '')) || 0;
+            var settlementBalance = parseFloat(option.data('settlement-balance'));
             var currency = option.data('currency') || form.find('.payment-currency-select').val() || 'PHP';
 
             if (!option.val() || isNaN(balance) || isNaN(amount) || amount <= 0) {
@@ -158,8 +161,13 @@
             }
 
             var diff = amount - balance;
+            var settlementDiff = isNaN(settlementBalance) ? diff : amount + cwt - settlementBalance;
+            var overpayment = Math.max(diff, settlementDiff);
 
-            if (Math.abs(diff) < 0.005) {
+            if (overpayment > 0.005) {
+                alertBox.removeClass('d-none alert-success').addClass('alert-warning')
+                    .text('Warning: This overpays the invoice by ' + currency + ' ' + money(overpayment) + '; for payment is ' + currency + ' ' + money(balance) + '.');
+            } else if (Math.abs(diff) < 0.005) {
                 alertBox.removeClass('d-none alert-warning').addClass('alert-success')
                     .text('This matches the outstanding balance of ' + currency + ' ' + money(balance) + '.');
             } else if (diff > 0) {
@@ -171,7 +179,7 @@
             }
         }
 
-        $(document).on('input change', '.payment-modal-form .payment-amount-input, .payment-modal-form .payment-invoice-select', function () {
+        $(document).on('input change', '.payment-modal-form .payment-amount-input, .payment-modal-form .payment-cwt-input, .payment-modal-form .payment-invoice-select', function () {
             checkPaymentBalance($(this).closest('.payment-modal-form'));
         });
 
