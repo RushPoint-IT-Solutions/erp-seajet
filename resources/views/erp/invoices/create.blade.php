@@ -148,6 +148,7 @@
                     <a href="{{ route('erp.billings.index') }}" class="btn btn-sm btn-outline-light"><i class="bi bi-x-circle me-1"></i>Back</a>
                     @unless($isEdit)
                         <button class="btn btn-sm btn-outline-light" type="button" id="sampleInvoiceButton"><i class="bi bi-magic me-1"></i>Sample Invoice</button>
+                        <a href="{{ route('erp.invoices.create') }}" class="btn btn-sm btn-outline-light" onclick="return confirm('Clear all unsaved Billing Invoice values?')"><i class="bi bi-arrow-counterclockwise me-1"></i>Clear Form</a>
                     @endunless
                     <button class="btn btn-sm btn-outline-light" type="submit" name="save_mode" value="draft"><i class="bi bi-save me-1"></i>{{ $isEdit ? 'Update Draft' : 'Save Draft' }}</button>
                     @if(in_array(strtolower(auth()->user()->role ?? ''), ['administrator', 'admin', 'finance'], true))
@@ -364,7 +365,6 @@
                             <th>Description</th>
                             <th class="text-end" style="width: 130px">Rate</th>
                             <th class="text-end" style="width: 100px">Qty</th>
-                            <th style="width: 150px">Class</th>
                             <th class="text-end" style="width: 150px">Total</th>
                             <th class="text-end" style="width: 105px">WHT %</th>
                             <th style="width: 140px">Tax</th>
@@ -382,7 +382,6 @@
                                                 data-account-tag="{{ $item->account_tag }}"
                                                 data-rate="{{ $item->rate }}"
                                                 data-qty="{{ $item->qty }}"
-                                                data-class="{{ $item->class }}"
                                                 data-account="{{ $item->account }}"
                                                 data-tax="{{ $item->tax }}">{{ $item->name }} [{{ $item->account_tag }}]</option>
                                     @endforeach
@@ -401,14 +400,6 @@
                             <td><textarea name="item_description[]" class="form-control" rows="2"></textarea></td>
                             <td><input name="unit_price[]" class="form-control text-end line-unit" value=""></td>
                             <td><input name="qty[]" class="form-control text-end line-qty" value=""></td>
-                            <td>
-                                <select name="line_class[]" class="form-select">
-                                    <option value=""></option>
-                                    <option>MANILA</option>
-                                    <option>PAMPANGA</option>
-                                    <option>CEBU</option>
-                                </select>
-                            </td>
                             <td><input name="line_amount[]" class="form-control text-end line-total" value="" readonly></td>
                             <td><input name="line_withholding_rate[]" type="number" min="0" max="100" step="0.01" class="form-control text-end line-wht-rate" value=""></td>
                             <td>
@@ -615,7 +606,6 @@
             row.find('textarea[name="item_description[]"]').val(option.data('description') || '');
             row.find('.line-unit').val(option.data('rate') || '');
             row.find('.line-qty').val(option.data('qty') || '1');
-            row.find('select[name="line_class[]"]').val(option.data('class') || $('#classCode').val() || '');
             row.find('.line-account').val(option.data('account') || $('#arAccount').val() || '');
             row.find('.line-tax').val(option.data('tax') || '');
             syncDocumentAccount();
@@ -675,7 +665,7 @@
             $('#phpEquivalentText').text('PHP ' + money(soaTotal * exchangeRate));
         }
 
-        function setLine(index, item, description, rate, qty, lineClass, taxCategory, account, withholdingRate) {
+        function setLine(index, item, description, rate, qty, taxCategory, account, withholdingRate) {
             while ($('#invoiceLines tbody tr').length <= index) {
                 $('#addLine').trigger('click');
             }
@@ -687,7 +677,6 @@
             row.find('textarea[name="item_description[]"]').val(description);
             row.find('.line-unit').val(rate);
             row.find('.line-qty').val(qty);
-            row.find('select[name="line_class[]"]').val(lineClass);
             row.find('.line-tax').val(taxCategory);
             row.find('.line-account').val(account || $('#arAccount').val() || '');
             row.find('.line-wht-rate').val(withholdingRate === undefined || withholdingRate === null ? '' : withholdingRate);
@@ -719,9 +708,9 @@
             $('#invoiceTemplate').val(['SOA_B', 'Billing Invoice']).trigger('change.select2');
 
             $('#invoiceLines tbody tr:gt(0)').remove();
-            setLine(0, 'Terminal Handling', 'TERMINAL HANDLING CHARGES', '321714.25', '1', 'MANILA', '12%', 'A/Trade-Billing Invoice');
-            setLine(1, 'Documentation VAT', 'DOC / IDENTIFICATION FEE', '4280.60', '1', 'MANILA', '12%', 'A/Trade-Billing Invoice');
-            setLine(2, 'Reimbursable Charges', 'REIMBURSABLE CHARGES - PORT ADVANCES', '753495.10', '1', 'MANILA', 'exempt', 'A/R-Reimbursable Charges');
+            setLine(0, 'Terminal Handling', 'TERMINAL HANDLING CHARGES', '321714.25', '1', '12%', 'A/Trade-Billing Invoice');
+            setLine(1, 'Documentation VAT', 'DOC / IDENTIFICATION FEE', '4280.60', '1', '12%', 'A/Trade-Billing Invoice');
+            setLine(2, 'Reimbursable Charges', 'REIMBURSABLE CHARGES - PORT ADVANCES', '753495.10', '1', 'exempt', 'A/R-Reimbursable Charges');
 
             recalc();
         }
@@ -807,7 +796,6 @@
             var descriptions = editInvoice.item_description || [];
             var rates = editInvoice.unit_price || [];
             var quantities = editInvoice.qty || [];
-            var classes = editInvoice.line_class || [];
             var taxes = editInvoice.tax_category || [];
             var accounts = editInvoice.line_ar_account || [];
             var withholdingRates = editInvoice.line_withholding_rate || [];
@@ -820,7 +808,6 @@
                     descriptions[i] || '',
                     rates[i] || '',
                     quantities[i] || '1',
-                    classes[i] || editInvoice.class_code || '',
                     taxes[i] || editInvoice.vat_classification || '',
                     accounts[i] || editInvoice.ar_account || '',
                     withholdingRates[i] === undefined ? editInvoice.withholding_tax_rate || '' : withholdingRates[i]

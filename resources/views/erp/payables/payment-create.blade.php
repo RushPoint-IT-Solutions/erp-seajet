@@ -80,13 +80,14 @@
                 <select name="bank_account" id="bankAccount" class="form-select erp-select" required>
                     <option value="">Select account...</option>
                     @foreach($bankAccounts as $bank)
-                        <option value="{{ $bank['account_no'] }}">{{ $bank['bank'] }} - {{ $bank['name'] }} ({{ $bank['currency'] }})</option>
+                        <option value="{{ $bank['account_no'] }}" data-next-check-no="{{ $bank['next_check_no'] ?? '000001' }}">{{ $bank['bank'] }} - {{ $bank['name'] }} ({{ $bank['currency'] }})</option>
                     @endforeach
                 </select>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Check No</label>
                 <input name="check_no" id="checkNumber" class="form-control" value="" {{ $selectedPaymentMethod === 'Cheque' ? 'required' : '' }}>
+                <div class="form-text">The next number is assigned automatically from this bank account's last check number.</div>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Currency</label>
@@ -113,6 +114,7 @@
         </div>
         <div class="d-flex justify-content-end gap-2 mt-4">
             <a href="{{ route('erp.modules.show', 'payables') }}" class="btn btn-outline-secondary">Cancel</a>
+            <a href="{{ route('erp.payables.payments.create', ['method' => $selectedPaymentMethod]) }}" class="btn btn-outline-secondary" onclick="return confirm('Clear all unsaved CV and payment values?')"><i class="bi bi-arrow-counterclockwise me-1"></i>Clear Form</a>
             <button class="btn btn-primary"><i class="bi bi-arrow-right me-1"></i> Review Payment</button>
         </div>
     </form>
@@ -145,12 +147,15 @@
         }
 
         function syncCheckRequirements() {
-            $('#checkNumber').prop('required', $('#paymentMethod').val() === 'Cheque');
+            var isCheque = $('#paymentMethod').val() === 'Cheque';
+            var nextCheckNo = $('#bankAccount option:selected').data('next-check-no') || '';
+            $('#checkNumber').prop('required', isCheque).val(isCheque ? nextCheckNo : '');
         }
 
         $('#billSelect').on('change', syncBill);
         $('#currencySelect').on('change', syncCurrency);
         $('#paymentMethod').on('change', syncCheckRequirements);
+        $('#bankAccount').on('change', syncCheckRequirements);
         syncBill();
         syncCurrency();
         syncCheckRequirements();

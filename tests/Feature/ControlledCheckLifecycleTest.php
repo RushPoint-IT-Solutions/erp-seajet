@@ -234,6 +234,44 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertSee('id="checkNumber" class="form-control" value="" required', false);
     }
 
+    public function test_check_preparation_assigns_the_next_bank_check_number_automatically()
+    {
+        list($bill, $bank) = $this->billAndBank();
+
+        $this->get(route('erp.payables.payments.create', ['method' => 'Cheque']))
+            ->assertOk()
+            ->assertSee('data-next-check-no="470131"', false)
+            ->assertSee('data-next-check-no="000001"', false)
+            ->assertSee('The next number is assigned automatically');
+
+        $this->post(route('erp.payables.payments.review'), $this->paymentPayload($bill, $bank, [
+            'check_no' => null,
+            'amount' => '5.00',
+        ]))->assertOk();
+
+        $payment = DB::table('payments')->where('payment_no', 'PV-CONTROL-1001')->first();
+        $this->assertSame('470131', $payment->check_no);
+        $this->assertDatabaseHas('check_issuances', [
+            'payment_id' => $payment->id,
+            'bank_account_id' => $bank->id,
+            'check_no' => '470131',
+        ]);
+        $this->assertSame('470131', DB::table('bank_accounts')->where('id', $bank->id)->value('last_check_no'));
+        $this->assertNull(DB::table('bank_accounts')->where('id', '<>', $bank->id)->value('last_check_no'));
+    }
+
+    public function test_entry_forms_offer_clear_actions_and_reset_data_is_only_in_finance_settings()
+    {
+        $this->get(route('erp.invoices.create'))->assertOk()->assertSee('Clear Form');
+        $this->get(route('erp.payables.vendor-bills.create'))->assertOk()->assertSee('Clear Form');
+        $this->get(route('erp.payables.payments.create', ['method' => 'Cheque']))->assertOk()->assertSee('Clear Form');
+        $this->get(route('erp.invoices.index'))->assertOk()->assertDontSee('Reset Data');
+        $this->get(route('erp.expenses.index'))->assertOk()->assertDontSee('Reset Data');
+        $this->get(route('erp.payables.approvals'))->assertOk()->assertDontSee('Reset Data');
+        $this->get(route('erp.accounting.journals'))->assertOk()->assertDontSee('Reset Data');
+        $this->get(route('erp.settings.index'))->assertOk()->assertSee('Reset Data');
+    }
+
     public function test_preparer_with_approval_access_can_approve_own_payment()
     {
         list($bill, $bank) = $this->billAndBank();

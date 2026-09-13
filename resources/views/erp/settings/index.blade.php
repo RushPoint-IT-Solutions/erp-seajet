@@ -23,6 +23,7 @@
             <a href="{{ route('erp.accounting.coa') }}" class="btn btn-primary"><i class="bi bi-journal-text me-1"></i>Chart of Accounts</a>
             <a href="{{ route('erp.approval-matrix') }}" class="btn btn-outline-secondary"><i class="bi bi-check2-square me-1"></i>Approvals</a>
             <a href="{{ route('erp.export', 'finance-settings') }}" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-excel me-1"></i>Export</a>
+            @include('erp.partials.transaction-data-reset')
         </div>
     </div>
 
@@ -342,6 +343,7 @@
                     <div class="col-md-3"><label class="form-label small text-muted">Branch</label><input name="branch_name" class="form-control form-control-sm"></div>
                     <div class="col-md-3"><label class="form-label small text-muted">Account Name</label><input name="account_name" class="form-control form-control-sm" required></div>
                     <div class="col-md-3"><label class="form-label small text-muted">Account No.</label><input name="account_no" class="form-control form-control-sm" required></div>
+                    <div class="col-md-2"><label class="form-label small text-muted">Last Check No.</label><input name="last_check_no" class="form-control form-control-sm"><div class="form-text">The next cheque increments from this bank-specific number.</div></div>
                     <div class="col-md-2"><label class="form-label small text-muted">Currency</label><input name="currency" class="form-control form-control-sm text-uppercase" value="PHP" required></div>
                     <div class="col-md-2"><label class="form-label small text-muted">SWIFT</label><input name="swift_code" class="form-control form-control-sm"></div>
                     <div class="col-md-3"><label class="form-label small text-muted">GL Account</label><select name="account_id" class="form-select form-select-sm"><option value=""></option>@foreach($accounts as $account)<option value="{{ $account->id }}">{{ $account->code }} - {{ $account->name }}</option>@endforeach</select></div>
@@ -353,15 +355,15 @@
             </form>
             <div class="settings-table table-responsive">
                 <table class="table table-sm table-hover align-middle mb-0">
-                    <thead><tr><th>Bank</th><th>Account</th><th>No.</th><th>Currency</th><th class="text-end">Book</th><th>Status</th><th></th></tr></thead>
+                    <thead><tr><th>Bank</th><th>Account</th><th>No.</th><th>Last Check</th><th>Currency</th><th class="text-end">Book</th><th>Status</th><th></th></tr></thead>
                     <tbody>
                     @forelse($bankAccounts as $bank)
                         <tr>
-                            <td class="fw-semibold">{{ $bank->bank_name }}</td><td>{{ $bank->account_name }}</td><td>{{ $bank->account_no }}</td><td>{{ $bank->currency }}</td><td class="text-end">{{ number_format((float) $bank->book_balance, 2) }}</td><td>{{ $bank->is_active ? 'Active' : 'Inactive' }}</td>
+                            <td class="fw-semibold">{{ $bank->bank_name }}</td><td>{{ $bank->account_name }}</td><td>{{ $bank->account_no }}</td><td>{{ $bank->last_check_no ?: '-' }}</td><td>{{ $bank->currency }}</td><td class="text-end">{{ number_format((float) $bank->book_balance, 2) }}</td><td>{{ $bank->is_active ? 'Active' : 'Inactive' }}</td>
                             <td class="text-end"><button type="button" class="btn btn-sm btn-outline-secondary edit-row" data-form="#bank-accounts form" data-row='@json($bank)'><i class="bi bi-pencil"></i></button></td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="text-center text-muted">No bank accounts yet.</td></tr>
+                        <tr><td colspan="8" class="text-center text-muted">No bank accounts yet.</td></tr>
                     @endforelse
                     </tbody>
                 </table>

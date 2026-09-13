@@ -124,4 +124,53 @@ class RecordPaymentPayableTest extends TestCase
 
         $this->assertFalse(DB::table('receipts')->where('amount', 160.01)->exists());
     }
+
+    public function test_one_payment_can_apply_to_multiple_invoices_and_labels_them_on_the_official_receipt()
+    {
+        $firstInvoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
+        DB::table('sales_documents')->where('id', $firstInvoice->id)->update([
+            'invoice_amount' => 100,
+            'freight_total' => 0,
+            'grand_total' => 100,
+            'withholding_tax_amount' => 0,
+            'paid_total' => 0,
+            'status' => 'posted',
+        ]);
+        $firstInvoice = DB::table('sales_documents')->where('id', $firstInvoice->id)->first();
+
+        $secondInvoiceData = (array) $firstInvoice;
+        unset($secondInvoiceData['id']);
+        $secondInvoiceData['document_no'] = 'BI-MULTI-002';
+        $secondInvoiceId = DB::table('sales_documents')->insertGetId($secondInvoiceData);
+
+        $response = $this->post(route('erp.payments.receipt'), [
+            'customer_id' => (string) $firstInvoice->customer_id,
+            'invoice_no' => ['BI-MULTI-002', $firstInvoice->document_no],
+            'payment_date' => '2026-09-13',
+            'payment_method' => 'Cash',
+            'currency' => 'PHP',
+            'exchange_rate' => 1,
+            'amount' => '200.00',
+            'cwt_amount' => '0.00',
+        ]);
+        $response->assertOk();
+
+        $receipt = DB::table('receipts')->orderBy('id', 'desc')->first();
+        $this->assertSame(
+            [(int) $secondInvoiceId, (int) $firstInvoice->id],
+            DB::table('receipt_applications')
+                ->where('receipt_id', $receipt->id)
+                ->orderBy('id')
+                ->pluck('sales_document_id')
+                ->map(function ($id) { return (int) $id; })
+                ->all()
+        );
+
+        $this->get(route('erp.official-receipt.preview', ['receipt_no' => $receipt->receipt_no]))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Billing 1: BI-MULTI-002',
+                'Billing 2: '.$firstInvoice->document_no,
+            ]);
+    }
 }

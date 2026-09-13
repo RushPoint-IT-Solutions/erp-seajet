@@ -34,9 +34,48 @@ class BillingInvoicePrintFlowTest extends TestCase
         $response->assertSee('Billing Invoice');
         $response->assertSee('Default WHT %');
         $response->assertSee('name="line_withholding_rate[]"', false);
+        $response->assertSee('name="class_code"', false);
+        $response->assertDontSee('name="line_class[]"', false);
         $response->assertSee('Print SOA B + Billing Invoice');
         $response->assertSee('Print SOA A');
         $response->assertSee('<textarea name="memo"', false);
+    }
+
+    public function test_client_statement_uses_letterhead_without_the_legacy_company_header()
+    {
+        $response = $this->get(route('erp.reports.client-soa'));
+
+        $response->assertOk();
+        $response->assertSee('class="client-soa-letterhead"', false);
+        $response->assertSee('images/background.jpg');
+        $response->assertDontSee('class="client-soa-header"', false);
+        $response->assertDontSee('class="client-soa-company"', false);
+        $response->assertDontSee('class="client-soa-logo"', false);
+        $response->assertSee('STATEMENT OF ACCOUNT');
+        $this->assertSame(11, substr_count($response->getContent(), 'class="client-soa-empty-row"'));
+    }
+
+    public function test_invoice_class_is_document_level_and_applies_to_all_lines()
+    {
+        $response = $this->post('/erp/invoices/review', $this->payload([
+            'class_code' => 'CEBU',
+            'vat_classification' => '12%',
+            'item' => ['Documentation VAT', 'Handling Fee'],
+            'item_description' => ['DOCUMENTATION', 'HANDLING'],
+            'qty' => ['1', '1'],
+            'unit_price' => ['100.00', '200.00'],
+            'line_class' => ['MANILA', 'PAMPANGA'],
+            'tax_category' => ['12%', '12%'],
+        ]));
+
+        $response->assertRedirect();
+        $document = DB::table('sales_documents')->where('document_no', 'BI-TEST-001')->first();
+        $this->assertSame('CEBU', $document->class_code);
+        $this->assertSame(['CEBU', 'CEBU'], DB::table('sales_document_lines')
+            ->where('sales_document_id', $document->id)
+            ->orderBy('id')
+            ->pluck('class_code')
+            ->all());
     }
 
     public function test_vatable_billing_review_can_print_soa_b_and_billing_invoice()

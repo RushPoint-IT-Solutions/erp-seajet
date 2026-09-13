@@ -144,6 +144,9 @@
                 <div class="d-flex flex-wrap gap-2">
                     <a href="{{ route('erp.expenses.index') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-search me-1"></i>Find</a>
                     <a href="{{ route('erp.payables.vendor-bills.create') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-plus-lg me-1"></i>New</a>
+                    @if(empty($bill['id']))
+                        <a href="{{ route('erp.payables.vendor-bills.create') }}" class="btn btn-sm btn-outline-secondary" onclick="return confirm('Clear all unsaved AP Vendor Bill values?')"><i class="bi bi-arrow-counterclockwise me-1"></i>Clear Form</a>
+                    @endif
                     <button class="btn btn-sm btn-success" type="submit"><i class="bi bi-save me-1"></i>Save</button>
                     @if(!empty($bill['id']))
                         <button type="submit" form="deleteVendorBillForm" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Delete</button>

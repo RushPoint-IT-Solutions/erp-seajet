@@ -6,42 +6,33 @@
 @push('styles')
 <style>
     .client-soa-sheet {
-        width: 216mm;
-        min-height: 279mm;
+        position: relative;
+        width: 215.9mm;
+        min-height: 279.4mm;
         margin: 0 auto;
-        padding: 10mm 12mm 8mm;
-        background: #fff;
+        padding: 42mm 12mm 34mm;
+        background: #fff url('{{ asset('images/background.jpg') }}') center / 100% 100% no-repeat;
         color: #000;
         border: 1px solid #d8dde6;
         box-shadow: 0 14px 36px rgba(15, 23, 42, .08);
         font-family: Arial, Calibri, sans-serif;
         font-size: 10pt;
         line-height: 1.2;
+        overflow: hidden;
     }
-    .client-soa-header {
-        position: relative;
-        text-align: center;
-        min-height: 96px;
-        margin-bottom: 12px;
-    }
-    .client-soa-logo {
+    .client-soa-letterhead {
         position: absolute;
-        left: 0;
-        top: 0;
-        width: 72px;
-        height: 72px;
-        object-fit: contain;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: fill;
+        pointer-events: none;
+        user-select: none;
+        z-index: 0;
     }
-    .client-soa-company {
-        font-size: 10pt;
-        line-height: 1.25;
-        padding-top: 1px;
-    }
-    .client-soa-company strong {
-        display: block;
-        font-size: 14pt;
-        line-height: 18pt;
-        letter-spacing: .02em;
+    .client-soa-sheet > :not(.client-soa-letterhead) {
+        position: relative;
+        z-index: 1;
     }
     .client-soa-to {
         display: grid;
@@ -105,7 +96,7 @@
         font-weight: 700;
     }
     .client-soa-bank {
-        margin-top: 20px;
+        margin-top: 12px;
         margin-left: 44px;
         font-size: 10pt;
         font-weight: 700;
@@ -116,7 +107,7 @@
         margin-bottom: 0;
     }
     .client-soa-overdue {
-        margin-top: 24px;
+        margin-top: 12px;
         width: 236px;
         font-size: 10pt;
         line-height: 15.75pt;
@@ -148,9 +139,13 @@
         .client-soa-sheet {
             border: 0;
             box-shadow: none;
-            width: auto;
-            min-height: auto;
+            width: 215.9mm;
+            height: 279.4mm;
+            min-height: 279.4mm;
             margin: 0;
+            background: #fff url('{{ asset('images/background.jpg') }}') center / 100% 100% no-repeat !important;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
         }
     }
 </style>
@@ -158,14 +153,12 @@
 
 @section('content')
 @php
-    $companyName = $company && !empty($company->name) ? $company->name : 'SEA-JET INTERNATIONAL FORWARDERS, INC.';
-    $address = $company && !empty($company->address) ? $company->address : 'Unit 18 & 19 Bldg. B. Cargo Village Complex';
     $money = function ($amount) {
         return number_format((float) $amount, 2);
     };
     $totalBalance = array_sum($currencyTotals);
     $invoiceRows = $invoices->count();
-    $blankRows = max(0, 16 - $invoiceRows);
+    $blankRows = max(0, 12 - $invoiceRows);
 @endphp
 
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 no-print">
@@ -202,17 +195,7 @@
     </form>
 
     <div class="client-soa-sheet">
-        <div class="client-soa-header">
-            <img src="{{ asset('images/gen_off_seajetlogo.webp') }}" class="client-soa-logo" alt="SeaJet logo">
-            <div class="client-soa-company">
-                <strong>{{ $companyName }}</strong>
-                <div>Unit 18 &amp; 19 Bldg. B. Cargo Village Complex</div>
-                <div>Ninoy Aquino Ave. Sto. Nino, Paranaque City, 1704, Philippines</div>
-                <div>Tel. Nos. (632) 8529001 up to 8529004; 8529006</div>
-                <div>Fax No.: (632) 8529007</div>
-                <div>E-mail Address: info@seajetintl.ph Website: www.seajetintl.ph</div>
-            </div>
-        </div>
+        <img src="{{ asset('images/background.jpg') }}" class="client-soa-letterhead" alt="" aria-hidden="true">
 
         <div class="client-soa-to">
             <strong>TO:</strong>

@@ -116,7 +116,7 @@
                     <th>Status</th>
                     <th>Receipt No.</th>
                     <th class="client-cell">Client</th>
-                    <th>Invoice No.</th>
+                    <th>Invoice No(s).</th>
                     <th>Method</th>
                     <th>Reference</th>
                     <th>Date</th>
@@ -210,17 +210,26 @@
         }
 
         function syncInvoice(form) {
-            var option = form.find('.payment-invoice-select option:selected');
-            if (option.data('customer-id')) {
-                form.find('.payment-customer-select').val(option.data('customer-id')).trigger('change');
+            var options = form.find('.payment-invoice-select option:selected');
+            var firstOption = options.first();
+            var cashBalance = 0;
+            var cwtBalance = 0;
+
+            options.each(function () {
+                cashBalance += parseFloat($(this).data('balance')) || 0;
+                cwtBalance += parseFloat($(this).data('cwt-balance')) || 0;
+            });
+
+            if (firstOption.data('customer-id')) {
+                form.find('.payment-customer-select').val(firstOption.data('customer-id')).trigger('change');
             }
-            if (option.data('currency')) {
-                form.find('.payment-currency-select').val(option.data('currency'));
+            if (firstOption.data('currency')) {
+                form.find('.payment-currency-select').val(firstOption.data('currency'));
             }
-            if (option.data('balance')) {
-                form.find('.payment-amount-input').val(option.data('balance'));
+            if (options.length) {
+                form.find('.payment-amount-input').val(cashBalance.toFixed(2));
             }
-            form.find('.payment-cwt-input').val(option.data('cwt-balance') || '0.00');
+            form.find('.payment-cwt-input').val(cwtBalance.toFixed(2));
         }
 
         $('.payment-customer-select').on('change', function () {
@@ -234,7 +243,10 @@
         $('.edit-payment').on('click', function () {
             var row = $(this).closest('tr');
             var form = $('#paymentModal').find('form');
-            form.find('.payment-invoice-select').val(row.data('invoice')).trigger('change');
+            var invoiceNumbers = String(row.data('invoice') || '').split(',').map(function (value) {
+                return value.trim();
+            }).filter(Boolean);
+            form.find('.payment-invoice-select').val(invoiceNumbers).trigger('change');
             form.find('.payment-amount-input').val(row.data('amount'));
             form.find('.payment-currency-select').val(row.data('currency'));
             form.find('input[name="payment_date"]').val(row.data('date'));
@@ -268,7 +280,7 @@
 
         if (requestedInvoice) {
             var form = $('#paymentModal').find('form');
-            form.find('.payment-invoice-select').val(requestedInvoice).trigger('change');
+            form.find('.payment-invoice-select').val([requestedInvoice]).trigger('change');
             if (paymentModal) {
                 paymentModal.show();
             }

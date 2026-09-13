@@ -170,6 +170,7 @@ Route::post('/erp/settings/number-series', 'Erp\ModuleController@saveFinanceNumb
 Route::post('/erp/settings/tax-codes', 'Erp\ModuleController@saveFinanceTaxCode')->name('erp.settings.tax-codes.save')->middleware(['auth', 'permission.access']);
 Route::post('/erp/settings/currency-rates', 'Erp\ModuleController@saveFinanceCurrencyRate')->name('erp.settings.currency-rates.save')->middleware(['auth', 'permission.access']);
 Route::post('/erp/settings/bank-accounts', 'Erp\ModuleController@saveFinanceBankAccount')->name('erp.settings.bank-accounts.save')->middleware(['auth', 'permission.access']);
+Route::post('/erp/settings/transaction-data/reset', 'Erp\ModuleController@resetTransactionData')->name('erp.settings.transaction-data.reset')->middleware(['auth', 'permission.access']);
 Route::get('/erp/system-update', 'Erp\SystemUpdateController@index')->name('erp.system-update.index')->middleware(['auth', 'permission.access:system_updates,view']);
 Route::get('/erp/system-update/status', 'Erp\SystemUpdateController@status')->name('erp.system-update.status')->middleware(['auth', 'permission.access:system_updates,view']);
 Route::post('/erp/system-update/run', 'Erp\SystemUpdateController@run')->name('erp.system-update.run')->middleware(['auth', 'permission.access:system_updates,edit']);

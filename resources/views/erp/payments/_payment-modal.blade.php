@@ -10,15 +10,15 @@
             <div class="modal-header">
                 <div>
                     <h5 class="modal-title mb-1">{{ $paymentModalTitle }}</h5>
-                    <div class="text-muted small">Apply a customer payment directly to an open invoice.</div>
+                    <div class="text-muted small">Apply one customer payment to one or more open invoices.</div>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <div class="row g-3">
                     <div class="col-lg-7">
-                        <label class="form-label">Invoice</label>
-                        <select name="invoice_no" class="form-select payment-invoice-select erp-select">
+                        <label class="form-label">Invoices</label>
+                        <select name="invoice_no[]" class="form-select payment-invoice-select erp-select" multiple>
                             <option value=""></option>
                             @foreach($invoices as $invoice)
                                 <option value="{{ $invoice['document_no'] }}"
@@ -32,6 +32,7 @@
                                 </option>
                             @endforeach
                         </select>
+                        <div class="form-text">Select invoices for the same client and currency. Payment is applied in the order shown.</div>
                     </div>
                     <div class="col-lg-5">
                         <label class="form-label">Client</label>
@@ -147,21 +148,38 @@
         }
 
         function checkPaymentBalance(form) {
-            var option = form.find('.payment-invoice-select option:selected');
+            var options = form.find('.payment-invoice-select option:selected');
             var alertBox = form.find('.payment-balance-alert');
-            var balance = parseFloat(option.data('balance'));
+            var balance = 0;
+            var settlementBalance = 0;
+            var currencies = {};
+            var customers = {};
+
+            options.each(function () {
+                var option = $(this);
+                balance += parseFloat(option.data('balance')) || 0;
+                settlementBalance += parseFloat(option.data('settlement-balance')) || 0;
+                currencies[option.data('currency') || 'PHP'] = true;
+                customers[String(option.data('customer-id') || '')] = true;
+            });
+
             var amount = parseFloat(String(form.find('.payment-amount-input').val() || '').replace(/,/g, ''));
             var cwt = parseFloat(String(form.find('.payment-cwt-input').val() || '0').replace(/,/g, '')) || 0;
-            var settlementBalance = parseFloat(option.data('settlement-balance'));
-            var currency = option.data('currency') || form.find('.payment-currency-select').val() || 'PHP';
+            var currency = Object.keys(currencies)[0] || form.find('.payment-currency-select').val() || 'PHP';
 
-            if (!option.val() || isNaN(balance) || isNaN(amount) || amount <= 0) {
+            if (!options.length || isNaN(amount) || amount <= 0) {
                 alertBox.addClass('d-none').removeClass('alert-warning alert-success').text('');
                 return;
             }
 
+            if (Object.keys(customers).length > 1 || Object.keys(currencies).length > 1) {
+                alertBox.removeClass('d-none alert-success').addClass('alert-warning')
+                    .text('All selected invoices must belong to the same client and use the same currency.');
+                return;
+            }
+
             var diff = amount - balance;
-            var settlementDiff = isNaN(settlementBalance) ? diff : amount + cwt - settlementBalance;
+            var settlementDiff = amount + cwt - settlementBalance;
             var overpayment = Math.max(diff, settlementDiff);
 
             if (overpayment > 0.005) {

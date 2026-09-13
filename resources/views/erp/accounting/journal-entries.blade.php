@@ -16,7 +16,9 @@
             <h1 class="h3 fw-bold mb-1">Create Journal Entry</h1>
             <p class="text-muted mb-0">Posts directly to the general ledger. Total debits must equal total credits before this entry can be saved.</p>
         </div>
-        <a href="{{ route('erp.accounting.coa') }}" class="btn btn-outline-secondary"><i class="bi bi-list-columns me-1"></i> Chart of Accounts</a>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{{ route('erp.accounting.coa') }}" class="btn btn-outline-secondary"><i class="bi bi-list-columns me-1"></i> Chart of Accounts</a>
+        </div>
     </div>
 
     @if($errors->any())
@@ -27,6 +29,9 @@
                 @endforeach
             </ul>
         </div>
+    @endif
+    @if(session('status'))
+        <div class="alert alert-success">{{ session('status') }}</div>
     @endif
 
     <form class="erp-card p-4" method="post" action="{{ route('erp.accounting.journals.review') }}" id="journalForm">
@@ -100,6 +105,7 @@
         </div>
         <div class="d-flex justify-content-end gap-2 mt-4">
             <a href="{{ route('erp.modules.show', 'accounting') }}" class="btn btn-outline-secondary">Cancel</a>
+            <a href="{{ route('erp.accounting.journals') }}" class="btn btn-outline-secondary" onclick="return confirm('Clear all unsaved Journal Entry values?')"><i class="bi bi-arrow-counterclockwise me-1"></i>Clear Form</a>
             <button class="btn btn-primary" id="postJournalBtn"><i class="bi bi-check2 me-1"></i> Post Journal Entry</button>
         </div>
     </form>

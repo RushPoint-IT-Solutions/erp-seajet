@@ -1865,6 +1865,11 @@ class ModuleController extends Controller
         $selectedPaymentMethod = in_array(request('method'), ['Cheque', 'Bank', 'Online Transfer'], true)
             ? request('method')
             : 'Bank';
+        $bankAccounts = collect($this->bankAccounts())->map(function ($bank) {
+            $bank['next_check_no'] = $this->nextCheckNumberForBank($bank['id']);
+
+            return $bank;
+        })->all();
 
         return view('erp.payables.payment-create', [
             'suppliers' => $this->vendorRows(),
@@ -1872,7 +1877,7 @@ class ModuleController extends Controller
             'selectedBill' => $selectedBill,
             'selectedPaymentMethod' => $selectedPaymentMethod,
             'nextPaymentNo' => $this->nextDocumentNumber('payment_voucher', 'PV-', 5, false),
-            'bankAccounts' => $this->bankAccounts(),
+            'bankAccounts' => $bankAccounts,
         ]);
     }
 
@@ -1892,7 +1897,7 @@ class ModuleController extends Controller
             'payee_name' => 'required|string|max:255',
             'payment_method' => 'required|in:Cheque,Bank Transfer,Online Transfer,Bank',
             'bank_account' => 'required|string|max:255',
-            'check_no' => 'required_if:payment_method,Cheque|nullable|string|max:100',
+            'check_no' => 'nullable|string|max:100',
             'currency' => 'required|string|max:3',
             'exchange_rate' => 'nullable|numeric|min:0.000001',
             'amount' => 'required|numeric|min:0.01',
@@ -3104,6 +3109,11 @@ class ModuleController extends Controller
                     ->value('id');
             }
 
+            if (strcasecmp($data['payment_method'], 'Cheque') === 0 && trim((string) ($data['check_no'] ?? '')) === '') {
+                DB::table('bank_accounts')->where('id', $bankAccountId)->lockForUpdate()->first();
+                $data['check_no'] = $this->nextCheckNumberForBank($bankAccountId);
+            }
+
             $paymentId = DB::table('payments')->insertGetId($this->tablePayload('payments', [
                 'company_id' => $companyId,
                 'supplier_id' => $supplierId,
@@ -3217,6 +3227,16 @@ class ModuleController extends Controller
             'updated_at' => now(),
         ]);
 
+        if (Schema::hasColumn('bank_accounts', 'last_check_no')) {
+            DB::table('bank_accounts')
+                ->where('company_id', $payment->company_id)
+                ->where('id', $payment->bank_account_id)
+                ->update([
+                    'last_check_no' => trim((string) $payment->check_no),
+                    'updated_at' => now(),
+                ]);
+        }
+
         if ($replacementFor) {
             DB::table('check_issuances')->where('id', $replacementFor)->update([
                 'status' => 'replaced',
@@ -3226,6 +3246,86 @@ class ModuleController extends Controller
         }
 
         return DB::table('check_issuances')->where('id', $issuanceId)->first();
+    }
+
+    private function nextCheckNumberForBank($bankAccountId)
+    {
+        if (!$bankAccountId || !Schema::hasTable('bank_accounts')) {
+            return '000001';
+        }
+
+        $bank = DB::table('bank_accounts')
+            ->where('company_id', $this->defaultCompanyId())
+            ->where('id', $bankAccountId)
+            ->first();
+        if (!$bank) {
+            return '000001';
+        }
+
+        $lastCheckNo = Schema::hasColumn('bank_accounts', 'last_check_no')
+            ? trim((string) ($bank->last_check_no ?? ''))
+            : '';
+        if ($lastCheckNo === '' && Schema::hasTable('check_issuances')) {
+            $lastCheckNo = DB::table('check_issuances')
+                ->where('company_id', $bank->company_id)
+                ->where('bank_account_id', $bank->id)
+                ->whereNotNull('check_no')
+                ->where('check_no', '<>', '')
+                ->orderBy('id', 'desc')
+                ->value('check_no');
+        }
+
+        if (!$lastCheckNo && Schema::hasTable('payments')) {
+            $lastCheckNo = DB::table('payments')
+                ->where('company_id', $bank->company_id)
+                ->whereNotNull('check_no')
+                ->where('check_no', '<>', '')
+                ->where(function ($query) use ($bank) {
+                    $query->where('bank_account_id', $bank->id)
+                        ->orWhere('bank_account', $bank->account_no)
+                        ->orWhere('bank_account', $bank->account_name)
+                        ->orWhere('bank_account', 'like', '%'.$bank->account_no.'%');
+                })
+                ->orderBy('id', 'desc')
+                ->value('check_no');
+        }
+
+        $candidate = '000001';
+        if ($lastCheckNo && preg_match('/^(.*?)(\d+)$/', trim((string) $lastCheckNo), $matches)) {
+            $candidate = $matches[1].str_pad((string) ((int) $matches[2] + 1), strlen($matches[2]), '0', STR_PAD_LEFT);
+        }
+
+        while ($this->checkNumberExistsForBank($bank, $candidate)) {
+            if (!preg_match('/^(.*?)(\d+)$/', $candidate, $matches)) {
+                $candidate .= '-1';
+                continue;
+            }
+            $candidate = $matches[1].str_pad((string) ((int) $matches[2] + 1), strlen($matches[2]), '0', STR_PAD_LEFT);
+        }
+
+        return $candidate;
+    }
+
+    private function checkNumberExistsForBank($bank, $checkNo)
+    {
+        if (Schema::hasTable('check_issuances') && DB::table('check_issuances')
+            ->where('company_id', $bank->company_id)
+            ->where('bank_account_id', $bank->id)
+            ->where('check_no', $checkNo)
+            ->exists()) {
+            return true;
+        }
+
+        return Schema::hasTable('payments') && DB::table('payments')
+            ->where('company_id', $bank->company_id)
+            ->where('check_no', $checkNo)
+            ->where(function ($query) use ($bank) {
+                $query->where('bank_account_id', $bank->id)
+                    ->orWhere('bank_account', $bank->account_no)
+                    ->orWhere('bank_account', $bank->account_name)
+                    ->orWhere('bank_account', 'like', '%'.$bank->account_no.'%');
+            })
+            ->exists();
     }
 
     private function activeCheckIssuance($paymentId, $lock = false)
@@ -7339,7 +7439,6 @@ class ModuleController extends Controller
         $descriptions = (array) ($data['item_description'] ?? []);
         $quantities = (array) ($data['qty'] ?? []);
         $unitPrices = (array) ($data['unit_price'] ?? []);
-        $classes = (array) ($data['line_class'] ?? []);
         $accounts = (array) ($data['line_ar_account'] ?? []);
         $taxCategories = (array) ($data['tax_category'] ?? []);
         $withholdingRates = (array) ($data['line_withholding_rate'] ?? []);
@@ -7371,7 +7470,7 @@ class ModuleController extends Controller
                 'discount_amount' => 0,
                 'tax_code_id' => $this->taxCodeId($taxCategories[$index] ?? null),
                 'line_total' => $lineTotal,
-                'class_code' => $classes[$index] ?? null,
+                'class_code' => $data['class_code'] ?? null,
                 'tax_category' => $taxCategories[$index] ?? null,
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -7727,9 +7826,6 @@ class ModuleController extends Controller
                                 return property_exists($line, 'withholding_tax_amount') && $line->withholding_tax_amount !== null
                                     ? number_format((float) $line->withholding_tax_amount, 2, '.', '')
                                     : '0.00';
-                            })->all();
-                            $data['line_class'] = $lines->map(function ($line) use ($invoice) {
-                                return (property_exists($line, 'class_code') && $line->class_code) ? $line->class_code : ($invoice->class_code ?? '');
                             })->all();
                             $data['line_ar_account'] = $lines->map(function ($line) use ($invoice) {
                                 return (property_exists($line, 'ar_account_code') && $line->ar_account_code)
@@ -8301,7 +8397,6 @@ class ModuleController extends Controller
             'item_description',
             'qty',
             'unit_price',
-            'line_class',
             'line_ar_account',
             'tax_category',
             'line_withholding_rate',
@@ -8564,13 +8659,19 @@ class ModuleController extends Controller
 
     public function paymentReceipt()
     {
+        $invoiceNumbers = array_values(array_unique(array_filter(array_map(function ($invoiceNo) {
+            return trim((string) $invoiceNo);
+        }, (array) request('invoice_no', [])))));
+        request()->merge(['invoice_no' => $invoiceNumbers]);
+
         $data = request()->validate([
             'receipt_type' => 'nullable|string|max:100',
             'receipt_no' => 'nullable|string|max:100',
             'customer_id' => 'required|string|max:100',
             'customer_name' => 'nullable|string|max:255',
             'job_shipment_id' => 'nullable|string|max:100',
-            'invoice_no' => 'nullable|string|max:100',
+            'invoice_no' => 'nullable|array',
+            'invoice_no.*' => 'string|max:100|distinct',
             'payment_date' => 'required|date',
             'payment_method' => 'required|string|max:100',
             'bank_account_id' => 'nullable|integer',
@@ -8620,45 +8721,51 @@ class ModuleController extends Controller
         }
 
         $companyId = $customer->company_id;
-        $invoice = null;
+        $invoices = collect();
 
-        if (Schema::hasTable('sales_documents') && request('invoice_no')) {
-            $invoice = DB::table('sales_documents')
+        if (Schema::hasTable('sales_documents') && count($invoiceNumbers) > 0) {
+            $invoicesByNumber = DB::table('sales_documents')
                 ->where('company_id', $companyId)
-                ->where('document_no', request('invoice_no'))
                 ->where('customer_id', $customer->id)
-                ->first();
+                ->whereIn('document_no', $invoiceNumbers)
+                ->get()
+                ->keyBy('document_no');
 
-            if ($invoice && in_array(strtolower((string) $invoice->status), ['cancelled', 'voided'], true)) {
-                return back()->withInput()->withErrors(['invoice_no' => 'A cancelled or voided invoice cannot receive a payment.']);
+            $invoices = collect($invoiceNumbers)->map(function ($invoiceNo) use ($invoicesByNumber) {
+                return $invoicesByNumber->get($invoiceNo);
+            })->filter()->values();
+
+            if ($invoices->count() !== count($invoiceNumbers)) {
+                return back()->withInput()->withErrors(['invoice_no' => 'Every selected invoice must belong to the selected client.']);
+            }
+
+            if ($invoices->contains(function ($invoice) {
+                return in_array(strtolower((string) $invoice->status), ['cancelled', 'voided', 'paid'], true);
+            })) {
+                return back()->withInput()->withErrors(['invoice_no' => 'A paid, cancelled, or voided invoice cannot receive a payment.']);
             }
         }
 
         $receiptNo = request('receipt_no') ?: $this->nextReceiptNumber($companyId);
 
         $settlementAmount = $amount + $cwtAmount;
-        $invoiceAmounts = null;
-        if ($invoice) {
-            $appliedCwt = Schema::hasTable('receipt_applications') && Schema::hasColumn('receipts', 'cwt_amount')
-                ? (float) DB::table('receipt_applications')
-                    ->join('receipts', 'receipts.id', '=', 'receipt_applications.receipt_id')
-                    ->where('receipt_applications.sales_document_id', $invoice->id)
-                    ->whereNotIn('receipts.status', ['cancelled', 'voided'])
-                    ->sum('receipts.cwt_amount')
-                : 0;
-            $invoiceAmounts = $this->paymentInvoiceAmounts($invoice, $appliedCwt);
-            if ($invoiceAmounts['settlement_balance'] <= 0.005) {
-                return back()->withInput()->withErrors(['invoice_no' => 'The selected invoice is already fully paid.']);
-            }
-            if ($settlementAmount - $invoiceAmounts['settlement_balance'] > 0.005) {
-                return back()->withInput()->withErrors(['amount' => 'Cash plus CWT cannot exceed the selected Billing Invoice balance.']);
-            }
+        $invoiceAmounts = $invoices->mapWithKeys(function ($invoice) {
+            return [$invoice->id => $this->paymentInvoiceAmounts($invoice)];
+        });
+        $totalSettlementBalance = $invoiceAmounts->sum('settlement_balance');
+        if ($invoices->isNotEmpty() && $settlementAmount - $totalSettlementBalance > 0.005) {
+            return back()->withInput()->withErrors(['amount' => 'Cash plus CWT cannot exceed the selected Billing Invoices\' combined balance.']);
         }
 
         $currency = strtoupper($data['currency']);
+        if ($invoices->contains(function ($invoice) use ($currency) {
+            return strtoupper((string) ($invoice->currency ?: 'PHP')) !== $currency;
+        })) {
+            return back()->withInput()->withErrors(['invoice_no' => 'All selected invoices must use the payment currency.']);
+        }
         $exchangeRate = $currency === 'PHP' ? 1 : max(0.000001, $this->moneyToFloat($data['exchange_rate'] ?? 1));
 
-        $receiptId = DB::transaction(function () use ($customer, $companyId, $invoice, $invoiceAmounts, $receiptNo, $amount, $cwtAmount, $settlementAmount, $currency, $exchangeRate, $data) {
+        $receiptId = DB::transaction(function () use ($customer, $companyId, $invoices, $invoiceAmounts, $receiptNo, $amount, $cwtAmount, $settlementAmount, $currency, $exchangeRate, $data) {
             $receiptId = DB::table('receipts')->insertGetId([
                 'company_id' => $companyId,
                 'customer_id' => $customer->id,
@@ -8683,23 +8790,39 @@ class ModuleController extends Controller
                 'updated_at' => now(),
             ]);
 
-            if ($invoice && Schema::hasTable('receipt_applications')) {
-                DB::table('receipt_applications')->insert([
-                    'receipt_id' => $receiptId,
-                    'sales_document_id' => $invoice->id,
-                    'amount_applied' => min($settlementAmount, $invoiceAmounts['settlement_balance']),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+            if ($invoices->isNotEmpty() && Schema::hasTable('receipt_applications')) {
+                $remainingSettlement = $settlementAmount;
 
-                $paidTotal = min($invoiceAmounts['invoice_total'], (float) $invoice->paid_total + $settlementAmount);
-                DB::table('sales_documents')->where('id', $invoice->id)->update([
-                    'paid_total' => $paidTotal,
-                    'total_payment' => $paidTotal,
-                    'balance_due' => max(0, $invoiceAmounts['invoice_total'] - $paidTotal),
-                    'status' => $paidTotal >= $invoiceAmounts['invoice_total'] - 0.005 ? 'paid' : 'partial',
-                    'updated_at' => now(),
-                ]);
+                foreach ($invoices as $invoice) {
+                    if ($remainingSettlement <= 0.005) {
+                        break;
+                    }
+
+                    $amounts = $invoiceAmounts->get($invoice->id);
+                    $amountApplied = min($remainingSettlement, $amounts['settlement_balance']);
+                    if ($amountApplied <= 0.005) {
+                        continue;
+                    }
+
+                    DB::table('receipt_applications')->insert([
+                        'receipt_id' => $receiptId,
+                        'sales_document_id' => $invoice->id,
+                        'amount_applied' => $amountApplied,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+
+                    $paidTotal = min($amounts['invoice_total'], (float) $invoice->paid_total + $amountApplied);
+                    DB::table('sales_documents')->where('id', $invoice->id)->update([
+                        'paid_total' => $paidTotal,
+                        'total_payment' => $paidTotal,
+                        'balance_due' => max(0, $amounts['invoice_total'] - $paidTotal),
+                        'status' => $paidTotal >= $amounts['invoice_total'] - 0.005 ? 'paid' : 'partial',
+                        'updated_at' => now(),
+                    ]);
+
+                    $remainingSettlement -= $amountApplied;
+                }
             }
 
             app(PostingService::class)->postReceipt($receiptId);
@@ -8709,6 +8832,7 @@ class ModuleController extends Controller
 
         $payment['receipt_no'] = $receiptNo;
         $payment['customer_name'] = $customer->name;
+        $payment['invoice_no'] = implode(', ', $invoiceNumbers);
 
         $receiptQuery = array_filter([
             'receipt_no' => $payment['receipt_no'] ?? null,
@@ -8983,10 +9107,28 @@ class ModuleController extends Controller
         $numericReceiptNo = preg_replace('/\D/', '', $dbReceipt->receipt_no);
         $defaultDescription = $isAcknowledgement ? 'PAYMENT FOR REIMBURSABLE CHARGES' : 'PAYMENT FOR LOCAL CHARGES';
         $documentPrefix = $isAcknowledgement ? 'SOA#' : 'BI#';
-        $documentNumbers = $isAcknowledgement && !empty($dbReceipt->soa_numbers) ? $dbReceipt->soa_numbers : $dbReceipt->invoice_numbers;
+        $appliedDocuments = DB::table('receipt_applications')
+            ->join('sales_documents', 'sales_documents.id', '=', 'receipt_applications.sales_document_id')
+            ->where('receipt_applications.receipt_id', $dbReceipt->id)
+            ->orderBy('receipt_applications.id')
+            ->select('sales_documents.document_no', 'sales_documents.soa_no')
+            ->get();
+        $documentNumbers = $isAcknowledgement
+            ? $appliedDocuments->pluck('soa_no')->filter()->unique()->implode(', ')
+            : $appliedDocuments->pluck('document_no')->filter()->unique()->implode(', ');
+        if ($documentNumbers === '') {
+            $documentNumbers = $isAcknowledgement && !empty($dbReceipt->soa_numbers) ? $dbReceipt->soa_numbers : $dbReceipt->invoice_numbers;
+        }
+        $documentReference = $documentNumbers ? $documentPrefix . ' ' . $documentNumbers : null;
+        if (!$isAcknowledgement && $appliedDocuments->count() > 1) {
+            $documentReference = $appliedDocuments->pluck('document_no')->filter()->unique()->values()
+                ->map(function ($documentNo, $index) {
+                    return 'Billing ' . ($index + 1) . ': ' . $documentNo;
+                })->implode("\n");
+        }
         $descriptionParts = array_filter([
             $dbReceipt->invoice_remarks ? trim($dbReceipt->invoice_remarks) : $defaultDescription,
-            $documentNumbers ? $documentPrefix . ' ' . $documentNumbers : null,
+            $documentReference,
             property_exists($dbReceipt, 'job_shipment_id') && $dbReceipt->job_shipment_id ? 'JOB ' . $dbReceipt->job_shipment_id : null,
         ]);
         $printAmount = (int) $dbReceipt->application_count > 0
@@ -9109,6 +9251,7 @@ class ModuleController extends Controller
                 'payment_date' => 'Payment date',
                 'registered_name' => 'Registered name',
                 'business_address' => 'Business address',
+                'description' => 'Description',
                 'amount' => 'Transaction amount',
                 'total_amount' => 'Total paid amount',
                 'printed_by' => 'Printed by',
@@ -9214,6 +9357,7 @@ class ModuleController extends Controller
                 'payment_date' => $defaults['payment_date'],
                 'registered_name' => $defaults['registered_name'],
                 'business_address' => $defaults['business_address'],
+                'description' => $defaults['description'],
                 'amount' => $defaults['amount'],
                 'total_amount' => $defaults['total_amount'],
                 'printed_by' => $defaults['printed_by'],
@@ -10886,6 +11030,195 @@ class ModuleController extends Controller
             ->sum('grand_total');
     }
 
+    public function resetTransactionData()
+    {
+        $role = app(RbacService::class)->normalizeRole(auth()->user()->role ?? '');
+        abort_unless($role === 'admin', 403, 'Only an Administrator may reset transaction data.');
+
+        $data = request()->validate([
+            'confirmation' => 'required|in:RESET TRANSACTION DATA',
+        ]);
+        $companyId = $this->defaultCompanyId();
+        $attachmentFiles = collect();
+
+        $deleted = DB::transaction(function () use ($companyId, &$attachmentFiles) {
+            $salesDocumentIds = Schema::hasTable('sales_documents')
+                ? DB::table('sales_documents')->where('company_id', $companyId)->pluck('id')->all()
+                : [];
+            $purchaseDocumentIds = Schema::hasTable('purchase_documents')
+                ? DB::table('purchase_documents')->where('company_id', $companyId)->pluck('id')->all()
+                : [];
+            $receiptIds = Schema::hasTable('receipts')
+                ? DB::table('receipts')->where('company_id', $companyId)->pluck('id')->all()
+                : [];
+            $paymentRecords = Schema::hasTable('payments')
+                ? DB::table('payments')->where('company_id', $companyId)->select('id', 'payment_no')->get()
+                : collect();
+            $paymentIds = $paymentRecords->pluck('id')->all();
+            $paymentNumbers = $paymentRecords->pluck('payment_no')->filter()->all();
+            $receiptNumbers = Schema::hasTable('receipts')
+                ? DB::table('receipts')->where('company_id', $companyId)->pluck('receipt_no')->filter()->all()
+                : [];
+            $journalEntryIds = Schema::hasTable('journal_entries')
+                ? DB::table('journal_entries')->where('company_id', $companyId)->pluck('id')->all()
+                : [];
+            $expenseIds = Schema::hasTable('expenses')
+                ? DB::table('expenses')->where('company_id', $companyId)->pluck('id')->all()
+                : [];
+            $bankAccountIds = Schema::hasTable('bank_accounts')
+                ? DB::table('bank_accounts')->where('company_id', $companyId)->pluck('id')->all()
+                : [];
+
+            if (Schema::hasTable('document_attachments') && (!empty($purchaseDocumentIds) || !empty($paymentIds))) {
+                $attachmentFiles = DB::table('document_attachments')
+                    ->where(function ($query) use ($purchaseDocumentIds, $paymentIds) {
+                        if (!empty($purchaseDocumentIds)) {
+                            $query->where(function ($documents) use ($purchaseDocumentIds) {
+                                $documents->where('document_type', 'purchase_document')->whereIn('document_id', $purchaseDocumentIds);
+                            });
+                        }
+                        if (!empty($paymentIds)) {
+                            $method = empty($purchaseDocumentIds) ? 'where' : 'orWhere';
+                            $query->{$method}(function ($documents) use ($paymentIds) {
+                                $documents->where('document_type', 'payment')->whereIn('document_id', $paymentIds);
+                            });
+                        }
+                    })
+                    ->get();
+                if ($attachmentFiles->isNotEmpty()) {
+                    DB::table('document_attachments')->whereIn('id', $attachmentFiles->pluck('id')->all())->delete();
+                }
+            }
+
+            if (Schema::hasTable('check_voucher_print_events')) {
+                DB::table('check_voucher_print_events')->where('company_id', $companyId)->delete();
+            }
+            if (Schema::hasTable('check_print_events')) {
+                DB::table('check_print_events')->where('company_id', $companyId)->delete();
+            }
+            if (Schema::hasTable('check_issuances')) {
+                DB::table('check_issuances')->where('company_id', $companyId)->delete();
+            }
+            if (Schema::hasTable('payment_applications') && !empty($paymentIds)) {
+                DB::table('payment_applications')->whereIn('payment_id', $paymentIds)->delete();
+            }
+            if (Schema::hasTable('receipt_applications') && !empty($receiptIds)) {
+                DB::table('receipt_applications')->whereIn('receipt_id', $receiptIds)->delete();
+            }
+            if (Schema::hasTable('approval_requests')) {
+                DB::table('approval_requests')
+                    ->where('company_id', $companyId)
+                    ->whereIn('approvable_type', ['purchase_document', 'payment', 'sales_document'])
+                    ->delete();
+            }
+            if (Schema::hasTable('client_portal_tokens') && Schema::hasColumn('client_portal_tokens', 'sales_document_id')) {
+                DB::table('client_portal_tokens')->where('company_id', $companyId)->whereNotNull('sales_document_id')->delete();
+            }
+            if (Schema::hasTable('sales_document_lines') && !empty($salesDocumentIds)) {
+                DB::table('sales_document_lines')->whereIn('sales_document_id', $salesDocumentIds)->delete();
+            }
+            if (Schema::hasTable('purchase_document_lines') && !empty($purchaseDocumentIds)) {
+                DB::table('purchase_document_lines')->whereIn('purchase_document_id', $purchaseDocumentIds)->delete();
+            }
+            if (Schema::hasTable('vendor_bill_lines') && !empty($purchaseDocumentIds)) {
+                DB::table('vendor_bill_lines')->whereIn('purchase_document_id', $purchaseDocumentIds)->delete();
+            }
+            if (Schema::hasTable('expense_lines') && !empty($expenseIds)) {
+                DB::table('expense_lines')->whereIn('expense_id', $expenseIds)->delete();
+            }
+
+            if (Schema::hasTable('bank_transactions') && !empty($bankAccountIds)
+                && (!empty($journalEntryIds) || !empty($paymentIds) || !empty($receiptIds) || !empty($paymentNumbers) || !empty($receiptNumbers))) {
+                $bankTransactions = DB::table('bank_transactions')
+                    ->whereIn('bank_account_id', $bankAccountIds)
+                    ->where(function ($query) use ($journalEntryIds, $paymentIds, $receiptIds, $paymentNumbers, $receiptNumbers) {
+                        if (!empty($journalEntryIds)) {
+                            $query->whereIn('journal_entry_id', $journalEntryIds);
+                        }
+                        if (!empty($paymentIds)) {
+                            $query->orWhere(function ($source) use ($paymentIds) {
+                                $source->whereIn('source_type', ['payment', 'payment_reversal'])->whereIn('source_id', $paymentIds);
+                            });
+                        }
+                        if (!empty($receiptIds)) {
+                            $query->orWhere(function ($source) use ($receiptIds) {
+                                $source->whereIn('source_type', ['receipt', 'receipt_reversal'])->whereIn('source_id', $receiptIds);
+                            });
+                        }
+                        $references = array_values(array_unique(array_merge($paymentNumbers, $receiptNumbers)));
+                        if (!empty($references)) {
+                            $query->orWhereIn('transaction_no', $references)->orWhereIn('reference_no', $references);
+                        }
+                    })
+                    ->get();
+
+                foreach ($bankTransactions->groupBy('bank_account_id') as $bankAccountId => $transactions) {
+                    $bank = DB::table('bank_accounts')->where('id', $bankAccountId)->lockForUpdate()->first();
+                    if ($bank) {
+                        $netMovement = $transactions->sum(function ($transaction) {
+                            return (float) $transaction->debit - (float) $transaction->credit;
+                        });
+                        DB::table('bank_accounts')->where('id', $bank->id)->update([
+                            'book_balance' => (float) $bank->book_balance - $netMovement,
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+                if ($bankTransactions->isNotEmpty()) {
+                    DB::table('bank_transactions')->whereIn('id', $bankTransactions->pluck('id')->all())->delete();
+                }
+            }
+
+            if (Schema::hasTable('payments')) {
+                DB::table('payments')->where('company_id', $companyId)->delete();
+            }
+            if (Schema::hasTable('receipts')) {
+                DB::table('receipts')->where('company_id', $companyId)->delete();
+            }
+            if (Schema::hasTable('expenses')) {
+                DB::table('expenses')->where('company_id', $companyId)->delete();
+            }
+            if (Schema::hasTable('purchase_documents')) {
+                DB::table('purchase_documents')->where('company_id', $companyId)->delete();
+            }
+            if (Schema::hasTable('sales_documents')) {
+                DB::table('sales_documents')->where('company_id', $companyId)->delete();
+            }
+            if (Schema::hasTable('journal_entry_lines') && !empty($journalEntryIds)) {
+                DB::table('journal_entry_lines')->whereIn('journal_entry_id', $journalEntryIds)->delete();
+            }
+            if (Schema::hasTable('journal_entries')) {
+                DB::table('journal_entries')->where('company_id', $companyId)->delete();
+            }
+
+            $summary = [
+                'billing_documents' => count($salesDocumentIds),
+                'ap_documents' => count($purchaseDocumentIds) + count($expenseIds),
+                'receipts' => count($receiptIds),
+                'payments_and_cvs' => count($paymentIds),
+                'journals' => count($journalEntryIds),
+            ];
+            app(ActivityLogger::class)->log('transaction_data_reset', 'company', $companyId, [], $summary, $companyId);
+
+            return $summary;
+        });
+
+        foreach ($attachmentFiles as $attachment) {
+            if (!empty($attachment->path)) {
+                try {
+                    Storage::disk($attachment->disk ?: 'local')->delete($attachment->path);
+                } catch (\Throwable $exception) {
+                    // The database reset is complete even if a legacy attachment disk is unavailable.
+                }
+            }
+        }
+
+        return redirect()->route('erp.settings.index')->with(
+            'status',
+            'Transaction data reset completed. Billing layouts, print designs, number series, master data, and settings were preserved.'
+        );
+    }
+
     public function financeSettings()
     {
         $companyId = $this->defaultCompanyId();
@@ -11166,6 +11499,7 @@ class ModuleController extends Controller
             'branch_name' => 'nullable|string|max:255',
             'account_name' => 'required|string|max:255',
             'account_no' => 'required|string|max:100',
+            'last_check_no' => 'nullable|string|max:100',
             'swift_code' => 'nullable|string|max:50',
             'currency' => 'required|string|max:3',
             'book_balance' => 'nullable',
@@ -11181,6 +11515,9 @@ class ModuleController extends Controller
             'branch_name' => $data['branch_name'] ?? null,
             'account_name' => $data['account_name'],
             'account_no' => $data['account_no'],
+            'last_check_no' => isset($data['last_check_no']) && trim((string) $data['last_check_no']) !== ''
+                ? trim((string) $data['last_check_no'])
+                : null,
             'swift_code' => $data['swift_code'] ?? null,
             'currency' => strtoupper($data['currency']),
             'book_balance' => $this->moneyToFloat($data['book_balance'] ?? 0),

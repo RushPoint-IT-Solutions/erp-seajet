@@ -1,6 +1,6 @@
 <div class="nonvat-sheet {{ $copyClass }} {{ $editableCopy && $adjustLayout ? 'is-adjusting' : '' }}" @if($editableCopy) id="receiptLayoutSheet" data-sheet-width-mm="215.9" @endif>
+    <img class="nonvat-letterhead-background" src="{{ asset('images/background.jpg') }}" alt="" aria-hidden="true">
     <div class="nonvat-header">
-        <img class="nonvat-logo" src="{{ asset('images/gen_off_seajetlogo.webp') }}" alt="Sea-Jet International Forwarders, Inc.">
         <span class="receipt-adjustable-field" @if($editableCopy) tabindex="0" data-field-key="report_header" data-field-label="Report header" @endif style="{{ $fieldStyle('report_header') }}">{{ $receiptContent['report_header'] }}</span>
         <div class="nonvat-title-rule"></div>
     </div>
@@ -11,6 +11,7 @@
         <tr><td>Date</td><td><span class="receipt-adjustable-field" @if($editableCopy) tabindex="0" data-field-key="payment_date" data-field-label="Payment date" @endif style="{{ $fieldStyle('payment_date') }}">{{ $receipt['payment_date'] ?? '' }}</span></td></tr>
         <tr><td>Received From</td><td><span class="receipt-adjustable-field receipt-field-block" @if($editableCopy) tabindex="0" data-field-key="registered_name" data-field-label="Registered name" @endif style="{{ $fieldStyle('registered_name') }}">{{ $receipt['registered_name'] ?? '' }}</span></td></tr>
         <tr><td>Address</td><td><span class="receipt-adjustable-field receipt-field-block" @if($editableCopy) tabindex="0" data-field-key="business_address" data-field-label="Business address" @endif style="{{ $fieldStyle('business_address') }}">{{ $receipt['business_address'] ?? '' }}</span></td></tr>
+        <tr><td>Description</td><td><span class="receipt-adjustable-field receipt-field-block nonvat-description" @if($editableCopy) tabindex="0" data-field-key="description" data-field-label="Description" @endif style="{{ $fieldStyle('description') }}">{{ $receipt['description'] ?? '' }}</span></td></tr>
         <tr><td>Amount Received</td><td class="nonvat-amount"><span class="receipt-adjustable-field" @if($editableCopy) tabindex="0" data-field-key="amount" data-field-label="Transaction amount" @endif style="{{ $fieldStyle('amount') }}">{{ $currency }} {{ number_format($amount, 2) }}</span></td></tr>
         <tr><td>Payment Method</td><td>{{ $receipt['payment_method'] ?? '' }}</td></tr>
         <tr class="nonvat-total-row"><td>Total Amount Received</td><td class="nonvat-amount"><span class="receipt-adjustable-field" @if($editableCopy) tabindex="0" data-field-key="total_amount" data-field-label="Total paid amount" @endif style="{{ $fieldStyle('total_amount') }}">{{ $currency }} {{ number_format($amount, 2) }}</span></td></tr>

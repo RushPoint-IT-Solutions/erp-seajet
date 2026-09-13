@@ -17,8 +17,8 @@
         width: 215.9mm;
         min-height: 279.4mm;
         margin: 0 auto;
-        padding: 15mm 18mm 18mm;
-        background: #fff;
+        padding: 42mm 18mm 18mm;
+        background: #fff url('{{ asset('images/background.jpg') }}') center / 100% 100% no-repeat;
         border: 1px solid #cbd5e1;
         box-shadow: 0 12px 32px rgba(15, 23, 42, .14);
         color: var(--nonvat-ink);
@@ -27,22 +27,29 @@
         overflow: hidden;
     }
     .nonvat-sheet + .nonvat-sheet { margin-top: 12mm; }
-    .nonvat-sheet::before {
-        content: '';
-        display: block;
-        height: 2.2mm;
-        margin: -15mm -18mm 10mm;
-        background: var(--nonvat-accent);
+    .nonvat-letterhead-background {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: fill;
+        pointer-events: none;
+        user-select: none;
+        z-index: 0;
+    }
+    .nonvat-header,
+    .nonvat-intro,
+    .nonvat-section-label,
+    .nonvat-details,
+    .nonvat-certification {
+        position: relative;
+        z-index: 1;
+    }
+    .nonvat-printed-by,
+    .nonvat-document-footer {
+        z-index: 1;
     }
     .nonvat-header { text-align: center; margin-bottom: 12mm; }
-    .nonvat-logo {
-        display: block;
-        width: 300px;
-        height: 82px;
-        max-width: 100%;
-        margin: 0 auto 5mm;
-        object-fit: contain;
-    }
     .nonvat-title-rule { width: 24mm; border-top: .7mm solid var(--nonvat-accent); margin: 4mm auto 0; }
     .nonvat-header .receipt-adjustable-field {
         text-transform: uppercase;
@@ -86,6 +93,7 @@
         text-transform: uppercase;
     }
     .nonvat-details td:last-child { font-size: 10pt; }
+    .nonvat-description { white-space: pre-line; }
     .nonvat-details .nonvat-total-row td {
         border-top: .7mm solid var(--nonvat-accent);
         background: #fff;
@@ -119,12 +127,12 @@
     .nonvat-document-footer {
         position: absolute;
         right: 18mm;
-        bottom: 13mm;
+        bottom: 34mm;
         color: var(--nonvat-muted);
         font-size: 7pt;
         letter-spacing: .25px;
     }
-    .nonvat-printed-by { position: absolute; left: 18mm; bottom: 13mm; color: var(--nonvat-muted); }
+    .nonvat-printed-by { position: absolute; left: 18mm; bottom: 34mm; color: var(--nonvat-muted); }
     .receipt-adjustable-field { position: relative; z-index: 2; display: inline-block; }
     .receipt-field-block { display: block; }
     .receipt-field-hidden { display: none !important; }
@@ -139,8 +147,10 @@
     }
     .nonvat-sheet.is-adjusting .receipt-adjustable-field.is-active { outline: 2px solid #2563eb; background: rgba(239, 246, 255, .92); }
     .nonvat-sheet.is-adjusting.show-grid {
-        background-image: linear-gradient(rgba(37, 99, 235, .1) 1px, transparent 1px), linear-gradient(90deg, rgba(37, 99, 235, .1) 1px, transparent 1px);
-        background-size: 5mm 5mm;
+        background-image: linear-gradient(rgba(37, 99, 235, .1) 1px, transparent 1px), linear-gradient(90deg, rgba(37, 99, 235, .1) 1px, transparent 1px), url('{{ asset('images/background.jpg') }}');
+        background-size: 5mm 5mm, 5mm 5mm, 100% 100%;
+        background-position: 0 0, 0 0, center;
+        background-repeat: repeat, repeat, no-repeat;
     }
     .nonvat-sheet.fields-locked .receipt-adjustable-field { cursor: default; }
     @media print {
