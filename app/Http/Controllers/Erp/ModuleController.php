@@ -1910,8 +1910,9 @@ class ModuleController extends Controller
                 'amount' => 'Payment amounts may have no more than two decimal places.',
             ]);
         }
-        $balance = max(0, (float) $bill->grand_total - (float) $bill->paid_total);
-        if ($amount > $balance + 0.0049) {
+        $balanceCents = (int) round(max(0, (float) $bill->grand_total - (float) $bill->paid_total) * 100);
+        $balance = $balanceCents / 100;
+        if ((int) round($amount * 100) > $balanceCents) {
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'amount' => 'Payment cannot exceed the outstanding bill balance of '.number_format($balance, 2).'.',
             ]);
@@ -2031,8 +2032,9 @@ class ModuleController extends Controller
 
             $bill = $this->apBillRecordByNumber($record->bill_no);
             abort_unless($bill, 422, 'The supplier bill linked to this payment no longer exists.');
-            $balance = max(0, (float) $bill->grand_total - (float) $bill->paid_total);
-            if ((float) $record->amount > $balance + 0.0049) {
+            $balanceCents = (int) round(max(0, (float) $bill->grand_total - (float) $bill->paid_total) * 100);
+            $balance = $balanceCents / 100;
+            if ((int) round((float) $record->amount * 100) > $balanceCents) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'amount' => 'Release blocked because the payment exceeds the current bill balance of '.number_format($balance, 2).'.',
                 ]);
@@ -2670,7 +2672,7 @@ class ModuleController extends Controller
             ->orderBy('purchase_documents.id', 'desc')
             ->get()
             ->map(function ($bill) {
-                $balance = max(0, (float) $bill->grand_total - (float) $bill->paid_total);
+                $balance = round(max(0, (float) $bill->grand_total - (float) $bill->paid_total), 2);
                 return [
                     $bill->document_no,
                     $bill->supplier_name ?: '-',
@@ -3056,7 +3058,7 @@ class ModuleController extends Controller
             ->orderBy('purchase_documents.document_date', 'desc')
             ->get()
             ->map(function ($bill) {
-                $balance = max(0, (float) $bill->grand_total - (float) $bill->paid_total);
+                $balance = round(max(0, (float) $bill->grand_total - (float) $bill->paid_total), 2);
 
                 return [
                     'id' => $bill->id,

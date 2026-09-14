@@ -202,6 +202,47 @@ class ControlledCheckLifecycleTest extends TestCase
         $this->assertDatabaseMissing('payments', ['payment_no' => 'PV-CONTROL-1002']);
     }
 
+    public function test_displayed_rounded_bill_balance_is_accepted_as_the_exact_payment_amount()
+    {
+        list($bill, $bank) = $this->billAndBank();
+        $grandTotal = (float) $bill->paid_total + 1372.505;
+        DB::table('purchase_documents')->where('id', $bill->id)->update([
+            'grand_total' => $grandTotal,
+            'status' => 'for_payment',
+        ]);
+        $bill = DB::table('purchase_documents')->where('id', $bill->id)->first();
+
+        $this->get(route('erp.payables.payments.create', ['bill' => $bill->document_no]))
+            ->assertOk()
+            ->assertSee('data-amount="1372.51"', false)
+            ->assertSee('PHP 1,372.51');
+
+        $response = $this->post(route('erp.payables.payments.review'), $this->paymentPayload($bill, $bank, [
+            'payment_method' => 'Bank',
+            'check_no' => null,
+            'amount' => '1372.51',
+        ]));
+
+        $response->assertOk();
+        $this->assertDatabaseHas('payments', [
+            'bill_no' => $bill->document_no,
+            'amount' => 1372.51,
+            'approval_status' => 'For Approval',
+        ]);
+
+        $payment = DB::table('payments')->where('bill_no', $bill->document_no)->first();
+        $this->actingAsFinance($bill->company_id);
+        $this->post(route('erp.payables.payments.approve', $payment->id))
+            ->assertRedirect(route('erp.payables.approvals'));
+        $this->post(route('erp.payables.payments.release', $payment->id))
+            ->assertRedirect(route('erp.payables.approvals'));
+        $this->assertDatabaseHas('payments', [
+            'id' => $payment->id,
+            'approval_status' => 'Released',
+            'posting_status' => 'posted',
+        ]);
+    }
+
     public function test_automatic_payment_number_skips_an_existing_stale_preview()
     {
         list($bill, $bank) = $this->billAndBank();
