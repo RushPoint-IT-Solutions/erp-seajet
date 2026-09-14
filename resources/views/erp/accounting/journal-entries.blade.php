@@ -37,21 +37,25 @@
     <form class="erp-card p-4" method="post" action="{{ route('erp.accounting.journals.review') }}" id="journalForm">
         {{ csrf_field() }}
         <div class="row g-3">
-            <div class="col-md-3">
+            <div class="col-lg-2 col-md-3">
                 <label class="form-label">Journal No</label>
                 <input name="journal_no" class="form-control" value="{{ old('journal_no', $nextJournalNo) }}" required>
             </div>
-            <div class="col-md-3">
+            <div class="col-lg-2 col-md-3">
                 <label class="form-label">Journal Date</label>
                 <input name="journal_date" type="date" class="form-control" value="{{ old('journal_date', date('Y-m-d')) }}" required>
             </div>
-            <div class="col-md-3">
+            <div class="col-lg-3 col-md-6">
                 <label class="form-label">Shipment Job ID</label>
                 <input name="shipment_job_id" class="form-control" value="{{ old('shipment_job_id') }}">
             </div>
-            <div class="col-md-3">
+            <div class="col-lg-2 col-md-6">
                 <label class="form-label">Reference No</label>
                 <input name="reference_no" class="form-control" value="{{ old('reference_no') }}">
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label">Payee</label>
+                <input name="payee" class="form-control" value="{{ old('payee') }}" maxlength="255">
             </div>
         </div>
 
@@ -118,6 +122,7 @@
                 <tr>
                     <th>Journal No</th>
                     <th>Date</th>
+                    <th>Payee</th>
                     <th>Memo</th>
                     <th>Status</th>
                     <th class="text-end">Amount</th>
@@ -129,13 +134,14 @@
                     <tr>
                         <td>{{ $entry->journal_no }}</td>
                         <td>{{ $entry->journal_date }}</td>
+                        <td>{{ $entry->payee ?: '-' }}</td>
                         <td>{{ $entry->memo ?: '-' }}</td>
                         <td><span class="badge text-bg-success text-uppercase">{{ $entry->status }}</span></td>
                         <td class="text-end">{{ number_format($entry->amount, 2) }}</td>
                         <td class="text-end"><a href="{{ route('erp.accounting.journals.show', $entry->id) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye me-1"></i>View</a></td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="text-center text-muted py-4">No journal entries have been posted yet.</td></tr>
+                    <tr><td colspan="7" class="text-center text-muted py-4">No journal entries have been posted yet.</td></tr>
                 @endforelse
                 </tbody>
             </table>

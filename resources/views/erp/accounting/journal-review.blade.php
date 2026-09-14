@@ -29,6 +29,10 @@
                 <div class="fw-semibold">{{ $journal->reference_no ?: '-' }}</div>
             </div>
             <div class="col-md-3">
+                <div class="small text-muted">Payee</div>
+                <div class="fw-semibold">{{ $journal->payee ?: '-' }}</div>
+            </div>
+            <div class="col-md-3">
                 <div class="small text-muted">Posted At</div>
                 <div class="fw-semibold">{{ $journal->posted_at }}</div>
             </div>

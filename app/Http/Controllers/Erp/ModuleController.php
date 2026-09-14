@@ -5432,6 +5432,7 @@ class ModuleController extends Controller
             'journal_date' => 'required|date',
             'shipment_job_id' => 'nullable|string|max:100',
             'reference_no' => 'nullable|string|max:100',
+            'payee' => 'nullable|string|max:255',
             'memo' => 'nullable|string|max:2000',
             'line_account' => 'required|array|min:2',
             'line_account.*' => 'nullable|integer',
@@ -5512,6 +5513,7 @@ class ModuleController extends Controller
                 'journal_date' => $data['journal_date'],
                 'source_module' => 'GL',
                 'reference_no' => $data['reference_no'] ?? null,
+                'payee' => trim((string) ($data['payee'] ?? '')) ?: null,
                 'shipment_job_id' => $data['shipment_job_id'] ?? null,
                 'memo' => $data['memo'] ?? null,
                 'status' => 'posted',
@@ -5539,6 +5541,7 @@ class ModuleController extends Controller
         app(ActivityLogger::class)->log('posted', 'journal_entry', $journalId, [], [
             'journal_no' => $journalNo,
             'source_module' => 'GL',
+            'payee' => trim((string) ($data['payee'] ?? '')) ?: null,
             'total_debit' => $totalDebit,
             'total_credit' => $totalCredit,
         ], $companyId);
@@ -5598,6 +5601,7 @@ class ModuleController extends Controller
                     'id' => $entry->id,
                     'journal_no' => $entry->journal_no,
                     'journal_date' => $entry->journal_date,
+                    'payee' => $entry->payee,
                     'memo' => $entry->memo,
                     'status' => $entry->status,
                     'amount' => (float) ($totals->debit_total ?? 0),
@@ -10660,6 +10664,7 @@ class ModuleController extends Controller
             ->get([
                 'journal_entries.journal_date',
                 'journal_entries.journal_no',
+                'journal_entries.payee',
                 'journal_entries.memo',
                 'accounts.name as account_name',
                 'journal_entry_lines.description',
@@ -10672,7 +10677,7 @@ class ModuleController extends Controller
                 return [
                     'DATE' => $line->journal_date,
                     'JV NO' => $line->journal_no,
-                    'PAYEE' => '',
+                    'PAYEE' => $line->payee ?: '',
                     'ACCOUNT TITLE/PARTICULARS' => trim(($line->account_name ?: '').' '.($line->description ?: $line->memo)),
                     'CASH IN BANK-PHP' => strpos($account, 'CASH') !== false ? $amount : 0,
                     'A/P TRADE - PHP' => strpos($account, 'PAYABLE') !== false ? $amount : 0,

@@ -29,6 +29,7 @@ class JournalEntryModuleTest extends TestCase
         $page->assertStatus(200)
             ->assertSee('Create Journal Entry')
             ->assertSee('Journal Entries')
+            ->assertSee('name="payee"', false)
             ->assertSee('Recently Posted Journal Entries');
 
         $accounts = DB::table('accounts')
@@ -43,6 +44,7 @@ class JournalEntryModuleTest extends TestCase
             'journal_no' => 'JV-MODULE-TEST',
             'journal_date' => '2026-08-30',
             'reference_no' => 'REF-MODULE-TEST',
+            'payee' => 'Sample Journal Payee',
             'shipment_job_id' => 'JOB-MODULE-TEST',
             'memo' => 'Journal module feature test',
             'line_account' => [$accounts[0], $accounts[1]],
@@ -57,8 +59,14 @@ class JournalEntryModuleTest extends TestCase
         $this->get(route('erp.accounting.journals.show', $journalId))
             ->assertStatus(200)
             ->assertSee('JV-MODULE-TEST')
+            ->assertSee('Sample Journal Payee')
             ->assertSee('Journal module feature test')
             ->assertSee('1,250.00');
+
+        $this->assertDatabaseHas('journal_entries', [
+            'id' => $journalId,
+            'payee' => 'Sample Journal Payee',
+        ]);
 
         $this->assertDatabaseHas('journal_entry_lines', [
             'journal_entry_id' => $journalId,
@@ -68,5 +76,16 @@ class JournalEntryModuleTest extends TestCase
             'journal_entry_id' => $journalId,
             'credit' => 1250,
         ]);
+
+        $report = $this->get(route('erp.reports.workbook', [
+            'report' => 'general-journal',
+            'period' => '2026-08',
+        ]));
+        $report->assertStatus(200);
+        $rows = collect($report->original->getData()['rows']);
+        $this->assertTrue($rows->contains(function ($row) {
+            return ($row['JV NO'] ?? '') === 'JV-MODULE-TEST'
+                && ($row['PAYEE'] ?? '') === 'Sample Journal Payee';
+        }));
     }
 }
