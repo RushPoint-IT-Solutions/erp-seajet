@@ -54,6 +54,10 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertSee('Check No.')
             ->assertSee('CONTROL-1001')
             ->assertSee('Ready for approval.')
+            ->assertSee('id="voidPaymentModal"', false)
+            ->assertSee('class="btn btn-sm btn-outline-danger void-payment-button"', false)
+            ->assertSee('Reason for voiding')
+            ->assertDontSee('window.prompt', false)
             ->assertSee(route('erp.payables.payments.approve', $payment->id));
         $supplierName = DB::table('suppliers')->where('id', $bill->supplier_id)->value('name');
         $this->get(route('erp.payables.check-voucher', $payment->id))

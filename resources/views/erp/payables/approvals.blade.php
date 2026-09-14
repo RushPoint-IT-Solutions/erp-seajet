@@ -85,7 +85,10 @@
                                 @endif
                                 <a href="{{ route('erp.payables.check-voucher', $row['id']) }}" class="btn btn-sm btn-outline-secondary">Voucher</a>
                                 @if($row['can_void'])
-                                    <form method="post" action="{{ route('erp.payables.payments.void', $row['id']) }}" class="void-payment-form">@csrf<input type="hidden" name="reason"><button class="btn btn-sm btn-outline-danger">Void</button></form>
+                                    <button type="button" class="btn btn-sm btn-outline-danger void-payment-button"
+                                            data-action="{{ route('erp.payables.payments.void', $row['id']) }}"
+                                            data-payment="{{ $row['payment_no'] }}"
+                                            data-supplier="{{ $row['supplier'] }}">Void</button>
                                 @endif
                             </div>
                         </td>
@@ -93,6 +96,31 @@
                 @endforeach
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <div class="modal fade" id="voidPaymentModal" tabindex="-1" aria-labelledby="voidPaymentModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" id="voidPaymentForm" novalidate>
+                    @csrf
+                    <div class="modal-header">
+                        <h2 class="modal-title fs-5" id="voidPaymentModalLabel"><i class="bi bi-exclamation-triangle text-danger me-2"></i>Void Check Preparation</h2>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-3">You are voiding <strong id="voidPaymentNumber"></strong><span id="voidPaymentSupplier"></span>. This action requires a reason and will remain in the audit trail.</p>
+                        <label for="voidPaymentReason" class="form-label fw-semibold">Reason for voiding</label>
+                        <textarea name="reason" id="voidPaymentReason" class="form-control" rows="4" minlength="5" maxlength="1000" required placeholder="Enter at least 5 characters"></textarea>
+                        <div class="invalid-feedback">Enter a reason containing at least 5 characters.</div>
+                        <div class="form-text"><span id="voidReasonCount">0</span>/1000 characters</div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger"><i class="bi bi-slash-circle me-1"></i>Void Check Preparation</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 @endsection
@@ -115,15 +143,46 @@
         $(this).addClass('active');
         checkPreparationTable.draw();
     });
-    document.querySelectorAll('.void-payment-form').forEach(function (form) {
-        form.addEventListener('submit', function (event) {
-            var reason = window.prompt('Enter the payment void reason:') || '';
-            if (reason.trim().length < 5) {
-                event.preventDefault();
-                return;
-            }
-            form.querySelector('[name="reason"]').value = reason;
-        });
+    var voidPaymentModalElement = document.getElementById('voidPaymentModal');
+    var voidPaymentModal = new bootstrap.Modal(voidPaymentModalElement);
+    var voidPaymentForm = document.getElementById('voidPaymentForm');
+    var voidPaymentReason = document.getElementById('voidPaymentReason');
+
+    document.addEventListener('click', function (event) {
+        var button = event.target.closest('.void-payment-button');
+        if (!button) {
+            return;
+        }
+
+        voidPaymentForm.action = button.dataset.action;
+        document.getElementById('voidPaymentNumber').textContent = button.dataset.payment || 'this payment';
+        document.getElementById('voidPaymentSupplier').textContent = button.dataset.supplier ? ' for ' + button.dataset.supplier : '';
+        voidPaymentReason.value = '';
+        voidPaymentReason.classList.remove('is-invalid');
+        document.getElementById('voidReasonCount').textContent = '0';
+        voidPaymentModal.show();
+    });
+
+    voidPaymentModalElement.addEventListener('shown.bs.modal', function () {
+        voidPaymentReason.focus();
+    });
+
+    voidPaymentReason.addEventListener('input', function () {
+        document.getElementById('voidReasonCount').textContent = String(this.value.length);
+        if (this.value.trim().length >= 5) {
+            this.classList.remove('is-invalid');
+        }
+    });
+
+    voidPaymentForm.addEventListener('submit', function (event) {
+        var reason = voidPaymentReason.value.trim();
+        if (reason.length < 5) {
+            event.preventDefault();
+            voidPaymentReason.classList.add('is-invalid');
+            voidPaymentReason.focus();
+            return;
+        }
+        voidPaymentReason.value = reason;
     });
 </script>
 @endpush
