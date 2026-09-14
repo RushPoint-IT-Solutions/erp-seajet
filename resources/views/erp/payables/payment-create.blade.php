@@ -12,9 +12,23 @@
         <a href="{{ route('erp.payables.approvals') }}" class="btn btn-outline-secondary"><i class="bi bi-check2-square me-1"></i> Approvals</a>
     </div>
 
+    @if(session('status'))
+        <div class="alert alert-info"><i class="bi bi-info-circle-fill me-1"></i>{{ session('status') }}</div>
+    @endif
+    @if($errors->any())
+        <div class="alert alert-danger" role="alert" id="paymentCreationErrors">
+            <div class="fw-semibold"><i class="bi bi-exclamation-triangle-fill me-1"></i>Check Preparation was not created. Please correct the following:</div>
+            <ul class="mb-0 mt-2">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
     @php($selectedBill = $selectedBill ?? null)
     @php($selectedPaymentMethod = $selectedPaymentMethod ?? 'Bank')
-    <form class="erp-card p-4" method="post" action="{{ route('erp.payables.payments.review') }}" enctype="multipart/form-data">
+    <form class="erp-card p-4" method="post" action="{{ route('erp.payables.payments.review') }}" enctype="multipart/form-data" novalidate>
         {{ csrf_field() }}
         <div class="row g-3">
             <div class="col-md-3">
@@ -23,7 +37,7 @@
             </div>
             <div class="col-md-3">
                 <label class="form-label">Payment Date</label>
-                <input name="payment_date" type="date" class="form-control" value="{{ date('Y-m-d') }}" required>
+                <input name="payment_date" type="date" class="form-control" value="{{ old('payment_date', date('Y-m-d')) }}" required>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Bill No</label>
@@ -36,7 +50,7 @@
                                 data-job="{{ $bill['shipment_job_id'] }}"
                                 data-currency="{{ $bill['currency'] }}"
                                 data-amount="{{ number_format($bill['balance'], 2, '.', '') }}"
-                                {{ $selectedBill && $selectedBill['bill_no'] === $bill['bill_no'] ? 'selected' : '' }}>
+                                {{ old('bill_no', $selectedBill['bill_no'] ?? '') === $bill['bill_no'] ? 'selected' : '' }}>
                             {{ $bill['bill_no'] }} - {{ $bill['supplier_name'] }} - {{ $bill['balance_display'] }}
                         </option>
                     @endforeach
@@ -44,13 +58,13 @@
             </div>
             <div class="col-md-3">
                 <label class="form-label">Shipment Job ID</label>
-                <input name="shipment_job_id" id="shipmentJobId" class="form-control" value="{{ $selectedBill['shipment_job_id'] ?? '' }}">
+                <input name="shipment_job_id" id="shipmentJobId" class="form-control" value="{{ old('shipment_job_id', $selectedBill['shipment_job_id'] ?? '') }}">
             </div>
             <div class="col-md-3">
                 <label class="form-label">Supplier ID</label>
                 <select name="supplier_id" id="supplierId" class="form-select erp-select">
                     @foreach($suppliers as $supplier)
-                        <option value="{{ $supplier['supplier_id'] }}" {{ $selectedBill && $selectedBill['supplier_id'] === $supplier['supplier_id'] ? 'selected' : '' }}>{{ $supplier['supplier_id'] }}</option>
+                        <option value="{{ $supplier['supplier_id'] }}" {{ old('supplier_id', $selectedBill['supplier_id'] ?? '') === $supplier['supplier_id'] ? 'selected' : '' }}>{{ $supplier['supplier_id'] }}</option>
                     @endforeach
                 </select>
             </div>
@@ -58,7 +72,7 @@
                 <label class="form-label">Supplier Name</label>
                 <select name="supplier_name" id="supplierName" class="form-select erp-select">
                     @foreach($suppliers as $supplier)
-                        <option {{ $selectedBill && $selectedBill['supplier_name'] === $supplier['name'] ? 'selected' : '' }}>{{ $supplier['name'] }}</option>
+                        <option {{ old('supplier_name', $selectedBill['supplier_name'] ?? '') === $supplier['name'] ? 'selected' : '' }}>{{ $supplier['name'] }}</option>
                     @endforeach
                 </select>
             </div>
@@ -71,7 +85,7 @@
                 <label class="form-label">Payment Method</label>
                 <select name="payment_method" id="paymentMethod" class="form-select erp-select">
                     @foreach(['Bank', 'Cheque', 'Online Transfer'] as $method)
-                        <option value="{{ $method }}" {{ $selectedPaymentMethod === $method ? 'selected' : '' }}>{{ $method }}</option>
+                        <option value="{{ $method }}" {{ old('payment_method', $selectedPaymentMethod) === $method ? 'selected' : '' }}>{{ $method }}</option>
                     @endforeach
                 </select>
             </div>
@@ -80,22 +94,22 @@
                 <select name="bank_account" id="bankAccount" class="form-select erp-select" required>
                     <option value="">Select account...</option>
                     @foreach($bankAccounts as $bank)
-                        <option value="{{ $bank['account_no'] }}" data-next-check-no="{{ $bank['next_check_no'] ?? '000001' }}">{{ $bank['bank'] }} - {{ $bank['name'] }} ({{ $bank['currency'] }})</option>
+                        <option value="{{ $bank['account_no'] }}" data-next-check-no="{{ $bank['next_check_no'] ?? '000001' }}" {{ old('bank_account') === $bank['account_no'] ? 'selected' : '' }}>{{ $bank['bank'] }} - {{ $bank['name'] }} ({{ $bank['currency'] }})</option>
                     @endforeach
                 </select>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Check No</label>
-                <input name="check_no" id="checkNumber" class="form-control" value="" {{ $selectedPaymentMethod === 'Cheque' ? 'required' : '' }}>
+                <input name="check_no" id="checkNumber" class="form-control" value="{{ old('check_no') }}" {{ old('payment_method', $selectedPaymentMethod) === 'Cheque' ? 'required' : '' }}>
                 <div class="form-text">The next number is assigned automatically from this bank account's last check number.</div>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Currency</label>
-                <select name="currency" id="currencySelect" class="form-select erp-select"><option>PHP</option><option>USD</option></select>
+                <select name="currency" id="currencySelect" class="form-select erp-select"><option {{ old('currency', $selectedBill['currency'] ?? 'PHP') === 'PHP' ? 'selected' : '' }}>PHP</option><option {{ old('currency', $selectedBill['currency'] ?? 'PHP') === 'USD' ? 'selected' : '' }}>USD</option></select>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Amount</label>
-                <input name="amount" id="amountInput" class="form-control" value="{{ $selectedBill ? str_replace(',', '', $selectedBill['net_amount']) : '' }}" required>
+                <input name="amount" id="amountInput" class="form-control" value="{{ old('amount', $selectedBill ? str_replace(',', '', $selectedBill['net_amount']) : '') }}" required>
             </div>
             <div class="col-md-3" id="exchangeRateGroup">
                 <label class="form-label">USD to PHP Rate</label>
@@ -123,6 +137,8 @@
 @push('scripts')
 <script>
     $(function () {
+        var hasOldInput = @json(session()->hasOldInput());
+
         function syncBill() {
             var option = $('#billSelect option:selected');
             if (!option.val()) {
@@ -146,19 +162,26 @@
             }
         }
 
-        function syncCheckRequirements() {
+        function syncCheckRequirements(assignNextNumber) {
             var isCheque = $('#paymentMethod').val() === 'Cheque';
             var nextCheckNo = $('#bankAccount option:selected').data('next-check-no') || '';
-            $('#checkNumber').prop('required', isCheque).val(isCheque ? nextCheckNo : '');
+            var checkNumber = $('#checkNumber').prop('required', isCheque);
+            if (!isCheque) {
+                checkNumber.val('');
+            } else if (assignNextNumber || !checkNumber.val()) {
+                checkNumber.val(nextCheckNo);
+            }
         }
 
         $('#billSelect').on('change', syncBill);
         $('#currencySelect').on('change', syncCurrency);
-        $('#paymentMethod').on('change', syncCheckRequirements);
-        $('#bankAccount').on('change', syncCheckRequirements);
-        syncBill();
+        $('#paymentMethod').on('change', function () { syncCheckRequirements(true); });
+        $('#bankAccount').on('change', function () { syncCheckRequirements(true); });
+        if (!hasOldInput) {
+            syncBill();
+        }
         syncCurrency();
-        syncCheckRequirements();
+        syncCheckRequirements(false);
     });
 </script>
 @endpush

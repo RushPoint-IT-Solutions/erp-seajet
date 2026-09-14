@@ -239,6 +239,31 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertSee('id="checkNumber" class="form-control" value="" required', false);
     }
 
+    public function test_check_preparation_creation_displays_validation_errors_after_save()
+    {
+        $createUrl = route('erp.payables.payments.create').'?bill=';
+
+        $response = $this->from($createUrl)->post(route('erp.payables.payments.review'), [
+            'payment_no' => 'PV-INVALID-CHECK-PREP',
+            'payment_date' => date('Y-m-d'),
+            'payment_method' => 'Cheque',
+            'currency' => 'PHP',
+            'amount' => '0',
+        ]);
+
+        $response->assertRedirect($createUrl)
+            ->assertSessionHasErrors(['bill_no', 'supplier_id', 'payee_name', 'bank_account', 'amount']);
+
+        $this->get($createUrl)
+            ->assertOk()
+            ->assertSee('Check Preparation was not created.')
+            ->assertSee('The bill no field is required.')
+            ->assertSee('The bank account field is required.')
+            ->assertSee('value="Cheque" selected', false)
+            ->assertSee('id="amountInput" class="form-control" value="0"', false)
+            ->assertSee('novalidate', false);
+    }
+
     public function test_check_preparation_assigns_the_next_bank_check_number_automatically()
     {
         list($bill, $bank) = $this->billAndBank();
