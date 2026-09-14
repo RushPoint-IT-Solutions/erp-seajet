@@ -3392,7 +3392,52 @@ class ModuleController extends Controller
             ->map(function ($payment) use ($canApprove, $canControlChecks) {
                 $issuance = $this->activeCheckIssuance($payment->id);
                 $status = $payment->approval_status ?: ucwords(str_replace('_', ' ', $payment->status));
+                $statusKey = strtolower((string) $status);
                 $isCheque = strcasecmp((string) $payment->payment_method, 'Cheque') === 0;
+                $voucherPrinted = $this->hasRecordedCheckVoucherPrint($payment->id);
+                $isPreparer = $payment->created_by && (int) $payment->created_by === (int) auth()->id();
+                $isPostDated = $payment->payment_date > date('Y-m-d');
+                $workflowTone = 'text-bg-light';
+
+                if (in_array($statusKey, ['for approval', 'pending'], true)) {
+                    if (!$canApprove) {
+                        $workflowMessage = 'Blocked: your role cannot approve payments.';
+                        $workflowTone = 'text-bg-danger';
+                    } elseif ($isPostDated) {
+                        $workflowMessage = 'Blocked until '.date('M d, Y', strtotime($payment->payment_date)).': the payment is post-dated.';
+                        $workflowTone = 'text-bg-danger';
+                    } else {
+                        $workflowMessage = 'Ready for approval.';
+                        $workflowTone = 'text-bg-info';
+                    }
+                } elseif ($statusKey === 'approved') {
+                    if (!$canControlChecks) {
+                        $workflowMessage = 'Blocked: your role cannot print or release payments.';
+                        $workflowTone = 'text-bg-danger';
+                    } elseif ($isCheque && (!$issuance || (int) $issuance->print_count < 1)) {
+                        if (!$voucherPrinted) {
+                            $workflowMessage = 'Next step: print the Check Voucher.';
+                        } else {
+                            $workflowMessage = 'Next step: print and record the Check.';
+                        }
+                        $workflowTone = 'text-bg-warning';
+                    } elseif ($isPreparer) {
+                        $workflowMessage = 'Blocked: the payment preparer cannot release it. Another authorized user must release it.';
+                        $workflowTone = 'text-bg-danger';
+                    } else {
+                        $workflowMessage = 'Ready for release.';
+                        $workflowTone = 'text-bg-info';
+                    }
+                } elseif ($statusKey === 'released') {
+                    $workflowMessage = 'Completed: released and posted.';
+                    $workflowTone = 'text-bg-success';
+                } elseif (in_array($statusKey, ['voided', 'cancelled'], true)) {
+                    $workflowMessage = 'Closed: this payment cannot proceed.';
+                    $workflowTone = 'text-bg-secondary';
+                } else {
+                    $workflowMessage = 'Blocked: unsupported payment status "'.$status.'".';
+                    $workflowTone = 'text-bg-danger';
+                }
 
                 return [
                     'id' => $payment->id,
@@ -3410,17 +3455,20 @@ class ModuleController extends Controller
                     'payment_method' => $payment->payment_method,
                     'check_status' => $issuance ? $issuance->status : null,
                     'print_count' => $issuance ? (int) $issuance->print_count : 0,
-                    'voucher_printed' => $this->hasRecordedCheckVoucherPrint($payment->id),
+                    'voucher_printed' => $voucherPrinted,
+                    'workflow_message' => $workflowMessage,
+                    'workflow_tone' => $workflowTone,
                     'can_approve' => $canApprove
-                        && in_array(strtolower((string) $status), ['for approval', 'pending'], true),
+                        && !$isPostDated
+                        && in_array($statusKey, ['for approval', 'pending'], true),
                     'can_release' => $canControlChecks
-                        && strtolower((string) $status) === 'approved'
-                        && (!$payment->created_by || (int) $payment->created_by !== (int) auth()->id())
+                        && $statusKey === 'approved'
+                        && !$isPreparer
                         && (!$isCheque || ($issuance && (int) $issuance->print_count > 0)),
                     'can_print' => $canControlChecks && $isCheque
-                        && in_array(strtolower((string) $status), ['approved', 'released'], true),
+                        && in_array($statusKey, ['approved', 'released'], true),
                     'can_void' => $canControlChecks
-                        && !in_array(strtolower((string) $status), ['voided', 'cancelled'], true),
+                        && !in_array($statusKey, ['voided', 'cancelled'], true),
                 ];
             })
             ->all();

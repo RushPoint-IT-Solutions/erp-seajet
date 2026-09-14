@@ -19,7 +19,14 @@
         <div class="alert alert-success">{{ session('status') }}</div>
     @endif
     @if($errors->any())
-        <div class="alert alert-danger"><strong>Action blocked.</strong> {{ $errors->first() }}</div>
+        <div class="alert alert-danger" role="alert">
+            <strong>Action blocked. Check Preparation could not proceed for the following reason:</strong>
+            <ul class="mb-0 mt-1">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
     @endif
 
     <div class="alert alert-light border small">
@@ -44,7 +51,7 @@
     <div class="erp-card p-3">
         <div class="table-responsive">
             <table class="table table-hover align-middle module-table w-100">
-                <thead><tr><th>Payment</th><th>Check Voucher</th><th>Supplier</th><th>Method</th><th>Check No.</th><th>Currency</th><th class="text-end">Amount</th><th>Status</th><th>Check Control</th><th class="text-end">Actions</th></tr></thead>
+                <thead><tr><th>Payment</th><th>Check Voucher</th><th>Supplier</th><th>Method</th><th>Check No.</th><th>Currency</th><th class="text-end">Amount</th><th>Status</th><th>Check Control</th><th>Reason / Next Step</th><th class="text-end">Actions</th></tr></thead>
                 <tbody>
                 @foreach($approvals as $row)
                     <tr data-status-group="{{ $row['status_group'] }}">
@@ -64,6 +71,7 @@
                                 <span class="text-muted">Not applicable</span>
                             @endif
                         </td>
+                        <td style="min-width:240px"><span class="badge text-wrap text-start {{ $row['workflow_tone'] }}">{{ $row['workflow_message'] }}</span></td>
                         <td class="text-end" style="min-width:260px">
                             <div class="d-flex flex-wrap justify-content-end gap-1">
                                 @if($row['can_approve'])

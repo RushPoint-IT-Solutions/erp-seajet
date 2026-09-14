@@ -53,6 +53,7 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertOk()
             ->assertSee('Check No.')
             ->assertSee('CONTROL-1001')
+            ->assertSee('Ready for approval.')
             ->assertSee(route('erp.payables.payments.approve', $payment->id));
         $supplierName = DB::table('suppliers')->where('id', $bill->supplier_id)->value('name');
         $this->get(route('erp.payables.check-voucher', $payment->id))
@@ -100,6 +101,10 @@ class ControlledCheckLifecycleTest extends TestCase
             'approval_status' => 'Approved',
             'posting_status' => 'unposted',
         ]);
+        $this->get(route('erp.payables.approvals'))
+            ->assertOk()
+            ->assertSee('Reason / Next Step')
+            ->assertSee('Next step: print the Check Voucher.');
 
         $this->actingAsFinance($bill->company_id);
         $this->get(route('erp.payables.check-print', $payment->id))
