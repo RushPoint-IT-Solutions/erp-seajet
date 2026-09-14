@@ -1083,8 +1083,7 @@ class ModuleController extends Controller
                 'account_categories.name as category'
             )
             ->where('accounts.is_active', true)
-            ->where('accounts.company_id', $this->defaultCompanyId())
-            ->whereIn('accounts.type', $this->apItemAccountTypes());
+            ->where('accounts.company_id', $this->defaultCompanyId());
 
         if (Schema::hasColumn('accounts', 'show_in_ap')) {
             $query->where('accounts.show_in_ap', true);
@@ -1106,11 +1105,6 @@ class ModuleController extends Controller
                     'withholding_rate' => $this->withholdingRatePercent($account->withholding_rate),
                 ];
             });
-    }
-
-    private function apItemAccountTypes()
-    {
-        return ['Expense', 'Other Expense', 'Other Current Asset', 'Fixed Asset', 'Other Asset'];
     }
 
     private function glAccountOptions()
@@ -5319,7 +5313,7 @@ class ModuleController extends Controller
                 ->withErrors(['code' => 'This account code already exists.']);
         }
 
-        $showInAp = isset($data['show_in_ap']) && in_array($data['type'], $this->apItemAccountTypes(), true);
+        $showInAp = isset($data['show_in_ap']);
 
         DB::table('accounts')->insert([
             'company_id' => $companyId,
@@ -5383,7 +5377,7 @@ class ModuleController extends Controller
                 ->withErrors(['parent_id' => 'An account cannot be its own parent.']);
         }
 
-        $showInAp = isset($data['show_in_ap']) && in_array($data['type'], $this->apItemAccountTypes(), true);
+        $showInAp = isset($data['show_in_ap']);
 
         DB::table('accounts')->where('id', $record->id)->update([
             'account_category_id' => $data['account_category_id'],
