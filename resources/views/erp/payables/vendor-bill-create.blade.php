@@ -121,6 +121,8 @@
         @php($bill = $bill ?? [])
         @php($lines = collect($lines ?? []))
         @php($attachments = collect($attachments ?? []))
+        @php($apAccounts = collect($apAccounts ?? []))
+        @php($selectedApAccount = old('ap_account', $bill['ap_account'] ?? ''))
         @php($vat12Selected = collect(old('expense_tax', $lines->pluck('tax_category')->all()))->contains('VAT12'))
         @php($errors = $errors ?? new \Illuminate\Support\ViewErrorBag)
         @if(session('status'))
@@ -169,10 +171,17 @@
                 </div>
                 <div class="d-flex align-items-center gap-2 flex-grow-1" style="max-width: 460px">
                     <label class="fw-semibold small text-muted text-nowrap">A/P Account</label>
-                    <select name="ap_account" class="form-select form-select-sm bill-field">
-                        <option value=""></option>
-                        @foreach(['AP-Trade (BDO - USD)', 'Accounts Payable Trade - PHP', 'Operating Expense Payable'] as $account)
-                            <option value="{{ $account }}" {{ ($bill['ap_account'] ?? '') === $account ? 'selected' : '' }}>{{ $account }}</option>
+                    <select name="ap_account" id="apAccountSelect" class="form-select form-select-sm bill-field" required>
+                        <option value="">Select BDO or Metrobank A/P account...</option>
+                        @if($selectedApAccount && !$apAccounts->contains('name', $selectedApAccount))
+                            <option value="{{ $selectedApAccount }}" selected>{{ $selectedApAccount }}</option>
+                        @endif
+                        @foreach($apAccounts as $account)
+                            <option value="{{ $account->name }}"
+                                    data-currency="{{ $account->currency }}"
+                                    data-bank="{{ $account->bank }}"
+                                    data-series="{{ $account->series }}"
+                                    {{ $selectedApAccount === $account->name ? 'selected' : '' }}>{{ $account->name }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -228,7 +237,7 @@
                                 </div>
                                 <div class="col-7">
                                     <label class="form-label small text-muted">Bill No <span class="fw-normal">(Automatic)</span></label>
-                                    <input name="bill_no" class="form-control bill-field bg-light" value="{{ $bill['bill_no'] ?? $nextBillNo }}" readonly>
+                                    <input name="bill_no" id="billNo" class="form-control bill-field bg-light" value="{{ $bill['bill_no'] ?? $nextBillNo }}" readonly>
                                 </div>
                             </div>
                         </div>
@@ -457,6 +466,9 @@
 @push('scripts')
 <script>
     $(function () {
+        var nextBillNumbers = @json($nextBillNumbers ?? ['default' => $nextBillNo]);
+        var editingBill = {{ !empty($bill['id']) ? 'true' : 'false' }};
+
         function numberValue(value) {
             var parsed = parseFloat(String(value || '').replace(/,/g, ''));
             return isNaN(parsed) ? 0 : parsed;
@@ -468,6 +480,27 @@
 
         function currency() {
             return $('#currencySelect').val() || 'USD';
+        }
+
+        function syncApAccount() {
+            var selectedCurrency = currency();
+            var select = $('#apAccountSelect');
+            var selected = select.find('option:selected');
+
+            select.find('option[data-currency]').each(function () {
+                var optionCurrency = String($(this).data('currency') || '');
+                $(this).prop('disabled', optionCurrency !== '' && optionCurrency !== selectedCurrency);
+            });
+
+            if (selected.is(':disabled')) {
+                select.val('');
+                selected = select.find('option:selected');
+            }
+
+            if (!editingBill) {
+                var series = selected.data('series') || 'default';
+                $('#billNo').val(nextBillNumbers[series] || nextBillNumbers.default || '');
+            }
         }
 
         function initExpenseAccountSearch(scope) {
@@ -510,6 +543,7 @@
             $('#supplierAddress').val(option.data('address') || '');
             $('#termsSelect').val(option.data('terms') || '');
             $('#currencySelect').val(option.data('currency') || currency());
+            syncApAccount();
             var expenseAccount = option.data('expense-account') || '';
             if (expenseAccount) {
                 var firstAccount = $('#expenseLines tbody tr:first .expense-account');
@@ -604,6 +638,8 @@
             syncSupplier();
             recalc();
         });
+        $('#apAccountSelect').on('change', syncApAccount);
+        $('#currencySelect').on('change', syncApAccount);
         $('#currencySelect, #exchangeRate, #grossAmount, #whtRate').on('input change', recalc);
         $('#expenseLines').on('change', '.expense-account', function () {
             syncLineWithholding($(this).closest('tr'));
@@ -667,6 +703,7 @@
         reindexRows();
         initExpenseAccountSearch(document);
         initCustomerJobSearch(document);
+        syncApAccount();
         recalc();
     });
 </script>

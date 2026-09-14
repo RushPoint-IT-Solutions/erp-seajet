@@ -1107,6 +1107,36 @@ class ModuleController extends Controller
             });
     }
 
+    private function apAccountOptions()
+    {
+        if (!Schema::hasTable('accounts')) {
+            return collect();
+        }
+
+        return DB::table('accounts')
+            ->select('id', 'code', 'name')
+            ->where('company_id', $this->defaultCompanyId())
+            ->where('is_active', true)
+            ->where('type', 'Accounts Payable')
+            ->orderBy('name')
+            ->get()
+            ->map(function ($account) {
+                $name = trim((string) $account->name);
+                $currency = stripos($name, 'USD') !== false ? 'USD' : (stripos($name, 'PHP') !== false ? 'PHP' : '');
+                $bank = stripos($name, 'BDO') !== false ? 'bdo' : (stripos($name, 'Metro') !== false ? 'metrobank' : 'default');
+                $series = $bank;
+
+                return (object) [
+                    'id' => $account->id,
+                    'code' => $account->code,
+                    'name' => $name,
+                    'currency' => $currency,
+                    'bank' => $bank,
+                    'series' => $series,
+                ];
+            });
+    }
+
     private function glAccountOptions()
     {
         if (!Schema::hasTable('accounts')) {
@@ -1544,14 +1574,24 @@ class ModuleController extends Controller
             ? $this->apBillByNumber(request('bill'))
             : null;
 
+        $billNumberSeries = collect([
+            'default' => $this->vendorBillNumberSeries(null),
+            'bdo' => $this->vendorBillNumberSeries('BDO'),
+            'metrobank' => $this->vendorBillNumberSeries('Metrobank'),
+        ])->map(function ($series) {
+            return $this->nextDocumentNumber($series['document_type'], $series['prefix'], 5, false);
+        })->all();
+
         return view('erp.payables.vendor-bill-create', [
             'suppliers' => $this->vendorRows(),
             'customers' => $this->customerSelectOptions(),
             'expenseAccounts' => $this->expenseAccountOptions(),
+            'apAccounts' => $this->apAccountOptions(),
             'bill' => $bill,
             'lines' => $bill ? $this->apBillLines($bill['id']) : collect(),
             'attachments' => $bill ? $this->documentAttachments('purchase_document', $bill['id']) : collect(),
-            'nextBillNo' => $this->nextDocumentNumber('vendor_bill', 'BILL-', 5, false),
+            'nextBillNo' => $billNumberSeries['default'],
+            'nextBillNumbers' => $billNumberSeries,
         ]);
     }
 
@@ -2845,9 +2885,10 @@ class ModuleController extends Controller
             $companyId = $this->defaultCompanyId();
             $supplierId = $this->supplierIdForAp($companyId, $data);
             $originalDocumentNo = trim((string) ($data['original_bill_no'] ?? ''));
+            $numberSeries = $this->vendorBillNumberSeries($data['ap_account'] ?? null);
             $documentNo = $originalDocumentNo !== ''
                 ? $originalDocumentNo
-                : $this->nextDocumentNumber('vendor_bill', 'BILL-', 5);
+                : $this->nextDocumentNumber($numberSeries['document_type'], $numberSeries['prefix'], 5);
 
             $lineTotal = 0.0;
             foreach ((array) ($data['expense_amount'] ?? []) as $amount) {
@@ -4903,6 +4944,8 @@ class ModuleController extends Controller
         $targets = [
             'vendor' => ['suppliers', 'code'],
             'vendor_bill' => ['purchase_documents', 'document_no'],
+            'vendor_bill_b' => ['purchase_documents', 'document_no'],
+            'vendor_bill_m' => ['purchase_documents', 'document_no'],
             'payment_voucher' => ['payments', 'payment_no'],
             'check_voucher' => ['payments', 'voucher_no'],
             'journal_voucher' => ['journal_entries', 'journal_no'],
@@ -4921,6 +4964,19 @@ class ModuleController extends Controller
             ->where('company_id', $companyId)
             ->where($column, $number)
             ->exists();
+    }
+
+    private function vendorBillNumberSeries($apAccount)
+    {
+        $account = strtolower(trim((string) $apAccount));
+        if (strpos($account, 'bdo') !== false) {
+            return ['document_type' => 'vendor_bill_b', 'prefix' => 'BILL-B'];
+        }
+        if (strpos($account, 'metro') !== false) {
+            return ['document_type' => 'vendor_bill_m', 'prefix' => 'BILL-M'];
+        }
+
+        return ['document_type' => 'vendor_bill', 'prefix' => 'BILL-'];
     }
 
     private function syncDocumentNumberSeries($documentType, $number)

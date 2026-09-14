@@ -214,7 +214,7 @@ class PostingService
                 );
             }
             $lines[] = $this->line(
-                $this->controlAccount($document->company_id, 'accounts_payable'),
+                $this->purchasePayableAccount($document),
                 'Accounts payable - '.$document->document_no,
                 0,
                 $payable,
@@ -369,9 +369,13 @@ class PostingService
             $currency = strtoupper($payment->currency ?: 'PHP');
             $rate = $this->rate($currency, $payment->exchange_rate ?? 1);
             $amount = max(0, (float) $payment->amount);
+            $bill = DB::table('purchase_documents')
+                ->where('company_id', $payment->company_id)
+                ->where('document_no', $payment->bill_no)
+                ->first();
             $lines = [
                 $this->line(
-                    $this->controlAccount($payment->company_id, 'accounts_payable'),
+                    $bill ? $this->purchasePayableAccount($bill) : $this->controlAccount($payment->company_id, 'accounts_payable'),
                     'Settlement of '.$payment->bill_no,
                     $amount,
                     0,
@@ -618,10 +622,29 @@ class PostingService
 
     private function purchaseExpenseAccount($document)
     {
+        foreach (['vendor_bill_lines', 'purchase_document_lines'] as $table) {
+            if (Schema::hasTable($table) && Schema::hasColumn($table, 'account_id')) {
+                $accountId = DB::table($table)
+                    ->where('purchase_document_id', $document->id)
+                    ->whereNotNull('account_id')
+                    ->value('account_id');
+                if ($accountId) {
+                    return $accountId;
+                }
+            }
+        }
+
+        return $this->controlAccount($document->company_id, 'cost_of_services');
+    }
+
+    private function purchasePayableAccount($document)
+    {
         $label = trim((string) ($document->ap_account ?? ''));
         if ($label !== '') {
             $accountId = DB::table('accounts')
                 ->where('company_id', $document->company_id)
+                ->where('is_active', true)
+                ->where('type', 'Accounts Payable')
                 ->where(function ($query) use ($label) {
                     $query->where('name', $label)->orWhere('code', $label);
                 })
@@ -631,7 +654,7 @@ class PostingService
             }
         }
 
-        return $this->controlAccount($document->company_id, 'cost_of_services');
+        return $this->controlAccount($document->company_id, 'accounts_payable');
     }
 
     private function cashOrBankAccount($companyId, $method, $bankLabel)
