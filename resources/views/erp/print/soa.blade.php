@@ -19,13 +19,13 @@
         @endif
         border: 1px solid #2f3542;
         box-shadow: 0 10px 30px rgba(15, 23, 42, .14);
-        font-family: Calibri, Arial, Helvetica, sans-serif;
+        font-family: {!! $settings['font_stack'] ?? 'Calibri, Arial, Helvetica, sans-serif' !!};
         color: #000;
         overflow: hidden;
     }
     .form-sheet,
     .form-sheet * {
-        font-family: Calibri, Arial, Helvetica, sans-serif !important;
+        font-family: {!! $settings['font_stack'] ?? 'Calibri, Arial, Helvetica, sans-serif' !!} !important;
     }
     .template-line,
     .template-box,

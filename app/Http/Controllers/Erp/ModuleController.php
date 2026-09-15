@@ -6720,7 +6720,8 @@ class ModuleController extends Controller
             $height = max(400, min(2200, (int) request('paper_height', $height)));
         }
 
-        $savedFontFamily = $saved['field_styles']['_font_family'] ?? 'arial';
+        $defaultFontFamily = $type === 'soa_b' ? 'calibri' : 'arial';
+        $savedFontFamily = $saved['field_styles']['_font_family'] ?? $defaultFontFamily;
         $fontFamily = strtolower(trim((string) request('font_family', $savedFontFamily)));
         if (!isset($fontOptions[$fontFamily])) {
             $fontFamily = 'arial';
@@ -6808,9 +6809,7 @@ class ModuleController extends Controller
             ];
         }
 
-        if ($type === 'soa_a') {
-            $styles['_font_family'] = $this->soaPrintSettings($type)['font_family'];
-        }
+        $styles['_font_family'] = $this->soaPrintSettings($type)['font_family'];
 
         return $styles;
     }
