@@ -183,7 +183,8 @@
         $paymentNoteLeft = $p['payment_note'][0];
         $paymentNoteTop = $p['payment_note'][1];
         $paymentNoteWidth = $s['payment_note']['width'];
-        $paymentNoteAmountWidth = min($paymentNoteWidth, 390);
+        // Keep the payment-summary amounts close to their labels on SOA B.
+        $paymentNoteAmountWidth = min($paymentNoteWidth, 260);
         $paymentNoteFontSize = (int) $s['payment_note']['font_size'];
         $paymentNoteSmallFontSize = max(6, $paymentNoteFontSize - 4);
         $paymentNoteAmountFontSize = max(6, $paymentNoteFontSize - 2);
