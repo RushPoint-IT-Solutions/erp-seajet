@@ -335,6 +335,87 @@ class ControlledCheckLifecycleTest extends TestCase
         $this->assertNull(DB::table('bank_accounts')->where('id', '<>', $bank->id)->value('last_check_no'));
     }
 
+    public function test_for_approval_check_preparation_date_and_bill_number_can_be_edited()
+    {
+        list($firstBill, $bank) = $this->billAndBank();
+        $this->post(route('erp.payables.payments.review'), $this->paymentPayload($firstBill, $bank, [
+            'amount' => '5.00',
+        ]))->assertOk();
+
+        $payment = DB::table('payments')->where('payment_no', 'PV-CONTROL-1001')->first();
+        $secondBillId = DB::table('purchase_documents')->insertGetId(array_merge((array) $firstBill, [
+            'id' => null,
+            'document_no' => 'BILL-EDIT-TARGET',
+            'grand_total' => 100,
+            'paid_total' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]));
+
+        $this->get(route('erp.payables.approvals'))
+            ->assertOk()
+            ->assertSee('edit-preparation-button')
+            ->assertSee('Payment / Check Date')
+            ->assertSee('Bill #');
+
+        $this->post(route('erp.payables.payments.update-preparation', $payment->id), [
+            'payment_date' => '2026-09-14',
+            'bill_no' => 'BILL-EDIT-TARGET',
+        ])->assertRedirect(route('erp.payables.approvals'));
+
+        $this->assertDatabaseHas('payments', [
+            'id' => $payment->id,
+            'payment_date' => '2026-09-14',
+            'bill_no' => 'BILL-EDIT-TARGET',
+        ]);
+        $this->assertDatabaseHas('check_issuances', [
+            'payment_id' => $payment->id,
+            'check_date' => '2026-09-14',
+        ]);
+        $this->assertDatabaseHas('payment_applications', [
+            'payment_id' => $payment->id,
+            'purchase_document_id' => $secondBillId,
+        ]);
+    }
+
+    public function test_edit_vendor_bill_allows_bill_number_change_and_updates_linked_payment()
+    {
+        list($bill, $bank) = $this->billAndBank();
+        $this->post(route('erp.payables.payments.review'), $this->paymentPayload($bill, $bank, [
+            'amount' => '5.00',
+        ]))->assertOk();
+
+        $edit = $this->get(route('erp.payables.vendor-bills.create', ['bill' => $bill->document_no]));
+        $edit->assertOk()
+            ->assertSee('Bill No <span class="fw-normal">(Editable)</span>', false)
+            ->assertSee('name="bill_no"', false);
+        $this->assertNotContains('readonly', [$edit->getContent()]);
+
+        $payload = [
+            'transaction_type' => $bill->transaction_type ?: 'Bill',
+            'supplier_id' => DB::table('suppliers')->where('id', $bill->supplier_id)->value('code'),
+            'supplier_name' => DB::table('suppliers')->where('id', $bill->supplier_id)->value('name'),
+            'bill_no' => 'BILL-RENAMED',
+            'original_bill_no' => $bill->document_no,
+            'bill_date' => $bill->document_date,
+            'currency' => $bill->currency,
+            'gross_amount' => $bill->gross_amount,
+            'expense_account' => ['Office Supplies'],
+            'expense_tax' => ['EXEMPT'],
+            'expense_amount' => [$bill->grand_total],
+        ];
+        $this->post(route('erp.payables.vendor-bills.review'), $payload)->assertOk();
+
+        $this->assertDatabaseHas('purchase_documents', [
+            'id' => $bill->id,
+            'document_no' => 'BILL-RENAMED',
+        ]);
+        $this->assertDatabaseHas('payments', [
+            'payment_no' => 'PV-CONTROL-1001',
+            'bill_no' => 'BILL-RENAMED',
+        ]);
+    }
+
     public function test_entry_forms_offer_clear_actions_and_reset_data_is_only_in_finance_settings()
     {
         $this->get(route('erp.invoices.create'))->assertOk()->assertSee('Clear Form');

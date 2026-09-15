@@ -236,8 +236,8 @@
                                     </select>
                                 </div>
                                 <div class="col-7">
-                                    <label class="form-label small text-muted">Bill No <span class="fw-normal">(Automatic)</span></label>
-                                    <input name="bill_no" id="billNo" class="form-control bill-field bg-light" value="{{ $bill['bill_no'] ?? $nextBillNo }}" readonly>
+                                    <label class="form-label small text-muted">Bill No <span class="fw-normal">({{ empty($bill['id']) ? 'Automatic' : 'Editable' }})</span></label>
+                                    <input name="bill_no" id="billNo" class="form-control bill-field {{ empty($bill['id']) ? 'bg-light' : '' }}" value="{{ $bill['bill_no'] ?? $nextBillNo }}" {{ empty($bill['id']) ? 'readonly' : '' }} required>
                                 </div>
                             </div>
                         </div>

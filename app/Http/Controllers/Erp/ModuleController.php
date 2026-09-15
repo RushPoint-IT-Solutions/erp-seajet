@@ -2006,7 +2006,111 @@ class ModuleController extends Controller
     {
         $approvals = $this->apPaymentRows();
 
-        return view('erp.payables.approvals', compact('approvals'));
+        return view('erp.payables.approvals', [
+            'approvals' => $approvals,
+            'openBills' => $this->openApBills(),
+        ]);
+    }
+
+    public function updateApPaymentPreparation($payment)
+    {
+        $this->authorizeAccountingPosting('payables', 'view');
+        $data = request()->validate([
+            'payment_date' => 'required|date',
+            'bill_no' => 'required|string|max:100',
+        ]);
+        $companyId = $this->defaultCompanyId();
+
+        DB::transaction(function () use ($payment, $data, $companyId) {
+            $record = DB::table('payments')
+                ->where('company_id', $companyId)
+                ->where('id', $payment)
+                ->lockForUpdate()
+                ->first();
+            abort_unless($record, 404);
+
+            $status = strtolower((string) ($record->approval_status ?: $record->status));
+            if (!in_array($status, ['for approval', 'for_approval', 'pending'], true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'payment' => 'Only a Check Preparation that is still For Approval can be edited.',
+                ]);
+            }
+
+            $issuance = $this->activeCheckIssuance($record->id, true);
+            if ($issuance && (int) $issuance->print_count > 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'payment' => 'This check has already been printed. Void it and prepare a replacement instead.',
+                ]);
+            }
+
+            $bill = $this->apBillRecordByNumber($data['bill_no']);
+            if (!$bill) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'bill_no' => 'The selected supplier bill was not found for this company.',
+                ]);
+            }
+            if (strtoupper((string) ($bill->currency ?: 'PHP')) !== strtoupper((string) ($record->currency ?: 'PHP'))) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'bill_no' => 'The selected bill currency must match the payment currency ('.strtoupper($record->currency ?: 'PHP').').',
+                ]);
+            }
+
+            $openPaymentExists = DB::table('payments')
+                ->where('company_id', $companyId)
+                ->where('id', '<>', $record->id)
+                ->where('bill_no', $bill->document_no)
+                ->whereNotIn('status', ['released', 'cancelled', 'voided'])
+                ->exists();
+            if ($openPaymentExists) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'bill_no' => 'This bill already has another unreleased payment.',
+                ]);
+            }
+
+            $balanceCents = (int) round(max(0, (float) $bill->grand_total - (float) $bill->paid_total) * 100);
+            if ((int) round((float) $record->amount * 100) > $balanceCents) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'bill_no' => 'The payment exceeds the selected bill balance of '.number_format($balanceCents / 100, 2).'.',
+                ]);
+            }
+
+            $before = [
+                'payment_date' => $record->payment_date,
+                'bill_no' => $record->bill_no,
+            ];
+            DB::table('payments')->where('id', $record->id)->update([
+                'payment_date' => $data['payment_date'],
+                'bill_no' => $bill->document_no,
+                'supplier_id' => $bill->supplier_id,
+                'shipment_job_id' => $bill->shipment_job_id,
+                'updated_at' => now(),
+            ]);
+
+            if ($issuance) {
+                DB::table('check_issuances')->where('id', $issuance->id)->update([
+                    'check_date' => $data['payment_date'],
+                    'updated_at' => now(),
+                ]);
+            }
+
+            if (Schema::hasTable('payment_applications')) {
+                DB::table('payment_applications')->where('payment_id', $record->id)->delete();
+                DB::table('payment_applications')->insert($this->tablePayload('payment_applications', [
+                    'payment_id' => $record->id,
+                    'purchase_document_id' => $bill->id,
+                    'amount_applied' => $record->amount,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]));
+            }
+
+            app(ActivityLogger::class)->log('updated', 'payment', $record->id, $before, [
+                'payment_date' => $data['payment_date'],
+                'bill_no' => $bill->document_no,
+            ], $companyId);
+        });
+
+        return redirect()->route('erp.payables.approvals')->with('status', 'Check Preparation date and Bill # updated.');
     }
 
     public function approveApPayment($payment)
@@ -2886,8 +2990,9 @@ class ModuleController extends Controller
             $supplierId = $this->supplierIdForAp($companyId, $data);
             $originalDocumentNo = trim((string) ($data['original_bill_no'] ?? ''));
             $numberSeries = $this->vendorBillNumberSeries($data['ap_account'] ?? null);
+            $requestedDocumentNo = trim((string) ($data['bill_no'] ?? ''));
             $documentNo = $originalDocumentNo !== ''
-                ? $originalDocumentNo
+                ? ($requestedDocumentNo !== '' ? $requestedDocumentNo : $originalDocumentNo)
                 : $this->nextDocumentNumber($numberSeries['document_type'], $numberSeries['prefix'], 5);
 
             $lineTotal = 0.0;
@@ -2970,6 +3075,16 @@ class ModuleController extends Controller
             if ($existingBill) {
                 DB::table('purchase_documents')->where('id', $existingBill->id)->update($payload);
                 $billId = $existingBill->id;
+
+                if ($originalDocumentNo !== $documentNo && Schema::hasTable('payments')) {
+                    DB::table('payments')
+                        ->where('company_id', $companyId)
+                        ->where('bill_no', $originalDocumentNo)
+                        ->update([
+                            'bill_no' => $documentNo,
+                            'updated_at' => now(),
+                        ]);
+                }
             } else {
                 $payload['created_at'] = now();
                 $billId = DB::table('purchase_documents')->insertGetId($payload);
@@ -3485,6 +3600,8 @@ class ModuleController extends Controller
                 return [
                     'id' => $payment->id,
                     'payment_no' => $payment->payment_no,
+                    'payment_date' => $payment->payment_date,
+                    'bill_no' => $payment->bill_no,
                     'check_voucher' => $payment->voucher_no ?: '-',
                     'supplier' => $payment->payee_snapshot ?: ($payment->supplier_name ?: '-'),
                     'shipment_job_id' => $payment->shipment_job_id ?: '-',
@@ -3501,6 +3618,8 @@ class ModuleController extends Controller
                     'voucher_printed' => $voucherPrinted,
                     'workflow_message' => $workflowMessage,
                     'workflow_tone' => $workflowTone,
+                    'can_edit' => in_array($statusKey, ['for approval', 'pending'], true)
+                        && (!$issuance || (int) $issuance->print_count === 0),
                     'can_approve' => $canApprove
                         && !$isPostDated
                         && in_array($statusKey, ['for approval', 'pending'], true),

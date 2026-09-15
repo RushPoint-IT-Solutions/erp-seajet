@@ -65,6 +65,7 @@ Route::middleware(['auth', 'permission.access'])->group(function () {
     Route::get('/erp/payables/payments/create', 'Erp\ModuleController@apPaymentCreate')->name('erp.payables.payments.create');
     Route::post('/erp/payables/payments/review', 'Erp\ModuleController@apPaymentReview')->name('erp.payables.payments.review');
     Route::get('/erp/payables/payment-approvals', 'Erp\ModuleController@paymentApprovals')->name('erp.payables.approvals');
+    Route::post('/erp/payables/payments/{payment}/update-preparation', 'Erp\ModuleController@updateApPaymentPreparation')->name('erp.payables.payments.update-preparation');
     Route::post('/erp/payables/payments/{payment}/approve', 'Erp\ModuleController@approveApPayment')->name('erp.payables.payments.approve');
     Route::post('/erp/payables/payments/{payment}/release', 'Erp\ModuleController@releaseApPayment')->name('erp.payables.payments.release');
     Route::post('/erp/payables/payments/{payment}/void', 'Erp\ModuleController@voidApPayment')->name('erp.payables.payments.void');

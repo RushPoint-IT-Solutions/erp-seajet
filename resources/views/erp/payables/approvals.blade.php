@@ -77,6 +77,13 @@
                                 @if($row['can_approve'])
                                     <form method="post" action="{{ route('erp.payables.payments.approve', $row['id']) }}">@csrf<button class="btn btn-sm btn-outline-primary">Approve</button></form>
                                 @endif
+                                @if($row['can_edit'])
+                                    <button type="button" class="btn btn-sm btn-outline-secondary edit-preparation-button"
+                                            data-action="{{ route('erp.payables.payments.update-preparation', $row['id']) }}"
+                                            data-payment="{{ $row['payment_no'] }}"
+                                            data-date="{{ $row['payment_date'] }}"
+                                            data-bill="{{ $row['bill_no'] }}">Edit</button>
+                                @endif
                                 @if($row['can_print'])
                                     <a href="{{ $row['print_count'] || $row['voucher_printed'] ? route('erp.payables.check-print', $row['id']) : route('erp.payables.check-voucher', $row['id']) }}" class="btn btn-sm btn-primary">{{ $row['print_count'] ? 'Reprint Check' : ($row['voucher_printed'] ? 'Print Check' : 'Print Check Voucher') }}</a>
                                 @endif
@@ -96,6 +103,39 @@
                 @endforeach
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <div class="modal fade" id="editPreparationModal" tabindex="-1" aria-labelledby="editPreparationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" id="editPreparationForm">
+                    @csrf
+                    <div class="modal-header">
+                        <h2 class="modal-title fs-5" id="editPreparationModalLabel"><i class="bi bi-pencil-square me-2"></i>Edit Check Preparation</h2>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted small">Update <strong id="editPreparationNumber"></strong>. The new values will also appear on its voucher and unprinted check.</p>
+                        <div class="mb-3">
+                            <label for="editPaymentDate" class="form-label fw-semibold">Payment / Check Date</label>
+                            <input type="date" name="payment_date" id="editPaymentDate" class="form-control" required>
+                        </div>
+                        <div>
+                            <label for="editBillNumber" class="form-label fw-semibold">Bill #</label>
+                            <select name="bill_no" id="editBillNumber" class="form-select erp-select" required>
+                                @foreach($openBills as $bill)
+                                    <option value="{{ $bill['bill_no'] }}">{{ $bill['bill_no'] }} - {{ $bill['supplier_name'] }} - {{ $bill['balance_display'] }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -147,6 +187,21 @@
     var voidPaymentModal = new bootstrap.Modal(voidPaymentModalElement);
     var voidPaymentForm = document.getElementById('voidPaymentForm');
     var voidPaymentReason = document.getElementById('voidPaymentReason');
+    var editPreparationModal = new bootstrap.Modal(document.getElementById('editPreparationModal'));
+    var editPreparationForm = document.getElementById('editPreparationForm');
+
+    document.addEventListener('click', function (event) {
+        var button = event.target.closest('.edit-preparation-button');
+        if (!button) {
+            return;
+        }
+
+        editPreparationForm.action = button.dataset.action;
+        document.getElementById('editPreparationNumber').textContent = button.dataset.payment || 'this payment';
+        document.getElementById('editPaymentDate').value = button.dataset.date || '';
+        $('#editBillNumber').val(button.dataset.bill).trigger('change');
+        editPreparationModal.show();
+    });
 
     document.addEventListener('click', function (event) {
         var button = event.target.closest('.void-payment-button');
