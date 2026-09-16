@@ -311,10 +311,15 @@
         @php
             $printedLinesBottom = !empty($billingLines) ? $p['line_description'][1] + $lineOffset : $p['line_description'][1] + 28;
             $additionalItemsOffset = !empty($billingLines) ? max(0, $lineOffset - $firstRowAdvance) : 0;
+            $hasSoaNumber = trim((string) ($print['soa_no'] ?? '')) !== '';
             $soaTop = max($p['soa_no'][1] + $additionalItemsOffset, $printedLinesBottom + 8);
-            $remarksTop = max($p['remarks'][1] + $additionalItemsOffset, $soaTop + 30);
+            $remarksTop = $hasSoaNumber
+                ? max($p['remarks'][1] + $additionalItemsOffset, $soaTop + 30)
+                : max($p['remarks'][1] + $additionalItemsOffset, $printedLinesBottom + 8);
         @endphp
-        <div class="bi-field fit-single-line print-field-soa_no" data-fit-text data-items-shift="{{ $additionalItemsOffset }}" style="left: {{ $p['soa_no'][0] }}px; top: {{ $soaTop }}px; {{ $fieldStyle('soa_no') }}">SOA# {{ $print['soa_no'] }}</div>
+        @if($hasSoaNumber)
+            <div class="bi-field fit-single-line print-field-soa_no" data-fit-text data-items-shift="{{ $additionalItemsOffset }}" style="left: {{ $p['soa_no'][0] }}px; top: {{ $soaTop }}px; {{ $fieldStyle('soa_no') }}">SOA# {{ $print['soa_no'] }}</div>
+        @endif
         <div class="bi-field fit-multiline print-field-remarks" data-fit-text data-min-font="6" data-items-shift="{{ $additionalItemsOffset }}" style="left: {{ $p['remarks'][0] }}px; top: {{ $remarksTop }}px; {{ $fieldStyle('remarks') }}">{{ $print['remarks'] ?? '' }}</div>
         @if((float) ($print['vatable_sales'] ?? 0) > 0)
             <div class="bi-field fit-single-line amount print-field-vatable_sales" data-fit-text style="left: {{ $p['vatable_sales'][0] }}px; top: {{ $p['vatable_sales'][1] }}px; {{ $fieldStyle('vatable_sales') }}">{{ $money($print['vatable_sales']) }}</div>

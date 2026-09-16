@@ -97,6 +97,21 @@ class BillingInvoicePrintFlowTest extends TestCase
         $show->assertDontSee('Print SOA A');
     }
 
+    public function test_billing_invoice_hides_empty_soa_number()
+    {
+        $withoutSoa = $this->get('/erp/billings/print/invoice?invoice_no=BI-NO-SOA&soa_no=');
+
+        $withoutSoa->assertStatus(200);
+        $withoutSoa->assertDontSee('class="bi-field fit-single-line print-field-soa_no"', false);
+        $withoutSoa->assertDontSee('SOA#');
+
+        $withSoa = $this->get('/erp/billings/print/invoice?invoice_no=BI-WITH-SOA&soa_no=SOA-001');
+
+        $withSoa->assertStatus(200);
+        $withSoa->assertSee('class="bi-field fit-single-line print-field-soa_no"', false);
+        $withSoa->assertSee('SOA# SOA-001');
+    }
+
     public function test_vatable_billing_separates_reimbursement_for_bi_and_soa_b_totals()
     {
         $response = $this->post('/erp/invoices/review', $this->payload([
