@@ -8322,10 +8322,18 @@ class ModuleController extends Controller
             }
         }
 
-        $withholdingTaxAmount = round($withholdingTaxAmount, 4);
+        $billingSubtotal = round($billingSubtotal, 2);
+        $vatableSales = round($vatableSales, 2);
+        $zeroRatedSales = round($zeroRatedSales, 2);
+        $vatExemptSales = round($vatExemptSales, 2);
+        $reimbursementTotal = round($reimbursementTotal, 2);
+        $vatAmount = round($vatAmount, 2);
+        $withholdingTaxAmount = round($withholdingTaxAmount, 2);
         $withholdingTaxRate = $withholdingBase > 0
             ? round(($withholdingTaxAmount / $withholdingBase) * 100, 4)
             : 0;
+        $billingTotal = round($billingSubtotal + $vatAmount, 2);
+        $soaTotal = round($billingTotal + $reimbursementTotal, 2);
 
         return [
             'billing_subtotal' => $billingSubtotal,
@@ -8335,9 +8343,9 @@ class ModuleController extends Controller
             'vat_amount' => $vatAmount,
             'withholding_tax_rate' => $withholdingTaxRate,
             'withholding_tax_amount' => $withholdingTaxAmount,
-            'billing_total' => $billingSubtotal + $vatAmount,
+            'billing_total' => $billingTotal,
             'reimbursement_total' => $reimbursementTotal,
-            'soa_total' => $billingSubtotal + $vatAmount + $reimbursementTotal,
+            'soa_total' => $soaTotal,
         ];
     }
 

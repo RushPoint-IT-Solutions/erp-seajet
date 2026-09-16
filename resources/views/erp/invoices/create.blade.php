@@ -479,6 +479,10 @@
             return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
+        function roundMoney(value) {
+            return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+        }
+
         function currency() {
             return $('#currencySelect').val() || 'PHP';
         }
@@ -623,7 +627,7 @@
                 var row = $(this);
                 var unit = numberValue(row.find('.line-unit').val());
                 var qty = numberValue(row.find('.line-qty').val());
-                var line = unit * qty;
+                var line = roundMoney(unit * qty);
                 var category = row.find('.line-tax').val();
                 var item = String(row.find('.item-select').val() || '').toLowerCase();
                 var description = String(row.find('textarea[name="item_description[]"]').val() || '').toLowerCase();
@@ -648,9 +652,13 @@
                 }
             });
 
-            var billingTotal = billingSubtotal + tax;
-            var soaTotal = billingTotal + reimbursement;
-            var netAmountDue = Math.max(0, soaTotal - withholdingTax);
+            billingSubtotal = roundMoney(billingSubtotal);
+            reimbursement = roundMoney(reimbursement);
+            tax = roundMoney(tax);
+            withholdingTax = roundMoney(withholdingTax);
+            var billingTotal = roundMoney(billingSubtotal + tax);
+            var soaTotal = roundMoney(billingTotal + reimbursement);
+            var netAmountDue = Math.max(0, roundMoney(soaTotal - withholdingTax));
             $('#subtotalText').text(currency() + ' ' + money(billingSubtotal));
             $('#taxText').text(currency() + ' ' + money(tax));
             $('#balanceText').text(currency() + ' ' + money(soaTotal));

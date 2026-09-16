@@ -112,6 +112,37 @@ class BillingInvoicePrintFlowTest extends TestCase
         $withSoa->assertSee('SOA# SOA-001');
     }
 
+    public function test_billing_totals_round_components_to_cents_before_calculating_amount_due()
+    {
+        $response = $this->post('/erp/invoices/review', $this->payload([
+            'invoice_no' => 'BI-ROUND-001',
+            'transaction_no' => 'BI-ROUND-001',
+            'vat_classification' => '12%',
+            'withholding_tax_rate' => '2',
+            'item' => ['Taxable service'],
+            'item_description' => ['TAXABLE SERVICE'],
+            'qty' => ['1'],
+            'unit_price' => ['34719.85'],
+            'line_amount' => ['34719.85'],
+            'line_withholding_rate' => ['2'],
+            'tax_category' => ['12%'],
+        ]));
+
+        $response->assertRedirect();
+
+        $document = DB::table('sales_documents')->where('document_no', 'BI-ROUND-001')->first();
+        $this->assertNotNull($document);
+        $this->assertEquals(4166.38, (float) $document->tax_total);
+        $this->assertEquals(38886.23, (float) $document->grand_total);
+        $this->assertEquals(694.40, (float) $document->withholding_tax_amount);
+
+        $show = $this->get($response->headers->get('Location'));
+        $show->assertStatus(200);
+        $show->assertSee('PHP 38,886.23');
+        $show->assertSee('PHP 694.40');
+        $show->assertSee('PHP 38,191.83');
+    }
+
     public function test_vatable_billing_separates_reimbursement_for_bi_and_soa_b_totals()
     {
         $response = $this->post('/erp/invoices/review', $this->payload([
