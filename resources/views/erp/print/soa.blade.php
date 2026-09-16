@@ -120,6 +120,11 @@
         font-size: 10px;
         font-weight: 700;
     }
+    .soa-payment-note-amount > span:last-child {
+        position: absolute;
+        left: var(--soa-payment-note-amount-left);
+        white-space: nowrap;
+    }
     @foreach($hiddenFields as $hiddenField)
     .print-field-{{ $hiddenField }} {
         display: none !important;
@@ -183,11 +188,14 @@
         $paymentNoteLeft = $p['payment_note'][0];
         $paymentNoteTop = $p['payment_note'][1];
         $paymentNoteWidth = $s['payment_note']['width'];
-        // Keep the payment-summary amounts close to their labels on SOA B.
-        $paymentNoteAmountWidth = min($paymentNoteWidth, 260);
         $paymentNoteFontSize = (int) $s['payment_note']['font_size'];
         $paymentNoteSmallFontSize = max(6, $paymentNoteFontSize - 4);
         $paymentNoteAmountFontSize = max(6, $paymentNoteFontSize - 2);
+        // Align the amount column beneath "TOGETHER" in the instruction above.
+        $paymentNoteAmountOffset = min(
+            max(0, $paymentNoteWidth - 100),
+            max(120, $paymentNoteSmallFontSize * 20)
+        );
         $paymentNoteLineStep = max(15, $paymentNoteFontSize + 3);
     @endphp
 
@@ -235,13 +243,13 @@
         <div class="soa-payment-note-line soa-payment-note-small print-field-payment_note" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop }}px; width: {{ $paymentNoteWidth }}px; font-size: {{ $paymentNoteSmallFontSize }}px">
             PLEASE PAY THIS REIMBURSEMENT CHARGES TOGETHER WITH INVOICE NUMBER {{ $print['invoice_no'] ?? '' }}
         </div>
-        <div class="soa-payment-note-line soa-payment-note-amount d-flex justify-content-between" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + $paymentNoteLineStep }}px; width: {{ $paymentNoteAmountWidth }}px; font-size: {{ $paymentNoteAmountFontSize }}px">
+        <div class="soa-payment-note-line soa-payment-note-amount" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + $paymentNoteLineStep }}px; width: {{ $paymentNoteWidth }}px; font-size: {{ $paymentNoteAmountFontSize }}px; --soa-payment-note-amount-left: {{ $paymentNoteAmountOffset }}px">
             <span>TOTAL INVOICE AMOUNT</span><span>{{ $money($billingInvoiceAmount) }}</span>
         </div>
-        <div class="soa-payment-note-line soa-payment-note-amount d-flex justify-content-between" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + ($paymentNoteLineStep * 2) }}px; width: {{ $paymentNoteAmountWidth }}px; font-size: {{ $paymentNoteAmountFontSize }}px">
+        <div class="soa-payment-note-line soa-payment-note-amount" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + ($paymentNoteLineStep * 2) }}px; width: {{ $paymentNoteWidth }}px; font-size: {{ $paymentNoteAmountFontSize }}px; --soa-payment-note-amount-left: {{ $paymentNoteAmountOffset }}px">
             <span>REIMBURSEMENT CHARGES</span><span>{{ $money($print['reimbursement_total'] ?? 0) }}</span>
         </div>
-        <div class="soa-payment-note-line soa-payment-note-amount d-flex justify-content-between" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + ($paymentNoteLineStep * 3) }}px; width: {{ $paymentNoteAmountWidth }}px; font-size: {{ $paymentNoteAmountFontSize }}px">
+        <div class="soa-payment-note-line soa-payment-note-amount" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + ($paymentNoteLineStep * 3) }}px; width: {{ $paymentNoteWidth }}px; font-size: {{ $paymentNoteAmountFontSize }}px; --soa-payment-note-amount-left: {{ $paymentNoteAmountOffset }}px">
             <span>PLEASE PAY THIS AMOUNT</span><span>{{ $money($combinedPayableTotal) }}</span>
         </div>
         <div class="soa-payment-note-line soa-payment-note-small" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop + ($paymentNoteLineStep * 4) + 3 }}px; width: {{ $paymentNoteWidth }}px; font-size: {{ $paymentNoteSmallFontSize }}px; font-style: italic">
