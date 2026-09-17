@@ -431,6 +431,9 @@ class BillingInvoicePrintFlowTest extends TestCase
         $this->assertRegExp('/\.bi-field\s*\{[^}]*letter-spacing:\s*\.25px;/s', $print->getContent());
         $this->assertRegExp('/\.bi-field\s*\{[^}]*letter-spacing:\s*\.25px\s*!important;/s', $print->getContent());
         $print->assertDontSee('current -= 0.5', false);
+        $this->assertRegExp('/print-field-address[^>]*data-fit-address[^>]*data-min-font="6"[^>]*height:\s*(?:1[2-9]|[23]\d|4[0-2])px;/', $print->getContent());
+        $print->assertSee("document.querySelectorAll('[data-fit-address]')", false);
+        $print->assertSee("field.style.setProperty('font-size', fitted + 'px', 'important');", false);
         preg_match_all('/data-line-row="0" data-line-top="(\d+)"/', $print->getContent(), $firstRowTops);
         preg_match_all('/data-line-row="1" data-line-top="(\d+)"/', $print->getContent(), $secondRowTops);
         $this->assertCount(4, $firstRowTops[1]);
