@@ -74,8 +74,9 @@
     .print-field-address {
         max-height: 42px;
     }
+    .print-field-customer,
     .print-field-address {
-        /* Keep the address inside the space above the TIN row. */
+        /* Keep header text inside its row instead of covering the next field. */
         min-height: 0;
     }
     .print-field-origin_dest,
@@ -215,6 +216,7 @@
         };
         $lineDescription = $print['line_description'] ?? '';
         $billingLines = $print['billing_lines'] ?? [];
+        $customerHeight = max(12, min(42, $p['address'][1] - $p['customer'][1] - 3));
         $addressHeight = max(12, min(42, $p['tin'][1] - $p['address'][1] - 3));
     @endphp
 
@@ -266,8 +268,8 @@
 
         <div class="bi-field print-field-cash_sales" style="left: {{ $p['cash_sales'][0] }}px; top: {{ $p['cash_sales'][1] }}px; {{ $fieldStyle('cash_sales') }}">[ ]</div>
         <div class="bi-field print-field-charge_sales" style="left: {{ $p['charge_sales'][0] }}px; top: {{ $p['charge_sales'][1] }}px; {{ $fieldStyle('charge_sales') }}">[x]</div>
-        <div class="bi-field fit-multiline print-field-customer" data-fit-text style="left: {{ $p['customer'][0] }}px; top: {{ $p['customer'][1] }}px; {{ $fieldStyle('customer') }}">{{ $print['customer'] }}</div>
-        <div class="bi-field fit-multiline print-field-address" data-fit-text data-fit-address data-min-font="6" style="left: {{ $p['address'][0] }}px; top: {{ $p['address'][1] }}px; height: {{ $addressHeight }}px; {{ $fieldStyle('address') }}">{{ $print['address'] }}</div>
+        <div class="bi-field fit-multiline print-field-customer" data-fit-text data-fit-bounded data-min-font="6" style="left: {{ $p['customer'][0] }}px; top: {{ $p['customer'][1] }}px; height: {{ $customerHeight }}px; {{ $fieldStyle('customer') }}">{{ $print['customer'] }}</div>
+        <div class="bi-field fit-multiline print-field-address" data-fit-text data-fit-bounded data-min-font="6" style="left: {{ $p['address'][0] }}px; top: {{ $p['address'][1] }}px; height: {{ $addressHeight }}px; {{ $fieldStyle('address') }}">{{ $print['address'] }}</div>
         <div class="bi-field fit-single-line print-field-tin" data-fit-text style="left: {{ $p['tin'][0] }}px; top: {{ $p['tin'][1] }}px; {{ $fieldStyle('tin') }}">{{ $print['tin'] }}</div>
         <div class="bi-field fit-single-line print-field-mawb" data-fit-text style="left: {{ $p['mawb'][0] }}px; top: {{ $p['mawb'][1] }}px; {{ $fieldStyle('mawb') }}">{{ $print['mawb'] }}</div>
         <div class="bi-field fit-single-line print-field-hawb" data-fit-text style="left: {{ $p['hawb'][0] }}px; top: {{ $p['hawb'][1] }}px; {{ $fieldStyle('hawb') }}">{{ $print['hawb'] }}</div>
@@ -376,7 +378,7 @@
                     field.style.transform = '';
                 });
 
-                document.querySelectorAll('[data-fit-address]').forEach(function (field) {
+                document.querySelectorAll('[data-fit-bounded]').forEach(function (field) {
                     var configured = parseFloat(field.dataset.configuredFont || window.getComputedStyle(field).fontSize);
                     var minimum = parseFloat(field.dataset.minFont || 6);
                     var fitted = configured;
