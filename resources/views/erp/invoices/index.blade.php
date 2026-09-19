@@ -16,7 +16,7 @@
             <a href="{{ route('erp.invoices.create') }}" class="btn btn-primary" title="Create new invoice">
                 <i class="bi bi-plus-lg me-1"></i> New Invoice
             </a>
-            <a href="{{ route('erp.customer-billing.aging') }}" class="btn btn-outline-secondary" title="Aging report">
+            <a href="{{ route('erp.invoices.index', ['tab' => 'aging']) }}" class="btn btn-outline-secondary" title="Aging report">
                 <i class="bi bi-bar-chart-line me-1"></i> Aging
             </a>
             <a href="{{ route('erp.export', 'invoices') }}" class="btn btn-outline-secondary" title="Export invoices">
@@ -45,76 +45,19 @@
         @endforeach
     </div>
 
-    <div class="erp-card p-3 mb-4">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-            <div>
-                <h2 class="h6 fw-bold mb-0">Aging Report</h2>
-                <small class="text-muted">Open invoices by aging bucket: current, 30, 60, and 90+ days.</small>
-            </div>
-            <a href="{{ route('erp.customer-billing.aging') }}" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-arrow-right-short me-1"></i>Full AR Aging
-            </a>
-        </div>
-
-        <div class="row g-3 mb-3">
-            @foreach($agingBuckets as $bucket)
-                <div class="col-md-6 col-xl-3">
-                    <div class="border rounded-3 p-3 h-100">
-                        <div class="d-flex align-items-start justify-content-between gap-3">
-                            <div>
-                                <div class="text-muted small">{{ $bucket['label'] }}</div>
-                                <div class="h5 fw-bold mb-0">{{ $bucket['value'] }}</div>
-                            </div>
-                            <span class="kpi-icon bg-{{ $bucket['tone'] }}"><i class="bi {{ $bucket['icon'] }}"></i></span>
-                        </div>
-                    </div>
-                </div>
-            @endforeach
-        </div>
-
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead>
-                <tr>
-                    <th>Customer</th>
-                    <th>Invoice No.</th>
-                    <th>Currency</th>
-                    <th class="text-end">Current</th>
-                    <th class="text-end">30</th>
-                    <th class="text-end">60</th>
-                    <th class="text-end">90+</th>
-                </tr>
-                </thead>
-                <tbody>
-                @foreach($agingRows as $row)
-                    <tr>
-                        <td class="fw-semibold">{{ $row[0] }}</td>
-                        <td>{{ $row[1] }}</td>
-                        <td>{{ $row[2] }}</td>
-                        <td class="text-end">{{ $row[3] }}</td>
-                        <td class="text-end">{{ $row[4] }}</td>
-                        <td class="text-end">{{ $row[5] }}</td>
-                        <td class="text-end">{{ $row[6] }}</td>
-                    </tr>
-                @endforeach
-                </tbody>
-            </table>
-        </div>
-    </div>
-
     <div class="row g-3 mb-4">
         <div class="col-12">
             <div class="erp-card p-3 h-100">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                     <div>
                         <h2 class="h6 fw-bold mb-0">Invoice List</h2>
-                        <small class="text-muted">Active billing documents and a separate audit view for voided or cancelled invoices.</small>
+                        <small class="text-muted">Active, voided, cancelled, and aging views in one table workspace.</small>
                     </div>
                     <a href="{{ route('erp.invoices.create') }}" class="btn btn-primary btn-sm" data-bs-toggle="tooltip" title="Create new">
                         <i class="bi bi-plus-lg"></i>
                     </a>
                 </div>
-                <ul class="nav nav-tabs mb-3 no-print" aria-label="Invoice status tabs">
+                <ul class="nav nav-tabs mb-3 no-print" aria-label="Invoice list tabs">
                     <li class="nav-item">
                         <a class="nav-link {{ $selectedInvoiceTab === 'active' ? 'active' : '' }}"
                            href="{{ route('erp.invoices.index', ['tab' => 'active']) }}">
@@ -127,7 +70,101 @@
                             Voided / Cancelled <span class="badge rounded-pill text-bg-light ms-1">{{ $invoiceTabCounts['voided'] }}</span>
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ $selectedInvoiceTab === 'aging' ? 'active' : '' }}"
+                           href="{{ route('erp.invoices.index', ['tab' => 'aging']) }}">
+                            Aging Report
+                        </a>
+                    </li>
                 </ul>
+                @if($selectedInvoiceTab === 'aging')
+                    <form class="border rounded p-3 mb-3 no-print" method="get" action="{{ route('erp.invoices.index') }}">
+                        <input type="hidden" name="tab" value="aging">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">As of Date</label>
+                                <input type="date" name="as_of" class="form-control" value="{{ $agingFilters['as_of'] }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Class</label>
+                                <select name="class" class="form-select erp-select">
+                                    @foreach(['All Classes', 'MANILA', 'PAMPANGA', 'CEBU'] as $option)
+                                        <option value="{{ $option }}" {{ $agingFilters['class'] === $option ? 'selected' : '' }}>{{ $option }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Currency</label>
+                                <select name="currency" class="form-select erp-select">
+                                    @foreach(['All Currency', 'PHP', 'USD'] as $option)
+                                        <option value="{{ $option }}" {{ $agingFilters['currency'] === $option ? 'selected' : '' }}>{{ $option }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">VAT</label>
+                                <select name="vat" class="form-select erp-select">
+                                    @foreach(['All VAT', '12%', 'zero-rated', 'exempt'] as $option)
+                                        <option value="{{ $option }}" {{ $agingFilters['vat'] === $option ? 'selected' : '' }}>{{ $option }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-12 d-flex flex-wrap justify-content-end gap-2">
+                                <a href="{{ route('erp.export', 'aging-excel') }}" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+                                <a href="{{ route('erp.export', 'aging-pdf') }}" class="btn btn-outline-secondary"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
+                                <button type="button" class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
+                                <button class="btn btn-primary"><i class="bi bi-funnel me-1"></i>Apply Filters</button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <div class="row g-3 mb-3">
+                        @foreach([
+                            ['label' => 'Current', 'key' => 'current'],
+                            ['label' => '30 Days', 'key' => 'thirty'],
+                            ['label' => '60 Days', 'key' => 'sixty'],
+                            ['label' => '90+ Days', 'key' => 'ninety'],
+                        ] as $bucket)
+                            <div class="col-md-6 col-xl-3">
+                                <div class="border rounded-3 p-3 h-100">
+                                    <div class="text-muted small">{{ $bucket['label'] }}</div>
+                                    <div class="h5 fw-bold mb-0">PHP {{ number_format($agingSummary[$bucket['key']] ?? 0, 2) }}</div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle invoice-aging-table w-100">
+                            <thead>
+                            <tr>
+                                <th>Customer ID</th><th>Customer</th><th>Job/Shipment ID</th><th>Invoice No.</th><th>Currency</th><th>VAT</th><th>Class</th>
+                                <th class="text-end">Current</th><th class="text-end">30</th><th class="text-end">60</th><th class="text-end">90+</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @forelse($agingReportRows as $row)
+                                <tr>
+                                    @foreach($row as $index => $cell)
+                                        <td class="{{ $index >= 7 ? 'text-end' : '' }}">{{ $index >= 7 ? number_format($cell, 2) : $cell }}</td>
+                                    @endforeach
+                                </tr>
+                            @empty
+                                <tr><td colspan="11" class="text-center text-muted py-4">No unpaid active invoices found for the selected filters.</td></tr>
+                            @endforelse
+                            </tbody>
+                            <tfoot>
+                            <tr class="fw-bold">
+                                <td colspan="7" class="text-end">Total</td>
+                                <td class="text-end">{{ number_format($agingSummary['current'] ?? 0, 2) }}</td>
+                                <td class="text-end">{{ number_format($agingSummary['thirty'] ?? 0, 2) }}</td>
+                                <td class="text-end">{{ number_format($agingSummary['sixty'] ?? 0, 2) }}</td>
+                                <td class="text-end">{{ number_format($agingSummary['ninety'] ?? 0, 2) }}</td>
+                            </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                @else
                 <div class="table-responsive">
                     <table class="table table-hover align-middle invoices-table w-100">
                         <thead>
@@ -177,6 +214,7 @@
                         </tbody>
                     </table>
                 </div>
+                @endif
             </div>
         </div>
     </div>
@@ -196,6 +234,14 @@
         lengthChange: false,
         language: { search: '', searchPlaceholder: 'Search invoices' }
     });
+
+    @if(!empty($agingReportRows))
+        $('.invoice-aging-table').DataTable({
+            pageLength: 10,
+            lengthChange: false,
+            language: { search: '', searchPlaceholder: 'Search aging' }
+        });
+    @endif
 
     $(function () {
         function syncCustomer(form) {

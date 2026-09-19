@@ -6722,12 +6722,22 @@ class ModuleController extends Controller
         };
         $finalInvoiceCount = count(array_filter($allInvoices, $isFinalInvoice));
         $selectedInvoiceTab = request('tab', 'active');
-        if (!in_array($selectedInvoiceTab, ['active', 'voided'], true)) {
+        if (!in_array($selectedInvoiceTab, ['active', 'voided', 'aging'], true)) {
             $selectedInvoiceTab = 'active';
         }
-        $invoices = array_values(array_filter($allInvoices, function ($invoice) use ($isFinalInvoice, $selectedInvoiceTab) {
-            return $selectedInvoiceTab === 'voided' ? $isFinalInvoice($invoice) : !$isFinalInvoice($invoice);
-        }));
+        $invoices = $selectedInvoiceTab === 'aging'
+            ? []
+            : array_values(array_filter($allInvoices, function ($invoice) use ($isFinalInvoice, $selectedInvoiceTab) {
+                return $selectedInvoiceTab === 'voided' ? $isFinalInvoice($invoice) : !$isFinalInvoice($invoice);
+            }));
+        $agingFilters = [
+            'as_of' => request('as_of', date('Y-m-d')),
+            'class' => request('class', 'All Classes'),
+            'currency' => request('currency', 'All Currency'),
+            'vat' => request('vat', 'All VAT'),
+        ];
+        $agingReportRows = $selectedInvoiceTab === 'aging' ? $this->agingReportRows($agingFilters) : [];
+        $agingSummary = $this->agingReportSummary($agingReportRows);
 
         return view('erp.invoices.index', [
             'invoices' => $invoices,
@@ -6746,8 +6756,9 @@ class ModuleController extends Controller
                 ['label' => 'Create invoice', 'route' => route('erp.invoices.create'), 'icon' => 'bi-plus-lg'],
                 ['label' => 'Receive payment', 'route' => route('erp.payments.create'), 'icon' => 'bi-credit-card'],
             ],
-            'agingBuckets' => $this->invoiceAgingBuckets(),
-            'agingRows' => $this->invoiceAgingRows(),
+            'agingFilters' => $agingFilters,
+            'agingReportRows' => $agingReportRows,
+            'agingSummary' => $agingSummary,
             'paymentCustomers' => $this->paymentCustomerOptions(),
             'paymentInvoices' => $this->paymentInvoiceOptions(),
         ]);

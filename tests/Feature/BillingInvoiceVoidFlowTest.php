@@ -123,6 +123,29 @@ class BillingInvoiceVoidFlowTest extends TestCase
         ]);
     }
 
+    public function test_ar_aging_report_is_a_tab_inside_the_invoice_list()
+    {
+        $invoice = $this->createInvoice('BI-AGING-TAB-001');
+
+        $page = $this->get(route('erp.invoices.index', [
+            'tab' => 'aging',
+            'as_of' => now()->toDateString(),
+            'currency' => 'PHP',
+        ]));
+
+        $page->assertStatus(200)
+            ->assertSee('Active')
+            ->assertSee('Voided / Cancelled')
+            ->assertSee('Aging Report')
+            ->assertSee('As of Date')
+            ->assertSee('BI-AGING-TAB-001')
+            ->assertSee('Current');
+        $this->assertSame('aging', $page->original->getData()['selectedInvoiceTab']);
+        $this->assertTrue(collect($page->original->getData()['agingReportRows'])->contains(function ($row) use ($invoice) {
+            return ($row[3] ?? '') === $invoice->document_no;
+        }));
+    }
+
     private function createInvoice($documentNo, $saveMode = 'draft')
     {
         $response = $this->post('/erp/invoices/review', [
