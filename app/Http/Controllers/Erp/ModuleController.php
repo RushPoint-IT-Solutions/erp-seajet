@@ -5639,6 +5639,7 @@ class ModuleController extends Controller
     {
         return view('erp.accounting.journal-entries', [
             'accounts' => $this->glAccountOptions(),
+            'suppliers' => $this->vendorRows(),
             'nextJournalNo' => $this->peekNextDocumentNumber('journal_voucher', 'JV-', 5),
             'recentEntries' => $this->recentJournalEntries(),
         ]);
@@ -5652,11 +5653,16 @@ class ModuleController extends Controller
             'shipment_job_id' => 'nullable|string|max:100',
             'reference_no' => 'nullable|string|max:100',
             'payee' => 'nullable|string|max:255',
+            'payee_supplier_id' => 'nullable|integer',
             'memo' => 'nullable|string|max:2000',
             'line_account' => 'required|array|min:2',
             'line_account.*' => 'nullable|integer',
             'line_description' => 'nullable|array',
             'line_description.*' => 'nullable|string|max:255',
+            'line_tax_category' => 'nullable|array',
+            'line_tax_category.*' => 'nullable|in:VAT12,ZERO,EXEMPT',
+            'line_withholding_tax_rate' => 'nullable|array',
+            'line_withholding_tax_rate.*' => 'nullable|numeric|min:0|max:100',
             'line_debit' => 'nullable|array',
             'line_debit.*' => 'nullable|string|max:50',
             'line_credit' => 'nullable|array',
@@ -5667,6 +5673,8 @@ class ModuleController extends Controller
         $debits = (array) ($data['line_debit'] ?? []);
         $credits = (array) ($data['line_credit'] ?? []);
         $descriptions = (array) ($data['line_description'] ?? []);
+        $taxCategories = (array) ($data['line_tax_category'] ?? []);
+        $withholdingRates = (array) ($data['line_withholding_tax_rate'] ?? []);
 
         $lines = [];
         $totalDebit = 0.0;
@@ -5684,9 +5692,17 @@ class ModuleController extends Controller
                 return back()->withInput()->withErrors(['lines' => 'Each journal line must have either a debit or a credit, not both.']);
             }
 
+            $taxCategory = strtoupper(trim((string) ($taxCategories[$index] ?? '')));
+            $withholdingRate = $this->moneyToFloat($withholdingRates[$index] ?? 0);
+            $taxBase = max($debit, $credit);
+
             $lines[] = [
                 'account_id' => $accountId,
                 'description' => $descriptions[$index] ?? null,
+                'tax_category' => $taxCategory ?: null,
+                'tax_amount' => $taxCategory === 'VAT12' ? round($taxBase * 0.12, 4) : 0,
+                'withholding_tax_rate' => $withholdingRate,
+                'withholding_tax_amount' => round($taxBase * ($withholdingRate / 100), 4),
                 'debit' => $debit,
                 'credit' => $credit,
             ];
@@ -5717,6 +5733,21 @@ class ModuleController extends Controller
             return back()->withInput()->withErrors(['lines' => 'One or more selected accounts are inactive or do not belong to this company.']);
         }
 
+        $payeeSupplier = null;
+        if (!empty($data['payee_supplier_id'])) {
+            $payeeSupplier = DB::table('suppliers')
+                ->where('company_id', $companyId)
+                ->where('is_active', true)
+                ->where('id', $data['payee_supplier_id'])
+                ->first(['id', 'name']);
+            if (!$payeeSupplier) {
+                return back()->withInput()->withErrors(['payee_supplier_id' => 'The selected payee is not an active vendor for this company.']);
+            }
+        }
+        $payee = $payeeSupplier
+            ? trim((string) $payeeSupplier->name)
+            : (trim((string) ($data['payee'] ?? '')) ?: null);
+
         $this->authorizeAccountingPosting('accounting', 'approve');
         app(PeriodLockService::class)->assertOpen($companyId, $data['journal_date']);
         $journalNo = trim((string) $data['journal_no']);
@@ -5724,7 +5755,7 @@ class ModuleController extends Controller
             return back()->withInput()->withErrors(['journal_no' => 'This journal number already exists.']);
         }
 
-        $journalId = DB::transaction(function () use ($companyId, $journalNo, $lines, $data) {
+        $journalId = DB::transaction(function () use ($companyId, $journalNo, $lines, $data, $payee, $payeeSupplier) {
             $id = DB::table('journal_entries')->insertGetId($this->tablePayload('journal_entries', [
                 'company_id' => $companyId,
                 'branch_id' => DB::table('branches')->where('company_id', $companyId)->orderBy('id')->value('id'),
@@ -5732,7 +5763,7 @@ class ModuleController extends Controller
                 'journal_date' => $data['journal_date'],
                 'source_module' => 'GL',
                 'reference_no' => $data['reference_no'] ?? null,
-                'payee' => trim((string) ($data['payee'] ?? '')) ?: null,
+                'payee' => $payee,
                 'shipment_job_id' => $data['shipment_job_id'] ?? null,
                 'memo' => $data['memo'] ?? null,
                 'status' => 'posted',
@@ -5747,8 +5778,13 @@ class ModuleController extends Controller
                     'journal_entry_id' => $id,
                     'account_id' => $line['account_id'],
                     'description' => $line['description'],
+                    'tax_category' => $line['tax_category'],
+                    'tax_amount' => $line['tax_amount'],
+                    'withholding_tax_rate' => $line['withholding_tax_rate'],
+                    'withholding_tax_amount' => $line['withholding_tax_amount'],
                     'debit' => $line['debit'],
                     'credit' => $line['credit'],
+                    'supplier_id' => $payeeSupplier ? $payeeSupplier->id : null,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -5760,7 +5796,7 @@ class ModuleController extends Controller
         app(ActivityLogger::class)->log('posted', 'journal_entry', $journalId, [], [
             'journal_no' => $journalNo,
             'source_module' => 'GL',
-            'payee' => trim((string) ($data['payee'] ?? '')) ?: null,
+            'payee' => $payee,
             'total_debit' => $totalDebit,
             'total_credit' => $totalCredit,
         ], $companyId);
@@ -5790,6 +5826,8 @@ class ModuleController extends Controller
             'lines' => $lines,
             'totalDebit' => (float) $lines->sum('debit'),
             'totalCredit' => (float) $lines->sum('credit'),
+            'totalVat' => (float) $lines->sum('tax_amount'),
+            'totalWithholding' => (float) $lines->sum('withholding_tax_amount'),
         ]);
     }
 
@@ -6156,6 +6194,51 @@ class ModuleController extends Controller
             }
         }
 
+        if (Schema::hasTable('journal_entries')
+            && Schema::hasTable('journal_entry_lines')
+            && Schema::hasColumn('journal_entry_lines', 'withholding_tax_amount')) {
+            $journalWithholding = DB::table('journal_entry_lines')
+                ->join('journal_entries', 'journal_entries.id', '=', 'journal_entry_lines.journal_entry_id')
+                ->where('journal_entries.company_id', $this->defaultCompanyId())
+                ->where('journal_entries.status', 'posted')
+                ->where('journal_entry_lines.withholding_tax_amount', '>', 0)
+                ->orderBy('journal_entries.journal_date', 'desc')
+                ->select(
+                    'journal_entries.id as journal_entry_id',
+                    'journal_entries.journal_date',
+                    'journal_entries.journal_no',
+                    'journal_entries.payee',
+                    'journal_entries.shipment_job_id',
+                    'journal_entry_lines.debit',
+                    'journal_entry_lines.credit',
+                    'journal_entry_lines.withholding_tax_rate',
+                    'journal_entry_lines.withholding_tax_amount'
+                )
+                ->get()
+                ->groupBy(function ($line) {
+                    return $line->journal_entry_id.'|'.number_format((float) $line->withholding_tax_rate, 4, '.', '');
+                });
+
+            foreach ($journalWithholding as $lines) {
+                $first = $lines->first();
+                $taxBase = $lines->sum(function ($line) {
+                    return max((float) $line->debit, (float) $line->credit);
+                });
+                $rows[] = [
+                    $first->journal_date,
+                    $first->journal_no,
+                    'Expanded Withholding Tax (JV)',
+                    $first->payee ?: 'Unspecified Payee',
+                    $first->shipment_job_id ?: '-',
+                    'PHP',
+                    $taxBase,
+                    number_format((float) $first->withholding_tax_rate, 0).'%',
+                    (float) $lines->sum('withholding_tax_amount'),
+                    'For Remittance',
+                ];
+            }
+        }
+
         usort($rows, function ($a, $b) {
             return strcmp((string) $b[0], (string) $a[0]);
         });
@@ -6295,7 +6378,7 @@ class ModuleController extends Controller
             $query->where('purchase_documents.document_date', '<=', $endDate);
         }
 
-        return $query
+        $rows = $query
             ->orderBy('purchase_documents.document_date', 'desc')
             ->select(
                 'purchase_documents.document_date',
@@ -6335,6 +6418,75 @@ class ModuleController extends Controller
                     (float) $document->tax_total,
                 ];
             })
+            ->all();
+
+        $rows = array_merge($rows, $this->journalPurchaseTaxRows($startDate, $endDate));
+        usort($rows, function ($a, $b) {
+            return strcmp((string) $b[0], (string) $a[0]);
+        });
+
+        return $rows;
+    }
+
+    private function journalPurchaseTaxRows($startDate = null, $endDate = null)
+    {
+        if (!Schema::hasTable('journal_entries')
+            || !Schema::hasTable('journal_entry_lines')
+            || !Schema::hasColumn('journal_entry_lines', 'tax_category')) {
+            return [];
+        }
+
+        $query = DB::table('journal_entry_lines')
+            ->join('journal_entries', 'journal_entries.id', '=', 'journal_entry_lines.journal_entry_id')
+            ->where('journal_entries.company_id', $this->defaultCompanyId())
+            ->where('journal_entries.status', 'posted')
+            ->whereIn('journal_entry_lines.tax_category', ['VAT12', 'ZERO', 'EXEMPT']);
+
+        if ($startDate) {
+            $query->where('journal_entries.journal_date', '>=', $startDate);
+        }
+        if ($endDate) {
+            $query->where('journal_entries.journal_date', '<=', $endDate);
+        }
+
+        return $query
+            ->select(
+                'journal_entries.id as journal_entry_id',
+                'journal_entries.journal_date',
+                'journal_entries.journal_no',
+                'journal_entries.payee',
+                'journal_entries.shipment_job_id',
+                'journal_entry_lines.tax_category',
+                'journal_entry_lines.tax_amount',
+                'journal_entry_lines.debit',
+                'journal_entry_lines.credit'
+            )
+            ->get()
+            ->groupBy(function ($line) {
+                return $line->journal_entry_id.'|'.$line->tax_category;
+            })
+            ->map(function ($lines) {
+                $first = $lines->first();
+                $labels = [
+                    'VAT12' => '12% VAT',
+                    'ZERO' => 'Zero-rated',
+                    'EXEMPT' => 'VAT-exempt',
+                ];
+
+                return [
+                    $first->journal_date,
+                    $first->journal_no,
+                    $first->payee ?: 'Unspecified Payee',
+                    $first->shipment_job_id ?: '-',
+                    $labels[$first->tax_category] ?? $first->tax_category,
+                    'PHP',
+                    (float) $lines->sum(function ($line) {
+                        return max((float) $line->debit, (float) $line->credit);
+                    }),
+                    (float) $lines->sum('tax_amount'),
+                ];
+            })
+            ->values()
             ->all();
     }
 

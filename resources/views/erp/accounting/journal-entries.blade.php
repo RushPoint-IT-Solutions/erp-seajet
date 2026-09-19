@@ -7,6 +7,8 @@
     @php
         $oldAccounts = old('line_account', ['', '']);
         $oldDescriptions = old('line_description', ['', '']);
+        $oldTaxCategories = old('line_tax_category', ['', '']);
+        $oldWithholdingRates = old('line_withholding_tax_rate', ['', '']);
         $oldDebits = old('line_debit', ['', '']);
         $oldCredits = old('line_credit', ['', '']);
         $journalRowCount = max(2, count($oldAccounts));
@@ -55,16 +57,32 @@
             </div>
             <div class="col-lg-3 col-md-6">
                 <label class="form-label">Payee</label>
-                <input name="payee" class="form-control" value="{{ old('payee') }}" maxlength="255">
+                <select name="payee_supplier_id" id="journalPayee" class="form-select erp-select">
+                    <option value=""></option>
+                    @foreach($suppliers as $supplier)
+                        <option value="{{ $supplier['id'] }}"
+                                data-name="{{ $supplier['name'] }}"
+                                {{ (string) old('payee_supplier_id') === (string) $supplier['id'] ? 'selected' : '' }}>
+                            {{ $supplier['supplier_id'] }} - {{ $supplier['name'] }}
+                        </option>
+                    @endforeach
+                </select>
+                <input type="hidden" name="payee" id="journalPayeeName" value="{{ old('payee') }}">
             </div>
+        </div>
+
+        <div class="alert alert-light border small text-muted mt-3 mb-0">
+            VAT and EWT are calculated from the amount on each tagged line. Apply tax only to the underlying taxable line and leave balancing tax/payable lines untagged.
         </div>
 
         <div class="table-responsive mt-4">
             <table class="table align-middle" id="journalLines">
                 <thead>
                 <tr>
-                    <th style="width: 32%">Account</th>
+                    <th style="min-width: 260px">Account</th>
                     <th>Description</th>
+                    <th style="min-width: 135px">VAT</th>
+                    <th style="min-width: 105px">EWT</th>
                     <th class="text-end" style="width: 150px">Debit</th>
                     <th class="text-end" style="width: 150px">Credit</th>
                     <th class="text-center no-print" style="width: 52px"></th>
@@ -82,6 +100,21 @@
                             </select>
                         </td>
                         <td><input name="line_description[]" class="form-control" value="{{ $oldDescriptions[$i] ?? '' }}"></td>
+                        <td>
+                            <select name="line_tax_category[]" class="form-select line-tax-category">
+                                <option value="">No VAT</option>
+                                <option value="VAT12" {{ ($oldTaxCategories[$i] ?? '') === 'VAT12' ? 'selected' : '' }}>VAT 12%</option>
+                                <option value="ZERO" {{ ($oldTaxCategories[$i] ?? '') === 'ZERO' ? 'selected' : '' }}>Zero-rated</option>
+                                <option value="EXEMPT" {{ ($oldTaxCategories[$i] ?? '') === 'EXEMPT' ? 'selected' : '' }}>VAT-exempt</option>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="line_withholding_tax_rate[]" class="form-select line-ewt-rate">
+                                @foreach([0, 2, 5, 10] as $rate)
+                                    <option value="{{ $rate }}" {{ (float) ($oldWithholdingRates[$i] ?? 0) === (float) $rate ? 'selected' : '' }}>{{ $rate ? $rate.'% EWT' : 'No EWT' }}</option>
+                                @endforeach
+                            </select>
+                        </td>
                         <td><input name="line_debit[]" class="form-control text-end line-debit" value="{{ $oldDebits[$i] ?? '' }}"></td>
                         <td><input name="line_credit[]" class="form-control text-end line-credit" value="{{ $oldCredits[$i] ?? '' }}"></td>
                         <td class="text-center no-print"><button type="button" class="btn btn-sm btn-outline-danger remove-line"><i class="bi bi-trash"></i></button></td>
@@ -90,13 +123,19 @@
                 </tbody>
                 <tfoot>
                 <tr class="fw-bold">
-                    <td colspan="2" class="text-end">Totals</td>
+                    <td colspan="4" class="text-end">Totals</td>
                     <td class="text-end" id="totalDebit">0.00</td>
                     <td class="text-end" id="totalCredit">0.00</td>
                     <td class="no-print"></td>
                 </tr>
                 <tr>
-                    <td colspan="5" id="balanceWarning" class="text-danger small no-print" style="display:none;">Total debits must equal total credits before this entry can be posted.</td>
+                    <td colspan="7" class="text-end small">
+                        <span class="text-muted me-3">Input VAT: <strong id="totalVat">0.00</strong></span>
+                        <span class="text-muted">EWT: <strong id="totalEwt">0.00</strong></span>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="7" id="balanceWarning" class="text-danger small no-print" style="display:none;">Total debits must equal total credits before this entry can be posted.</td>
                 </tr>
                 </tfoot>
             </table>
@@ -160,11 +199,25 @@
         function recalc() {
             var totalDebit = 0;
             var totalCredit = 0;
-            $('.line-debit').each(function () { totalDebit += numberValue($(this).val()); });
-            $('.line-credit').each(function () { totalCredit += numberValue($(this).val()); });
+            var totalVat = 0;
+            var totalEwt = 0;
+            $('#journalLines tbody tr').each(function () {
+                var row = $(this);
+                var debit = numberValue(row.find('.line-debit').val());
+                var credit = numberValue(row.find('.line-credit').val());
+                var taxBase = Math.max(debit, credit);
+                totalDebit += debit;
+                totalCredit += credit;
+                if (row.find('.line-tax-category').val() === 'VAT12') {
+                    totalVat += taxBase * 0.12;
+                }
+                totalEwt += taxBase * (numberValue(row.find('.line-ewt-rate').val()) / 100);
+            });
 
             $('#totalDebit').text(totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
             $('#totalCredit').text(totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#totalVat').text(totalVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#totalEwt').text(totalEwt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
             var balanced = Math.abs(totalDebit - totalCredit) < 0.005 && totalDebit > 0;
             $('#balanceWarning').toggle(!balanced);
@@ -181,7 +234,11 @@
             });
         }
 
-        $('#journalLines').on('input change', '.line-debit, .line-credit', recalc);
+        $('#journalLines').on('input change', '.line-debit, .line-credit, .line-tax-category, .line-ewt-rate', recalc);
+
+        $('#journalPayee').on('change', function () {
+            $('#journalPayeeName').val($(this).find(':selected').data('name') || '');
+        }).trigger('change');
 
         $('#addJournalLine').on('click', function () {
             var source = $('#journalLines tbody tr:first');
@@ -191,6 +248,7 @@
             var row = source.clone();
             row.find('input').val('');
             row.find('select').val('');
+            row.find('.line-ewt-rate').val('0');
             $('#journalLines tbody').append(row);
             initAccountSearch(source);
             initAccountSearch(row);

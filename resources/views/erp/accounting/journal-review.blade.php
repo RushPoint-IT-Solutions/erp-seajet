@@ -48,6 +48,8 @@
                 <tr>
                     <th>Account</th>
                     <th>Description</th>
+                    <th>VAT</th>
+                    <th>EWT</th>
                     <th class="text-end">Debit</th>
                     <th class="text-end">Credit</th>
                 </tr>
@@ -57,6 +59,18 @@
                     <tr>
                         <td>{{ trim(($line->account_code ? $line->account_code.' - ' : '').$line->account_name) }}</td>
                         <td>{{ $line->description ?: '-' }}</td>
+                        <td>
+                            @if(($line->tax_category ?? '') === 'VAT12')
+                                VAT 12% <span class="text-muted">({{ number_format($line->tax_amount, 2) }})</span>
+                            @elseif(($line->tax_category ?? '') === 'ZERO')
+                                Zero-rated
+                            @elseif(($line->tax_category ?? '') === 'EXEMPT')
+                                VAT-exempt
+                            @else
+                                -
+                            @endif
+                        </td>
+                        <td>{{ ($line->withholding_tax_rate ?? 0) > 0 ? number_format($line->withholding_tax_rate, 0).'% ('.number_format($line->withholding_tax_amount, 2).')' : '-' }}</td>
                         <td class="text-end">{{ $line->debit > 0 ? number_format($line->debit, 2) : '' }}</td>
                         <td class="text-end">{{ $line->credit > 0 ? number_format($line->credit, 2) : '' }}</td>
                     </tr>
@@ -64,13 +78,30 @@
                 </tbody>
                 <tfoot>
                 <tr class="fw-bold">
-                    <td colspan="2" class="text-end">Totals</td>
+                    <td colspan="4" class="text-end">Totals</td>
                     <td class="text-end">{{ number_format($totalDebit, 2) }}</td>
                     <td class="text-end">{{ number_format($totalCredit, 2) }}</td>
                 </tr>
                 </tfoot>
             </table>
         </div>
+
+        @if($totalVat > 0 || $totalWithholding > 0)
+            <div class="row g-3 mt-1">
+                <div class="col-md-3">
+                    <div class="erp-card bg-light p-3">
+                        <div class="small text-muted">Input VAT</div>
+                        <div class="h5 fw-bold mb-0">{{ number_format($totalVat, 2) }}</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="erp-card bg-light p-3">
+                        <div class="small text-muted">Expanded Withholding Tax</div>
+                        <div class="h5 fw-bold mb-0">{{ number_format($totalWithholding, 2) }}</div>
+                    </div>
+                </div>
+            </div>
+        @endif
 
         <hr>
         <div class="d-flex gap-2">
