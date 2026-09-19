@@ -57,9 +57,12 @@
             <h1 class="h3 fw-bold mb-1">Payments</h1>
             <p class="text-muted mb-0">Receive customer payments, apply them to invoices, and generate receipts.</p>
         </div>
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#paymentModal">
-            <i class="bi bi-plus-lg me-1"></i> Receive Payment
-        </button>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{{ route('erp.accounting.opening-balances.import') }}" class="btn btn-outline-primary"><i class="bi bi-upload me-1"></i> Import Invoices</a>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#paymentModal">
+                <i class="bi bi-plus-lg me-1"></i> Receive Payment
+            </button>
+        </div>
     </div>
 
     <div class="row g-3 mb-4">

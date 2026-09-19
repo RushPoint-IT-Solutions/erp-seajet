@@ -10,6 +10,9 @@
             <p class="text-muted mb-0">Dashboard, invoice list, billing actions, invoice review, and collection follow-up.</p>
         </div>
         <div class="d-flex flex-wrap gap-2 no-print">
+            <a href="{{ route('erp.accounting.opening-balances.import') }}" class="btn btn-outline-primary" title="Import opening invoices">
+                <i class="bi bi-upload me-1"></i> Import Invoices
+            </a>
             <a href="{{ route('erp.invoices.create') }}" class="btn btn-primary" title="Create new invoice">
                 <i class="bi bi-plus-lg me-1"></i> New Invoice
             </a>

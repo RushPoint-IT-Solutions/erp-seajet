@@ -598,6 +598,11 @@ class PostingService
 
     private function salesReceivableAccount($document)
     {
+        $openingBalanceAccount = $this->openingBalanceControlAccount($document);
+        if ($openingBalanceAccount) {
+            return $openingBalanceAccount;
+        }
+
         $keyMap = [
             'AR_TRADE_BI' => 'ar_trade_billing',
             'AR_REIMBURSABLE' => 'ar_reimbursable',
@@ -639,6 +644,11 @@ class PostingService
 
     private function purchasePayableAccount($document)
     {
+        $openingBalanceAccount = $this->openingBalanceControlAccount($document);
+        if ($openingBalanceAccount) {
+            return $openingBalanceAccount;
+        }
+
         $label = trim((string) ($document->ap_account ?? ''));
         if ($label !== '') {
             $accountId = DB::table('accounts')
@@ -655,6 +665,22 @@ class PostingService
         }
 
         return $this->controlAccount($document->company_id, 'accounts_payable');
+    }
+
+    private function openingBalanceControlAccount($document)
+    {
+        $accountId = isset($document->opening_balance_control_account_id)
+            ? (int) $document->opening_balance_control_account_id
+            : 0;
+        if (!$accountId) {
+            return null;
+        }
+
+        return DB::table('accounts')
+            ->where('id', $accountId)
+            ->where('company_id', $document->company_id)
+            ->where('is_active', true)
+            ->value('id');
     }
 
     private function cashOrBankAccount($companyId, $method, $bankLabel)

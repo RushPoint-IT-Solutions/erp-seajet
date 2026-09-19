@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Erp;
 
 use App\Http\Controllers\Controller;
+use App\Services\Accounting\OpeningBalanceImportService;
 use App\Services\Accounting\PeriodLockService;
 use App\Services\Accounting\PostingService;
 use App\Services\Audit\ActivityLogger;
@@ -5643,6 +5644,198 @@ class ModuleController extends Controller
             'nextJournalNo' => $this->peekNextDocumentNumber('journal_voucher', 'JV-', 5),
             'recentEntries' => $this->recentJournalEntries(),
         ]);
+    }
+
+    public function openingBalanceImport()
+    {
+        $this->authorizeAccountingPosting('accounting', 'approve');
+
+        return $this->openingBalanceImportView();
+    }
+
+    public function openingBalanceImportPreview(OpeningBalanceImportService $importer)
+    {
+        $this->authorizeAccountingPosting('accounting', 'approve');
+        $data = request()->validate(array_merge([
+            'file' => 'required|file|max:10240',
+        ], $this->openingBalanceMappingRules()));
+
+        $file = request()->file('file');
+        if (!$file || strtolower((string) $file->getClientOriginalExtension()) !== 'xlsx') {
+            return back()->withInput()->withErrors(['file' => 'Upload an XLSX workbook.']);
+        }
+
+        $token = Str::random(40);
+        $relativePath = 'opening-balance-imports/'.$token.'.xlsx';
+        Storage::putFileAs('opening-balance-imports', $file, $token.'.xlsx');
+        $absolutePath = storage_path('app/'.$relativePath);
+        $fileHash = hash_file('sha256', $absolutePath);
+        $mapping = $this->openingBalanceMapping($data);
+
+        try {
+            $preview = $importer->preview($absolutePath, $this->defaultCompanyId(), $mapping, $fileHash);
+        } catch (\Throwable $exception) {
+            Storage::delete($relativePath);
+            if ($exception instanceof \Illuminate\Validation\ValidationException) {
+                throw $exception;
+            }
+
+            return back()->withInput()->withErrors(['file' => $exception->getMessage()]);
+        }
+
+        session()->put('opening_balance_imports.'.$token, [
+            'path' => $relativePath,
+            'file_hash' => $fileHash,
+            'filename' => $file->getClientOriginalName(),
+            'mapping' => $mapping,
+            'created_at' => time(),
+        ]);
+
+        return $this->openingBalanceImportView($preview, $token, $data);
+    }
+
+    public function openingBalanceImportCommit(OpeningBalanceImportService $importer)
+    {
+        $this->authorizeAccountingPosting('accounting', 'approve');
+        $data = request()->validate(['token' => 'required|string|size:40']);
+        $sessionKey = 'opening_balance_imports.'.$data['token'];
+        $pending = session($sessionKey);
+
+        if (!$pending || empty($pending['path']) || !Storage::exists($pending['path'])) {
+            return redirect()->route('erp.accounting.opening-balances.import')
+                ->withErrors(['file' => 'The import preview expired. Upload the workbook again.']);
+        }
+        if (time() - (int) ($pending['created_at'] ?? 0) > 7200) {
+            Storage::delete($pending['path']);
+            session()->forget($sessionKey);
+
+            return redirect()->route('erp.accounting.opening-balances.import')
+                ->withErrors(['file' => 'The import preview expired after two hours. Upload the workbook again.']);
+        }
+
+        try {
+            $result = $importer->import(
+                storage_path('app/'.$pending['path']),
+                $this->defaultCompanyId(),
+                $pending['mapping'],
+                $pending['file_hash'],
+                $pending['filename'],
+                auth()->id()
+            );
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            return redirect()->route('erp.accounting.opening-balances.import')
+                ->withErrors($exception->errors());
+        } finally {
+            Storage::delete($pending['path']);
+            session()->forget($sessionKey);
+        }
+
+        return redirect()->route('erp.accounting.journals.show', $result['journal_id'])
+            ->with('status', 'Opening balances imported: '.$result['rows_imported'].' rows, '
+                .$result['customers_created'].' new customers, '.$result['invoices_created'].' open invoices, '
+                .$result['vendor_bills_created'].' open vendor bills, PHP '
+                .number_format($result['total_amount'], 2).'. Created '.$result['journal_count'].' journal(s) using the Excel dates.');
+    }
+
+    private function openingBalanceImportView($preview = null, $token = null, array $input = [])
+    {
+        $accounts = $this->glAccountOptions();
+        $defaults = $this->openingBalanceAccountDefaults($accounts);
+        foreach ($this->openingBalanceMappingFields() as $requestField => $mappingKey) {
+            if (isset($input[$requestField])) {
+                $defaults[$requestField] = $input[$requestField];
+            }
+        }
+
+        $recentImports = Schema::hasTable('opening_balance_import_batches')
+            ? DB::table('opening_balance_import_batches')
+                ->leftJoin('journal_entries', 'journal_entries.id', '=', 'opening_balance_import_batches.journal_entry_id')
+                ->where('opening_balance_import_batches.company_id', $this->defaultCompanyId())
+                ->select('opening_balance_import_batches.*', 'journal_entries.journal_no')
+                ->orderBy('opening_balance_import_batches.id', 'desc')
+                ->limit(10)
+                ->get()
+            : collect();
+
+        foreach ($recentImports as $batch) {
+            $dateSummary = DB::table('opening_balance_import_rows')
+                ->where('batch_id', $batch->id)
+                ->selectRaw('MIN(source_date) as date_from, MAX(source_date) as date_to, COUNT(DISTINCT journal_entry_id) as journal_count')
+                ->first();
+            $batch->source_date_from = $dateSummary ? $dateSummary->date_from : $batch->posting_date;
+            $batch->source_date_to = $dateSummary ? $dateSummary->date_to : $batch->posting_date;
+            $batch->journal_count = $dateSummary ? (int) $dateSummary->journal_count : 1;
+        }
+
+        return view('erp.accounting.opening-balance-import', compact('accounts', 'defaults', 'preview', 'token', 'recentImports'));
+    }
+
+    private function openingBalanceMappingRules()
+    {
+        $rules = [];
+        foreach (array_keys($this->openingBalanceMappingFields()) as $field) {
+            $rules[$field] = 'required|integer';
+        }
+
+        return $rules;
+    }
+
+    private function openingBalanceMapping(array $input)
+    {
+        $mapping = [];
+        foreach ($this->openingBalanceMappingFields() as $requestField => $mappingKey) {
+            $mapping[$mappingKey] = (int) $input[$requestField];
+        }
+
+        return $mapping;
+    }
+
+    private function openingBalanceMappingFields()
+    {
+        return [
+            'opening_balance_account_id' => 'opening_balance',
+            'ar_trade_php_account_id' => 'ar_trade_php',
+            'ar_trade_usd_account_id' => 'ar_trade_usd',
+            'ar_reimbursable_php_account_id' => 'ar_reimbursable_php',
+            'ar_reimbursable_usd_account_id' => 'ar_reimbursable_usd',
+            'ap_trade_php_account_id' => 'ap_trade_php',
+            'ap_trade_usd_account_id' => 'ap_trade_usd',
+        ];
+    }
+
+    private function openingBalanceAccountDefaults($accounts)
+    {
+        $find = function (array $needles, $currency = null) use ($accounts) {
+            foreach ($accounts as $account) {
+                $name = strtoupper((string) $account->name);
+                $normalized = preg_replace('/[^A-Z0-9]+/', '', $name);
+                $currencyMatches = $currency === null
+                    || ($currency === 'USD' ? strpos($name, 'USD') !== false : strpos($name, 'USD') === false);
+                if ($currencyMatches) {
+                    foreach ($needles as $needle) {
+                        if (strpos($normalized, $needle) !== false) {
+                            return $account->id;
+                        }
+                    }
+                }
+            }
+
+            return null;
+        };
+
+        $arTradePhp = $find(['ARTRADE', 'ATRADEBILLINGINVOICE'], 'PHP');
+        $arReimbursablePhp = $find(['ARREIMBURSABLE', 'REIMBURSABLECHARGES'], 'PHP');
+        $apTradePhp = $find(['APTRADE', 'ACCOUNTSPAYABLE'], 'PHP');
+
+        return [
+            'opening_balance_account_id' => $find(['OPENINGBALANCE']),
+            'ar_trade_php_account_id' => $arTradePhp,
+            'ar_trade_usd_account_id' => $find(['ARTRADE', 'ATRADEBILLINGINVOICE'], 'USD') ?: $arTradePhp,
+            'ar_reimbursable_php_account_id' => $arReimbursablePhp,
+            'ar_reimbursable_usd_account_id' => $find(['ARREIMBURSABLE', 'REIMBURSABLECHARGES'], 'USD') ?: $arReimbursablePhp,
+            'ap_trade_php_account_id' => $apTradePhp,
+            'ap_trade_usd_account_id' => $find(['APTRADE', 'ACCOUNTSPAYABLE'], 'USD') ?: $apTradePhp,
+        ];
     }
 
     public function journalEntryReview()
@@ -11508,6 +11701,15 @@ class ModuleController extends Controller
             }
             if (Schema::hasTable('expense_lines') && !empty($expenseIds)) {
                 DB::table('expense_lines')->whereIn('expense_id', $expenseIds)->delete();
+            }
+            if (Schema::hasTable('opening_balance_import_rows')) {
+                DB::table('opening_balance_import_rows')->where('company_id', $companyId)->delete();
+            }
+            if (Schema::hasTable('opening_balance_import_journals')) {
+                DB::table('opening_balance_import_journals')->where('company_id', $companyId)->delete();
+            }
+            if (Schema::hasTable('opening_balance_import_batches')) {
+                DB::table('opening_balance_import_batches')->where('company_id', $companyId)->delete();
             }
 
             if (Schema::hasTable('bank_transactions') && !empty($bankAccountIds)

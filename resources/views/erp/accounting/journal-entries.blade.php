@@ -19,6 +19,7 @@
             <p class="text-muted mb-0">Posts directly to the general ledger. Total debits must equal total credits before this entry can be saved.</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
+            <a href="{{ route('erp.accounting.opening-balances.import') }}" class="btn btn-outline-primary"><i class="bi bi-upload me-1"></i> Import Opening Balances</a>
             <a href="{{ route('erp.accounting.coa') }}" class="btn btn-outline-secondary"><i class="bi bi-list-columns me-1"></i> Chart of Accounts</a>
         </div>
     </div>

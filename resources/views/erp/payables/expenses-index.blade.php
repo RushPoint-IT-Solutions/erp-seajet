@@ -10,6 +10,7 @@
             <p class="text-muted mb-0">Vendor bills, shipment-linked client tagging, payment approvals, vouchers, checks, withholding tax, aging, and USD/PHP payables.</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
+            <a href="{{ route('erp.accounting.opening-balances.import') }}" class="btn btn-outline-primary"><i class="bi bi-upload me-1"></i> Import Bills</a>
             <a href="{{ route('erp.payables.vendor-bills.create') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i> Vendor Bill</a>
             <a href="{{ route('erp.payables.approvals') }}" class="btn btn-outline-secondary"><i class="bi bi-check2-square me-1"></i> Approvals</a>
             <a href="{{ route('erp.payables.payments.create') }}" class="btn btn-outline-secondary"><i class="bi bi-credit-card me-1"></i> Pay Bills</a>

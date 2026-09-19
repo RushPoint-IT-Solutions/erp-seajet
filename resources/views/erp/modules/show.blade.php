@@ -37,7 +37,7 @@
                         'New Journal Entry' => route('erp.accounting.journals'),
                         'Journal Entries' => route('erp.accounting.journals'),
                         'Chart of Accounts' => route('erp.accounting.coa'),
-                        'Import Opening Balances' => route('erp.action', 'import-opening-balances'),
+                        'Import Opening Balances' => route('erp.accounting.opening-balances.import'),
                         'Run Trial Balance' => route('erp.action', 'run-trial-balance'),
                         'Lock Posting Period' => route('erp.action', 'lock-posting-period'),
                         'Record Supplier Bill' => route('erp.payables.vendor-bills.create'),

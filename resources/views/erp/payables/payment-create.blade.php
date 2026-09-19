@@ -9,7 +9,10 @@
             <h1 class="h3 fw-bold mb-1">Payment Processing</h1>
             <p class="text-muted mb-0">Process approved supplier bills by bank, cheque, or online transfer in PHP or USD.</p>
         </div>
-        <a href="{{ route('erp.payables.approvals') }}" class="btn btn-outline-secondary"><i class="bi bi-check2-square me-1"></i> Approvals</a>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{{ route('erp.accounting.opening-balances.import') }}" class="btn btn-outline-primary"><i class="bi bi-upload me-1"></i> Import Bills</a>
+            <a href="{{ route('erp.payables.approvals') }}" class="btn btn-outline-secondary"><i class="bi bi-check2-square me-1"></i> Approvals</a>
+        </div>
     </div>
 
     @if(session('status'))

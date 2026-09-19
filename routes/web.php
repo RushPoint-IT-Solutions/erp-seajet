@@ -104,6 +104,9 @@ Route::middleware(['auth', 'permission.access'])->group(function () {
     Route::post('/erp/accounting/chart-of-accounts/{account}/toggle-status', 'Erp\ModuleController@chartOfAccountsToggleStatus')->name('erp.accounting.coa.toggle-status');
     Route::get('/erp/accounting/journal-entries', 'Erp\ModuleController@journalEntries')->name('erp.accounting.journals');
     Route::post('/erp/accounting/journal-entries/review', 'Erp\ModuleController@journalEntryReview')->name('erp.accounting.journals.review');
+    Route::get('/erp/accounting/opening-balances/import', 'Erp\ModuleController@openingBalanceImport')->name('erp.accounting.opening-balances.import');
+    Route::post('/erp/accounting/opening-balances/import/preview', 'Erp\ModuleController@openingBalanceImportPreview')->name('erp.accounting.opening-balances.preview');
+    Route::post('/erp/accounting/opening-balances/import/commit', 'Erp\ModuleController@openingBalanceImportCommit')->name('erp.accounting.opening-balances.commit');
     Route::get('/erp/accounting/journal-entries/{journal}', 'Erp\ModuleController@journalEntryShow')->name('erp.accounting.journals.show');
 
     Route::get('/erp/statements/balance-sheet', 'Erp\ModuleController@balanceSheet')->name('erp.statements.balance-sheet');
