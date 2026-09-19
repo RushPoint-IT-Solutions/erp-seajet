@@ -36,6 +36,8 @@ class RecordPaymentPayableTest extends TestCase
         $this->get(route('erp.payments.create'))
             ->assertOk()
             ->assertSee('BI-2026-REIMB')
+            ->assertSee("Select the client first. Only that client's unpaid invoices will appear below.", false)
+            ->assertSee('class="form-check-input payment-invoice-check"', false)
             ->assertSee('PHP 160.00')
             ->assertSee('data-balance="160.00"', false)
             ->assertSee('data-cwt-balance="2.00"', false);

@@ -11,20 +11,27 @@ class OpeningBalanceImportSeeder extends Seeder
 {
     public function run(OpeningBalanceImportService $importer)
     {
-        $path = env('OPENING_BALANCE_IMPORT_FILE', 'docs/AR TRADE/AR TRADE & AR REIMBURSABLE.xlsx');
-        $isWindowsAbsolute = strlen($path) >= 3
-            && ctype_alpha($path[0])
-            && $path[1] === ':'
-            && in_array($path[2], ['\\', '/'], true);
-        $isAbsolute = $isWindowsAbsolute || substr($path, 0, 1) === '/';
-        if (!$isAbsolute) {
-            $path = base_path($path);
+        $explicitArPath = env('OPENING_BALANCE_IMPORT_FILE');
+        $paths = $explicitArPath
+            ? [$explicitArPath]
+            : [
+                'docs/AR TRADE/AR TRADE & AR REIMBURSABLE.xlsx',
+                env('OPENING_BALANCE_AP_IMPORT_FILE', 'docs/A-P TRADE.xlsx'),
+            ];
+        if ($explicitArPath && env('OPENING_BALANCE_AP_IMPORT_FILE')) {
+            $paths[] = env('OPENING_BALANCE_AP_IMPORT_FILE');
         }
-        if (!is_file($path)) {
-            throw new RuntimeException('Opening-balance workbook was not found: '.$path);
-        }
-        if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) !== 'xlsx') {
-            throw new RuntimeException('Opening-balance seed file must be an XLSX workbook.');
+
+        $paths = array_values(array_unique(array_filter(array_map(function ($path) {
+            return $this->resolveWorkbookPath($path);
+        }, $paths))));
+        foreach ($paths as $path) {
+            if (!is_file($path)) {
+                throw new RuntimeException('Opening-balance workbook was not found: '.$path);
+            }
+            if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) !== 'xlsx') {
+                throw new RuntimeException('Opening-balance seed file must be an XLSX workbook: '.$path);
+            }
         }
 
         $companyCode = env('OPENING_BALANCE_COMPANY_CODE', 'SJ');
@@ -40,8 +47,38 @@ class OpeningBalanceImportSeeder extends Seeder
         }
 
         $mapping = $this->accountMapping($company->id);
+        $userId = DB::table('users')->where('company_id', $company->id)->orderBy('id')->value('id');
+        if (!$userId) {
+            $userId = DB::table('users')->orderBy('id')->value('id');
+        }
+
+        foreach ($paths as $path) {
+            $this->importWorkbook($importer, $path, $company->id, $mapping, $userId);
+        }
+    }
+
+    private function resolveWorkbookPath($path)
+    {
+        $path = trim((string) $path);
+        if ($path === '') {
+            return null;
+        }
+        $isWindowsAbsolute = strlen($path) >= 3
+            && ctype_alpha($path[0])
+            && $path[1] === ':'
+            && in_array($path[2], ['\\', '/'], true);
+        $isAbsolute = $isWindowsAbsolute || substr($path, 0, 1) === '/';
+        if (!$isAbsolute) {
+            $path = base_path($path);
+        }
+
+        return $path;
+    }
+
+    private function importWorkbook(OpeningBalanceImportService $importer, $path, $companyId, array $mapping, $userId)
+    {
         $fileHash = hash_file('sha256', $path);
-        $preview = $importer->preview($path, $company->id, $mapping, $fileHash);
+        $preview = $importer->preview($path, $companyId, $mapping, $fileHash);
 
         $this->line('Workbook: '.basename($path));
         $this->line('Ready rows: '.$preview['valid_count']);
@@ -67,14 +104,9 @@ class OpeningBalanceImportSeeder extends Seeder
             return;
         }
 
-        $userId = DB::table('users')->where('company_id', $company->id)->orderBy('id')->value('id');
-        if (!$userId) {
-            $userId = DB::table('users')->orderBy('id')->value('id');
-        }
-
         $result = $importer->import(
             $path,
-            $company->id,
+            $companyId,
             $mapping,
             $fileHash,
             basename($path),

@@ -9169,6 +9169,7 @@ class ModuleController extends Controller
             ->select(
                 'sales_documents.id',
                 'sales_documents.document_no',
+                'sales_documents.document_date',
                 'sales_documents.currency',
                 'sales_documents.grand_total',
                 'sales_documents.invoice_amount',
@@ -9203,9 +9204,11 @@ class ModuleController extends Controller
                 return [
                     'id' => $invoice->id,
                     'document_no' => $invoice->document_no,
+                    'document_date' => $invoice->document_date,
                     'currency' => $invoice->currency ?: 'PHP',
                     'grand_total' => (float) $invoice->grand_total,
                     'paid_total' => (float) $invoice->paid_total,
+                    'invoice_total' => $amounts['invoice_total'],
                     'balance' => $amounts['cash_balance'],
                     'cwt_balance' => $amounts['cwt_balance'],
                     'settlement_balance' => $amounts['settlement_balance'],

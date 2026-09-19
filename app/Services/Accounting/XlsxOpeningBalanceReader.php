@@ -157,20 +157,25 @@ class XlsxOpeningBalanceReader
                 continue;
             }
             $headers = $this->headerMap($rows[$headerRow]);
+            $isCompactAp = isset($headers['DATE'], $headers['VENDOR NAME'], $headers['OPEN BALANCE'])
+                && !isset($headers['BRANCH'], $headers['ACCOUNT TYPE']);
 
             foreach ($rows as $rowNumber => $cells) {
                 if ($rowNumber <= $headerRow) {
                     continue;
                 }
 
-                $branch = $this->text($this->mappedCell($cells, $headers, ['BRANCH'], 1));
-                $accountType = $this->text($this->mappedCell($cells, $headers, ['ACCOUNT TYPE', 'ACCOUNT'], 2));
-                $documentType = $this->text($this->mappedCell($cells, $headers, ['DOCUMENT TYPE', 'TYPE'], 3));
-                $partyName = $this->text($this->mappedCell($cells, $headers, ['CUSTOMER NAME', 'VENDOR NAME', 'SUPPLIER NAME', 'PARTY NAME'], 5));
-                $reference = $this->text($this->mappedCell($cells, $headers, ['NUMBER', 'REFERENCE', 'REFERENCE NO', 'DOCUMENT NO'], 6));
-                $rawDate = $this->mappedCell($cells, $headers, ['DATE', 'DOCUMENT DATE'], 4);
-                $amount = $this->number($this->mappedCell($cells, $headers, ['OPENING BALANCE', 'AMOUNT', 'BALANCE'], 7));
+                $branch = $isCompactAp ? 'MAIN' : $this->text($this->mappedCell($cells, $headers, ['BRANCH'], 1));
+                $accountType = $isCompactAp ? 'A/P TRADE' : $this->text($this->mappedCell($cells, $headers, ['ACCOUNT TYPE', 'ACCOUNT'], 2));
+                $documentType = $isCompactAp ? 'VENDOR BILL' : $this->text($this->mappedCell($cells, $headers, ['DOCUMENT TYPE', 'TYPE'], 3));
+                $partyName = $this->text($this->mappedCell($cells, $headers, ['CUSTOMER NAME', 'VENDOR NAME', 'SUPPLIER NAME', 'PARTY NAME'], $isCompactAp ? 2 : 5));
+                $reference = $this->text($this->mappedCell($cells, $headers, ['NUMBER', 'REFERENCE', 'REFERENCE NO', 'DOCUMENT NO', 'DESCRIPTION'], $isCompactAp ? 3 : 6));
+                $rawDate = $this->mappedCell($cells, $headers, ['DATE', 'DOCUMENT DATE'], $isCompactAp ? 1 : 4);
+                $amount = $this->number($this->mappedCell($cells, $headers, ['OPENING BALANCE', 'OPEN BALANCE', 'AMOUNT', 'BALANCE'], $isCompactAp ? 4 : 7));
 
+                if ($isCompactAp && $partyName === '' && $reference === '') {
+                    continue;
+                }
                 if ($branch === '' && $accountType === '' && $partyName === '' && $reference === '') {
                     continue;
                 }
@@ -215,6 +220,11 @@ class XlsxOpeningBalanceReader
             if (in_array('BRANCH', $headers, true)
                 && in_array('ACCOUNT TYPE', $headers, true)
                 && in_array('OPENING BALANCE', $headers, true)) {
+                return $rowNumber;
+            }
+            if (in_array('DATE', $headers, true)
+                && in_array('VENDOR NAME', $headers, true)
+                && in_array('OPEN BALANCE', $headers, true)) {
                 return $rowNumber;
             }
         }

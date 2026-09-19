@@ -237,14 +237,19 @@ class OpeningBalanceImportTest extends TestCase
         $this->accountMapping();
         $customer = DB::table('customers')->where('company_id', 1)->where('is_active', true)->first();
         $supplier = DB::table('suppliers')->where('company_id', 1)->where('is_active', true)->first();
-        $rows = [
+        $arRows = [
             ['MAIN', 'A/R TRADE', 'BILLING INVOICE', '2026-09-01', $customer->name, 'SEED-AR-001', 1000, '', ''],
+        ];
+        $apRows = [
             ['MAIN', 'A/P TRADE', 'VENDOR BILL', '2026-09-02', $supplier->name, 'SEED-AP-001', 500, '', ''],
         ];
-        $path = $this->workbook($rows);
+        $arPath = $this->workbook($arRows);
+        $apPath = $this->workbook($apRows);
 
-        putenv('OPENING_BALANCE_IMPORT_FILE='.$path);
-        $_ENV['OPENING_BALANCE_IMPORT_FILE'] = $path;
+        putenv('OPENING_BALANCE_IMPORT_FILE='.$arPath);
+        putenv('OPENING_BALANCE_AP_IMPORT_FILE='.$apPath);
+        $_ENV['OPENING_BALANCE_IMPORT_FILE'] = $arPath;
+        $_ENV['OPENING_BALANCE_AP_IMPORT_FILE'] = $apPath;
 
         try {
             $exitCode = Artisan::call('db:seed', [
@@ -256,8 +261,9 @@ class OpeningBalanceImportTest extends TestCase
             $this->assertStringContainsString('Created open invoices: 1', $output);
             $this->assertStringContainsString('Created open vendor bills: 1', $output);
             $this->assertStringContainsString('Created customers: 0', $output);
-            $this->assertStringContainsString('Created journals: 2 (Excel dates 2026-09-01 to 2026-09-02)', $output);
-            $this->assertSame(1, DB::table('opening_balance_import_batches')->count());
+            $this->assertStringContainsString('Created journals: 1 (Excel dates 2026-09-01 to 2026-09-01)', $output);
+            $this->assertStringContainsString('Created journals: 1 (Excel dates 2026-09-02 to 2026-09-02)', $output);
+            $this->assertSame(2, DB::table('opening_balance_import_batches')->count());
             $this->assertSame(2, DB::table('journal_entries')->where('source_type', 'opening_balance_import')->count());
             $this->assertDatabaseHas('sales_documents', ['transaction_no' => 'SEED-AR-001']);
             $this->assertDatabaseHas('purchase_documents', ['reference_no' => 'SEED-AP-001']);
@@ -269,20 +275,23 @@ class OpeningBalanceImportTest extends TestCase
             $this->assertSame(0, $exitCode);
             $output = Artisan::output();
             $this->assertStringContainsString('Nothing was imported', $output);
-            $this->assertSame(1, DB::table('opening_balance_import_batches')->count());
+            $this->assertSame(2, DB::table('opening_balance_import_batches')->count());
         } finally {
             putenv('OPENING_BALANCE_IMPORT_FILE');
-            unset($_ENV['OPENING_BALANCE_IMPORT_FILE']);
+            putenv('OPENING_BALANCE_AP_IMPORT_FILE');
+            unset($_ENV['OPENING_BALANCE_IMPORT_FILE'], $_ENV['OPENING_BALANCE_AP_IMPORT_FILE']);
         }
     }
 
-    public function test_default_seed_workbook_is_packaged_with_both_ar_tabs()
+    public function test_default_seed_workbooks_are_packaged_with_ar_and_ap_rows()
     {
-        $path = base_path('docs/AR TRADE/AR TRADE & AR REIMBURSABLE.xlsx');
-        $this->assertFileExists($path);
+        $arPath = base_path('docs/AR TRADE/AR TRADE & AR REIMBURSABLE.xlsx');
+        $apPath = base_path('docs/A-P TRADE.xlsx');
+        $this->assertFileExists($arPath);
+        $this->assertFileExists($apPath);
 
         $counts = [];
-        foreach (app(XlsxOpeningBalanceReader::class)->read($path) as $row) {
+        foreach (app(XlsxOpeningBalanceReader::class)->read($arPath) as $row) {
             $counts[$row['sheet_name']] = ($counts[$row['sheet_name']] ?? 0) + 1;
         }
 
@@ -290,6 +299,12 @@ class OpeningBalanceImportTest extends TestCase
             'AR-TRADE' => 134,
             'AR-REIM' => 116,
         ], $counts);
+
+        $apRows = app(XlsxOpeningBalanceReader::class)->read($apPath);
+        $this->assertCount(43, $apRows);
+        $this->assertSame(['A/P TRADE'], array_values(array_unique(array_column($apRows, 'account_type'))));
+        $this->assertSame(['MAIN'], array_values(array_unique(array_column($apRows, 'branch'))));
+        $this->assertSame(['PHP'], array_values(array_unique(array_column($apRows, 'currency'))));
     }
 
     private function accountMapping()
