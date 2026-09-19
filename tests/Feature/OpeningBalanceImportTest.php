@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\Accounting\PostingService;
+use App\Services\Accounting\XlsxOpeningBalanceReader;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -273,6 +274,22 @@ class OpeningBalanceImportTest extends TestCase
             putenv('OPENING_BALANCE_IMPORT_FILE');
             unset($_ENV['OPENING_BALANCE_IMPORT_FILE']);
         }
+    }
+
+    public function test_default_seed_workbook_is_packaged_with_both_ar_tabs()
+    {
+        $path = base_path('docs/AR TRADE/AR TRADE & AR REIMBURSABLE.xlsx');
+        $this->assertFileExists($path);
+
+        $counts = [];
+        foreach (app(XlsxOpeningBalanceReader::class)->read($path) as $row) {
+            $counts[$row['sheet_name']] = ($counts[$row['sheet_name']] ?? 0) + 1;
+        }
+
+        $this->assertSame([
+            'AR-TRADE' => 134,
+            'AR-REIM' => 116,
+        ], $counts);
     }
 
     private function accountMapping()

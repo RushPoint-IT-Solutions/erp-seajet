@@ -11,7 +11,7 @@ class OpeningBalanceImportSeeder extends Seeder
 {
     public function run(OpeningBalanceImportService $importer)
     {
-        $path = env('OPENING_BALANCE_IMPORT_FILE', 'C:\Users\RUSHPOINT IT\Downloads\AR TRADE & AR REIMBURSABLE.xlsx');
+        $path = env('OPENING_BALANCE_IMPORT_FILE', 'docs/AR TRADE/AR TRADE & AR REIMBURSABLE.xlsx');
         $isWindowsAbsolute = strlen($path) >= 3
             && ctype_alpha($path[0])
             && $path[1] === ':'
