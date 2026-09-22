@@ -9148,6 +9148,9 @@ class ModuleController extends Controller
                 WHEN receipt_applications.component = 'soa' THEN COALESCE(NULLIF(sales_documents.soa_no, ''), sales_documents.document_no)
                 ELSE sales_documents.document_no END";
             $documentReferences = DB::raw('GROUP_CONCAT(DISTINCT '.$referenceExpression.') as document_references');
+            $firstApplications = DB::table('receipt_applications')
+                ->select('receipt_id', 'sales_document_id', DB::raw('MIN(id) as first_id'))
+                ->groupBy('receipt_id', 'sales_document_id');
             $forPaymentAmount = DB::raw("COALESCE(SUM(CASE WHEN sales_documents.id IS NULL THEN 0
                 WHEN receipt_applications.component = 'bi' THEN
                     CASE WHEN COALESCE(sales_documents.invoice_amount, 0) > 0
@@ -9160,8 +9163,7 @@ class ModuleController extends Controller
                         THEN CASE WHEN sales_documents.grand_total > COALESCE(sales_documents.withholding_tax_amount, 0)
                             THEN sales_documents.grand_total - COALESCE(sales_documents.withholding_tax_amount, 0) ELSE 0 END
                         ELSE COALESCE(sales_documents.freight_total, 0) END
-                WHEN receipt_applications.id <> (SELECT MIN(first_application.id) FROM receipt_applications first_application
-                    WHERE first_application.receipt_id = receipts.id AND first_application.sales_document_id = sales_documents.id) THEN 0
+                WHEN first_application.first_id IS NULL THEN 0
                 ELSE CASE WHEN COALESCE(sales_documents.grand_total, 0) > COALESCE(sales_documents.withholding_tax_amount, 0)
                     THEN sales_documents.grand_total - COALESCE(sales_documents.withholding_tax_amount, 0) ELSE 0 END
                 END), 0) as for_payment");
@@ -9170,6 +9172,7 @@ class ModuleController extends Controller
                 ->leftJoin('customers', 'customers.id', '=', 'receipts.customer_id')
                 ->leftJoin('receipt_applications', 'receipt_applications.receipt_id', '=', 'receipts.id')
                 ->leftJoin('sales_documents', 'sales_documents.id', '=', 'receipt_applications.sales_document_id')
+                ->leftJoinSub($firstApplications, 'first_application', 'first_application.first_id', '=', 'receipt_applications.id')
                 ->select(
                     'receipts.id',
                     'receipts.status',

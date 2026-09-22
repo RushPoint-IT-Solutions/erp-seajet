@@ -289,6 +289,33 @@ class RecordPaymentPayableTest extends TestCase
         ])->assertRedirect(route('erp.payments.create'))->assertSessionHasErrors('invoice_no');
     }
 
+    public function test_legacy_receipt_with_multiple_applications_counts_its_invoice_once()
+    {
+        $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
+        DB::table('sales_documents')->where('id', $invoice->id)->update([
+            'invoice_amount' => 112, 'freight_total' => 50,
+            'grand_total' => 162, 'withholding_tax_amount' => 0,
+        ]);
+        $receiptId = DB::table('receipts')->insertGetId([
+            'company_id' => $invoice->company_id, 'customer_id' => $invoice->customer_id,
+            'receipt_no' => 'OR-LEGACY-DUPLICATE', 'receipt_date' => '2026-09-12',
+            'payment_method' => 'Cash', 'amount' => 162, 'status' => 'posted',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        foreach ([112, 50] as $amount) {
+            DB::table('receipt_applications')->insert([
+                'receipt_id' => $receiptId, 'sales_document_id' => $invoice->id,
+                'amount_applied' => $amount, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+
+        $payments = $this->get(route('erp.payments.create'))->assertOk()->original->getData()['payments'];
+        $receipt = collect($payments)->first(function ($payment) {
+            return $payment['number'] === 'OR-LEGACY-DUPLICATE';
+        });
+        $this->assertSame('162.00', $receipt['for_payment']);
+    }
+
     public function test_wrong_combined_payment_can_be_reversed_then_replaced_with_bi_only()
     {
         $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
