@@ -66,7 +66,7 @@
             <div class="modal-header">
                 <div>
                     <h5 class="modal-title mb-1">{{ $paymentModalTitle }}</h5>
-                    <div class="text-muted small">Choose a client, select their unpaid invoices, then save one combined payment.</div>
+                    <div class="text-muted small">Record BI and SOA payments separately. Each payment gets its own receipt number and document reference.</div>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -77,6 +77,15 @@
                         <span class="badge badge-soft">Step 1</span>
                     </div>
                     <div class="row g-3">
+                        <div class="col-lg-6">
+                            <label class="form-label fw-semibold">Payment For</label>
+                            <select name="payment_for" class="form-select payment-for-select" required>
+                                <option value="" selected>Select BI or SOA...</option>
+                                <option value="bi">Billing Invoice (BI) only</option>
+                                <option value="soa">Statement of Account (SOA) only</option>
+                            </select>
+                            <div class="form-text">Save a separate payment if the client pays the other portion.</div>
+                        </div>
                         <div class="col-lg-6">
                             <label class="form-label fw-semibold">Client <span class="text-danger">*</span></label>
                             <select name="customer_id" class="form-select payment-customer-select erp-select" required>
@@ -94,8 +103,25 @@
                             <input type="hidden" name="customer_name" class="payment-customer-name" value="">
                         </div>
                         <div class="col-sm-6 col-lg-3">
+                            <label class="form-label fw-semibold">Class <span class="text-danger">*</span></label>
+                            <select name="class_code" class="form-select payment-class-select" required>
+                                <option value="">Select class...</option>
+                                <option>MANILA</option>
+                                <option>PAMPANGA</option>
+                                <option>CEBU</option>
+                            </select>
+                            <div class="form-text">Uses this class's OR or AR series.</div>
+                        </div>
+                        <div class="col-sm-6 col-lg-3">
                             <label class="form-label fw-semibold">Payment Date</label>
                             <input name="payment_date" type="date" class="form-control" value="{{ date('Y-m-d') }}" required>
+                        </div>
+                        <div class="col-sm-6 col-lg-3">
+                            <label class="form-label fw-semibold">Next Receipt No.</label>
+                            <input class="form-control payment-receipt-preview" readonly
+                                   data-series='@json($receiptSeries['by_class'])'
+                                   placeholder="Choose class and BI or SOA">
+                            <div class="form-text">Confirmed number appears after saving.</div>
                         </div>
                         <div class="col-sm-6 col-lg-3">
                             <label class="form-label fw-semibold">Payment Method</label>
@@ -149,9 +175,12 @@
                         @foreach($invoices as $invoice)
                             <option value="{{ $invoice['document_no'] }}"
                                     data-customer-id="{{ $invoice['customer_id'] }}"
+                                    data-class-code="{{ $invoice['class_code'] }}"
                                     data-customer-name="{{ $invoice['customer_name'] }}"
                                     data-currency="{{ $invoice['currency'] }}"
                                     data-balance="{{ number_format($invoice['balance'], 2, '.', '') }}"
+                                    data-bi-balance="{{ number_format($invoice['bi_balance'], 2, '.', '') }}"
+                                    data-soa-balance="{{ number_format($invoice['soa_balance'], 2, '.', '') }}"
                                     data-cwt-balance="{{ number_format($invoice['cwt_balance'], 2, '.', '') }}"
                                     data-settlement-balance="{{ number_format($invoice['settlement_balance'], 2, '.', '') }}">
                                 {{ $invoice['document_no'] }} - {{ $invoice['customer_name'] }} - {{ $invoice['currency'] }} {{ number_format($invoice['balance'], 2) }}
@@ -165,10 +194,10 @@
                             <tr>
                                 <th class="invoice-check-cell"><input type="checkbox" class="form-check-input payment-select-all" aria-label="Select all visible unpaid invoices" disabled></th>
                                 <th>Date</th>
-                                <th>Invoice No.</th>
-                                <th class="text-end">Original Amount</th>
-                                <th class="text-end">Amount Due</th>
-                                <th class="text-end">For Payment</th>
+                                <th>BI / SOA Reference</th>
+                                <th class="text-end">Invoice Total</th>
+                                <th class="text-end">Selected Balance Due</th>
+                                <th class="text-end">Cash Due</th>
                             </tr>
                             </thead>
                             <tbody>
@@ -176,22 +205,35 @@
                                 <tr class="payment-invoice-row d-none"
                                     data-invoice="{{ $invoice['document_no'] }}"
                                     data-customer-id="{{ $invoice['customer_id'] }}"
+                                    data-class-code="{{ $invoice['class_code'] }}"
                                     data-currency="{{ $invoice['currency'] }}"
                                     data-original="{{ number_format($invoice['invoice_total'], 2, '.', '') }}"
                                     data-balance="{{ number_format($invoice['balance'], 2, '.', '') }}"
+                                    data-bi-balance="{{ number_format($invoice['bi_balance'], 2, '.', '') }}"
+                                    data-soa-balance="{{ number_format($invoice['soa_balance'], 2, '.', '') }}"
+                                    data-bi-reference="{{ $invoice['bi_reference'] }}"
+                                    data-soa-reference="{{ $invoice['soa_reference'] }}"
                                     data-cwt-balance="{{ number_format($invoice['cwt_balance'], 2, '.', '') }}"
                                     data-settlement-balance="{{ number_format($invoice['settlement_balance'], 2, '.', '') }}">
                                     <td class="invoice-check-cell"><input type="checkbox" class="form-check-input payment-invoice-check" value="{{ $invoice['document_no'] }}" aria-label="Select invoice {{ $invoice['document_no'] }}"></td>
                                     <td>{{ $invoice['document_date'] ? \Carbon\Carbon::parse($invoice['document_date'])->format('d/M/Y') : '-' }}</td>
-                                    <td><span class="invoice-no">{{ $invoice['document_no'] }}</span></td>
+                                    <td>
+                                        <span class="invoice-no payment-document-reference">{{ $invoice['bi_reference'] }}</span>
+                                        <div class="small text-muted">
+                                            BI: {{ $invoice['bi_reference'] }}
+                                            @if($invoice['soa_balance'] > 0.005)
+                                                / SOA: {{ $invoice['soa_reference'] }}
+                                            @endif
+                                        </div>
+                                    </td>
                                     <td class="text-end"><span class="payment-currency-prefix">{{ $invoice['currency'] }}</span>{{ number_format($invoice['invoice_total'], 2) }}</td>
                                     <td class="text-end">
-                                        <span class="payment-currency-prefix">{{ $invoice['currency'] }}</span>{{ number_format($invoice['settlement_balance'], 2) }}
+                                        <span class="payment-currency-prefix">{{ $invoice['currency'] }}</span><span class="payment-row-due">{{ number_format($invoice['settlement_balance'], 2) }}</span>
                                         @if($invoice['cwt_balance'] > 0.005)
                                             <div class="invoice-cwt-note">Includes CWT {{ number_format($invoice['cwt_balance'], 2) }}</div>
                                         @endif
                                     </td>
-                                    <td class="text-end fw-semibold"><span class="payment-currency-prefix">{{ $invoice['currency'] }}</span>{{ number_format($invoice['balance'], 2) }}</td>
+                                    <td class="text-end fw-semibold"><span class="payment-currency-prefix">{{ $invoice['currency'] }}</span><span class="payment-row-cash">{{ number_format($invoice['balance'], 2) }}</span></td>
                                 </tr>
                             @endforeach
                             <tr class="payment-invoice-placeholder">
@@ -254,8 +296,6 @@
                 </div>
 
                 <input type="hidden" name="payment_type" value="Customer Payment">
-                <input type="hidden" name="receipt_type" value="Official Receipt">
-                <input type="hidden" name="receipt_no" value="">
             </div>
             <div class="modal-footer">
                 <div class="me-auto small text-muted"><i class="bi bi-info-circle me-1"></i>One receipt will be created for all selected invoices.</div>
@@ -272,6 +312,27 @@
             function numberValue(value) { return parseFloat(String(value || '0').replace(/,/g, '')) || 0; }
             function money(value) { return numberValue(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
             function selectedOptions(form) { return form.find('.payment-invoice-select option:selected'); }
+            function applyPaymentFor(form) {
+                var mode = form.find('.payment-for-select').val() || 'all';
+                form.find('.payment-invoice-select option, .payment-invoice-row').each(function () {
+                    var item = $(this);
+                    var bi = numberValue(item.attr('data-bi-balance'));
+                    var soa = numberValue(item.attr('data-soa-balance'));
+                    var totalCwt = numberValue(item.attr('data-cwt-balance-original') || item.attr('data-cwt-balance'));
+                    if (!item.attr('data-cwt-balance-original')) { item.attr('data-cwt-balance-original', totalCwt); }
+                    var due = mode === 'bi' ? bi : (mode === 'soa' ? soa : 0);
+                    var cwt = mode === 'bi' ? Math.min(bi, totalCwt) : 0;
+                    item.data('settlement-balance', due).data('cwt-balance', cwt).data('balance', Math.max(0, due - cwt));
+                    if (item.is('option') && due <= 0.005) { item.prop('selected', false); }
+                    if (item.is('tr')) {
+                        item.find('.payment-row-due').text(money(due));
+                        item.find('.payment-row-cash').text(money(Math.max(0, due - cwt)));
+                        item.find('.invoice-cwt-note').toggleClass('d-none', cwt <= 0.005);
+                        var reference = mode === 'soa' ? item.attr('data-soa-reference') : item.attr('data-bi-reference');
+                        item.find('.payment-document-reference').text((mode === 'soa' ? 'SOA: ' : 'BI: ') + reference);
+                    }
+                });
+            }
 
             function setCustomerDetails(form) {
                 var option = form.find('.payment-customer-select option:selected');
@@ -281,15 +342,18 @@
 
             function filterInvoices(form) {
                 var customerId = String(form.find('.payment-customer-select').val() || '');
+                var classCode = String(form.find('.payment-class-select').val() || '');
                 var rows = form.find('.payment-invoice-row');
-                var visibleRows = rows.filter(function () { return customerId !== '' && String($(this).data('customer-id')) === customerId; });
+                var visibleRows = rows.filter(function () { return customerId !== '' && String($(this).data('customer-id')) === customerId && (!classCode || String($(this).data('class-code')) === classCode) && numberValue($(this).data('settlement-balance')) > 0.005; });
                 rows.addClass('d-none');
                 visibleRows.removeClass('d-none');
                 form.find('.payment-select-all').prop('disabled', visibleRows.length === 0);
                 form.find('.payment-total-row').toggleClass('d-none', visibleRows.length === 0);
 
                 var placeholder = form.find('.payment-invoice-placeholder');
-                if (!customerId) {
+                if (!form.find('.payment-for-select').val()) {
+                    placeholder.removeClass('d-none').find('td').html('<i class="bi bi-list-check d-block fs-3 mb-2"></i>Choose BI or SOA to view the amount due.');
+                } else if (!customerId) {
                     placeholder.removeClass('d-none').find('td').html('<i class="bi bi-person-lines-fill d-block fs-3 mb-2"></i>Select a client to view their unpaid invoices.');
                 } else if (!visibleRows.length) {
                     placeholder.removeClass('d-none').find('td').html('<i class="bi bi-check-circle d-block fs-3 mb-2 text-success"></i>This client has no unpaid invoices.');
@@ -379,6 +443,16 @@
             }
 
             function refresh(form, fillPaymentAmount) {
+                applyPaymentFor(form);
+                var firstInvoice = selectedOptions(form).first();
+                if (firstInvoice.length && !form.find('.payment-class-select').val()) {
+                    form.find('.payment-class-select').val(String(firstInvoice.data('class-code') || 'MANILA'));
+                }
+                var preview = form.find('.payment-receipt-preview');
+                var mode = form.find('.payment-for-select').val();
+                var classCode = form.find('.payment-class-select').val();
+                var series = preview.data('series') || {};
+                preview.val((series[mode] || {})[classCode] || '');
                 setCustomerDetails(form);
                 syncRowsFromSelect(form);
                 syncTotals(form, fillPaymentAmount);
@@ -390,6 +464,17 @@
                 var customerId = String($(this).val() || '');
                 form.find('.payment-invoice-select option:selected').each(function () {
                     if (String($(this).data('customer-id')) !== customerId) { this.selected = false; }
+                });
+                refresh(form, true);
+            });
+            $(document).on('change', '.payment-modal-form .payment-for-select', function () {
+                refresh($(this).closest('.payment-modal-form'), true);
+            });
+            $(document).on('change', '.payment-modal-form .payment-class-select', function () {
+                var form = $(this).closest('.payment-modal-form');
+                var classCode = String($(this).val() || '');
+                form.find('.payment-invoice-select option:selected').each(function () {
+                    if (classCode && String($(this).data('class-code')) !== classCode) { this.selected = false; }
                 });
                 refresh(form, true);
             });
@@ -423,6 +508,10 @@
                 var first = selectedOptions(form).first();
                 if (first.length && String(form.find('.payment-customer-select').val() || '') !== String(first.data('customer-id'))) {
                     form.find('.payment-customer-select').val(String(first.data('customer-id'))).trigger('change');
+                    return;
+                }
+                if (first.length && String(form.find('.payment-class-select').val() || '') !== String(first.data('class-code'))) {
+                    form.find('.payment-class-select').val(String(first.data('class-code'))).trigger('change');
                     return;
                 }
                 refresh(form, true);

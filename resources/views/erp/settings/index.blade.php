@@ -240,13 +240,15 @@
         </section>
 
         <section class="erp-card p-3" id="number-series">
-            <h2 class="h6 fw-bold mb-3">Number Series</h2>
+            <h2 class="h6 fw-bold mb-1">Number Series</h2>
+            <p class="small text-muted mb-3">Set Current No. to one less than the first BI, OR, or AR number you want to issue for each class.</p>
             <form method="post" action="{{ route('erp.settings.number-series.save') }}" class="settings-form settings-edit-form mb-3">
                 {{ csrf_field() }}<input type="hidden" name="id">
                 <div class="row g-2">
-                    <div class="col-md-4"><label class="form-label small text-muted">Document Type</label><input name="document_type" class="form-control form-control-sm" required></div>
+                    <div class="col-md-3"><label class="form-label small text-muted">Document Type</label><input name="document_type" class="form-control form-control-sm" required></div>
+                    <div class="col-md-2"><label class="form-label small text-muted">Class</label><select name="class_code" class="form-select form-select-sm"><option value="">Global / legacy</option><option>MANILA</option><option>PAMPANGA</option><option>CEBU</option></select></div>
                     <div class="col-md-2"><label class="form-label small text-muted">Prefix</label><input name="prefix" class="form-control form-control-sm"></div>
-                    <div class="col-md-3"><label class="form-label small text-muted">Current No.</label><input name="current_number" type="number" class="form-control form-control-sm" required></div>
+                    <div class="col-md-2"><label class="form-label small text-muted">Current No.</label><input name="current_number" type="number" min="0" class="form-control form-control-sm" required></div>
                     <div class="col-md-2"><label class="form-label small text-muted">Padding</label><input name="padding" type="number" class="form-control form-control-sm" value="5" required></div>
                     <div class="col-md-1 d-flex align-items-end"><input type="checkbox" name="is_active" value="1" class="form-check-input mb-2" checked></div>
                 </div>
@@ -254,15 +256,15 @@
             </form>
             <div class="settings-table table-responsive">
                 <table class="table table-sm table-hover align-middle mb-0">
-                    <thead><tr><th>Document</th><th>Prefix</th><th>Current</th><th>Next</th><th>Padding</th><th>Status</th><th></th></tr></thead>
+                    <thead><tr><th>Document</th><th>Class</th><th>Prefix</th><th>Current</th><th>Next</th><th>Padding</th><th>Status</th><th></th></tr></thead>
                     <tbody>
                     @forelse($numberSeries as $series)
                         <tr>
-                            <td class="fw-semibold">{{ $series->document_type }}</td><td>{{ $series->prefix }}</td><td>{{ $series->current_number }}</td><td>{{ $series->prefix }}{{ str_pad($series->current_number + 1, $series->padding, '0', STR_PAD_LEFT) }}</td><td>{{ $series->padding }}</td><td>{{ $series->is_active ? 'Active' : 'Inactive' }}</td>
+                            <td class="fw-semibold">{{ $series->document_type }}</td><td>{{ $series->class_code ?: 'Global' }}</td><td>{{ $series->prefix }}</td><td>{{ $series->current_number }}</td><td>{{ $series->prefix }}{{ str_pad($series->current_number + 1, $series->padding, '0', STR_PAD_LEFT) }}</td><td>{{ $series->padding }}</td><td>{{ $series->is_active ? 'Active' : 'Inactive' }}</td>
                             <td class="text-end"><button type="button" class="btn btn-sm btn-outline-secondary edit-row" data-form="#number-series form" data-row='@json($series)'><i class="bi bi-pencil"></i></button></td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="text-center text-muted">No number series yet.</td></tr>
+                        <tr><td colspan="8" class="text-center text-muted">No number series yet.</td></tr>
                     @endforelse
                     </tbody>
                 </table>

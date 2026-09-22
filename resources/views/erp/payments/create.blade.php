@@ -52,6 +52,12 @@
 @endpush
 
 @section('content')
+    @if(session('status'))
+        <div class="alert alert-info">{{ session('status') }}</div>
+    @endif
+    @if($errors->any())
+        <div class="alert alert-danger">{{ $errors->first() }}</div>
+    @endif
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
         <div>
             <h1 class="h3 fw-bold mb-1">Payments</h1>
@@ -99,7 +105,6 @@
                     <option value="All">All Status</option>
                     <option value="Posted">Posted</option>
                     <option value="Draft">Draft</option>
-                    <option value="Voided">Voided</option>
                 </select>
                 <select class="form-select" id="typeFilter" style="width: 180px">
                     <option value="All">All Methods</option>
@@ -118,8 +123,9 @@
                 <tr>
                     <th>Status</th>
                     <th>Receipt No.</th>
+                    <th>Paid For</th>
                     <th class="client-cell">Client</th>
-                    <th>Invoice No(s).</th>
+                    <th>BI / SOA Reference</th>
                     <th>Method</th>
                     <th>Reference</th>
                     <th>Date</th>
@@ -153,8 +159,9 @@
                         data-reference="{{ $payment['reference_no'] }}">
                         <td><span class="payment-status {{ $statusClass }}">{{ $payment['status'] }}</span></td>
                         <td class="fw-semibold">{{ $payment['number'] }}</td>
+                        <td>{{ $payment['paid_for'] }}</td>
                         <td class="client-cell">{{ $payment['client'] }}</td>
-                        <td>{{ $payment['invoice_number'] ?: '-' }}</td>
+                        <td>{{ $payment['document_reference'] ?: '-' }}</td>
                         <td>{{ $payment['payment_method'] ?: '-' }}</td>
                         <td>{{ $payment['reference_no'] ?: '-' }}</td>
                         <td>{{ $payment['date'] ? \Carbon\Carbon::parse($payment['date'])->format('d/M/Y') : '-' }}</td>
@@ -162,9 +169,13 @@
                         <td class="text-end">{{ $payment['currency'] === 'PHP' ? 'PHP' : $payment['currency'] }} {{ $payment['amount'] }}</td>
                         <td class="text-end">
                             <div class="d-inline-flex gap-1">
-                                <button type="button" class="btn btn-sm btn-outline-primary edit-payment" data-bs-toggle="modal" data-bs-target="#paymentModal">
-                                    <i class="bi bi-pencil-square"></i>
+                                <button type="button" class="btn btn-sm btn-outline-primary correct-payment"
+                                        data-bs-toggle="modal" data-bs-target="#correctPaymentModal"
+                                        data-url="{{ route('erp.payments.correct', $payment['id']) }}"
+                                        data-receipt="{{ $payment['number'] }}" title="Correct posted payment">
+                                    <i class="bi bi-arrow-counterclockwise"></i>
                                 </button>
+                                @if($payment['can_print_or'])
                                 <div class="btn-group">
                                     <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-receipt me-1"></i>OR</button>
                                     <ul class="dropdown-menu dropdown-menu-end">
@@ -172,6 +183,8 @@
                                         <li><a class="dropdown-item" target="_blank" href="{{ route('erp.official-receipt.preview', array_merge($receiptQuery, ['tax_print' => 'non_vat'])) }}">Non-VAT Print</a></li>
                                     </ul>
                                 </div>
+                                @endif
+                                @if($payment['can_print_ar'])
                                 <div class="btn-group">
                                     <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-receipt-cutoff me-1"></i>AR</button>
                                     <ul class="dropdown-menu dropdown-menu-end">
@@ -179,13 +192,14 @@
                                         <li><a class="dropdown-item" target="_blank" href="{{ route('erp.acknowledgement-receipt.preview', array_merge($receiptQuery, ['tax_print' => 'non_vat'])) }}">Non-VAT Print</a></li>
                                     </ul>
                                 </div>
+                                @endif
                             </div>
                         </td>
                     </tr>
                 @endforeach
                 @if(count($payments) === 0)
                     <tr>
-                        <td colspan="10" class="text-center text-muted py-5">No payment records found.</td>
+                        <td colspan="11" class="text-center text-muted py-5">No payment records found.</td>
                     </tr>
                 @endif
                 </tbody>
@@ -194,6 +208,21 @@
     </div>
 
     @include('erp.payments._payment-modal', ['paymentModalId' => 'paymentModal', 'paymentModalTitle' => 'Receive Payment'])
+
+    <div class="modal fade" id="correctPaymentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="post" class="modal-content" id="correctPaymentForm">
+                {{ csrf_field() }}
+                <div class="modal-header"><h5 class="modal-title">Correct posted payment</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <p>Receipt <strong id="correctReceiptNumber"></strong> will be reversed. Its BI and SOA balances will reopen so you can record the correct payment. The original receipt stays in the accounting audit trail.</p>
+                    <label class="form-label fw-semibold" for="correctionReason">Reason for correction</label>
+                    <textarea id="correctionReason" name="reason" class="form-control" rows="2" minlength="5" maxlength="1000" required></textarea>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Reverse and reopen</button></div>
+            </form>
+        </div>
+    </div>
 @endsection
 
 @push('scripts')
@@ -204,56 +233,10 @@
         var modalEl = document.getElementById('paymentModal');
         var paymentModal = modalEl ? new bootstrap.Modal(modalEl) : null;
 
-        function syncCustomer(form) {
-            var option = form.find('.payment-customer-select option:selected');
-            form.find('.payment-customer-name').val(option.data('name') || '');
-            if (option.data('currency')) {
-                form.find('.payment-currency-select').val(option.data('currency'));
-            }
-        }
-
-        function syncInvoice(form) {
-            var options = form.find('.payment-invoice-select option:selected');
-            var firstOption = options.first();
-            var cashBalance = 0;
-            var cwtBalance = 0;
-
-            options.each(function () {
-                cashBalance += parseFloat($(this).data('balance')) || 0;
-                cwtBalance += parseFloat($(this).data('cwt-balance')) || 0;
-            });
-
-            if (firstOption.data('customer-id')) {
-                form.find('.payment-customer-select').val(firstOption.data('customer-id')).trigger('change');
-            }
-            if (firstOption.data('currency')) {
-                form.find('.payment-currency-select').val(firstOption.data('currency'));
-            }
-            if (options.length) {
-                form.find('.payment-amount-input').val(cashBalance.toFixed(2));
-            }
-            form.find('.payment-cwt-input').val(cwtBalance.toFixed(2));
-        }
-
-        $('.payment-customer-select').on('change', function () {
-            syncCustomer($(this).closest('form'));
-        });
-
-        $('.payment-invoice-select').on('change', function () {
-            syncInvoice($(this).closest('form'));
-        });
-
-        $('.edit-payment').on('click', function () {
-            var row = $(this).closest('tr');
-            var form = $('#paymentModal').find('form');
-            var invoiceNumbers = String(row.data('invoice') || '').split(',').map(function (value) {
-                return value.trim();
-            }).filter(Boolean);
-            form.find('.payment-invoice-select').val(invoiceNumbers).trigger('change');
-            form.find('.payment-amount-input').val(row.data('amount'));
-            form.find('.payment-currency-select').val(row.data('currency'));
-            form.find('input[name="payment_date"]').val(row.data('date'));
-            form.find('input[name="reference_no"]').val(row.data('reference'));
+        $('.correct-payment').on('click', function () {
+            $('#correctPaymentForm').attr('action', $(this).data('url'));
+            $('#correctReceiptNumber').text($(this).data('receipt'));
+            $('#correctionReason').val('');
         });
 
         $('#paymentSearch, #statusFilter, #typeFilter').on('input change', filterPayments);
@@ -283,6 +266,12 @@
 
         if (requestedInvoice) {
             var form = $('#paymentModal').find('form');
+            var requestedPaymentFor = @json(request('payment_for', ''));
+            var requestedOption = form.find('.payment-invoice-select option').filter(function () { return this.value === requestedInvoice; });
+            if (!requestedPaymentFor && requestedOption.length) {
+                requestedPaymentFor = (parseFloat(requestedOption.attr('data-bi-balance')) || 0) > 0 ? 'bi' : 'soa';
+            }
+            form.find('.payment-for-select').val(requestedPaymentFor).trigger('change');
             form.find('.payment-invoice-select').val([requestedInvoice]).trigger('change');
             if (paymentModal) {
                 paymentModal.show();

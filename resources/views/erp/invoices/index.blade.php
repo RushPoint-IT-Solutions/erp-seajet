@@ -244,40 +244,14 @@
     @endif
 
     $(function () {
-        function syncCustomer(form) {
-            var option = form.find('.payment-customer-select option:selected');
-            form.find('.payment-customer-name').val(option.data('name') || '');
-            if (option.data('currency')) {
-                form.find('.payment-currency-select').val(option.data('currency'));
-            }
-        }
-
-        function syncInvoice(form) {
-            var option = form.find('.payment-invoice-select option:selected');
-            if (option.data('customer-id')) {
-                form.find('.payment-customer-select').val(option.data('customer-id')).trigger('change');
-            }
-            if (option.data('currency')) {
-                form.find('.payment-currency-select').val(option.data('currency'));
-            }
-            if (option.data('balance')) {
-                form.find('.payment-amount-input').val(option.data('balance'));
-            }
-            form.find('.payment-cwt-input').val(option.data('cwt-balance') || '0.00');
-        }
-
-        $('#invoicePaymentModal .payment-customer-select').on('change', function () {
-            syncCustomer($(this).closest('form'));
-        });
-
-        $('#invoicePaymentModal .payment-invoice-select').on('change', function () {
-            syncInvoice($(this).closest('form'));
-        });
-
         $(document).on('click', '.invoice-payment-button', function () {
             var form = $('#invoicePaymentModal').find('form');
             form[0].reset();
-            form.find('.payment-invoice-select').val($(this).data('invoice')).trigger('change');
+            var invoiceNo = String($(this).data('invoice'));
+            var option = form.find('.payment-invoice-select option').filter(function () { return this.value === invoiceNo; });
+            var mode = (parseFloat(option.attr('data-bi-balance')) || 0) > 0 ? 'bi' : 'soa';
+            form.find('.payment-for-select').val(mode).trigger('change');
+            form.find('.payment-invoice-select').val([invoiceNo]).trigger('change');
         });
     });
 </script>

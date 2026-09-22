@@ -265,7 +265,7 @@ class PostingService
             $applications = DB::table('receipt_applications')
                 ->join('sales_documents', 'sales_documents.id', '=', 'receipt_applications.sales_document_id')
                 ->where('receipt_applications.receipt_id', $receipt->id)
-                ->select('receipt_applications.amount_applied', 'sales_documents.*')
+                ->select('receipt_applications.amount_applied', 'receipt_applications.component', 'sales_documents.*')
                 ->get();
             $lines = [
                 $this->line(
@@ -301,7 +301,11 @@ class PostingService
                 $applicationAmount = max(0, (float) $application->amount_applied);
                 $applied += $applicationAmount;
                 $lines[] = $this->line(
-                    $this->salesReceivableAccount($application),
+                    $application->component === 'soa'
+                        && !in_array(strtolower((string) $application->document_type), ['soa', 'soa_a', 'statement_of_account_a'], true)
+                        ? ($this->openingBalanceControlAccount($application)
+                            ?: $this->controlAccount($receipt->company_id, 'ar_reimbursable'))
+                        : $this->salesReceivableAccount($application),
                     'Applied to '.$application->document_no,
                     0,
                     $applicationAmount,

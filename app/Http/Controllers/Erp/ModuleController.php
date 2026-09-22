@@ -5009,9 +5009,10 @@ class ModuleController extends Controller
             ->get();
     }
 
-    private function nextDocumentNumber($documentType, $prefix, $padding = 5, $increment = true)
+    private function nextDocumentNumber($documentType, $prefix, $padding = 5, $increment = true, $classCode = '')
     {
         $companyId = $this->defaultCompanyId();
+        $classCode = strtoupper(trim((string) $classCode));
 
         if (!Schema::hasTable('number_series')) {
             return $prefix.date('YmdHis');
@@ -5020,6 +5021,7 @@ class ModuleController extends Controller
         $series = DB::table('number_series')
             ->where('company_id', $companyId)
             ->where('document_type', $documentType)
+            ->where('class_code', $classCode)
             ->lockForUpdate()
             ->first();
 
@@ -5027,6 +5029,7 @@ class ModuleController extends Controller
             DB::table('number_series')->insert([
                 'company_id' => $companyId,
                 'document_type' => $documentType,
+                'class_code' => $classCode,
                 'prefix' => $prefix,
                 'current_number' => 0,
                 'padding' => $padding,
@@ -5037,6 +5040,7 @@ class ModuleController extends Controller
             $series = DB::table('number_series')
                 ->where('company_id', $companyId)
                 ->where('document_type', $documentType)
+                ->where('class_code', $classCode)
                 ->first();
         }
 
@@ -5068,6 +5072,9 @@ class ModuleController extends Controller
             'vendor_bill_m' => ['purchase_documents', 'document_no'],
             'payment_voucher' => ['payments', 'payment_no'],
             'check_voucher' => ['payments', 'voucher_no'],
+            'official_receipt' => ['receipts', 'receipt_no'],
+            'acknowledgement_receipt' => ['receipts', 'receipt_no'],
+            'billing_invoice' => ['sales_documents', 'document_no'],
             'journal_voucher' => ['journal_entries', 'journal_no'],
         ];
 
@@ -6689,6 +6696,7 @@ class ModuleController extends Controller
             'customers' => $this->customerSelectOptions(),
             'invoiceTemplates' => $this->invoiceTemplates(),
             'items' => $this->invoiceItemOptions(),
+            'invoiceSeries' => $this->classNumberPreview('billing_invoice', 6),
         ]);
     }
 
@@ -6761,6 +6769,7 @@ class ModuleController extends Controller
             'agingSummary' => $agingSummary,
             'paymentCustomers' => $this->paymentCustomerOptions(),
             'paymentInvoices' => $this->paymentInvoiceOptions(),
+            'receiptSeries' => $this->paymentReceiptSeries(),
         ]);
     }
 
@@ -6798,6 +6807,7 @@ class ModuleController extends Controller
             'printDocuments' => $printDocuments,
             'paymentCustomers' => $this->paymentCustomerOptions(),
             'paymentInvoices' => $this->paymentInvoiceOptions(),
+            'receiptSeries' => $this->paymentReceiptSeries(),
         ]);
     }
 
@@ -6817,6 +6827,7 @@ class ModuleController extends Controller
             'customers' => $this->customerSelectOptions(),
             'invoiceTemplates' => $this->invoiceTemplates(),
             'items' => $this->invoiceItemOptions(),
+            'invoiceSeries' => $this->classNumberPreview('billing_invoice', 6),
         ]);
     }
 
@@ -7731,7 +7742,7 @@ class ModuleController extends Controller
                     'address' => $customer->billing_address,
                     'terms' => $customer->payment_terms,
                     'currency' => $customer->currency ?: 'PHP',
-                    'class' => $customer->default_class_code ?: 'MANILA',
+                    'class' => $this->seriesClassCode($customer->default_class_code),
                     'vat_classification' => $taxClassification,
                 ];
             })
@@ -8119,7 +8130,40 @@ class ModuleController extends Controller
         return 'billing_invoice';
     }
 
-    private function nextSalesDocumentNumber(array $templates)
+    private function classNumberPrefix($documentType, $classCode)
+    {
+        $labels = [
+            'billing_invoice' => 'BI',
+            'official_receipt' => 'OR',
+            'acknowledgement_receipt' => 'AR',
+        ];
+        $classes = ['MANILA' => 'MNL', 'PAMPANGA' => 'PAM', 'CEBU' => 'CEB'];
+
+        return $labels[$documentType].'-'.$classes[$classCode].'-';
+    }
+
+    private function seriesClassCode($classCode)
+    {
+        $code = strtoupper(trim((string) $classCode));
+        return [
+            'MAIN' => 'MANILA', 'MNL' => 'MANILA',
+            'PAM' => 'PAMPANGA', 'CEB' => 'CEBU',
+        ][$code] ?? ($code ?: 'MANILA');
+    }
+
+    private function classNumberPreview($documentType, $padding)
+    {
+        $numbers = [];
+        foreach (['MANILA', 'PAMPANGA', 'CEBU'] as $classCode) {
+            $numbers[$classCode] = $this->nextDocumentNumber(
+                $documentType, $this->classNumberPrefix($documentType, $classCode), $padding, false, $classCode
+            );
+        }
+
+        return $numbers;
+    }
+
+    private function nextSalesDocumentNumber(array $templates, $classCode)
     {
         if (in_array('SOA_A', $templates, true)) {
             return $this->nextDocumentNumber('statement_of_account_a', 'SOAA-', 4);
@@ -8129,7 +8173,9 @@ class ModuleController extends Controller
             return $this->nextDocumentNumber('debit_note', 'DN-', 6);
         }
 
-        return $this->nextDocumentNumber('billing_invoice', 'BI-', 6);
+        return $this->nextDocumentNumber(
+            'billing_invoice', $this->classNumberPrefix('billing_invoice', $classCode), 6, true, $classCode
+        );
     }
 
     private function arAccountCode($label)
@@ -8992,6 +9038,7 @@ class ModuleController extends Controller
         ]);
 
         request()->validate([
+            'class_code' => 'required|in:MANILA,PAMPANGA,CEBU',
             'withholding_tax_rate' => 'nullable|numeric|min:0|max:100',
             'line_withholding_rate' => 'nullable|array',
             'line_withholding_rate.*' => 'nullable|numeric|min:0|max:100',
@@ -9001,19 +9048,22 @@ class ModuleController extends Controller
         $selectedTemplates = array_values(array_filter(array_map('trim', (array) ($data['invoice_template'] ?? []))));
         $invoiceNo = trim((string) ($data['invoice_no'] ?? ''));
         $transactionNo = trim((string) ($data['transaction_no'] ?? ''));
+        $autoNumber = $invoiceNo === '' && $transactionNo === '' && $originalInvoiceNo === '';
         $data['invoice_no'] = $invoiceNo !== ''
             ? $invoiceNo
-            : ($transactionNo !== '' ? $transactionNo : ($originalInvoiceNo !== '' ? $originalInvoiceNo : $this->nextSalesDocumentNumber($selectedTemplates)));
+            : ($transactionNo !== '' ? $transactionNo : $originalInvoiceNo);
         $data['transaction_no'] = $data['invoice_no'];
 
-        $duplicateQuery = DB::table('sales_documents')
-            ->where('company_id', $this->defaultCompanyId())
-            ->where('document_no', $data['invoice_no']);
-        if ($originalInvoiceNo !== '') {
-            $duplicateQuery->where('document_no', '<>', $originalInvoiceNo);
-        }
-        if ($duplicateQuery->exists()) {
-            return redirect()->back()->withInput()->withErrors(['invoice_no' => 'This invoice number already exists.']);
+        if (!$autoNumber) {
+            $duplicateQuery = DB::table('sales_documents')
+                ->where('company_id', $this->defaultCompanyId())
+                ->where('document_no', $data['invoice_no']);
+            if ($originalInvoiceNo !== '') {
+                $duplicateQuery->where('document_no', '<>', $originalInvoiceNo);
+            }
+            if ($duplicateQuery->exists()) {
+                return redirect()->back()->withInput()->withErrors(['invoice_no' => 'This invoice number already exists.']);
+            }
         }
 
         $totals = $this->billingTotals($data);
@@ -9029,7 +9079,11 @@ class ModuleController extends Controller
         }
 
         $shouldPost = request('save_mode') === 'post';
-        $savedInvoice = DB::transaction(function () use ($data, $totals, $shouldPost) {
+        $savedInvoice = DB::transaction(function () use ($data, $totals, $shouldPost, $autoNumber, $selectedTemplates) {
+            if ($autoNumber) {
+                $data['invoice_no'] = $this->nextSalesDocumentNumber($selectedTemplates, $data['class_code']);
+                $data['transaction_no'] = $data['invoice_no'];
+            }
             $savedInvoice = $this->saveInvoiceData($data, $totals);
             if ($shouldPost) {
                 app(PostingService::class)->postSalesDocument($savedInvoice->id);
@@ -9041,6 +9095,7 @@ class ModuleController extends Controller
 
             return $savedInvoice;
         });
+        $data['invoice_no'] = $savedInvoice->document_no;
         $data['id'] = $savedInvoice->id;
         $data['status'] = $savedInvoice->status;
         $data['saved_message'] = request('save_mode') === 'post'
@@ -9063,22 +9118,53 @@ class ModuleController extends Controller
         $customers = $this->paymentCustomerOptions();
         $invoices = $this->paymentInvoiceOptions();
         $payments = $this->paymentRows();
+        $receiptSeries = $this->paymentReceiptSeries();
 
         $bankAccounts = $this->bankAccounts();
 
-        return view('erp.payments.create', compact('customers', 'invoices', 'payments', 'bankAccounts'));
+        return view('erp.payments.create', compact('customers', 'invoices', 'payments', 'bankAccounts', 'receiptSeries'));
+    }
+
+    private function paymentReceiptSeries()
+    {
+        $orNumbers = $this->classNumberPreview('official_receipt', 5);
+        $arNumbers = $this->classNumberPreview('acknowledgement_receipt', 6);
+
+        return [
+            'bi' => $orNumbers['MANILA'],
+            'soa' => $arNumbers['MANILA'],
+            'by_class' => ['bi' => $orNumbers, 'soa' => $arNumbers],
+        ];
     }
 
     private function paymentRows()
     {
         if (Schema::hasTable('receipts')) {
             $invoiceNumbers = DB::connection()->getDriverName() === 'sqlite'
-                ? DB::raw('GROUP_CONCAT(sales_documents.document_no, ", ") as invoice_numbers')
-                : DB::raw('GROUP_CONCAT(sales_documents.document_no ORDER BY sales_documents.document_no SEPARATOR ", ") as invoice_numbers');
-            $forPaymentAmount = DB::raw('COALESCE(SUM(CASE WHEN sales_documents.id IS NULL THEN 0 '
-                .'WHEN (COALESCE(sales_documents.grand_total, 0) - COALESCE(sales_documents.withholding_tax_amount, 0)) > 0 '
-                .'THEN COALESCE(sales_documents.grand_total, 0) - COALESCE(sales_documents.withholding_tax_amount, 0) '
-                .'ELSE 0 END), 0) as for_payment');
+                ? DB::raw('GROUP_CONCAT(DISTINCT sales_documents.document_no) as invoice_numbers')
+                : DB::raw('GROUP_CONCAT(DISTINCT sales_documents.document_no ORDER BY sales_documents.document_no SEPARATOR ", ") as invoice_numbers');
+            $referenceExpression = "CASE WHEN sales_documents.opening_balance_control_account_id IS NOT NULL
+                AND sales_documents.transaction_no IS NOT NULL THEN sales_documents.transaction_no
+                WHEN receipt_applications.component = 'soa' THEN COALESCE(NULLIF(sales_documents.soa_no, ''), sales_documents.document_no)
+                ELSE sales_documents.document_no END";
+            $documentReferences = DB::raw('GROUP_CONCAT(DISTINCT '.$referenceExpression.') as document_references');
+            $forPaymentAmount = DB::raw("COALESCE(SUM(CASE WHEN sales_documents.id IS NULL THEN 0
+                WHEN receipt_applications.component = 'bi' THEN
+                    CASE WHEN COALESCE(sales_documents.invoice_amount, 0) > 0
+                        THEN CASE WHEN sales_documents.invoice_amount > COALESCE(sales_documents.withholding_tax_amount, 0)
+                            THEN sales_documents.invoice_amount - COALESCE(sales_documents.withholding_tax_amount, 0) ELSE 0 END
+                        ELSE CASE WHEN sales_documents.grand_total > COALESCE(sales_documents.freight_total, 0) + COALESCE(sales_documents.withholding_tax_amount, 0)
+                            THEN sales_documents.grand_total - COALESCE(sales_documents.freight_total, 0) - COALESCE(sales_documents.withholding_tax_amount, 0) ELSE 0 END END
+                WHEN receipt_applications.component = 'soa' THEN
+                    CASE WHEN LOWER(sales_documents.document_type) IN ('soa', 'soa_a', 'statement_of_account_a')
+                        THEN CASE WHEN sales_documents.grand_total > COALESCE(sales_documents.withholding_tax_amount, 0)
+                            THEN sales_documents.grand_total - COALESCE(sales_documents.withholding_tax_amount, 0) ELSE 0 END
+                        ELSE COALESCE(sales_documents.freight_total, 0) END
+                WHEN receipt_applications.id <> (SELECT MIN(first_application.id) FROM receipt_applications first_application
+                    WHERE first_application.receipt_id = receipts.id AND first_application.sales_document_id = sales_documents.id) THEN 0
+                ELSE CASE WHEN COALESCE(sales_documents.grand_total, 0) > COALESCE(sales_documents.withholding_tax_amount, 0)
+                    THEN sales_documents.grand_total - COALESCE(sales_documents.withholding_tax_amount, 0) ELSE 0 END
+                END), 0) as for_payment");
 
             return DB::table('receipts')
                 ->leftJoin('customers', 'customers.id', '=', 'receipts.customer_id')
@@ -9094,10 +9180,15 @@ class ModuleController extends Controller
                     'receipts.payment_method',
                     'receipts.reference_no',
                     'customers.name as customer_name',
+                    DB::raw("MAX(CASE WHEN receipt_applications.component = 'bi' THEN 1 ELSE 0 END) as has_bi"),
+                    DB::raw("MAX(CASE WHEN receipt_applications.component = 'soa' THEN 1 ELSE 0 END) as has_soa"),
+                    DB::raw('MAX(CASE WHEN receipt_applications.component IS NULL THEN 1 ELSE 0 END) as has_legacy'),
                     $invoiceNumbers,
+                    $documentReferences,
                     $forPaymentAmount
                 )
                 ->where('receipts.company_id', $this->defaultCompanyId())
+                ->whereNotIn('receipts.status', ['voided', 'cancelled'])
                 ->groupBy(
                     'receipts.id',
                     'receipts.status',
@@ -9123,9 +9214,13 @@ class ModuleController extends Controller
                         'for_payment' => number_format((float) $payment->for_payment, 2),
                         'amount' => number_format((float) $payment->amount, 2),
                         'invoice_number' => $payment->invoice_numbers ?: '',
+                        'document_reference' => $payment->document_references ?: '',
+                        'paid_for' => $payment->has_bi && !$payment->has_soa ? 'BI' : ($payment->has_soa && !$payment->has_bi ? 'SOA' : 'Legacy'),
                         'date' => $payment->receipt_date,
                         'payment_method' => $payment->payment_method,
                         'reference_no' => $payment->reference_no,
+                        'can_print_or' => (bool) ($payment->has_bi || $payment->has_legacy),
+                        'can_print_ar' => (bool) ($payment->has_soa || $payment->has_legacy),
                     ];
                 })
                 ->all();
@@ -9168,15 +9263,20 @@ class ModuleController extends Controller
             ->leftJoin('customers', 'customers.id', '=', 'sales_documents.customer_id')
             ->select(
                 'sales_documents.id',
+                'sales_documents.document_type',
                 'sales_documents.document_no',
                 'sales_documents.document_date',
                 'sales_documents.currency',
                 'sales_documents.grand_total',
                 'sales_documents.invoice_amount',
                 'sales_documents.freight_total',
+                'sales_documents.soa_no',
+                'sales_documents.transaction_no',
+                'sales_documents.opening_balance_control_account_id',
                 'sales_documents.withholding_tax_amount',
                 'sales_documents.paid_total',
                 'sales_documents.customer_id',
+                'sales_documents.class_code',
                 'customers.name as customer_name'
             )
             ->where('sales_documents.company_id', $this->defaultCompanyId())
@@ -9187,19 +9287,31 @@ class ModuleController extends Controller
             ->get();
 
         $appliedCwt = collect();
+        $componentApplications = collect();
+        if (Schema::hasTable('receipt_applications') && Schema::hasColumn('receipt_applications', 'component') && Schema::hasTable('receipts')) {
+            $componentApplications = DB::table('receipt_applications')
+                ->join('receipts', 'receipts.id', '=', 'receipt_applications.receipt_id')
+                ->whereIn('receipt_applications.sales_document_id', $invoices->pluck('id')->all())
+                ->whereNotIn('receipts.status', ['cancelled', 'voided'])
+                ->select('receipt_applications.sales_document_id', 'receipt_applications.component', 'receipt_applications.amount_applied')
+                ->get()
+                ->groupBy('sales_document_id');
+        }
         if (Schema::hasTable('receipt_applications') && Schema::hasTable('receipts') && Schema::hasColumn('receipts', 'cwt_amount')) {
             $appliedCwt = DB::table('receipt_applications')
                 ->join('receipts', 'receipts.id', '=', 'receipt_applications.receipt_id')
                 ->whereIn('receipt_applications.sales_document_id', $invoices->pluck('id')->all())
                 ->whereNotIn('receipts.status', ['cancelled', 'voided'])
-                ->groupBy('receipt_applications.sales_document_id')
-                ->selectRaw('receipt_applications.sales_document_id, COALESCE(SUM(receipts.cwt_amount), 0) as cwt_total')
-                ->pluck('cwt_total', 'sales_document_id');
+                ->select('receipt_applications.sales_document_id', 'receipts.id as receipt_id', 'receipts.cwt_amount')
+                ->distinct()
+                ->get()
+                ->groupBy('sales_document_id')
+                ->map(function ($rows) { return $rows->sum('cwt_amount'); });
         }
 
         return $invoices
-            ->map(function ($invoice) use ($appliedCwt) {
-                $amounts = $this->paymentInvoiceAmounts($invoice, (float) $appliedCwt->get($invoice->id, 0));
+            ->map(function ($invoice) use ($appliedCwt, $componentApplications) {
+                $amounts = $this->paymentInvoiceAmounts($invoice, (float) $appliedCwt->get($invoice->id, 0), $componentApplications->get($invoice->id, collect()));
 
                 return [
                     'id' => $invoice->id,
@@ -9212,7 +9324,15 @@ class ModuleController extends Controller
                     'balance' => $amounts['cash_balance'],
                     'cwt_balance' => $amounts['cwt_balance'],
                     'settlement_balance' => $amounts['settlement_balance'],
+                    'bi_balance' => $amounts['bi_balance'],
+                    'soa_balance' => $amounts['soa_balance'],
+                    'soa_no' => $invoice->soa_no,
+                    'bi_reference' => $invoice->opening_balance_control_account_id && $invoice->transaction_no
+                        ? $invoice->transaction_no : $invoice->document_no,
+                    'soa_reference' => $invoice->opening_balance_control_account_id && $invoice->transaction_no
+                        ? $invoice->transaction_no : ($invoice->soa_no ?: $invoice->document_no),
                     'customer_id' => $invoice->customer_id,
+                    'class_code' => $this->seriesClassCode($invoice->class_code),
                     'customer_name' => $invoice->customer_name ?: 'Guest / Non-tax Client',
                 ];
             })
@@ -9224,7 +9344,7 @@ class ModuleController extends Controller
             ->all();
     }
 
-    private function paymentInvoiceAmounts($invoice, $appliedCwt = 0)
+    private function paymentInvoiceAmounts($invoice, $appliedCwt = 0, $componentApplications = null)
     {
         $grandTotal = max(0, (float) ($invoice->grand_total ?? 0));
         $invoiceTotal = $grandTotal;
@@ -9235,14 +9355,37 @@ class ModuleController extends Controller
 
         $paidTotal = max(0, (float) ($invoice->paid_total ?? 0));
         $settlementBalance = max(0, $invoiceTotal - $paidTotal);
+        $soaTotal = in_array(strtolower((string) ($invoice->document_type ?? '')), ['soa', 'soa_a', 'statement_of_account_a'], true)
+            ? $invoiceTotal
+            : min($invoiceTotal, max(0, (float) ($invoice->freight_total ?? 0)));
+        $biTotal = max(0, $invoiceTotal - $soaTotal);
+        $components = $componentApplications !== null ? $componentApplications
+            : (Schema::hasColumn('receipt_applications', 'component')
+                ? DB::table('receipt_applications')
+                ->join('receipts', 'receipts.id', '=', 'receipt_applications.receipt_id')
+                ->where('receipt_applications.sales_document_id', $invoice->id)
+                ->whereNotIn('receipts.status', ['cancelled', 'voided'])
+                ->select('receipt_applications.component', 'receipt_applications.amount_applied')
+                ->get()
+                : collect());
+        $biPaid = (float) $components->where('component', 'bi')->sum('amount_applied');
+        $soaPaid = (float) $components->where('component', 'soa')->sum('amount_applied');
+        // Older receipts did not identify the portion paid. Keep their existing
+        // total and assign that legacy amount to BI before SOA.
+        $legacyPaid = max(0, $paidTotal - $biPaid - $soaPaid);
+        $legacyBiPaid = min(max(0, $biTotal - $biPaid), $legacyPaid);
+        $biBalance = max(0, $biTotal - $biPaid - $legacyBiPaid);
+        $soaBalance = max(0, $soaTotal - $soaPaid - ($legacyPaid - $legacyBiPaid));
         $withholdingTotal = min($invoiceTotal, max(0, (float) ($invoice->withholding_tax_amount ?? 0)));
-        $cwtBalance = min($settlementBalance, max(0, $withholdingTotal - max(0, (float) $appliedCwt)));
+        $cwtBalance = min($biBalance, max(0, $withholdingTotal - max(0, (float) $appliedCwt)));
 
         return [
             'invoice_total' => $invoiceTotal,
             'settlement_balance' => $settlementBalance,
             'cwt_balance' => $cwtBalance,
             'cash_balance' => max(0, $settlementBalance - $cwtBalance),
+            'bi_balance' => $biBalance,
+            'soa_balance' => $soaBalance,
         ];
     }
 
@@ -9254,13 +9397,13 @@ class ModuleController extends Controller
         request()->merge(['invoice_no' => $invoiceNumbers]);
 
         $data = request()->validate([
-            'receipt_type' => 'nullable|string|max:100',
-            'receipt_no' => 'nullable|string|max:100',
             'customer_id' => 'required|string|max:100',
             'customer_name' => 'nullable|string|max:255',
             'job_shipment_id' => 'nullable|string|max:100',
             'invoice_no' => 'nullable|array',
             'invoice_no.*' => 'string|max:100|distinct',
+            'payment_for' => 'required|in:bi,soa',
+            'class_code' => 'nullable|in:MANILA,PAMPANGA,CEBU',
             'payment_date' => 'required|date',
             'payment_method' => 'required|string|max:100',
             'bank_account_id' => 'nullable|integer',
@@ -9274,8 +9417,7 @@ class ModuleController extends Controller
         $this->authorizeAccountingPosting('payments', 'create');
 
         $payment = request()->only([
-            'receipt_type',
-            'receipt_no',
+            'payment_for',
             'customer_id',
             'customer_name',
             'job_shipment_id',
@@ -9335,15 +9477,32 @@ class ModuleController extends Controller
             }
         }
 
-        $receiptNo = request('receipt_no') ?: $this->nextReceiptNumber($companyId);
+        $invoiceClasses = $invoices->map(function ($invoice) {
+            return $this->seriesClassCode($invoice->class_code);
+        })->unique()->values();
+        if ($invoiceClasses->count() > 1) {
+            return back()->withInput()->withErrors(['invoice_no' => 'Select invoices from one class for each receipt.']);
+        }
+        $classCode = $invoiceClasses->first() ?: ($data['class_code'] ?? 'MANILA');
+        if (!in_array($classCode, ['MANILA', 'PAMPANGA', 'CEBU'], true)) {
+            return back()->withInput()->withErrors(['class_code' => 'Select a valid class.']);
+        }
+        if ($invoiceClasses->isNotEmpty() && !empty($data['class_code']) && $data['class_code'] !== $classCode) {
+            return back()->withInput()->withErrors(['class_code' => 'The receipt class must match the selected invoice.']);
+        }
 
         $settlementAmount = $amount + $cwtAmount;
+        $paymentFor = $data['payment_for'];
+        if ($paymentFor === 'soa' && $cwtAmount > 0.005) {
+            return back()->withInput()->withErrors(['cwt_amount' => 'CWT can only be applied to the Billing Invoice portion.']);
+        }
         $invoiceAmounts = $invoices->mapWithKeys(function ($invoice) {
             return [$invoice->id => $this->paymentInvoiceAmounts($invoice)];
         });
-        $totalSettlementBalance = $invoiceAmounts->sum('settlement_balance');
+        $balanceKey = $paymentFor === 'bi' ? 'bi_balance' : 'soa_balance';
+        $totalSettlementBalance = $invoiceAmounts->sum($balanceKey);
         if ($invoices->isNotEmpty() && $settlementAmount - $totalSettlementBalance > 0.005) {
-            return back()->withInput()->withErrors(['amount' => 'Cash plus CWT cannot exceed the selected Billing Invoices\' combined balance.']);
+            return back()->withInput()->withErrors(['amount' => 'Cash plus CWT cannot exceed the selected BI or SOA balance.']);
         }
 
         $currency = strtoupper($data['currency']);
@@ -9354,15 +9513,18 @@ class ModuleController extends Controller
         }
         $exchangeRate = $currency === 'PHP' ? 1 : max(0.000001, $this->moneyToFloat($data['exchange_rate'] ?? 1));
 
-        $receiptId = DB::transaction(function () use ($customer, $companyId, $invoices, $invoiceAmounts, $receiptNo, $amount, $cwtAmount, $settlementAmount, $currency, $exchangeRate, $data) {
+        $receiptResult = DB::transaction(function () use ($customer, $companyId, $invoices, $invoiceAmounts, $amount, $cwtAmount, $settlementAmount, $currency, $exchangeRate, $data, $paymentFor, $classCode) {
+            $receiptNo = $paymentFor === 'bi'
+                ? $this->nextDocumentNumber('official_receipt', $this->classNumberPrefix('official_receipt', $classCode), 5, true, $classCode)
+                : $this->nextDocumentNumber('acknowledgement_receipt', $this->classNumberPrefix('acknowledgement_receipt', $classCode), 6, true, $classCode);
             $receiptId = DB::table('receipts')->insertGetId([
                 'company_id' => $companyId,
                 'customer_id' => $customer->id,
                 'receipt_no' => $receiptNo,
-                'receipt_type' => $data['receipt_type'] ?? 'collection_receipt',
+                'receipt_type' => $paymentFor === 'bi' ? 'collection_receipt' : 'acknowledgement_receipt',
                 'customer_id_text' => $customer->customer_id ?: $customer->code,
                 'job_shipment_id' => request('job_shipment_id'),
-                'class_code' => request('class_code', 'MANILA'),
+                'class_code' => $classCode,
                 'currency' => $currency,
                 'exchange_rate' => $exchangeRate,
                 'receipt_date' => $data['payment_date'],
@@ -9388,7 +9550,7 @@ class ModuleController extends Controller
                     }
 
                     $amounts = $invoiceAmounts->get($invoice->id);
-                    $amountApplied = min($remainingSettlement, $amounts['settlement_balance']);
+                    $amountApplied = min($remainingSettlement, $amounts[$paymentFor === 'bi' ? 'bi_balance' : 'soa_balance']);
                     if ($amountApplied <= 0.005) {
                         continue;
                     }
@@ -9396,6 +9558,7 @@ class ModuleController extends Controller
                     DB::table('receipt_applications')->insert([
                         'receipt_id' => $receiptId,
                         'sales_document_id' => $invoice->id,
+                        'component' => $paymentFor,
                         'amount_applied' => $amountApplied,
                         'created_at' => now(),
                         'updated_at' => now(),
@@ -9416,10 +9579,13 @@ class ModuleController extends Controller
 
             app(PostingService::class)->postReceipt($receiptId);
 
-            return $receiptId;
+            return ['id' => $receiptId, 'number' => $receiptNo];
         });
+        $receiptId = $receiptResult['id'];
+        $receiptNo = $receiptResult['number'];
 
         $payment['receipt_no'] = $receiptNo;
+        $payment['receipt_type'] = $paymentFor === 'bi' ? 'Official Receipt (OR)' : 'Acknowledgement Receipt (AR)';
         $payment['customer_name'] = $customer->name;
         $payment['invoice_no'] = implode(', ', $invoiceNumbers);
 
@@ -9436,15 +9602,90 @@ class ModuleController extends Controller
             return $value !== null && $value !== '';
         });
 
-        return view('erp.payments.receipt', [
-            'payment' => $payment,
-            'receiptDocuments' => [
+        $receiptDocuments = [
                 ['label' => 'VAT Official Receipt', 'route' => route('erp.official-receipt.preview', array_merge($receiptQuery, ['tax_print' => 'vat'])), 'icon' => 'bi-receipt'],
                 ['label' => 'Non-VAT Official Receipt', 'route' => route('erp.official-receipt.preview', array_merge($receiptQuery, ['tax_print' => 'non_vat'])), 'icon' => 'bi-receipt'],
                 ['label' => 'VAT Acknowledgement Receipt', 'route' => route('erp.acknowledgement-receipt.preview', array_merge($receiptQuery, ['tax_print' => 'vat'])), 'icon' => 'bi-receipt-cutoff'],
                 ['label' => 'Non-VAT Acknowledgement Report', 'route' => route('erp.acknowledgement-receipt.preview', array_merge($receiptQuery, ['tax_print' => 'non_vat'])), 'icon' => 'bi-file-earmark-text'],
-            ],
+        ];
+        if ($paymentFor === 'bi') {
+            $receiptDocuments = array_slice($receiptDocuments, 0, 2);
+        } elseif ($paymentFor === 'soa') {
+            $receiptDocuments = array_slice($receiptDocuments, 2);
+        }
+
+        return view('erp.payments.receipt', [
+            'payment' => $payment,
+            'receiptDocuments' => $receiptDocuments,
         ]);
+    }
+
+    public function correctPayment($receipt)
+    {
+        $data = request()->validate([
+            'reason' => 'required|string|min:5|max:1000',
+        ]);
+        $this->authorizeAccountingPosting('payments', 'edit');
+
+        $reopen = DB::transaction(function () use ($receipt, $data) {
+            $record = DB::table('receipts')
+                ->where('company_id', $this->defaultCompanyId())
+                ->where('id', $receipt)
+                ->lockForUpdate()
+                ->first();
+            if (!$record || in_array(strtolower((string) $record->status), ['cancelled', 'voided'], true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'receipt' => 'This payment is no longer available for correction.',
+                ]);
+            }
+
+            $applications = DB::table('receipt_applications')
+                ->where('receipt_id', $record->id)
+                ->orderBy('id')
+                ->get();
+            $reversal = app(PostingService::class)->reverseSource('receipt', $record->id, trim($data['reason']));
+            if (!$reversal) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'receipt' => 'The posted payment journal could not be reversed.',
+                ]);
+            }
+            DB::table('receipts')->where('id', $record->id)->update([
+                'status' => 'voided',
+                'posting_status' => 'reversed',
+                'updated_at' => now(),
+            ]);
+
+            foreach ($applications->groupBy('sales_document_id') as $documentId => $documentApplications) {
+                $document = DB::table('sales_documents')->where('id', $documentId)->lockForUpdate()->first();
+                if (!$document) {
+                    continue;
+                }
+                $total = max(0, (float) $document->grand_total);
+                if ($total <= 0) {
+                    $total = max(0, (float) $document->invoice_amount) + max(0, (float) $document->freight_total);
+                }
+                $paid = max(0, (float) $document->paid_total - (float) $documentApplications->sum('amount_applied'));
+                DB::table('sales_documents')->where('id', $documentId)->update([
+                    'paid_total' => $paid,
+                    'total_payment' => $paid,
+                    'balance_due' => max(0, $total - $paid),
+                    'status' => $paid >= $total - 0.005 && $total > 0 ? 'paid' : ($paid > 0.005 ? 'partial' : 'posted'),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            $firstApplication = $applications->first();
+            $invoiceNo = $firstApplication
+                ? DB::table('sales_documents')->where('id', $firstApplication->sales_document_id)->value('document_no')
+                : null;
+            $components = $applications->pluck('component')->unique()->filter()->values();
+            $paymentFor = $components->count() === 1 ? $components->first() : 'bi';
+
+            return ['invoice' => $invoiceNo, 'payment_for' => $paymentFor];
+        });
+
+        return redirect()->route('erp.payments.create', array_filter($reopen))
+            ->with('status', 'The posted receipt was reversed. Record the corrected BI or SOA payment below.');
     }
 
     private function resolveArCustomerForPayment($customerIdOrCode, $customerName = null)
@@ -9471,23 +9712,6 @@ class ModuleController extends Controller
                 }
             })
             ->first();
-    }
-
-    private function nextReceiptNumber($companyId)
-    {
-        if (!$companyId) {
-            return 'OR-' . date('YmdHis');
-        }
-
-        $lastReceipt = DB::table('receipts')
-            ->where('company_id', $companyId)
-            ->where('receipt_no', 'like', 'OR-%')
-            ->orderBy('id', 'desc')
-            ->value('receipt_no');
-
-        $number = $lastReceipt ? (int) preg_replace('/\D/', '', $lastReceipt) : 0;
-
-        return 'OR-' . str_pad($number + 1, 5, '0', STR_PAD_LEFT);
     }
 
     private function authorizeAccountingPosting($module = 'accounting', $action = 'approve')
@@ -9643,6 +9867,9 @@ class ModuleController extends Controller
         if (in_array('currency', $receiptColumns, true)) {
             $query->addSelect('receipts.currency');
         }
+        if (in_array('cwt_amount', $receiptColumns, true)) {
+            $query->addSelect('receipts.cwt_amount');
+        }
 
         if (in_array('customer_id_text', $receiptColumns, true)) {
             $query->addSelect('receipts.customer_id_text');
@@ -9679,6 +9906,9 @@ class ModuleController extends Controller
             ->when(in_array('currency', $receiptColumns, true), function ($grouped) {
                 return $grouped->groupBy('receipts.currency');
             })
+            ->when(in_array('cwt_amount', $receiptColumns, true), function ($grouped) {
+                return $grouped->groupBy('receipts.cwt_amount');
+            })
             ->when(in_array('customer_id_text', $receiptColumns, true), function ($grouped) {
                 return $grouped->groupBy('receipts.customer_id_text');
             })
@@ -9693,39 +9923,62 @@ class ModuleController extends Controller
             return $fallback;
         }
 
-        $numericReceiptNo = preg_replace('/\D/', '', $dbReceipt->receipt_no);
         $defaultDescription = $isAcknowledgement ? 'PAYMENT FOR REIMBURSABLE CHARGES' : 'PAYMENT FOR LOCAL CHARGES';
         $documentPrefix = $isAcknowledgement ? 'SOA#' : 'BI#';
         $appliedDocuments = DB::table('receipt_applications')
             ->join('sales_documents', 'sales_documents.id', '=', 'receipt_applications.sales_document_id')
             ->where('receipt_applications.receipt_id', $dbReceipt->id)
             ->orderBy('receipt_applications.id')
-            ->select('sales_documents.document_no', 'sales_documents.soa_no')
+            ->select('sales_documents.document_no', 'sales_documents.soa_no', 'sales_documents.transaction_no',
+                'sales_documents.opening_balance_control_account_id', 'receipt_applications.component',
+                'receipt_applications.amount_applied')
             ->get();
+        $hasComponentApplications = $appliedDocuments->contains(function ($document) {
+            return in_array($document->component, ['bi', 'soa'], true);
+        });
+        $printedDocuments = $hasComponentApplications
+            ? $appliedDocuments->filter(function ($document) use ($isAcknowledgement) {
+                return $document->component === ($isAcknowledgement ? 'soa' : 'bi');
+            })
+            : $appliedDocuments;
+        if ($hasComponentApplications && $printedDocuments->isEmpty()) {
+            abort(404, 'This receipt belongs to the other payment type.');
+        }
         $documentNumbers = $isAcknowledgement
-            ? $appliedDocuments->pluck('soa_no')->filter()->unique()->implode(', ')
-            : $appliedDocuments->pluck('document_no')->filter()->unique()->implode(', ');
-        if ($documentNumbers === '') {
+            ? $printedDocuments->map(function ($document) {
+                return $document->opening_balance_control_account_id
+                    ? $document->transaction_no : ($document->soa_no ?: $document->document_no);
+            })->filter()->unique()->implode(', ')
+            : $printedDocuments->map(function ($document) {
+                return $document->opening_balance_control_account_id
+                    ? $document->transaction_no : $document->document_no;
+            })->filter()->unique()->implode(', ');
+        if ($documentNumbers === '' && !$hasComponentApplications) {
             $documentNumbers = $isAcknowledgement && !empty($dbReceipt->soa_numbers) ? $dbReceipt->soa_numbers : $dbReceipt->invoice_numbers;
         }
-        $documentReference = $documentNumbers ? $documentPrefix . ' ' . $documentNumbers : null;
-        if (!$isAcknowledgement && $appliedDocuments->count() > 1) {
-            $documentReference = $appliedDocuments->pluck('document_no')->filter()->unique()->values()
+        $documentReference = $documentNumbers
+            ? (preg_match('/^(?:BI|SOA)\s*[#-]/i', $documentNumbers) ? $documentNumbers : $documentPrefix.' '.$documentNumbers)
+            : null;
+        if (!$isAcknowledgement && $printedDocuments->pluck('document_no')->unique()->count() > 1) {
+            $documentReference = $printedDocuments->pluck('document_no')->filter()->unique()->values()
                 ->map(function ($documentNo, $index) {
                     return 'Billing ' . ($index + 1) . ': ' . $documentNo;
                 })->implode("\n");
         }
         $descriptionParts = array_filter([
-            $dbReceipt->invoice_remarks ? trim($dbReceipt->invoice_remarks) : $defaultDescription,
+            $printedDocuments->contains(function ($document) { return (bool) $document->opening_balance_control_account_id; })
+                ? $defaultDescription : ($dbReceipt->invoice_remarks ? trim($dbReceipt->invoice_remarks) : $defaultDescription),
             $documentReference,
             property_exists($dbReceipt, 'job_shipment_id') && $dbReceipt->job_shipment_id ? 'JOB ' . $dbReceipt->job_shipment_id : null,
         ]);
-        $printAmount = (int) $dbReceipt->application_count > 0
-            ? (float) ($isAcknowledgement ? $dbReceipt->soa_amount_total : $dbReceipt->invoice_amount_total)
-            : (float) $dbReceipt->amount;
+        $printAmount = $hasComponentApplications
+            ? max(0, (float) $printedDocuments->sum('amount_applied') - ($isAcknowledgement ? 0 : (float) ($dbReceipt->cwt_amount ?? 0)))
+            : ((int) $dbReceipt->application_count > 0
+                ? (float) ($isAcknowledgement ? $dbReceipt->soa_amount_total : $dbReceipt->invoice_amount_total)
+                : (float) $dbReceipt->amount);
 
         return [
-            'receipt_no' => $numericReceiptNo ? str_pad($numericReceiptNo, 7, '0', STR_PAD_LEFT) : $dbReceipt->receipt_no,
+            'receipt_no' => $dbReceipt->receipt_no,
             'payment_date' => $dbReceipt->receipt_date ? date('M d, Y', strtotime($dbReceipt->receipt_date)) : date('M d, Y'),
             'account_no' => property_exists($dbReceipt, 'customer_id_text') && $dbReceipt->customer_id_text ? $dbReceipt->customer_id_text : $dbReceipt->customer_code,
             'registered_name' => $dbReceipt->customer_name ?: request('customer', $fallback['registered_name']),
@@ -10465,22 +10718,17 @@ class ModuleController extends Controller
             ->orderBy('document_date')
             ->orderBy('id')
             ->get()
-            ->map(function ($invoice) use ($balanceExpression) {
-                $balance = $this->salesDocumentBalance($invoice);
-                $invoiceAmount = (float) ($invoice->invoice_amount ?: 0);
-                $soaAmount = max(0, (float) $invoice->grand_total - $invoiceAmount);
-                if ($invoiceAmount <= 0 && $soaAmount <= 0) {
-                    $invoiceAmount = (float) $invoice->grand_total;
-                }
+            ->map(function ($invoice) {
+                $amounts = $this->paymentInvoiceAmounts($invoice);
 
                 return (object) [
                     'document_date' => $invoice->document_date,
                     'document_no' => $invoice->document_no,
                     'soa_no' => $invoice->soa_no ?: ($invoice->template_code && stripos($invoice->template_code, 'SOA') !== false ? $invoice->document_no : ''),
                     'currency' => $invoice->currency ?: 'PHP',
-                    'invoice_amount' => $invoiceAmount,
-                    'soa_amount' => $soaAmount,
-                    'total' => $balance,
+                    'invoice_amount' => $amounts['bi_balance'],
+                    'soa_amount' => $amounts['soa_balance'],
+                    'total' => $amounts['settlement_balance'],
                     'aging' => $this->clientSoaAgingLabel($invoice->due_date ?: $invoice->document_date),
                     'due_date' => $invoice->due_date,
                 ];
@@ -12016,15 +12264,22 @@ class ModuleController extends Controller
         $data = request()->validate([
             'id' => 'nullable|integer',
             'document_type' => 'required|string|max:100',
+            'class_code' => 'nullable|in:MANILA,PAMPANGA,CEBU',
             'prefix' => 'nullable|string|max:20',
             'current_number' => 'required|integer|min:0',
             'padding' => 'required|integer|min:1|max:12',
             'is_active' => 'nullable|string',
         ]);
 
+        if (in_array($data['document_type'], ['billing_invoice', 'official_receipt', 'acknowledgement_receipt'], true)
+            && empty($data['class_code'])) {
+            return back()->withInput()->withErrors(['class_code' => 'Select a class for BI, OR, or AR numbering.']);
+        }
+
         $this->upsertFinanceRow('number_series', $data['id'] ?? null, [
             'company_id' => $this->defaultCompanyId(),
             'document_type' => $data['document_type'],
+            'class_code' => $data['class_code'] ?? '',
             'prefix' => $data['prefix'] ?? null,
             'current_number' => (int) $data['current_number'],
             'padding' => (int) $data['padding'],
@@ -12171,6 +12426,7 @@ class ModuleController extends Controller
             return [
                 'company_id' => $companyId,
                 'document_type' => $payload['document_type'] ?? null,
+                'class_code' => $payload['class_code'] ?? '',
             ];
         }
 
@@ -12237,9 +12493,18 @@ class ModuleController extends Controller
             return collect();
         }
 
+        $this->classNumberPreview('billing_invoice', 6);
+        $this->classNumberPreview('official_receipt', 5);
+        $this->classNumberPreview('acknowledgement_receipt', 6);
+
         return DB::table('number_series')
             ->where('company_id', $companyId)
+            ->where(function ($query) {
+                $query->whereNotIn('document_type', ['billing_invoice', 'official_receipt', 'acknowledgement_receipt'])
+                    ->orWhere('class_code', '<>', '');
+            })
             ->orderBy('document_type')
+            ->orderBy('class_code')
             ->get();
     }
 

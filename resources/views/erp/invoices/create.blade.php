@@ -323,7 +323,8 @@
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label text-muted">Invoice No. #</label>
-                                <input name="invoice_no" id="invoiceNo" class="form-control invoice-field" value="" placeholder="Optional">
+                                <input name="invoice_no" id="invoiceNo" class="form-control invoice-field" value="" placeholder="Select a class for the next number">
+                                <div class="form-text">Leave blank to assign the next number for this class when saving.</div>
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label text-muted">Currency</label>
@@ -469,6 +470,14 @@
     $(function () {
         var isEdit = @json($isEdit);
         var editInvoice = @json($editingInvoice);
+        var invoiceSeries = @json($invoiceSeries);
+
+        function updateInvoiceNumberPreview() {
+            var classCode = $('#classCode').val();
+            var templates = $('#invoiceTemplate').val() || [];
+            var isSoaA = templates.indexOf('SOA_A') !== -1;
+            $('#invoiceNo').attr('placeholder', isSoaA ? 'SOA A number assigned on save' : (invoiceSeries[classCode] || 'Select a class for the next number'));
+        }
 
         function numberValue(value) {
             var parsed = parseFloat(String(value || '').replace(/,/g, ''));
@@ -555,6 +564,7 @@
             $('#currencySelect').val(option.data('currency') || '').trigger('change.select2');
             syncExchangeRate(true);
             $('#classCode').val(option.data('class') || '');
+            updateInvoiceNumberPreview();
             $('#vatClassification').val(taxClass);
             $('#customerTin').val(option.data('tin') || '');
             $('textarea[name="invoice_to"]').val(option.data('address') || '');
@@ -769,6 +779,7 @@
                 editInvoice.invoice_no || ''
             ].filter(Boolean).join(' | '));
             $('#classCode').val(editInvoice.class_code || $('#classCode').val() || '');
+            updateInvoiceNumberPreview();
             $('#arAccount').val(editInvoice.ar_account || 'A/Trade-Billing Invoice');
             $('#currencySelect').val(editInvoice.currency || 'PHP').trigger('change.select2');
             $('#exchangeRateInput').val(editInvoice.exchange_rate || '1.000000');
@@ -831,6 +842,8 @@
             recalc();
         });
 
+        $('#classCode, #invoiceTemplate').on('change', updateInvoiceNumberPreview);
+
         $('#currencySelect').on('change', function () {
             syncExchangeRate(true);
             recalc();
@@ -889,6 +902,7 @@
         if (!fillEditInvoice()) {
             syncCustomer();
         }
+        updateInvoiceNumberPreview();
         initItemSelects();
         syncExchangeRate(true);
         recalc();

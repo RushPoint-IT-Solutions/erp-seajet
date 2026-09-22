@@ -191,6 +191,16 @@ class OpeningBalanceImportTest extends TestCase
             'updated_at' => now(),
         ]);
         app(PostingService::class)->postReceipt($receiptId);
+        $this->get(route('erp.official-receipt.preview', ['receipt_no' => 'OR-OB-TEST']))
+            ->assertOk()
+            ->assertSee('PAYMENT FOR LOCAL CHARGES')
+            ->assertSee('BI# INV-OB-001')
+            ->assertDontSee('imported opening balance');
+        DB::table('sales_documents')->where('id', $tradeInvoice->id)->update(['transaction_no' => 'BI#000644']);
+        $this->get(route('erp.official-receipt.preview', ['receipt_no' => 'OR-OB-TEST']))
+            ->assertOk()
+            ->assertSee('BI#000644')
+            ->assertDontSee('BI# BI#000644');
         $receiptJournalId = DB::table('journal_entries')
             ->where('source_type', 'receipt')->where('source_id', $receiptId)->value('id');
         $this->assertDatabaseHas('journal_entry_lines', [
@@ -198,6 +208,30 @@ class OpeningBalanceImportTest extends TestCase
             'account_id' => $accounts['ar_trade_php_account_id'],
             'credit' => 1000,
         ]);
+
+        $this->post(route('erp.payments.receipt'), [
+            'customer_id' => (string) $customer->id,
+            'invoice_no' => $reimbursableInvoice->document_no,
+            'payment_for' => 'soa',
+            'payment_date' => '2026-09-20',
+            'payment_method' => 'Cash',
+            'currency' => 'USD',
+            'exchange_rate' => 50,
+            'amount' => '40.00',
+            'cwt_amount' => '0.00',
+        ])->assertOk();
+        $soaReceipt = DB::table('receipts')->orderBy('id', 'desc')->first();
+        $this->assertDatabaseHas('receipt_applications', [
+            'receipt_id' => $soaReceipt->id,
+            'sales_document_id' => $reimbursableInvoice->id,
+            'component' => 'soa',
+            'amount_applied' => 40,
+        ]);
+        $this->get(route('erp.acknowledgement-receipt.preview', ['receipt_no' => $soaReceipt->receipt_no]))
+            ->assertOk()
+            ->assertSee('PAYMENT FOR REIMBURSABLE CHARGES')
+            ->assertSee('SOA# REIM-OB-001')
+            ->assertDontSee('imported opening balance');
 
         $supplierPaymentId = DB::table('payments')->insertGetId([
             'company_id' => 1,

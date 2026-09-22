@@ -144,6 +144,7 @@ Route::middleware(['auth', 'permission.access'])->group(function () {
     Route::get('/erp/payments', 'Erp\ModuleController@paymentCreate')->name('erp.payments.index');
     Route::get('/erp/payments/create', 'Erp\ModuleController@paymentCreate')->name('erp.payments.create');
     Route::post('/erp/payments/receipt', 'Erp\ModuleController@paymentReceipt')->name('erp.payments.receipt');
+    Route::post('/erp/payments/{receipt}/correct', 'Erp\ModuleController@correctPayment')->name('erp.payments.correct');
 
     Route::get('/erp/invoice/preview', 'Erp\ModuleController@invoicePreview')->name('erp.invoice.preview');
     Route::get('/erp/statement-of-account/preview', 'Erp\ModuleController@soaPreview')->name('erp.soa.preview');

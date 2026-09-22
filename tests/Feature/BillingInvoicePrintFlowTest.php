@@ -78,6 +78,35 @@ class BillingInvoicePrintFlowTest extends TestCase
             ->all());
     }
 
+    public function test_automatic_billing_invoice_numbers_advance_independently_by_class()
+    {
+        $this->get('/erp/invoices/create')->assertOk();
+        $series = DB::table('number_series')->where('document_type', 'billing_invoice');
+        $this->assertSame(3, (clone $series)->where('class_code', '<>', '')->count());
+        (clone $series)->where('class_code', 'MANILA')->update(['current_number' => 40]);
+        (clone $series)->where('class_code', 'CEBU')->update(['current_number' => 90]);
+
+        $create = $this->get('/erp/invoices/create');
+        $create->assertOk();
+        $this->assertSame('BI-MNL-000041', $create->original->getData()['invoiceSeries']['MANILA']);
+        $this->assertSame('BI-CEB-000091', $create->original->getData()['invoiceSeries']['CEBU']);
+
+        $this->withoutExceptionHandling();
+        $this->post('/erp/invoices/review', $this->payload([
+            'invoice_no' => '', 'transaction_no' => '', 'class_code' => 'CEBU', 'vat_classification' => '12%',
+        ]))->assertRedirect();
+        $this->assertDatabaseHas('sales_documents', ['document_no' => 'BI-CEB-000091', 'class_code' => 'CEBU']);
+
+        $this->post('/erp/invoices/review', $this->payload([
+            'invoice_no' => '', 'transaction_no' => '', 'class_code' => 'MANILA', 'vat_classification' => '12%',
+        ]))->assertRedirect();
+        $this->assertDatabaseHas('sales_documents', ['document_no' => 'BI-MNL-000041', 'class_code' => 'MANILA']);
+        $companyId = DB::table('sales_documents')->where('document_no', 'BI-MNL-000041')->value('company_id');
+        $this->assertSame(41, (int) (clone $series)->where('company_id', $companyId)->where('class_code', 'MANILA')->value('current_number'));
+        $this->assertSame(91, (int) (clone $series)->where('company_id', $companyId)->where('class_code', 'CEBU')->value('current_number'));
+        $this->assertSame(0, (int) (clone $series)->where('company_id', $companyId)->where('class_code', 'PAMPANGA')->value('current_number'));
+    }
+
     public function test_vatable_billing_review_can_print_soa_b_and_billing_invoice()
     {
         $response = $this->post('/erp/invoices/review', $this->payload([
