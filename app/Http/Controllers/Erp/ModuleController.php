@@ -5767,11 +5767,16 @@ class ModuleController extends Controller
         foreach ($recentImports as $batch) {
             $dateSummary = DB::table('opening_balance_import_rows')
                 ->where('batch_id', $batch->id)
-                ->selectRaw('MIN(source_date) as date_from, MAX(source_date) as date_to, COUNT(DISTINCT journal_entry_id) as journal_count')
+                ->selectRaw("MIN(source_date) as date_from, MAX(source_date) as date_to,
+                    COUNT(DISTINCT journal_entry_id) as journal_count,
+                    SUM(CASE WHEN sales_document_id IS NOT NULL THEN 1 ELSE 0 END) as ar_rows,
+                    SUM(CASE WHEN purchase_document_id IS NOT NULL THEN 1 ELSE 0 END) as ap_rows")
                 ->first();
             $batch->source_date_from = $dateSummary ? $dateSummary->date_from : $batch->posting_date;
             $batch->source_date_to = $dateSummary ? $dateSummary->date_to : $batch->posting_date;
             $batch->journal_count = $dateSummary ? (int) $dateSummary->journal_count : 1;
+            $batch->ar_rows = $dateSummary ? (int) $dateSummary->ar_rows : 0;
+            $batch->ap_rows = $dateSummary ? (int) $dateSummary->ap_rows : 0;
         }
 
         return view('erp.accounting.opening-balance-import', compact('accounts', 'defaults', 'preview', 'token', 'recentImports'));
@@ -7230,11 +7235,13 @@ class ModuleController extends Controller
         if ($type === 'soa_a') {
             return [
                 'serial' => [690, 134],
+                'date' => [565, 162],
                 'customer' => [92, 228],
                 'shipper' => [92, 282],
                 'particulars' => [112, 320],
                 'amounts' => [637, 320],
                 'total_reimbursement' => [637, 797],
+                'prepared_by' => [505, 925],
             ];
         }
 
@@ -7286,7 +7293,10 @@ class ModuleController extends Controller
                 $defaultWidth = 520;
             }
             if ($key === 'date') {
-                $defaultWidth = 90;
+                $defaultWidth = $type === 'soa_a' ? 190 : 90;
+            }
+            if ($key === 'prepared_by' && $type === 'soa_a') {
+                $defaultWidth = 250;
             }
 
             $styles[$key] = [
@@ -7343,11 +7353,13 @@ class ModuleController extends Controller
         if ($type === 'soa_a') {
             return [
                 'serial' => ['label' => 'A Number', 'value' => '0907', 'class' => 'serial'],
+                'date' => ['label' => 'Date', 'value' => 'Date: 05/19/2026', 'class' => ''],
                 'customer' => ['label' => 'Customer', 'value' => 'PHILUSA CORPORATION', 'class' => ''],
                 'shipper' => ['label' => 'Shipper', 'value' => 'SHIPPER: LEMOINE HOLLAND B.V.', 'class' => 'small'],
                 'particulars' => ['label' => 'Particulars', 'value' => "OCEAN FREIGHT\nBUNKER SURCHARGE\nSOLAS ADMIN\n5% COLLECT FEE\n\nSHIPPER: LEMOINE HOLLAND B.V.", 'class' => ''],
                 'amounts' => ['label' => 'Amounts', 'value' => "368,376.75\n120,022.50\n20,311.50\n9,232.50", 'class' => 'amount'],
                 'total_reimbursement' => ['label' => 'Total Reimbursement', 'value' => '518,943.25', 'class' => 'amount'],
+                'prepared_by' => ['label' => 'Prepared By', 'value' => auth()->user()->name ?? 'User', 'class' => ''],
             ];
         }
 
@@ -12611,7 +12623,12 @@ class ModuleController extends Controller
             ->whereIn('sales_documents.document_type', ['invoice', 'billing_invoice', 'statement_of_account_a', 'soa_a', 'debit_note'])
             ->whereRaw($balanceExpression.' > 0')
             ->when(($filters['class'] ?? 'All Classes') !== 'All Classes', function ($query) use ($filters) {
-                return $query->where('sales_documents.class_code', $filters['class']);
+                $aliases = [
+                    'MANILA' => ['MANILA', 'MAIN', 'MNL'],
+                    'PAMPANGA' => ['PAMPANGA', 'PAM'],
+                    'CEBU' => ['CEBU', 'CEB'],
+                ];
+                return $query->whereIn('sales_documents.class_code', $aliases[$filters['class']] ?? [$filters['class']]);
             })
             ->when(($filters['currency'] ?? 'All Currency') !== 'All Currency', function ($query) use ($filters) {
                 return $query->where('sales_documents.currency', $filters['currency']);
@@ -12638,7 +12655,7 @@ class ModuleController extends Controller
                     $invoice->document_no,
                     $invoice->currency ?: 'PHP',
                     $invoice->vat_classification ?: '-',
-                    $invoice->class_code ?: '-',
+                    $invoice->class_code ? $this->seriesClassCode($invoice->class_code) : '-',
                     $current,
                     $thirty,
                     $sixty,

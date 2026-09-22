@@ -23,7 +23,7 @@
     @endif
 
     <div class="alert alert-info">
-        <strong>Posting rule:</strong> every valid source row debits the selected Opening Balance account and credits A/R Trade, A/R Reimbursable, or A/P Trade. A/R rows become open invoices in Receive Payment; A/P rows become approved open vendor bills in Pay Bills. Each journal, invoice, and bill uses the date in its Excel row. Rows with the same Excel date are combined into one balanced journal.
+        <strong>Posting rule:</strong> A/R rows debit the selected receivable account and credit Opening Balance Equity. A/P rows debit Opening Balance Equity and credit the selected payable account. A/R rows become open invoices visible in AR Aging and Receive Payment; A/P rows become approved open vendor bills in Pay Bills. Each journal, invoice, and bill uses the date in its Excel row. Rows with the same Excel date are combined into one balanced journal.
     </div>
 
     <form method="post" action="{{ route('erp.accounting.opening-balances.preview') }}" enctype="multipart/form-data" class="erp-card p-4">
@@ -41,7 +41,7 @@
         <div class="row g-3">
             <div class="col-lg-6">
                 <div class="border rounded p-3 h-100">
-                    <div class="text-uppercase small fw-bold text-muted mb-3">Debit</div>
+                    <div class="text-uppercase small fw-bold text-muted mb-3">Offset account</div>
                     <label class="form-label">Opening Balance</label>
                     <select name="opening_balance_account_id" class="form-select erp-select" required>
                         <option value="">Select account</option>
@@ -53,7 +53,7 @@
             </div>
             <div class="col-lg-6">
                 <div class="border rounded p-3 h-100">
-                    <div class="text-uppercase small fw-bold text-muted mb-3">Credit</div>
+                    <div class="text-uppercase small fw-bold text-muted mb-3">Receivable and payable accounts</div>
                     @foreach([
                         'ar_trade' => 'A/R Trade',
                         'ar_reimbursable' => 'A/R Reimbursable',
@@ -166,11 +166,11 @@
             <h2 class="h6 fw-bold mb-3">Recent opening-balance imports</h2>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
-                    <thead><tr><th>Imported</th><th>File</th><th>Excel posting dates</th><th class="text-end">Rows</th><th class="text-end">Skipped</th><th class="text-end">Amount</th><th>Journals</th></tr></thead>
+                    <thead><tr><th>Imported</th><th>File</th><th>Excel posting dates</th><th class="text-end">Rows</th><th class="text-end">AR invoices</th><th class="text-end">AP bills</th><th class="text-end">Skipped</th><th class="text-end">Amount</th><th>Journals</th></tr></thead>
                     <tbody>
                     @foreach($recentImports as $batch)
                         <tr>
-                            <td>{{ $batch->imported_at }}</td><td>{{ $batch->original_filename }}</td><td>{{ $batch->source_date_from }}@if($batch->source_date_to !== $batch->source_date_from) to {{ $batch->source_date_to }}@endif</td><td class="text-end">{{ number_format($batch->row_count) }}</td><td class="text-end">{{ number_format($batch->skipped_count) }}</td><td class="text-end">{{ number_format($batch->total_amount, 2) }}</td>
+                            <td>{{ $batch->imported_at }}</td><td>{{ $batch->original_filename }}</td><td>{{ $batch->source_date_from }}@if($batch->source_date_to !== $batch->source_date_from) to {{ $batch->source_date_to }}@endif</td><td class="text-end">{{ number_format($batch->row_count) }}</td><td class="text-end">{{ number_format($batch->ar_rows) }}</td><td class="text-end">{{ number_format($batch->ap_rows) }}</td><td class="text-end">{{ number_format($batch->skipped_count) }}</td><td class="text-end">{{ number_format($batch->total_amount, 2) }}</td>
                             <td>@if($batch->journal_entry_id)<a href="{{ route('erp.accounting.journals.show', $batch->journal_entry_id) }}">{{ number_format($batch->journal_count) }} journal(s)</a>@else-@endif</td>
                         </tr>
                     @endforeach

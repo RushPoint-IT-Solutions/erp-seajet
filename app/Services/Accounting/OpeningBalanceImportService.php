@@ -217,7 +217,9 @@ class OpeningBalanceImportService
                 foreach ($datedRows as $row) {
                 $description = $this->lineDescription($row);
                 $foreignAmount = $row['currency'] === 'USD' ? (float) $row['foreign_amount'] : 0;
-                $partyFields = $row['balance_type'] === 'ap_trade'
+                $isPayable = $row['balance_type'] === 'ap_trade';
+                $classCode = $this->classCode($row['branch']);
+                $partyFields = $isPayable
                     ? ['customer_id' => null, 'supplier_id' => $row['party_id']]
                     : ['customer_id' => $row['party_id'], 'supplier_id' => null];
 
@@ -231,14 +233,14 @@ class OpeningBalanceImportService
                     'withholding_tax_amount' => 0,
                     'currency' => $row['currency'],
                     'exchange_rate' => $row['exchange_rate'],
-                    'foreign_debit' => $foreignAmount,
-                    'foreign_credit' => 0,
-                    'debit' => $row['base_amount'],
-                    'credit' => 0,
+                    'foreign_debit' => $isPayable ? $foreignAmount : 0,
+                    'foreign_credit' => $isPayable ? 0 : $foreignAmount,
+                    'debit' => $isPayable ? $row['base_amount'] : 0,
+                    'credit' => $isPayable ? 0 : $row['base_amount'],
                     'customer_id' => null,
                     'supplier_id' => null,
                     'shipment_job_id' => null,
-                    'class_code' => strtoupper($row['branch']),
+                    'class_code' => $classCode,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
@@ -253,12 +255,12 @@ class OpeningBalanceImportService
                     'withholding_tax_amount' => 0,
                     'currency' => $row['currency'],
                     'exchange_rate' => $row['exchange_rate'],
-                    'foreign_debit' => 0,
-                    'foreign_credit' => $foreignAmount,
-                    'debit' => 0,
-                    'credit' => $row['base_amount'],
+                    'foreign_debit' => $isPayable ? 0 : $foreignAmount,
+                    'foreign_credit' => $isPayable ? $foreignAmount : 0,
+                    'debit' => $isPayable ? 0 : $row['base_amount'],
+                    'credit' => $isPayable ? $row['base_amount'] : 0,
                     'shipment_job_id' => null,
-                    'class_code' => strtoupper($row['branch']),
+                    'class_code' => $classCode,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ], $partyFields));
@@ -346,7 +348,7 @@ class OpeningBalanceImportService
             ? (float) $row['foreign_amount']
             : (float) $row['base_amount'];
         $memo = $this->lineDescription($row).' (imported opening balance)';
-        $classCode = strtoupper($row['branch']);
+        $classCode = $this->classCode($row['branch']);
         $postingTimestamp = $row['source_date'].' 00:00:00';
 
         if ($row['balance_type'] === 'ap_trade') {
@@ -515,7 +517,7 @@ class OpeningBalanceImportService
                     'payment_terms' => 'Opening Balance',
                     'credit_term_days' => 0,
                     'currency' => $row['currency'],
-                    'default_class_code' => strtoupper($row['branch']),
+                    'default_class_code' => $this->classCode($row['branch']),
                     'default_ar_account_code' => $row['balance_type'] === 'ar_reimbursable'
                         ? 'AR_REIMBURSABLE'
                         : 'AR_TRADE_BI',
@@ -630,7 +632,7 @@ class OpeningBalanceImportService
 
         if (!$accounts['opening_balance']) {
             throw ValidationException::withMessages([
-                'opening_balance_account_id' => 'Select an active opening-balance debit account.',
+                'opening_balance_account_id' => 'Select an active Opening Balance Equity account.',
             ]);
         }
 
@@ -705,6 +707,15 @@ class OpeningBalanceImportService
     {
         return trim($row['balance_type_label'].' opening balance '.$row['reference_no']
             .' | '.$row['party_name'].' | '.$row['source_date']);
+    }
+
+    private function classCode($branch)
+    {
+        $code = strtoupper(trim((string) $branch));
+        return [
+            'MAIN' => 'MANILA', 'MNL' => 'MANILA',
+            'PAM' => 'PAMPANGA', 'CEB' => 'CEBU',
+        ][$code] ?? $code;
     }
 
     private function normalize($value)

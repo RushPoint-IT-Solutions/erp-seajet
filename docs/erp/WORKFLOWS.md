@@ -19,6 +19,13 @@
 4. Filter by VAT classification: 12%, zero-rated, exempt.
 5. Bucket unpaid balances into Current, 30, 60, and 90+ days.
 
+## Opening A/R and A/P Balances
+
+1. In Accounting, open **Import Opening Balances** and upload the Excel workbook. The supplied seeder uses `docs/AR TRADE/AR TRADE & AR REIMBURSABLE.xlsx` and `docs/A-P TRADE.xlsx` by default: `php artisan db:seed --class='App\Seeders\OpeningBalanceImportSeeder' --force`.
+2. Review **Ready rows**, **Skipped rows**, and **Created open invoices** in the import output. The import page also lists the number of AR invoices and AP bills in each batch. If no AR invoices were created, check whether `OPENING_BALANCE_IMPORT_FILE` points only to the AP workbook.
+3. A/R rows create customer invoices in **Invoices**, **AR Aging**, **Receive Payment**, and the client statement. A/P rows create vendor bills. Entering a total in the chart of accounts alone does not create customer level outstanding invoices.
+4. For AR batches imported before the journal direction fix, preview corrections with `php artisan seajet:repair-imported-ar`. Review the row count and amount, then post the correcting journals with `php artisan seajet:repair-imported-ar --apply --date=YYYY-MM-DD` in an open accounting period. The command leaves already correct or corrected rows untouched.
+
 ## Purchase to Payment
 
 Supplier payments follow a controlled lifecycle: prepare as For Approval, approve by a different authorized user, print and record the cheque where applicable, release and post, then clear through the check register. Approved payments do not affect the ledger until release. Spoiled checks may be replaced before release; released payments require a reversal-based void, and cleared checks require a bank-correction workflow.

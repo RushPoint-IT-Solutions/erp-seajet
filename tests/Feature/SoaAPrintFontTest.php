@@ -60,6 +60,24 @@ class SoaAPrintFontTest extends TestCase
 
     }
 
+    public function test_soa_a_prints_invoice_date_and_preparer_name()
+    {
+        $this->get(route('erp.billings.print-layout.soa-a'))
+            ->assertOk()
+            ->assertSee('data-field="date"', false)
+            ->assertSee('data-field="prepared_by"', false);
+
+        $this->get(route('erp.soa-a.preview', [
+            'invoice_date' => '2026-09-22',
+            'prepared_by' => 'Renz Sample',
+        ]))
+            ->assertOk()
+            ->assertSee('Date: 09/22/2026')
+            ->assertSee('Renz Sample')
+            ->assertSee('print-field-date', false)
+            ->assertSee('print-field-prepared_by', false);
+    }
+
     public function test_soa_b_layout_has_font_and_font_size_controls_and_saves_them()
     {
         $this->get(route('erp.billings.print-layout.soa-b'))

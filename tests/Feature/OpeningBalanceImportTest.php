@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\Accounting\PostingService;
+use App\Services\Accounting\OpeningBalanceImportService;
 use App\Services\Accounting\XlsxOpeningBalanceReader;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
@@ -93,16 +94,22 @@ class OpeningBalanceImportTest extends TestCase
         $this->assertDatabaseHas('journal_entry_lines', [
             'journal_entry_id' => $journals[1]->id,
             'account_id' => $accounts['opening_balance_account_id'],
-            'debit' => 2000,
+            'credit' => 2000,
             'currency' => 'USD',
-            'foreign_debit' => 40,
+            'foreign_credit' => 40,
         ]);
         $this->assertDatabaseHas('journal_entry_lines', [
             'journal_entry_id' => $journals[1]->id,
             'account_id' => $accounts['ar_reimbursable_usd_account_id'],
             'customer_id' => $customer->id,
-            'credit' => 2000,
-            'foreign_credit' => 40,
+            'debit' => 2000,
+            'foreign_debit' => 40,
+        ]);
+        $this->assertDatabaseHas('journal_entry_lines', [
+            'journal_entry_id' => $journals[0]->id,
+            'account_id' => $accounts['ar_trade_php_account_id'],
+            'customer_id' => $customer->id,
+            'debit' => 1000,
         ]);
         $this->assertDatabaseHas('journal_entry_lines', [
             'journal_entry_id' => $journals[2]->id,
@@ -125,6 +132,8 @@ class OpeningBalanceImportTest extends TestCase
         $createdCustomerInvoice = DB::table('sales_documents')->where('transaction_no', 'INV-BAD-001')->first();
         $this->assertNotNull($tradeInvoice);
         $this->assertNotNull($reimbursableInvoice);
+        $this->assertSame('MANILA', $tradeInvoice->class_code);
+        $this->assertSame('CEBU', $reimbursableInvoice->class_code);
         $this->assertNotNull($vendorBill);
         $this->assertNotNull($createdCustomer);
         $this->assertNotNull($createdCustomerInvoice);
@@ -149,11 +158,24 @@ class OpeningBalanceImportTest extends TestCase
         $this->assertEquals(50.0, (float) $reimbursableInvoice->exchange_rate);
         $this->assertEquals(500.0, (float) $vendorBill->grand_total);
         $this->assertSame('Approved', $vendorBill->approval_status);
+        $this->get(route('erp.customer-billing.aging', ['class' => 'CEBU']))
+            ->assertOk()->assertSee($reimbursableInvoice->document_no);
+        DB::table('sales_documents')->where('id', $reimbursableInvoice->id)->update(['class_code' => 'CEB']);
+        $this->get(route('erp.customer-billing.aging', ['class' => 'CEBU']))
+            ->assertOk()->assertSee($reimbursableInvoice->document_no);
+        DB::table('sales_documents')->where('id', $tradeInvoice->id)->update(['class_code' => 'MAIN']);
+        $this->get(route('erp.customer-billing.aging', ['class' => 'MANILA']))
+            ->assertOk()->assertSee($tradeInvoice->document_no);
         $this->assertSame(3, DB::table('sales_document_lines')
             ->whereIn('sales_document_id', [$tradeInvoice->id, $reimbursableInvoice->id, $createdCustomerInvoice->id])->count());
         $this->assertSame(1, DB::table('vendor_bill_lines')->where('purchase_document_id', $vendorBill->id)->count());
         $this->assertSame(3, DB::table('opening_balance_import_rows')->whereNotNull('sales_document_id')->count());
         $this->assertSame(1, DB::table('opening_balance_import_rows')->whereNotNull('purchase_document_id')->count());
+        $importPage = $this->get(route('erp.accounting.opening-balances.import'))->assertOk()
+            ->assertSee('AR invoices')->assertSee('AP bills');
+        $recent = $importPage->original->getData()['recentImports']->first();
+        $this->assertSame(3, $recent->ar_rows);
+        $this->assertSame(1, $recent->ap_rows);
 
         $this->get(route('erp.payments.create'))
             ->assertStatus(200)
@@ -339,6 +361,44 @@ class OpeningBalanceImportTest extends TestCase
         $this->assertSame(['A/P TRADE'], array_values(array_unique(array_column($apRows, 'account_type'))));
         $this->assertSame(['MAIN'], array_values(array_unique(array_column($apRows, 'branch'))));
         $this->assertSame(['PHP'], array_values(array_unique(array_column($apRows, 'currency'))));
+    }
+
+    public function test_reversed_historical_ar_import_can_be_previewed_and_corrected_once()
+    {
+        $accounts = $this->accountMapping();
+        $mapping = [];
+        foreach ($accounts as $key => $id) {
+            $mapping[str_replace('_account_id', '', $key)] = $id;
+        }
+        $customer = DB::table('customers')->where('company_id', 1)->where('is_active', true)->first();
+        $path = $this->workbook([
+            ['MAIN', 'A/R TRADE', 'BILLING INVOICE', '2026-09-01', $customer->name, 'REPAIR-AR-001', 1000, '', ''],
+        ]);
+        app(OpeningBalanceImportService::class)->import(
+            $path, 1, $mapping, hash_file('sha256', $path), basename($path), auth()->id()
+        );
+        $this->assertSame(0, Artisan::call('seajet:repair-imported-ar', ['--date' => '2026-09-22']));
+        $this->assertStringContainsString('Needs correction: 0', Artisan::output());
+        $row = DB::table('opening_balance_import_rows')->where('reference_no', 'REPAIR-AR-001')->first();
+        $arLine = DB::table('journal_entry_lines')->where('journal_entry_id', $row->journal_entry_id)
+            ->where('account_id', $accounts['ar_trade_php_account_id'])->first();
+        $openingLine = DB::table('journal_entry_lines')->where('journal_entry_id', $row->journal_entry_id)
+            ->where('account_id', $accounts['opening_balance_account_id'])->first();
+        DB::table('journal_entry_lines')->where('id', $arLine->id)->update(['debit' => 0, 'credit' => 1000]);
+        DB::table('journal_entry_lines')->where('id', $openingLine->id)->update(['debit' => 1000, 'credit' => 0]);
+
+        $this->assertSame(0, Artisan::call('seajet:repair-imported-ar', ['--date' => '2026-09-22']));
+        $this->assertStringContainsString('Needs correction: 1', Artisan::output());
+        $this->assertFalse(DB::table('journal_entries')->where('source_type', 'opening_balance_import_correction')->exists());
+
+        $this->assertSame(0, Artisan::call('seajet:repair-imported-ar', ['--date' => '2026-09-22', '--apply' => true]));
+        $this->assertStringContainsString('Posted correcting journals: 1', Artisan::output());
+        $correction = DB::table('journal_entries')->where('source_type', 'opening_balance_import_correction')->first();
+        $this->assertSame((int) $row->id, (int) $correction->source_id);
+        $this->assertEquals(2000, DB::table('journal_entry_lines')->where('journal_entry_id', $correction->id)
+            ->where('account_id', $accounts['ar_trade_php_account_id'])->value('debit'));
+        $this->assertSame(0, Artisan::call('seajet:repair-imported-ar', ['--date' => '2026-09-22', '--apply' => true]));
+        $this->assertSame(1, DB::table('journal_entries')->where('source_type', 'opening_balance_import_correction')->count());
     }
 
     private function accountMapping()

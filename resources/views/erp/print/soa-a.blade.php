@@ -135,6 +135,7 @@
         <div class="label" style="left: 330px; top: 132px; font-size: 17px">Statement of Account</div>
         <div class="label" style="left: 635px; top: 137px">A No.</div>
         <div class="field fit-single-line print-field-serial" data-fit-text style="left: {{ $p['serial'][0] }}px; top: {{ $p['serial'][1] }}px; {{ $fieldStyle('serial') }}; color: #991b1b; font-weight: 800">{{ $print['soa_no'] ?? '0907' }}</div>
+        <div class="field fit-single-line print-field-date" data-fit-text style="left: {{ $p['date'][0] }}px; top: {{ $p['date'][1] }}px; {{ $fieldStyle('date') }}">Date: {{ $print['invoice_date'] ?? '' }}</div>
 
         <div class="box" style="left: 66px; top: 185px; width: 690px; height: 588px"></div>
         <div class="line" style="left: 66px; top: 213px; width: 690px"></div>
@@ -153,6 +154,7 @@
         <div class="field fit-single-line amount print-field-total_reimbursement" data-fit-text style="left: {{ $p['total_reimbursement'][0] }}px; top: {{ $p['total_reimbursement'][1] }}px; {{ $fieldStyle('total_reimbursement') }}">{{ number_format((float) ($print['soa_total'] ?? 0), 2) }}</div>
         <div class="field fit-multiline print-field-customer" data-fit-text style="left: {{ $p['customer'][0] }}px; top: {{ $p['customer'][1] }}px; {{ $fieldStyle('customer') }}">{{ $customerDisplay }}</div>
         <div class="field fit-single-line print-field-shipper" data-fit-text style="left: {{ $p['shipper'][0] }}px; top: {{ $p['shipper'][1] }}px; {{ $fieldStyle('shipper') }}">{{ $shipperDisplay }}</div>
+        <div class="field fit-single-line print-field-prepared_by" data-fit-text style="left: {{ $p['prepared_by'][0] }}px; top: {{ $p['prepared_by'][1] }}px; {{ $fieldStyle('prepared_by') }}; text-align: center">{{ $print['prepared_by'] ?? '' }}</div>
         @foreach($customFields as $custom)
             <div class="field fit-multiline" data-fit-text data-min-font="6" style="left: {{ $custom['x'] }}px; top: {{ $custom['y'] }}px; width: {{ $custom['width'] }}px; font-size: {{ $custom['font_size'] }}px; max-height: 120px">{{ $cleanSoaAText($custom['text']) }}</div>
         @endforeach
