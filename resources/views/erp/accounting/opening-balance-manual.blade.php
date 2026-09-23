@@ -63,6 +63,11 @@
                 <input name="reference_no" id="manualReference" class="form-control" value="{{ old('reference_no') }}" maxlength="100" placeholder="Original BI or SOA number" required>
                 <div class="form-text" id="manualReferenceHelp">This reference must not already exist in Accounts Receivable.</div>
             </div>
+            <div class="col-12 d-none" id="manualDescriptionGroup">
+                <label class="form-label fw-semibold">Description</label>
+                <textarea name="description" id="manualDescription" class="form-control" rows="3" maxlength="1000" placeholder="Enter the vendor bill particulars or reason for this opening balance">{{ old('description') }}</textarea>
+                <div class="form-text">This will appear in the vendor bill memo, bill line, and journal entry.</div>
+            </div>
             <div class="col-md-6 col-lg-3">
                 <label class="form-label fw-semibold">Invoice Date <span class="text-danger">*</span></label>
                 <input name="source_date" type="date" class="form-control" value="{{ old('source_date', date('Y-m-d')) }}" required>
@@ -126,7 +131,7 @@
 
         <div class="d-flex justify-content-end gap-2 mt-4">
             <a href="{{ route('erp.payments.create') }}" class="btn btn-outline-secondary">Cancel</a>
-            <button class="btn btn-primary" onclick="return confirm('Post this manual A/R opening balance?')"><i class="bi bi-journal-check me-1"></i> Post Opening Balance</button>
+            <button class="btn btn-primary" onclick="return confirm('Post this manual opening balance?')"><i class="bi bi-journal-check me-1"></i> Post Opening Balance</button>
         </div>
     </form>
 @endsection
@@ -144,8 +149,10 @@
             var isPayable = type === 'ap_trade';
             $('#manualCustomerGroup').toggleClass('d-none', isPayable);
             $('#manualSupplierGroup').toggleClass('d-none', !isPayable);
+            $('#manualDescriptionGroup').toggleClass('d-none', !isPayable);
             $('#manualCustomer').prop('disabled', isPayable).prop('required', !isPayable);
             $('#manualSupplier').prop('disabled', !isPayable).prop('required', isPayable);
+            $('#manualDescription').prop('disabled', !isPayable);
 
             var account = $('#manualTradeAccount');
             account.find('option[data-balance-type]').each(function () {

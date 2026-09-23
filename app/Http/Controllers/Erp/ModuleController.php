@@ -5722,6 +5722,7 @@ class ModuleController extends Controller
             'customer_id' => 'nullable|required_if:balance_type,ar_trade|integer',
             'supplier_id' => 'nullable|required_if:balance_type,ap_trade|integer',
             'reference_no' => 'required|string|max:100',
+            'description' => 'nullable|string|max:1000',
             'source_date' => 'required|date',
             'due_date' => 'required|date|after_or_equal:source_date',
             'branch_id' => 'required|integer',

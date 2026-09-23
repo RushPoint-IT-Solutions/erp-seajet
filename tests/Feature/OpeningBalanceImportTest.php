@@ -390,12 +390,15 @@ class OpeningBalanceImportTest extends TestCase
             ->assertSee($manualApUrl);
         $this->get($manualApUrl)
             ->assertOk()
-            ->assertSee('value="ap_trade" checked', false);
+            ->assertSee('value="ap_trade" checked', false)
+            ->assertSee('name="description"', false)
+            ->assertSee('This will appear in the vendor bill memo, bill line, and journal entry.');
 
         $response = $this->post(route('erp.accounting.opening-balances.manual.store'), [
             'balance_type' => 'ap_trade',
             'supplier_id' => $supplier->id,
             'reference_no' => 'BDO-AP-OB-001',
+            'description' => 'Unpaid international freight charges from prior period',
             'source_date' => '2026-09-02',
             'due_date' => '2026-09-30',
             'branch_id' => $branch->id,
@@ -413,6 +416,9 @@ class OpeningBalanceImportTest extends TestCase
         $this->assertSame('2026-09-30', $bill->due_date);
         $this->assertEquals(750, (float) $bill->grand_total);
         $this->assertEquals($bdoAccountId, (int) $bill->opening_balance_control_account_id);
+        $this->assertStringContainsString('Unpaid international freight charges from prior period', $bill->memo);
+        $this->assertStringContainsString('Unpaid international freight charges from prior period', DB::table('vendor_bill_lines')
+            ->where('purchase_document_id', $bill->id)->value('memo'));
 
         $this->assertDatabaseHas('journal_entry_lines', [
             'journal_entry_id' => $bill->journal_entry_id,
@@ -425,6 +431,10 @@ class OpeningBalanceImportTest extends TestCase
             'supplier_id' => $supplier->id,
             'credit' => 750,
         ]);
+        $this->assertTrue(DB::table('journal_entry_lines')
+            ->where('journal_entry_id', $bill->journal_entry_id)
+            ->where('description', 'like', '%Unpaid international freight charges from prior period%')
+            ->exists());
         $this->get(route('erp.payables.payments.create'))
             ->assertOk()
             ->assertSee($bill->document_no);

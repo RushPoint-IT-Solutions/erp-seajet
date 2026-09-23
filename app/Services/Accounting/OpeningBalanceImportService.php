@@ -253,6 +253,7 @@ class OpeningBalanceImportService
             'source_date' => $data['source_date'],
             'due_date' => $data['due_date'],
             'reference_no' => $reference,
+            'description' => trim((string) ($data['description'] ?? '')),
             'currency' => $currency,
             'foreign_amount' => $currency === 'USD' ? $transactionAmount : 0,
             'exchange_rate' => $exchangeRate,
@@ -852,8 +853,11 @@ class OpeningBalanceImportService
 
     private function lineDescription(array $row)
     {
-        return trim($row['balance_type_label'].' opening balance '.$row['reference_no']
+        $description = trim($row['balance_type_label'].' opening balance '.$row['reference_no']
             .' | '.$row['party_name'].' | '.$row['source_date']);
+        $manualDescription = trim((string) ($row['description'] ?? ''));
+
+        return $manualDescription !== '' ? $description.' | '.$manualDescription : $description;
     }
 
     private function classCode($branch)
