@@ -303,7 +303,7 @@ class OpeningBalanceImportTest extends TestCase
             ->assertSee(route('erp.accounting.opening-balances.manual'));
         $this->get(route('erp.accounting.opening-balances.manual'))
             ->assertOk()
-            ->assertSee('Manual A/R Opening Balance')
+            ->assertSee('Manual Trade Opening Balance')
             ->assertSee('A/R Trade Metrobank - PHP')
             ->assertSee('value="'.$customer->id.'"', false);
 
@@ -348,6 +348,100 @@ class OpeningBalanceImportTest extends TestCase
             ->assertOk()
             ->assertSee('METRO-OB-001')
             ->assertSee('data-bi-balance="1000.00"', false);
+    }
+
+    public function test_manual_ap_opening_balance_supports_bdo_and_metro_and_creates_an_open_vendor_bill()
+    {
+        $accounts = $this->accountMapping();
+        $bdoAccountId = $accounts['ap_trade_php_account_id'];
+        $bdoAccount = DB::table('accounts')->where('id', $bdoAccountId)->first();
+        DB::table('accounts')->where('id', $bdoAccountId)->update([
+            'name' => 'A/P Trade BDO - PHP',
+        ]);
+        DB::table('accounts')->insert([
+            'company_id' => 1,
+            'account_category_id' => $bdoAccount->account_category_id,
+            'code' => '2101-METRO',
+            'name' => 'A/P Trade Metro - PHP',
+            'type' => 'Accounts Payable',
+            'opening_balance' => 0,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $supplier = DB::table('suppliers')->where('company_id', 1)->where('is_active', true)->first();
+        $branch = DB::table('branches')->where('company_id', 1)->where('is_active', true)->first();
+
+        $this->get(route('erp.accounting.opening-balances.manual'))
+            ->assertOk()
+            ->assertSee('A/P Trade (Vendor — BDO / Metro)')
+            ->assertSee('A/P Trade BDO - PHP')
+            ->assertSee('A/P Trade Metro - PHP')
+            ->assertSee('value="'.$supplier->id.'"', false);
+
+        $response = $this->post(route('erp.accounting.opening-balances.manual.store'), [
+            'balance_type' => 'ap_trade',
+            'supplier_id' => $supplier->id,
+            'reference_no' => 'BDO-AP-OB-001',
+            'source_date' => '2026-09-02',
+            'due_date' => '2026-09-30',
+            'branch_id' => $branch->id,
+            'currency' => 'PHP',
+            'exchange_rate' => 1,
+            'amount' => 750,
+            'target_account_id' => $bdoAccountId,
+            'opening_balance_account_id' => $accounts['opening_balance_account_id'],
+        ]);
+
+        $response->assertRedirect(route('erp.payables.payments.create'));
+        $bill = DB::table('purchase_documents')->where('reference_no', 'BDO-AP-OB-001')->first();
+        $this->assertNotNull($bill);
+        $this->assertSame('Opening Balance', $bill->transaction_type);
+        $this->assertSame('2026-09-30', $bill->due_date);
+        $this->assertEquals(750, (float) $bill->grand_total);
+        $this->assertEquals($bdoAccountId, (int) $bill->opening_balance_control_account_id);
+
+        $this->assertDatabaseHas('journal_entry_lines', [
+            'journal_entry_id' => $bill->journal_entry_id,
+            'account_id' => $accounts['opening_balance_account_id'],
+            'debit' => 750,
+        ]);
+        $this->assertDatabaseHas('journal_entry_lines', [
+            'journal_entry_id' => $bill->journal_entry_id,
+            'account_id' => $bdoAccountId,
+            'supplier_id' => $supplier->id,
+            'credit' => 750,
+        ]);
+        $this->get(route('erp.payables.payments.create'))
+            ->assertOk()
+            ->assertSee($bill->document_no);
+    }
+
+    public function test_trial_balance_normalizes_ar_beginning_balances_as_positive()
+    {
+        $accountId = $this->accountMapping()['ar_trade_php_account_id'];
+        $account = DB::table('accounts')->where('id', $accountId)->first();
+
+        $this->get(route('erp.accounting.coa.edit', $accountId))
+            ->assertOk()
+            ->assertSee('A/R Trade and A/R Reimbursable are debit-normal');
+
+        $this->put(route('erp.accounting.coa.update', $accountId), [
+            'code' => $account->code,
+            'name' => $account->name,
+            'type' => $account->type,
+            'account_category_id' => $account->account_category_id,
+            'parent_id' => $account->parent_id,
+            'opening_balance' => '-1250.00',
+        ])->assertRedirect(route('erp.accounting.coa'));
+
+        $this->assertEquals(1250, (float) DB::table('accounts')->where('id', $accountId)->value('opening_balance'));
+        // Legacy imports may already contain a negative stored A/R opening balance.
+        DB::table('accounts')->where('id', $accountId)->update(['opening_balance' => -1250]);
+        $this->get(route('erp.reports.trial-balance'))
+            ->assertOk()
+            ->assertSee('1,250.00')
+            ->assertDontSee('(1,250.00)');
     }
 
     public function test_dedicated_seeder_imports_the_workbook_and_is_safe_to_run_again()

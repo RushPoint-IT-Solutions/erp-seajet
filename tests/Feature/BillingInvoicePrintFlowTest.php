@@ -154,8 +154,37 @@ class BillingInvoicePrintFlowTest extends TestCase
         $this->get(route('erp.soa-a.preview', ['invoice' => 'SOAA-0021']))
             ->assertOk()
             ->assertSee('print-field-serial', false)
-            ->assertDontSee('.print-field-serial {', false)
+            ->assertSee('.soa-a-sheet .print-field-serial { display: none !important; }', false)
             ->assertSee('SOAA-0021');
+    }
+
+    public function test_soa_a_prints_payor_address_and_memo_without_a_number_hash_prefix()
+    {
+        $print = $this->get(route('erp.soa-a.preview', [
+            'customer' => 'North Harbor Trading',
+            'invoice_to' => "North Harbor Center\nManila, Philippines",
+            'memo' => 'Apply payment to September freight charges.',
+            'soa_no' => '# 0954',
+            'invoice_date' => '2026-09-23',
+            'item_description' => ['Ocean freight charges'],
+            'line_amount' => ['1250.00'],
+            'billing_total' => '1250.00',
+            'soa_total' => '1250.00',
+        ]));
+
+        $print->assertOk()
+            ->assertSee('print-field-address', false)
+            ->assertSee("North Harbor Center\nManila, Philippines")
+            ->assertSee('print-field-remarks', false)
+            ->assertSee('Apply payment to September freight charges.')
+            ->assertSee('>0954</div>', false)
+            ->assertDontSee('># 0954</div>', false);
+        $this->assertRegExp('/@media\s+print\s*\{.*\.soa-a-sheet \.print-field-serial\s*\{\s*display:\s*none\s*!important;/s', $print->getContent());
+
+        $this->get(route('erp.billings.print-layout.soa-a'))
+            ->assertOk()
+            ->assertSee('data-field="address"', false)
+            ->assertSee('data-field="remarks"', false);
     }
 
     public function test_vatable_billing_review_can_print_soa_b_and_billing_invoice()

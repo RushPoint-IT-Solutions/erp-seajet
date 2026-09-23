@@ -59,8 +59,12 @@
         max-height: 510px;
     }
     .print-field-customer,
+    .print-field-address,
     .print-field-shipper {
         max-height: 36px;
+    }
+    .print-field-remarks {
+        max-height: 88px;
     }
     @foreach($hiddenFields as $hiddenField)
     .print-field-{{ $hiddenField }} {
@@ -86,6 +90,8 @@
         .soa-a-sheet .label,
         .soa-a-sheet .logo,
         .soa-a-sheet .company { display: none !important; }
+        /* The physical SOA A stock already carries its own control number. */
+        .soa-a-sheet .print-field-serial { display: none !important; }
     }
 </style>
 @endpush
@@ -110,10 +116,15 @@
         $shipperText = preg_replace('/^SHIPPER:\s*/i', '', $shipperText);
         $shipperDisplay = $shipperText !== '' ? 'SHIPPER: '.$shipperText : '';
         $cleanSoaAText = function ($text) {
+            if (trim((string) $text) === '#') {
+                return '';
+            }
             $key = strtolower(preg_replace('/[^a-z0-9]+/', '', trim((string) $text)));
             return strpos($key, 'guest') === 0 || (strpos($key, 'guest') !== false && strpos($key, 'nontax') !== false) ? '' : $text;
         };
         $customerDisplay = $cleanSoaAText(trim($print['customer'] ?? ''));
+        $addressDisplay = $cleanSoaAText(trim($print['address'] ?? ''));
+        $memoDisplay = $cleanSoaAText(trim($print['memo'] ?? ''));
         $soaAQuery = request()->query();
         if (isset($soaAQuery['customer']) && $cleanSoaAText($soaAQuery['customer']) === '') {
             unset($soaAQuery['customer']);
@@ -153,7 +164,11 @@
         <div class="field fit-multiline amount print-field-amounts" data-fit-text data-min-font="6" style="left: {{ $p['amounts'][0] }}px; top: {{ $p['amounts'][1] }}px; {{ $fieldStyle('amounts') }}">{{ $soaAmounts }}</div>
         <div class="field fit-single-line amount print-field-total_reimbursement" data-fit-text style="left: {{ $p['total_reimbursement'][0] }}px; top: {{ $p['total_reimbursement'][1] }}px; {{ $fieldStyle('total_reimbursement') }}">{{ number_format((float) ($print['soa_total'] ?? 0), 2) }}</div>
         <div class="field fit-multiline print-field-customer" data-fit-text style="left: {{ $p['customer'][0] }}px; top: {{ $p['customer'][1] }}px; {{ $fieldStyle('customer') }}">{{ $customerDisplay }}</div>
+        <div class="field fit-multiline print-field-address" data-fit-text data-min-font="6" style="left: {{ $p['address'][0] }}px; top: {{ $p['address'][1] }}px; {{ $fieldStyle('address') }}">{{ $addressDisplay }}</div>
         <div class="field fit-single-line print-field-shipper" data-fit-text style="left: {{ $p['shipper'][0] }}px; top: {{ $p['shipper'][1] }}px; {{ $fieldStyle('shipper') }}">{{ $shipperDisplay }}</div>
+        @if($memoDisplay !== '')
+            <div class="field fit-multiline print-field-remarks" data-fit-text data-min-font="6" style="left: {{ $p['remarks'][0] }}px; top: {{ $p['remarks'][1] }}px; {{ $fieldStyle('remarks') }}">{{ $memoDisplay }}</div>
+        @endif
         <div class="field fit-single-line print-field-prepared_by" data-fit-text style="left: {{ $p['prepared_by'][0] }}px; top: {{ $p['prepared_by'][1] }}px; {{ $fieldStyle('prepared_by') }}; text-align: center">{{ $print['prepared_by'] ?? '' }}</div>
         @foreach($customFields as $custom)
             <div class="field fit-multiline" data-fit-text data-min-font="6" style="left: {{ $custom['x'] }}px; top: {{ $custom['y'] }}px; width: {{ $custom['width'] }}px; font-size: {{ $custom['font_size'] }}px; max-height: 120px">{{ $cleanSoaAText($custom['text']) }}</div>

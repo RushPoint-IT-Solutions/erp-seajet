@@ -5529,6 +5529,19 @@ class ModuleController extends Controller
         ]);
     }
 
+    private function normalizedOpeningBalance($type, $name, $value)
+    {
+        $amount = $this->moneyToFloat($value);
+        $normalizedName = preg_replace('/[^A-Z0-9]+/', '', strtoupper((string) $name));
+        $isReceivable = stripos((string) $type, 'Accounts Receivable') !== false
+            || strpos($normalizedName, 'ARTRADE') !== false
+            || strpos($normalizedName, 'ATRADEBILLINGINVOICE') !== false
+            || strpos($normalizedName, 'ARREIMBURSABLE') !== false;
+
+        // Trade and reimbursable receivables are debit-normal balances.
+        return $isReceivable ? abs($amount) : $amount;
+    }
+
     public function chartOfAccountsStore()
     {
         $data = $this->validateAccountData();
@@ -5557,7 +5570,7 @@ class ModuleController extends Controller
             'name' => trim($data['name']),
             'type' => $data['type'],
             'show_in_ap' => $showInAp,
-            'opening_balance' => $this->moneyToFloat($data['opening_balance'] ?? 0),
+            'opening_balance' => $this->normalizedOpeningBalance($data['type'], $data['name'], $data['opening_balance'] ?? 0),
             'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),
@@ -5620,7 +5633,7 @@ class ModuleController extends Controller
             'name' => trim($data['name']),
             'type' => $data['type'],
             'show_in_ap' => $showInAp,
-            'opening_balance' => $this->moneyToFloat($data['opening_balance'] ?? 0),
+            'opening_balance' => $this->normalizedOpeningBalance($data['type'], $data['name'], $data['opening_balance'] ?? 0),
             'updated_at' => now(),
         ]);
 
@@ -5677,24 +5690,37 @@ class ModuleController extends Controller
         $defaultReceivableId = optional($receivableAccounts->first(function ($account) {
             return stripos((string) $account->name, 'metro') !== false;
         }))->id ?: ($defaults['ar_trade_php_account_id'] ?? null);
+        $payableAccounts = $accounts->filter(function ($account) {
+            $name = strtoupper((string) $account->name);
+
+            return strpos($name, 'A/P') !== false
+                || strpos($name, 'ACCOUNTS PAYABLE') !== false;
+        })->values();
 
         return view('erp.accounting.opening-balance-manual', [
             'customers' => DB::table('customers')->where('company_id', $companyId)
                 ->where('is_active', true)->orderBy('name')->get(['id', 'code', 'customer_id', 'name']),
+            'suppliers' => DB::table('suppliers')->where('company_id', $companyId)
+                ->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name']),
             'branches' => DB::table('branches')->where('company_id', $companyId)
                 ->where('is_active', true)->orderBy('id')->get(['id', 'code', 'name']),
             'accounts' => $accounts,
             'receivableAccounts' => $receivableAccounts,
+            'payableAccounts' => $payableAccounts,
             'defaultOpeningAccountId' => $defaults['opening_balance_account_id'] ?? null,
             'defaultReceivableId' => $defaultReceivableId,
+            'defaultPayableId' => $defaults['ap_trade_php_account_id'] ?? null,
         ]);
     }
 
     public function storeManualOpeningBalance(OpeningBalanceImportService $importer)
     {
         $this->authorizeAccountingPosting('accounting', 'approve');
+        request()->merge(['balance_type' => request('balance_type', 'ar_trade')]);
         $data = request()->validate([
-            'customer_id' => 'required|integer',
+            'balance_type' => 'required|in:ar_trade,ap_trade',
+            'customer_id' => 'nullable|required_if:balance_type,ar_trade|integer',
+            'supplier_id' => 'nullable|required_if:balance_type,ap_trade|integer',
             'reference_no' => 'required|string|max:100',
             'source_date' => 'required|date',
             'due_date' => 'required|date|after_or_equal:source_date',
@@ -5706,15 +5732,14 @@ class ModuleController extends Controller
             'opening_balance_account_id' => 'required|integer',
         ]);
 
-        $result = $importer->importManualArTrade(
-            $this->defaultCompanyId(),
-            $data,
-            auth()->id()
-        );
+        $isPayable = $data['balance_type'] === 'ap_trade';
+        $result = $isPayable
+            ? $importer->importManualApTrade($this->defaultCompanyId(), $data, auth()->id())
+            : $importer->importManualArTrade($this->defaultCompanyId(), $data, auth()->id());
 
-        return redirect()->route('erp.payments.create')
-            ->with('status', 'Manual A/R opening balance '.$data['reference_no'].' was posted. '
-                .$data['currency'].' '.number_format((float) $data['amount'], 2).' is now available for collection.');
+        return redirect()->route($isPayable ? 'erp.payables.payments.create' : 'erp.payments.create')
+            ->with('status', 'Manual '.($isPayable ? 'A/P' : 'A/R').' opening balance '.$data['reference_no'].' was posted. '
+                .$data['currency'].' '.number_format((float) $data['amount'], 2).' is now available for '.($isPayable ? 'payment.' : 'collection.'));
     }
 
     public function openingBalanceImportPreview(OpeningBalanceImportService $importer)
@@ -7296,9 +7321,11 @@ class ModuleController extends Controller
                 'serial' => [690, 134],
                 'date' => [565, 162],
                 'customer' => [92, 228],
+                'address' => [92, 248],
                 'shipper' => [92, 282],
                 'particulars' => [112, 320],
                 'amounts' => [637, 320],
+                'remarks' => [112, 665],
                 'total_reimbursement' => [637, 797],
                 'prepared_by' => [505, 925],
             ];
@@ -7417,9 +7444,11 @@ class ModuleController extends Controller
                 'serial' => ['label' => 'A Number', 'value' => '0907', 'class' => 'serial'],
                 'date' => ['label' => 'Date', 'value' => 'Date: 05/19/2026', 'class' => ''],
                 'customer' => ['label' => 'Customer', 'value' => 'PHILUSA CORPORATION', 'class' => ''],
+                'address' => ['label' => 'Payor Address', 'value' => "28 SHAW BLVD, KAPITOLYO 1603\nCITY OF PASIG", 'class' => 'small'],
                 'shipper' => ['label' => 'Shipper', 'value' => 'SHIPPER: LEMOINE HOLLAND B.V.', 'class' => 'small'],
                 'particulars' => ['label' => 'Particulars', 'value' => "OCEAN FREIGHT\nBUNKER SURCHARGE\nSOLAS ADMIN\n5% COLLECT FEE\n\nSHIPPER: LEMOINE HOLLAND B.V.", 'class' => ''],
                 'amounts' => ['label' => 'Amounts', 'value' => "368,376.75\n120,022.50\n20,311.50\n9,232.50", 'class' => 'amount'],
+                'remarks' => ['label' => 'Memo', 'value' => 'Memo: Freight charges for September shipment', 'class' => 'small'],
                 'total_reimbursement' => ['label' => 'Total Reimbursement', 'value' => '518,943.25', 'class' => 'amount'],
                 'prepared_by' => ['label' => 'Prepared By', 'value' => auth()->user()->name ?? 'User', 'class' => ''],
             ];
@@ -9857,8 +9886,9 @@ class ModuleController extends Controller
     public function soaAPreview()
     {
         $print = $this->billingPrintPreviewData();
+        $print['soa_no'] = preg_replace('/^\s*#\s*/', '', (string) ($print['soa_no'] ?? ''));
         if (trim((string) ($print['soa_no'] ?? '')) === '') {
-            $print['soa_no'] = $print['invoice_no'] ?? '';
+            $print['soa_no'] = preg_replace('/^\s*#\s*/', '', (string) ($print['invoice_no'] ?? ''));
         }
 
         return view('erp.print.soa-a', [
@@ -11084,6 +11114,13 @@ class ModuleController extends Controller
 
         return $accounts->map(function ($account) use ($beginningMovements, $periodMovements) {
             $opening = (float) ($account->opening_balance ?? 0) + (float) ($beginningMovements[$account->id]['TOTAL'] ?? 0);
+            $normalizedName = preg_replace('/[^A-Z0-9]+/', '', strtoupper((string) $account->name));
+            if (strtolower((string) $account->type) === 'accounts receivable'
+                || strpos($normalizedName, 'ARTRADE') !== false
+                || strpos($normalizedName, 'ATRADEBILLINGINVOICE') !== false
+                || strpos($normalizedName, 'ARREIMBURSABLE') !== false) {
+                $opening = abs($opening);
+            }
             $sales = (float) ($periodMovements[$account->id]['SALES BOOK'] ?? 0);
             $soa = (float) ($periodMovements[$account->id]['SOA'] ?? 0);
             $receipts = (float) ($periodMovements[$account->id]['CASH RECEIPTS BOOK'] ?? 0);
