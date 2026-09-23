@@ -100,6 +100,40 @@ class RecordPaymentPayableTest extends TestCase
             ->assertSee('Non-VAT Print');
     }
 
+    public function test_client_statement_shows_net_invoice_payable_and_adds_the_soa_amount()
+    {
+        $this->seed(\BillingReimbursementSampleSeeder::class);
+
+        $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
+        DB::table('sales_documents')->where('id', $invoice->id)->update([
+            'invoice_amount' => 112,
+            'freight_total' => 50,
+            'grand_total' => 162,
+            'soa_no' => 'SOA-7370',
+            'withholding_tax_amount' => 2,
+            'paid_total' => 0,
+            'balance_due' => 162,
+            'status' => 'posted',
+        ]);
+
+        $statement = $this->get(route('erp.reports.client-soa', ['customer_id' => $invoice->customer_id]));
+        $statement->assertOk()
+            ->assertSee('INV AMT')
+            ->assertSee('(LESS W-TAX)')
+            ->assertSee('(INV + SOA)')
+            ->assertSee('BI-2026-REIMB')
+            ->assertSee('SOA-7370');
+
+        $row = $statement->original->getData()['invoices']->first(function ($item) use ($invoice) {
+            return $item->document_no === $invoice->document_no;
+        });
+
+        $this->assertNotNull($row);
+        $this->assertEquals(110, (float) $row->invoice_amount);
+        $this->assertEquals(50, (float) $row->soa_amount);
+        $this->assertEquals(160, (float) $row->total);
+    }
+
     public function test_overpayment_shows_a_warning_and_cannot_be_saved()
     {
         $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();

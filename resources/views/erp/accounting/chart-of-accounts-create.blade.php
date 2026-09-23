@@ -82,7 +82,7 @@
                 <label class="form-label">Beginning Balance</label>
                 <input name="opening_balance" type="number" step="0.01" class="form-control text-end {{ $errors->has('opening_balance') ? 'is-invalid' : '' }}" value="{{ old('opening_balance', $isEdit ? number_format((float) $account->opening_balance, 2, '.', '') : '0.00') }}">
                 @if($errors->has('opening_balance'))<div class="invalid-feedback">{{ $errors->first('opening_balance') }}</div>@endif
-                <div class="form-text">A/R Trade and A/R Reimbursable are debit-normal and are shown as positive balances in the Trial Balance. A minus sign is retained only for non-receivable contra or credit balances.</div>
+                <div class="form-text">Enter the accounting sign required for this account. Posted opening-balance journals should be corrected through a reversing or correcting journal, not by changing their display sign.</div>
             </div>
             <div class="col-12">
                 <label class="form-check">

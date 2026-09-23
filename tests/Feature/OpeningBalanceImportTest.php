@@ -440,14 +440,16 @@ class OpeningBalanceImportTest extends TestCase
             ->assertSee($bill->document_no);
     }
 
-    public function test_trial_balance_normalizes_ar_beginning_balances_as_positive()
+    public function test_chart_of_accounts_preserves_the_entered_beginning_balance_sign()
     {
+        $this->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class);
+
         $accountId = $this->accountMapping()['ar_trade_php_account_id'];
         $account = DB::table('accounts')->where('id', $accountId)->first();
 
         $this->get(route('erp.accounting.coa.edit', $accountId))
             ->assertOk()
-            ->assertSee('A/R Trade and A/R Reimbursable are debit-normal');
+            ->assertSee('Enter the accounting sign required for this account');
 
         $this->put(route('erp.accounting.coa.update', $accountId), [
             'code' => $account->code,
@@ -458,13 +460,10 @@ class OpeningBalanceImportTest extends TestCase
             'opening_balance' => '-1250.00',
         ])->assertRedirect(route('erp.accounting.coa'));
 
-        $this->assertEquals(1250, (float) DB::table('accounts')->where('id', $accountId)->value('opening_balance'));
-        // Legacy imports may already contain a negative stored A/R opening balance.
-        DB::table('accounts')->where('id', $accountId)->update(['opening_balance' => -1250]);
+        $this->assertEquals(-1250, (float) DB::table('accounts')->where('id', $accountId)->value('opening_balance'));
         $this->get(route('erp.reports.trial-balance'))
             ->assertOk()
-            ->assertSee('1,250.00')
-            ->assertDontSee('(1,250.00)');
+            ->assertSee('(1,250.00)');
     }
 
     public function test_dedicated_seeder_imports_the_workbook_and_is_safe_to_run_again()

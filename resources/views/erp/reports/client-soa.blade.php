@@ -225,10 +225,10 @@
             <tr>
                 <th>DATE</th>
                 <th>INV#</th>
-                <th>INV AMT</th>
+                <th>INV AMT<br><small>(LESS W-TAX)</small></th>
                 <th>SOA#</th>
                 <th>SOA AMT</th>
-                <th>TOTAL</th>
+                <th>TOTAL<br><small>(INV + SOA)</small></th>
                 <th>AGING</th>
             </tr>
             </thead>

@@ -5529,19 +5529,6 @@ class ModuleController extends Controller
         ]);
     }
 
-    private function normalizedOpeningBalance($type, $name, $value)
-    {
-        $amount = $this->moneyToFloat($value);
-        $normalizedName = preg_replace('/[^A-Z0-9]+/', '', strtoupper((string) $name));
-        $isReceivable = stripos((string) $type, 'Accounts Receivable') !== false
-            || strpos($normalizedName, 'ARTRADE') !== false
-            || strpos($normalizedName, 'ATRADEBILLINGINVOICE') !== false
-            || strpos($normalizedName, 'ARREIMBURSABLE') !== false;
-
-        // Trade and reimbursable receivables are debit-normal balances.
-        return $isReceivable ? abs($amount) : $amount;
-    }
-
     public function chartOfAccountsStore()
     {
         $data = $this->validateAccountData();
@@ -5570,7 +5557,7 @@ class ModuleController extends Controller
             'name' => trim($data['name']),
             'type' => $data['type'],
             'show_in_ap' => $showInAp,
-            'opening_balance' => $this->normalizedOpeningBalance($data['type'], $data['name'], $data['opening_balance'] ?? 0),
+            'opening_balance' => $this->moneyToFloat($data['opening_balance'] ?? 0),
             'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),
@@ -5633,7 +5620,7 @@ class ModuleController extends Controller
             'name' => trim($data['name']),
             'type' => $data['type'],
             'show_in_ap' => $showInAp,
-            'opening_balance' => $this->normalizedOpeningBalance($data['type'], $data['name'], $data['opening_balance'] ?? 0),
+            'opening_balance' => $this->moneyToFloat($data['opening_balance'] ?? 0),
             'updated_at' => now(),
         ]);
 
@@ -10875,15 +10862,16 @@ class ModuleController extends Controller
             ->get()
             ->map(function ($invoice) {
                 $amounts = $this->paymentInvoiceAmounts($invoice);
+                $invoicePayable = max(0, $amounts['bi_balance'] - $amounts['cwt_balance']);
 
                 return (object) [
                     'document_date' => $invoice->document_date,
                     'document_no' => $invoice->document_no,
                     'soa_no' => $invoice->soa_no ?: ($invoice->template_code && stripos($invoice->template_code, 'SOA') !== false ? $invoice->document_no : ''),
                     'currency' => $invoice->currency ?: 'PHP',
-                    'invoice_amount' => $amounts['bi_balance'],
+                    'invoice_amount' => $invoicePayable,
                     'soa_amount' => $amounts['soa_balance'],
-                    'total' => $amounts['settlement_balance'],
+                    'total' => $invoicePayable + $amounts['soa_balance'],
                     'aging' => $this->clientSoaAgingLabel($invoice->due_date ?: $invoice->document_date),
                     'due_date' => $invoice->due_date,
                 ];
@@ -11115,13 +11103,6 @@ class ModuleController extends Controller
 
         return $accounts->map(function ($account) use ($beginningMovements, $periodMovements) {
             $opening = (float) ($account->opening_balance ?? 0) + (float) ($beginningMovements[$account->id]['TOTAL'] ?? 0);
-            $normalizedName = preg_replace('/[^A-Z0-9]+/', '', strtoupper((string) $account->name));
-            if (strtolower((string) $account->type) === 'accounts receivable'
-                || strpos($normalizedName, 'ARTRADE') !== false
-                || strpos($normalizedName, 'ATRADEBILLINGINVOICE') !== false
-                || strpos($normalizedName, 'ARREIMBURSABLE') !== false) {
-                $opening = abs($opening);
-            }
             $sales = (float) ($periodMovements[$account->id]['SALES BOOK'] ?? 0);
             $soa = (float) ($periodMovements[$account->id]['SOA'] ?? 0);
             $receipts = (float) ($periodMovements[$account->id]['CASH RECEIPTS BOOK'] ?? 0);
