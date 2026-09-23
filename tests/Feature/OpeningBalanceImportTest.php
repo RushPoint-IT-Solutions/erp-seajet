@@ -288,6 +288,68 @@ class OpeningBalanceImportTest extends TestCase
         $this->assertSame(4, $duplicateData['skipped_count']);
     }
 
+    public function test_manual_metrobank_ar_opening_balance_creates_a_collectible_invoice_and_balanced_journal()
+    {
+        $accounts = $this->accountMapping();
+        DB::table('accounts')->where('id', $accounts['ar_trade_php_account_id'])->update([
+            'name' => 'A/R Trade Metrobank - PHP',
+        ]);
+        $customer = DB::table('customers')->where('company_id', 1)->where('is_active', true)->first();
+        $branch = DB::table('branches')->where('company_id', 1)->where('is_active', true)->first();
+
+        $this->get(route('erp.payments.create'))
+            ->assertOk()
+            ->assertSee('Manual Opening Balance')
+            ->assertSee(route('erp.accounting.opening-balances.manual'));
+        $this->get(route('erp.accounting.opening-balances.manual'))
+            ->assertOk()
+            ->assertSee('Manual A/R Opening Balance')
+            ->assertSee('A/R Trade Metrobank - PHP')
+            ->assertSee('value="'.$customer->id.'"', false);
+
+        $response = $this->post(route('erp.accounting.opening-balances.manual.store'), [
+            'customer_id' => $customer->id,
+            'reference_no' => 'METRO-OB-001',
+            'source_date' => '2026-09-01',
+            'due_date' => '2026-09-30',
+            'branch_id' => $branch->id,
+            'currency' => 'PHP',
+            'exchange_rate' => 1,
+            'amount' => 1000,
+            'target_account_id' => $accounts['ar_trade_php_account_id'],
+            'opening_balance_account_id' => $accounts['opening_balance_account_id'],
+        ]);
+
+        $response->assertRedirect(route('erp.payments.create'));
+        $invoice = DB::table('sales_documents')->where('transaction_no', 'METRO-OB-001')->first();
+        $this->assertNotNull($invoice);
+        $this->assertSame('2026-09-30', $invoice->due_date);
+        $this->assertSame('posted', $invoice->status);
+        $this->assertEquals(1000, (float) $invoice->balance_due);
+        $this->assertEquals($accounts['ar_trade_php_account_id'], (int) $invoice->opening_balance_control_account_id);
+
+        $journal = DB::table('journal_entries')->where('id', $invoice->journal_entry_id)->first();
+        $totals = DB::table('journal_entry_lines')->where('journal_entry_id', $journal->id)
+            ->selectRaw('SUM(debit) as debit, SUM(credit) as credit')->first();
+        $this->assertEquals(1000, (float) $totals->debit);
+        $this->assertEquals(1000, (float) $totals->credit);
+        $this->assertDatabaseHas('journal_entry_lines', [
+            'journal_entry_id' => $journal->id,
+            'account_id' => $accounts['ar_trade_php_account_id'],
+            'customer_id' => $customer->id,
+            'debit' => 1000,
+        ]);
+        $this->assertDatabaseHas('journal_entry_lines', [
+            'journal_entry_id' => $journal->id,
+            'account_id' => $accounts['opening_balance_account_id'],
+            'credit' => 1000,
+        ]);
+        $this->get(route('erp.payments.create'))
+            ->assertOk()
+            ->assertSee('METRO-OB-001')
+            ->assertSee('data-bi-balance="1000.00"', false);
+    }
+
     public function test_dedicated_seeder_imports_the_workbook_and_is_safe_to_run_again()
     {
         $this->accountMapping();

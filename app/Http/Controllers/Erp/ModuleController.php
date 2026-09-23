@@ -5661,6 +5661,62 @@ class ModuleController extends Controller
         return $this->openingBalanceImportView();
     }
 
+    public function manualOpeningBalance()
+    {
+        $this->authorizeAccountingPosting('accounting', 'approve');
+        $companyId = $this->defaultCompanyId();
+        $accounts = $this->glAccountOptions();
+        $defaults = $this->openingBalanceAccountDefaults($accounts);
+        $receivableAccounts = $accounts->filter(function ($account) {
+            $name = strtoupper((string) $account->name);
+
+            return strpos($name, 'A/R') !== false
+                || strpos($name, 'A/TRADE') !== false
+                || strpos($name, 'ACCOUNTS RECEIVABLE') !== false;
+        })->values();
+        $defaultReceivableId = optional($receivableAccounts->first(function ($account) {
+            return stripos((string) $account->name, 'metro') !== false;
+        }))->id ?: ($defaults['ar_trade_php_account_id'] ?? null);
+
+        return view('erp.accounting.opening-balance-manual', [
+            'customers' => DB::table('customers')->where('company_id', $companyId)
+                ->where('is_active', true)->orderBy('name')->get(['id', 'code', 'customer_id', 'name']),
+            'branches' => DB::table('branches')->where('company_id', $companyId)
+                ->where('is_active', true)->orderBy('id')->get(['id', 'code', 'name']),
+            'accounts' => $accounts,
+            'receivableAccounts' => $receivableAccounts,
+            'defaultOpeningAccountId' => $defaults['opening_balance_account_id'] ?? null,
+            'defaultReceivableId' => $defaultReceivableId,
+        ]);
+    }
+
+    public function storeManualOpeningBalance(OpeningBalanceImportService $importer)
+    {
+        $this->authorizeAccountingPosting('accounting', 'approve');
+        $data = request()->validate([
+            'customer_id' => 'required|integer',
+            'reference_no' => 'required|string|max:100',
+            'source_date' => 'required|date',
+            'due_date' => 'required|date|after_or_equal:source_date',
+            'branch_id' => 'required|integer',
+            'currency' => 'required|in:PHP,USD',
+            'exchange_rate' => 'nullable|required_if:currency,USD|numeric|min:0.000001',
+            'amount' => 'required|numeric|min:0.01',
+            'target_account_id' => 'required|integer',
+            'opening_balance_account_id' => 'required|integer',
+        ]);
+
+        $result = $importer->importManualArTrade(
+            $this->defaultCompanyId(),
+            $data,
+            auth()->id()
+        );
+
+        return redirect()->route('erp.payments.create')
+            ->with('status', 'Manual A/R opening balance '.$data['reference_no'].' was posted. '
+                .$data['currency'].' '.number_format((float) $data['amount'], 2).' is now available for collection.');
+    }
+
     public function openingBalanceImportPreview(OpeningBalanceImportService $importer)
     {
         $this->authorizeAccountingPosting('accounting', 'approve');

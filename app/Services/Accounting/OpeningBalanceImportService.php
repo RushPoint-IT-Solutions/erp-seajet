@@ -146,6 +146,125 @@ class OpeningBalanceImportService
             $this->periods->assertOpen($companyId, $sourceDate);
         }
 
+        return $this->postPreview($preview, $companyId, $mapping, $fileHash, $filename, $userId);
+    }
+
+    public function importManualArTrade($companyId, array $data, $userId)
+    {
+        $branch = DB::table('branches')
+            ->where('company_id', $companyId)
+            ->where('id', $data['branch_id'])
+            ->where('is_active', true)
+            ->first();
+        $customer = DB::table('customers')
+            ->where('company_id', $companyId)
+            ->where('id', $data['customer_id'])
+            ->where('is_active', true)
+            ->first();
+        $targetAccount = DB::table('accounts')
+            ->where('company_id', $companyId)
+            ->where('id', $data['target_account_id'])
+            ->where('is_active', true)
+            ->first();
+        $openingAccount = DB::table('accounts')
+            ->where('company_id', $companyId)
+            ->where('id', $data['opening_balance_account_id'])
+            ->where('is_active', true)
+            ->first();
+
+        if (!$branch || !$customer || !$targetAccount || !$openingAccount) {
+            throw ValidationException::withMessages([
+                'opening_balance' => 'Select an active branch, customer, receivable account, and opening-balance account for this company.',
+            ]);
+        }
+        $targetName = $this->normalize($targetAccount->name);
+        if (strpos($targetName, 'ARTRADE') === false && strpos($targetName, 'ACCOUNTSRECEIVABLE') === false) {
+            throw ValidationException::withMessages([
+                'target_account_id' => 'Select an A/R Trade or Accounts Receivable account.',
+            ]);
+        }
+        if (strpos($this->normalize($openingAccount->name), 'OPENINGBALANCE') === false) {
+            throw ValidationException::withMessages([
+                'opening_balance_account_id' => 'Select the Opening Balance Equity account.',
+            ]);
+        }
+
+        $reference = trim((string) $data['reference_no']);
+        if (DB::table('sales_documents')->where('company_id', $companyId)
+            ->where(function ($query) use ($reference) {
+                $query->where('document_no', $reference)->orWhere('transaction_no', $reference);
+            })->exists()) {
+            throw ValidationException::withMessages([
+                'reference_no' => 'This BI/SOA reference already exists.',
+            ]);
+        }
+
+        $currency = strtoupper($data['currency']);
+        $transactionAmount = round((float) $data['amount'], 4);
+        $exchangeRate = $currency === 'PHP' ? 1.0 : round((float) $data['exchange_rate'], 6);
+        $baseAmount = round($transactionAmount * $exchangeRate, 4);
+        $fileHash = hash('sha256', implode('|', [
+            'manual-ar', $companyId, $reference, microtime(true), random_int(1, PHP_INT_MAX),
+        ]));
+        $filename = 'Manual AR Opening Balance - '.$reference;
+        $mapping = [
+            'opening_balance' => (int) $openingAccount->id,
+            'ar_trade_php' => (int) $targetAccount->id,
+            'ar_trade_usd' => (int) $targetAccount->id,
+        ];
+        $row = [
+            'sheet_name' => 'Manual Entry',
+            'row_number' => 1,
+            'account_type' => 'A/R TRADE',
+            'document_type' => 'BILLING INVOICE',
+            'branch' => $branch->code,
+            'branch_id' => $branch->id,
+            'party_name' => $customer->name,
+            'party_id' => $customer->id,
+            'party_code' => $customer->code,
+            'source_date' => $data['source_date'],
+            'due_date' => $data['due_date'],
+            'reference_no' => $reference,
+            'currency' => $currency,
+            'foreign_amount' => $currency === 'USD' ? $transactionAmount : 0,
+            'exchange_rate' => $exchangeRate,
+            'base_amount' => $baseAmount,
+            'balance_type' => 'ar_trade',
+            'balance_type_label' => 'A/R Trade',
+            'target_account_id' => $targetAccount->id,
+            'target_account_code' => $targetAccount->code,
+            'target_account_name' => $targetAccount->name,
+            'target_account_label' => trim($targetAccount->code.' - '.$targetAccount->name),
+            'will_create_customer' => false,
+            'errors' => [],
+            'is_valid' => true,
+        ];
+        $rows = $this->assignSubledgerDocumentNumbers($companyId, [$row]);
+        $preview = [
+            'rows' => $rows,
+            'valid_rows' => $rows,
+            'valid_count' => 1,
+            'skipped_count' => 0,
+            'total_amount' => $baseAmount,
+            'source_date_from' => $data['source_date'],
+            'source_date_to' => $data['source_date'],
+            'source_date_count' => 1,
+            'summary' => [[
+                'label' => 'A/R Trade',
+                'currency' => $currency,
+                'rows' => 1,
+                'amount' => $baseAmount,
+            ]],
+            'opening_account' => $openingAccount,
+        ];
+
+        $this->periods->assertOpen($companyId, $data['source_date']);
+
+        return $this->postPreview($preview, $companyId, $mapping, $fileHash, $filename, $userId);
+    }
+
+    private function postPreview(array $preview, $companyId, array $mapping, $fileHash, $filename, $userId)
+    {
         return DB::transaction(function () use ($preview, $companyId, $mapping, $fileHash, $filename, $userId) {
             $now = now();
             $customerResult = $this->createMissingCustomers($companyId, $preview['valid_rows'], $now);
@@ -365,7 +484,7 @@ class OpeningBalanceImportService
                 'document_no' => $row['subledger_document_no'],
                 'reference_no' => $row['reference_no'],
                 'document_date' => $row['source_date'],
-                'due_date' => $row['source_date'],
+                'due_date' => $row['due_date'] ?? $row['source_date'],
                 'terms' => 'Opening Balance',
                 'currency' => $row['currency'],
                 'exchange_rate' => $row['exchange_rate'],
@@ -426,7 +545,7 @@ class OpeningBalanceImportService
             'transaction_no' => $row['reference_no'],
             'soa_no' => $isReimbursable ? $row['reference_no'] : null,
             'document_date' => $row['source_date'],
-            'due_date' => $row['source_date'],
+            'due_date' => $row['due_date'] ?? $row['source_date'],
             'credit_term_days' => 0,
             'vat_classification' => 'exempt',
             'class_code' => $classCode,
