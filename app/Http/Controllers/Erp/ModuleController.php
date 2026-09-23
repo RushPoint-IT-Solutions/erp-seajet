@@ -9659,7 +9659,30 @@ class ModuleController extends Controller
         ]);
         $this->authorizeAccountingPosting('payments', 'edit');
 
-        $reopen = DB::transaction(function () use ($receipt, $data) {
+        $reopen = $this->reverseCustomerPayment($receipt, $data['reason'], 'corrected');
+
+        return redirect()->route('erp.payments.create', array_filter([
+            'invoice' => $reopen['invoice'],
+            'payment_for' => $reopen['payment_for'],
+        ]))->with('status', 'The posted receipt was reversed. Record the corrected BI or SOA payment below.');
+    }
+
+    public function deletePayment($receipt)
+    {
+        $data = request()->validate([
+            'reason' => 'required|string|min:5|max:1000',
+        ]);
+        $this->authorizeAccountingPosting('payments', 'delete');
+
+        $deleted = $this->reverseCustomerPayment($receipt, $data['reason'], 'deleted');
+
+        return redirect()->route('erp.payments.create')
+            ->with('status', 'Payment '.$deleted['receipt_no'].' was deleted. Its journal was reversed and the invoice balance was reopened.');
+    }
+
+    private function reverseCustomerPayment($receipt, $reason, $activityAction)
+    {
+        return DB::transaction(function () use ($receipt, $reason, $activityAction) {
             $record = DB::table('receipts')
                 ->where('company_id', $this->defaultCompanyId())
                 ->where('id', $receipt)
@@ -9675,7 +9698,7 @@ class ModuleController extends Controller
                 ->where('receipt_id', $record->id)
                 ->orderBy('id')
                 ->get();
-            $reversal = app(PostingService::class)->reverseSource('receipt', $record->id, trim($data['reason']));
+            $reversal = app(PostingService::class)->reverseSource('receipt', $record->id, trim($reason));
             if (!$reversal) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'receipt' => 'The posted payment journal could not be reversed.',
@@ -9713,11 +9736,19 @@ class ModuleController extends Controller
             $components = $applications->pluck('component')->unique()->filter()->values();
             $paymentFor = $components->count() === 1 ? $components->first() : 'bi';
 
-            return ['invoice' => $invoiceNo, 'payment_for' => $paymentFor];
-        });
+            app(ActivityLogger::class)->log($activityAction, 'receipt', $record->id, [
+                'status' => $record->status,
+            ], [
+                'status' => 'voided',
+                'reason' => trim($reason),
+            ], $record->company_id);
 
-        return redirect()->route('erp.payments.create', array_filter($reopen))
-            ->with('status', 'The posted receipt was reversed. Record the corrected BI or SOA payment below.');
+            return [
+                'invoice' => $invoiceNo,
+                'payment_for' => $paymentFor,
+                'receipt_no' => $record->receipt_no,
+            ];
+        });
     }
 
     private function resolveArCustomerForPayment($customerIdOrCode, $customerName = null)

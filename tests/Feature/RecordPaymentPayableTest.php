@@ -129,6 +129,56 @@ class RecordPaymentPayableTest extends TestCase
         $this->assertFalse(DB::table('receipts')->where('amount', 110.01)->exists());
     }
 
+    public function test_payment_delete_button_reverses_the_journal_and_reopens_the_invoice_balance()
+    {
+        $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
+        DB::table('sales_documents')->where('id', $invoice->id)->update([
+            'invoice_amount' => 112,
+            'freight_total' => 50,
+            'grand_total' => 162,
+            'withholding_tax_amount' => 0,
+            'paid_total' => 0,
+            'status' => 'posted',
+        ]);
+
+        $this->post(route('erp.payments.receipt'), [
+            'customer_id' => (string) $invoice->customer_id,
+            'invoice_no' => $invoice->document_no,
+            'payment_for' => 'bi',
+            'payment_date' => '2026-09-12',
+            'payment_method' => 'Cash',
+            'currency' => 'PHP',
+            'exchange_rate' => 1,
+            'amount' => '112.00',
+            'cwt_amount' => '0.00',
+        ])->assertOk();
+
+        $receipt = DB::table('receipts')->orderBy('id', 'desc')->first();
+        $this->get(route('erp.payments.create'))
+            ->assertOk()
+            ->assertSee(route('erp.payments.delete', $receipt->id))
+            ->assertSee('title="Delete payment"', false);
+
+        $this->delete(route('erp.payments.delete', $receipt->id), [
+            'reason' => 'Duplicate customer payment',
+        ])->assertRedirect(route('erp.payments.create'));
+
+        $this->assertSame('voided', DB::table('receipts')->where('id', $receipt->id)->value('status'));
+        $this->assertSame('reversed', DB::table('receipts')->where('id', $receipt->id)->value('posting_status'));
+        $this->assertEquals(0, (float) DB::table('sales_documents')->where('id', $invoice->id)->value('paid_total'));
+        $this->assertEquals(162, (float) DB::table('sales_documents')->where('id', $invoice->id)->value('balance_due'));
+        $this->assertDatabaseHas('journal_entries', [
+            'source_type' => 'receipt',
+            'source_id' => $receipt->id,
+            'posting_type' => 'reversal',
+            'status' => 'posted',
+        ]);
+        $paymentRows = $this->get(route('erp.payments.create'))->assertOk()->original->getData()['payments'];
+        $this->assertFalse(collect($paymentRows)->contains(function ($payment) use ($receipt) {
+            return $payment['number'] === $receipt->receipt_no;
+        }));
+    }
+
     public function test_old_opening_balance_remains_available_after_many_newer_invoices()
     {
         $source = (array) DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();

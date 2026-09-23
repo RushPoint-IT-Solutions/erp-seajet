@@ -175,6 +175,12 @@
                                         data-receipt="{{ $payment['number'] }}" title="Correct posted payment">
                                     <i class="bi bi-arrow-counterclockwise"></i>
                                 </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger delete-payment"
+                                        data-bs-toggle="modal" data-bs-target="#deletePaymentModal"
+                                        data-url="{{ route('erp.payments.delete', $payment['id']) }}"
+                                        data-receipt="{{ $payment['number'] }}" title="Delete payment">
+                                    <i class="bi bi-trash"></i>
+                                </button>
                                 @if($payment['can_print_or'])
                                 <div class="btn-group">
                                     <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-receipt me-1"></i>OR</button>
@@ -223,6 +229,24 @@
             </form>
         </div>
     </div>
+
+    <div class="modal fade" id="deletePaymentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="post" class="modal-content" id="deletePaymentForm">
+                {{ csrf_field() }}
+                {{ method_field('DELETE') }}
+                <div class="modal-header"><h5 class="modal-title">Delete payment</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        Receipt <strong id="deleteReceiptNumber"></strong> will be removed from the active payment list. Its journal will be reversed, the invoice balance will reopen, and the audit history will be retained.
+                    </div>
+                    <label class="form-label fw-semibold" for="deletePaymentReason">Reason for deletion</label>
+                    <textarea id="deletePaymentReason" name="reason" class="form-control" rows="2" minlength="5" maxlength="1000" required></textarea>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-danger"><i class="bi bi-trash me-1"></i>Delete payment</button></div>
+            </form>
+        </div>
+    </div>
 @endsection
 
 @push('scripts')
@@ -237,6 +261,12 @@
             $('#correctPaymentForm').attr('action', $(this).data('url'));
             $('#correctReceiptNumber').text($(this).data('receipt'));
             $('#correctionReason').val('');
+        });
+
+        $('.delete-payment').on('click', function () {
+            $('#deletePaymentForm').attr('action', $(this).data('url'));
+            $('#deleteReceiptNumber').text($(this).data('receipt'));
+            $('#deletePaymentReason').val('');
         });
 
         $('#paymentSearch, #statusFilter, #typeFilter').on('input change', filterPayments);
