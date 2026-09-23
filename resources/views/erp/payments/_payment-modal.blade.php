@@ -77,7 +77,7 @@
                         <span class="badge badge-soft">Step 1</span>
                     </div>
                     <div class="row g-3">
-                        <div class="col-lg-6">
+                        <div class="col-lg-4">
                             <label class="form-label fw-semibold">Payment For</label>
                             <select name="payment_for" class="form-select payment-for-select" required>
                                 <option value="" selected>Select BI or SOA...</option>
@@ -86,7 +86,7 @@
                             </select>
                             <div class="form-text">Save a separate payment if the client pays the other portion.</div>
                         </div>
-                        <div class="col-lg-6">
+                        <div class="col-lg-4">
                             <label class="form-label fw-semibold">Client <span class="text-danger">*</span></label>
                             <select name="customer_id" class="form-select payment-customer-select erp-select" required>
                                 <option value=""></option>
@@ -101,6 +101,16 @@
                             </select>
                             <div class="form-text">Select the client first. Only that client's unpaid invoices will appear below.</div>
                             <input type="hidden" name="customer_name" class="payment-customer-name" value="">
+                        </div>
+                        <div class="col-lg-4">
+                            <label class="form-label fw-semibold">Amount to Pay <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text payment-amount-currency">PHP</span>
+                                <input name="amount" type="number" min="0.01" step="0.01"
+                                       class="form-control text-end payment-amount-input" value=""
+                                       inputmode="decimal" placeholder="0.00" required>
+                            </div>
+                            <div class="form-text">Enter the amount actually received. Partial payments leave the remaining BI or SOA balance open.</div>
                         </div>
                         <div class="col-sm-6 col-lg-3">
                             <label class="form-label fw-semibold">Class <span class="text-danger">*</span></label>
@@ -280,10 +290,10 @@
                                 <div class="payment-summary-item"><div class="payment-summary-label">Client outstanding</div><div class="payment-summary-value payment-client-outstanding">PHP 0.00</div></div>
                                 <div class="payment-summary-item"><div class="payment-summary-label">Selected invoices</div><div class="payment-summary-value payment-selected-count">0</div></div>
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold">Payment Amount <span class="text-danger">*</span></label>
-                                <div class="input-group"><span class="input-group-text payment-amount-currency">PHP</span><input name="amount" class="form-control text-end payment-amount-input" value="" inputmode="decimal" required></div>
-                                <div class="form-text">Total cash or bank amount for the selected invoices.</div>
+                            <div class="mb-3 rounded border bg-light p-3">
+                                <div class="payment-summary-label">Amount entered</div>
+                                <div class="payment-summary-value"><span class="payment-amount-summary-currency">PHP</span> <span class="payment-amount-summary">0.00</span></div>
+                                <div class="form-text">This amount will be matched against the selected BI or SOA.</div>
                             </div>
                             <div>
                                 <label class="form-label">CWT Amount</label>
@@ -400,9 +410,10 @@
                 form.find('.payment-total-due').text(currency + ' ' + money(due));
                 form.find('.payment-total-cash').text(currency + ' ' + money(cash));
                 form.find('.payment-amount-currency').text(currency);
+                form.find('.payment-amount-summary-currency').text(currency);
+                form.find('.payment-amount-summary').text(money(form.find('.payment-amount-input').val()));
                 form.find('.payment-select-all').prop('checked', visibleRows.length > 0 && visibleRows.filter('.is-selected').length === visibleRows.length);
                 if (fillPaymentAmount) {
-                    form.find('.payment-amount-input').val(count ? cash.toFixed(2) : '');
                     form.find('.payment-cwt-input').val(cwt.toFixed(2));
                 }
             }
@@ -518,7 +529,11 @@
                 window.setTimeout(function () { refresh(form, true); }, 0);
             });
 
-            $(document).on('input change', '.payment-modal-form .payment-amount-input, .payment-modal-form .payment-cwt-input', function () { checkPaymentBalance($(this).closest('.payment-modal-form')); });
+            $(document).on('input change', '.payment-modal-form .payment-amount-input, .payment-modal-form .payment-cwt-input', function () {
+                var form = $(this).closest('.payment-modal-form');
+                form.find('.payment-amount-summary').text(money(form.find('.payment-amount-input').val()));
+                checkPaymentBalance(form);
+            });
             $(document).on('change', '.payment-modal-form .payment-currency-select', function () { syncTotals($(this).closest('.payment-modal-form'), false); });
             $(document).on('shown.bs.modal', '.payment-modal', function () {
                 var form = $(this).find('.payment-modal-form');

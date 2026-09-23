@@ -129,6 +129,47 @@ class RecordPaymentPayableTest extends TestCase
         $this->assertFalse(DB::table('receipts')->where('amount', 110.01)->exists());
     }
 
+    public function test_manual_fifty_percent_payment_keeps_the_remaining_invoice_balance_open()
+    {
+        $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
+        DB::table('sales_documents')->where('id', $invoice->id)->update([
+            'invoice_amount' => 100,
+            'freight_total' => 0,
+            'grand_total' => 100,
+            'withholding_tax_amount' => 0,
+            'paid_total' => 0,
+            'balance_due' => 100,
+            'status' => 'posted',
+        ]);
+
+        $this->get(route('erp.payments.create'))
+            ->assertOk()
+            ->assertSee('Amount to Pay')
+            ->assertSee('Partial payments leave the remaining BI or SOA balance open.')
+            ->assertSee('name="amount" type="number"', false);
+
+        $this->post(route('erp.payments.receipt'), [
+            'customer_id' => (string) $invoice->customer_id,
+            'invoice_no' => $invoice->document_no,
+            'payment_for' => 'bi',
+            'payment_date' => '2026-09-12',
+            'payment_method' => 'Cash',
+            'currency' => 'PHP',
+            'exchange_rate' => 1,
+            'amount' => '50.00',
+            'cwt_amount' => '0.00',
+        ])->assertOk();
+
+        $updated = DB::table('sales_documents')->where('id', $invoice->id)->first();
+        $this->assertEquals(50, (float) $updated->paid_total);
+        $this->assertEquals(50, (float) $updated->balance_due);
+        $this->assertSame('partial', $updated->status);
+
+        $page = $this->get(route('erp.payments.create'))->assertOk();
+        $page->assertSee('data-bi-balance="50.00"', false)
+            ->assertSee('data-balance="50.00"', false);
+    }
+
     public function test_payment_delete_button_reverses_the_journal_and_reopens_the_invoice_balance()
     {
         $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
