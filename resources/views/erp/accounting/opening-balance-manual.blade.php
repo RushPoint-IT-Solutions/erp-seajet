@@ -1,5 +1,7 @@
 @extends('erp.layout')
 
+@php($selectedBalanceType = old('balance_type', request('balance_type', 'ar_trade')))
+
 @section('title', 'Manual Trade Opening Balance')
 @section('page-title', 'Manual Trade Opening Balance')
 
@@ -30,8 +32,8 @@
             <div class="col-12">
                 <label class="form-label fw-semibold d-block">Balance Type <span class="text-danger">*</span></label>
                 <div class="d-flex flex-wrap gap-4">
-                    <label class="form-check-label"><input class="form-check-input me-1" type="radio" name="balance_type" value="ar_trade" {{ old('balance_type', 'ar_trade') === 'ar_trade' ? 'checked' : '' }}> A/R Trade (Customer)</label>
-                    <label class="form-check-label"><input class="form-check-input me-1" type="radio" name="balance_type" value="ap_trade" {{ old('balance_type') === 'ap_trade' ? 'checked' : '' }}> A/P Trade (Vendor — BDO / Metro)</label>
+                    <label class="form-check-label"><input class="form-check-input me-1" type="radio" name="balance_type" value="ar_trade" {{ $selectedBalanceType === 'ar_trade' ? 'checked' : '' }}> A/R Trade (Customer)</label>
+                    <label class="form-check-label"><input class="form-check-input me-1" type="radio" name="balance_type" value="ap_trade" {{ $selectedBalanceType === 'ap_trade' ? 'checked' : '' }}> A/P Trade (Vendor — BDO / Metro)</label>
                 </div>
             </div>
             <div class="col-lg-6" id="manualCustomerGroup">

@@ -379,6 +379,19 @@ class OpeningBalanceImportTest extends TestCase
             ->assertSee('A/P Trade Metro - PHP')
             ->assertSee('value="'.$supplier->id.'"', false);
 
+        $manualApUrl = route('erp.accounting.opening-balances.manual', ['balance_type' => 'ap_trade']);
+        $this->get(route('erp.expenses.index'))
+            ->assertOk()
+            ->assertSee('Manual A/P Opening Balance')
+            ->assertSee($manualApUrl);
+        $this->get(route('erp.payables.payments.create'))
+            ->assertOk()
+            ->assertSee('Manual A/P Opening Balance')
+            ->assertSee($manualApUrl);
+        $this->get($manualApUrl)
+            ->assertOk()
+            ->assertSee('value="ap_trade" checked', false);
+
         $response = $this->post(route('erp.accounting.opening-balances.manual.store'), [
             'balance_type' => 'ap_trade',
             'supplier_id' => $supplier->id,
