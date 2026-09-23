@@ -107,6 +107,57 @@ class BillingInvoicePrintFlowTest extends TestCase
         $this->assertSame(0, (int) (clone $series)->where('company_id', $companyId)->where('class_code', 'PAMPANGA')->value('current_number'));
     }
 
+    public function test_soa_a_uses_one_automatic_number_series_across_all_classes()
+    {
+        DB::table('number_series')
+            ->where('document_type', 'statement_of_account_a')
+            ->where('class_code', '')
+            ->update(['current_number' => 20]);
+
+        $create = $this->get('/erp/invoices/create');
+        $create->assertOk();
+        $this->assertSame('SOAA-0021', $create->original->getData()['soaASeries']);
+
+        foreach (['MANILA', 'CEBU', 'PAMPANGA'] as $index => $classCode) {
+            $number = 'SOAA-'.str_pad((string) (21 + $index), 4, '0', STR_PAD_LEFT);
+            $this->post('/erp/invoices/review', $this->payload([
+                'invoice_no' => '',
+                'transaction_no' => '',
+                'soa_no' => '',
+                'class_code' => $classCode,
+                'invoice_template' => 'SOA_A',
+                'ar_account' => 'A/R Trade Metro',
+                'line_ar_account' => ['A/R Trade Metro'],
+                'vat_classification' => 'exempt',
+            ]))->assertRedirect();
+
+            $this->assertDatabaseHas('sales_documents', [
+                'document_no' => $number,
+                'soa_no' => $number,
+                'class_code' => $classCode,
+                'ar_account_code' => 'AR_TRADE_SOAA',
+            ]);
+        }
+
+        $companyId = DB::table('sales_documents')->where('document_no', 'SOAA-0021')->value('company_id');
+        $this->assertSame(0, DB::table('number_series')
+            ->where('company_id', $companyId)
+            ->where('document_type', 'statement_of_account_a')
+            ->whereIn('class_code', ['MANILA', 'CEBU', 'PAMPANGA'])
+            ->count());
+        $this->assertSame(23, (int) DB::table('number_series')
+            ->where('company_id', $companyId)
+            ->where('document_type', 'statement_of_account_a')
+            ->where('class_code', '')
+            ->value('current_number'));
+        DB::table('sales_documents')->where('document_no', 'SOAA-0021')->update(['soa_no' => null]);
+        $this->get(route('erp.soa-a.preview', ['invoice' => 'SOAA-0021']))
+            ->assertOk()
+            ->assertSee('print-field-serial', false)
+            ->assertDontSee('.print-field-serial {', false)
+            ->assertSee('SOAA-0021');
+    }
+
     public function test_vatable_billing_review_can_print_soa_b_and_billing_invoice()
     {
         $response = $this->post('/erp/invoices/review', $this->payload([

@@ -47,7 +47,7 @@ class ModuleController extends Controller
             'terms' => '60 Days',
             'currency' => 'USD',
             'class' => 'CEBU',
-            'ar_account' => 'A/R Trade-SOA A',
+            'ar_account' => 'A/R Trade Metro',
             'credit_limit' => '250,000.00',
             'credit_status' => 'Watchlist',
         ],
@@ -511,7 +511,7 @@ class ModuleController extends Controller
         $arAccounts = [
             'AR_TRADE_BI' => 'A/Trade-Billing Invoice',
             'AR_REIMBURSABLE' => 'A/R Reimbursable Charges',
-            'AR_TRADE_SOAA' => 'A/R Trade-SOA A',
+            'AR_TRADE_SOAA' => 'A/R Trade Metro',
             'AR_TRADE_DN' => 'A/R Trade-Debit Note',
         ];
 
@@ -5075,6 +5075,7 @@ class ModuleController extends Controller
             'official_receipt' => ['receipts', 'receipt_no'],
             'acknowledgement_receipt' => ['receipts', 'receipt_no'],
             'billing_invoice' => ['sales_documents', 'document_no'],
+            'statement_of_account_a' => ['sales_documents', 'document_no'],
             'journal_voucher' => ['journal_entries', 'journal_no'],
         ];
 
@@ -6702,6 +6703,7 @@ class ModuleController extends Controller
             'invoiceTemplates' => $this->invoiceTemplates(),
             'items' => $this->invoiceItemOptions(),
             'invoiceSeries' => $this->classNumberPreview('billing_invoice', 6),
+            'soaASeries' => $this->nextDocumentNumber('statement_of_account_a', 'SOAA-', 4, false),
         ]);
     }
 
@@ -6833,6 +6835,7 @@ class ModuleController extends Controller
             'invoiceTemplates' => $this->invoiceTemplates(),
             'items' => $this->invoiceItemOptions(),
             'invoiceSeries' => $this->classNumberPreview('billing_invoice', 6),
+            'soaASeries' => $this->nextDocumentNumber('statement_of_account_a', 'SOAA-', 4, false),
         ]);
     }
 
@@ -7341,7 +7344,10 @@ class ModuleController extends Controller
     private function soaPrintHiddenFields($type)
     {
         $saved = $this->savedSoaPrintLayout($type);
-        $hidden = request()->has('hidden_fields_present') ? (array) request('hidden_field', []) : ($saved['hidden_fields'] ?? ['serial']);
+        $hidden = request()->has('hidden_fields_present') ? (array) request('hidden_field', []) : ($saved['hidden_fields'] ?? ($type === 'soa_a' ? [] : ['serial']));
+        if ($type === 'soa_a') {
+            $hidden = array_diff($hidden, ['serial']);
+        }
 
         return array_values(array_unique(array_filter(array_map(function ($field) {
             return preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) $field);
@@ -7818,7 +7824,7 @@ class ModuleController extends Controller
             return [
                 'source_account' => $accountName ?: 'Service Income-SOA A',
                 'tag' => 'SOA A',
-                'invoice_account' => 'A/R Trade-SOA A',
+                'invoice_account' => 'A/R Trade Metro',
                 'tax_category' => 'zero-rated',
                 'tax_type' => 'Non',
             ];
@@ -7939,6 +7945,9 @@ class ModuleController extends Controller
             $originalDocumentNo = trim((string) ($data['original_invoice_no'] ?? ''));
             $templates = array_values(array_filter((array) ($data['invoice_template'] ?? [])));
             $documentType = $this->invoiceDocumentType($documentNo, $templates);
+            if ($documentType === 'statement_of_account_a' && trim((string) ($data['soa_no'] ?? '')) === '') {
+                $data['soa_no'] = $documentNo;
+            }
             $paidTotal = $this->moneyToFloat($data['total_payment'] ?? 0);
             $exchangeRate = $this->moneyToFloat($data['exchange_rate'] ?? 1);
             $exchangeRate = strtoupper((string) ($data['currency'] ?? 'PHP')) === 'USD' ? max($exchangeRate, 0.000001) : 1;
@@ -8197,6 +8206,9 @@ class ModuleController extends Controller
             'A/R-Reimbursable Charges' => 'AR_REIMBURSABLE',
             'A/R Reimbursable Charges' => 'AR_REIMBURSABLE',
             'A/R Trade-SOA A' => 'AR_TRADE_SOAA',
+            'A/R Trade Metro' => 'AR_TRADE_SOAA',
+            'A/R-Trade(Metro-PHP)' => 'AR_TRADE_SOAA',
+            'A/R-Trade(Metro-USD)' => 'AR_TRADE_SOAA',
             'A/R Trade-Debit Note' => 'AR_TRADE_DN',
         ];
 
@@ -8208,7 +8220,7 @@ class ModuleController extends Controller
         $map = [
             'AR_TRADE_BI' => 'A/Trade-Billing Invoice',
             'AR_REIMBURSABLE' => 'A/R-Reimbursable Charges',
-            'AR_TRADE_SOAA' => 'A/R Trade-SOA A',
+            'AR_TRADE_SOAA' => 'A/R Trade Metro',
             'AR_TRADE_DN' => 'A/R Trade-Debit Note',
         ];
 
@@ -8308,7 +8320,7 @@ class ModuleController extends Controller
                 'credit_term_days' => '30',
                 'vat_classification' => 'zero-rated',
                 'class_code' => 'CEBU',
-                'ar_account' => 'A/R Trade-SOA A',
+                'ar_account' => 'A/R Trade Metro',
                 'invoice_template' => ['SOA_A'],
                 'currency' => 'USD',
                 'mawb_no' => 'MAWB-SEA-0398',
@@ -8564,7 +8576,7 @@ class ModuleController extends Controller
         return [
             ['key' => 'SOA_B', 'label' => 'SOA B', 'account' => 'A/Trade-Billing Invoice'],
             ['key' => 'Billing Invoice', 'label' => 'Billing Invoice', 'account' => 'A/Trade-Billing Invoice'],
-            ['key' => 'SOA_A', 'label' => 'SOA A', 'account' => 'A/R Trade-SOA A'],
+            ['key' => 'SOA_A', 'label' => 'SOA A', 'account' => 'A/R Trade Metro'],
             ['key' => 'Debit Note', 'label' => 'Debit Note', 'account' => 'A/R Trade-Debit Note'],
         ];
     }
@@ -9095,6 +9107,9 @@ class ModuleController extends Controller
             if ($autoNumber) {
                 $data['invoice_no'] = $this->nextSalesDocumentNumber($selectedTemplates, $data['class_code']);
                 $data['transaction_no'] = $data['invoice_no'];
+                if (in_array('SOA_A', $selectedTemplates, true)) {
+                    $data['soa_no'] = $data['invoice_no'];
+                }
             }
             $savedInvoice = $this->saveInvoiceData($data, $totals);
             if ($shouldPost) {
@@ -9297,8 +9312,11 @@ class ModuleController extends Controller
             ->where('sales_documents.company_id', $this->defaultCompanyId())
             ->whereIn('sales_documents.document_type', ['invoice', 'billing_invoice', 'soa', 'soa_a', 'statement_of_account_a', 'debit_note'])
             ->whereNotIn('sales_documents.status', ['cancelled', 'voided', 'paid'])
+            ->whereRaw('CASE WHEN COALESCE(sales_documents.grand_total, 0) > 0
+                THEN sales_documents.grand_total
+                ELSE COALESCE(sales_documents.invoice_amount, 0) + COALESCE(sales_documents.freight_total, 0)
+                END > COALESCE(sales_documents.paid_total, 0)')
             ->orderBy('sales_documents.document_date', 'desc')
-            ->limit(300)
             ->get();
 
         $appliedCwt = collect();
@@ -9354,7 +9372,6 @@ class ModuleController extends Controller
             ->filter(function ($invoice) {
                 return $invoice['balance'] > 0.005 || $invoice['cwt_balance'] > 0.005;
             })
-            ->take(150)
             ->values()
             ->all();
     }
@@ -9752,8 +9769,13 @@ class ModuleController extends Controller
 
     public function soaAPreview()
     {
+        $print = $this->billingPrintPreviewData();
+        if (trim((string) ($print['soa_no'] ?? '')) === '') {
+            $print['soa_no'] = $print['invoice_no'] ?? '';
+        }
+
         return view('erp.print.soa-a', [
-            'print' => $this->billingPrintPreviewData(),
+            'print' => $print,
             'settings' => $this->soaPrintSettings('soa_a'),
             'positions' => $this->soaPrintPositions('soa_a'),
             'fieldStyles' => $this->soaPrintFieldStyles('soa_a'),
@@ -10570,7 +10592,7 @@ class ModuleController extends Controller
         $templates = [
             ['Billing Invoice', 'BI-PREPRINT', 'A4 / Legal', 'Yes', 'A/Trade-Billing Invoice', 'PHP / USD'],
             ['Statement of Account', 'SOA-PREPRINT', 'A4', 'Yes', 'A/R Trade-SOA', 'PHP / USD'],
-            ['Statement of Account A', 'SOAA-PLAIN', 'A4', 'No', 'A/R Trade-SOA A', 'PHP / USD'],
+            ['Statement of Account A', 'SOAA-PLAIN', 'A4', 'No', 'A/R Trade Metro', 'PHP / USD'],
             ['Debit Note', 'DN-PREPRINT', 'A4', 'Yes', 'A/R Trade-Debit Note', 'PHP / USD'],
             ['Official Receipt (Supplementary)', 'CR-PREPRINT', 'A4 / Approved Form', 'Yes', 'A/Trade-Billing Invoice', 'PHP / USD'],
             ['Acknowledgement Receipt', 'AR-PREPRINT', 'A4 / Official Form', 'Yes', 'A/R Reimbursable Charges', 'PHP / USD'],
@@ -12693,7 +12715,7 @@ class ModuleController extends Controller
                 'rows' => [
                     ['JV-2026-00218', 'JOB-SEA-2026-0423', 'BI-2026-01043', 'Accounts Receivable', 'Service Revenue', 'Draft'],
                     ['JV-2026-00217', 'JOB-SEA-2026-0422', 'BI-2026-01042', 'A/Trade-Billing Invoice', 'Service Revenue', 'Posted'],
-                    ['JV-2026-00216', 'JOB-SEA-2026-0398', 'SOAA-2026-00211', 'A/R Trade-SOA A', 'Service Revenue', 'Posted'],
+                    ['JV-2026-00216', 'JOB-SEA-2026-0398', 'SOAA-2026-00211', 'A/R Trade Metro', 'Service Revenue', 'Posted'],
                 ],
             ],
             'receivables' => [
@@ -12704,7 +12726,7 @@ class ModuleController extends Controller
                 'columns' => ['Customer ID', 'Customer', 'Terms', 'Currency', 'AR Account', 'Class'],
                 'rows' => [
                     ['CUST-001', 'North Harbor Trading', '30 Days', 'PHP', 'A/Trade-Billing Invoice', 'MANILA'],
-                    ['CUST-002', 'Blue Anchor Logistics', '60 Days', 'USD', 'A/R Trade-SOA A', 'CEBU'],
+                    ['CUST-002', 'Blue Anchor Logistics', '60 Days', 'USD', 'A/R Trade Metro', 'CEBU'],
                     ['CUST-003', 'Island Prime Foods', '90 Days', 'PHP', 'A/R Trade-Debit Note', 'PAMPANGA'],
                 ],
             ],

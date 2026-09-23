@@ -116,7 +116,7 @@
                     @foreach([
                         'AR_TRADE_BI' => 'A/Trade-Billing Invoice',
                         'AR_REIMBURSABLE' => 'A/R Reimbursable Charges',
-                        'AR_TRADE_SOAA' => 'A/R Trade-SOA A',
+                        'AR_TRADE_SOAA' => 'A/R Trade Metro',
                         'AR_TRADE_DN' => 'A/R Trade-Debit Note',
                     ] as $code => $label)
                         <option value="{{ $code }}" {{ old('default_ar_account_code', $isEdit ? $customer->default_ar_account_code : 'AR_TRADE_BI') === $code ? 'selected' : '' }}>{{ $label }}</option>

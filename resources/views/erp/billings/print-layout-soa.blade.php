@@ -144,7 +144,9 @@
                              data-field="{{ $field }}"
                              data-label="{{ $sample['label'] }}"
                              style="left: {{ $point[0] }}px; top: {{ $point[1] }}px; width: {{ $fieldStyles[$field]['width'] }}px; font-size: {{ $fieldStyles[$field]['font_size'] }}px">
-                            <button type="button" class="field-remove" data-field="{{ $field }}" title="Hide field"><i class="bi bi-x"></i></button>
+                            @unless($type === 'soa_a' && $field === 'serial')
+                                <button type="button" class="field-remove" data-field="{{ $field }}" title="Hide field"><i class="bi bi-x"></i></button>
+                            @endunless
                             <span class="field-resize" data-field="{{ $field }}"></span>
                             {{ $sample['value'] }}
                         </div>
@@ -267,6 +269,7 @@ $(function () {
         $('#fieldFontControl').val(parseInt(el[0].style.fontSize, 10) || 12);
         $('#fieldXControl').val(parseInt(el[0].style.left, 10) || 0);
         $('#fieldYControl').val(parseInt(el[0].style.top, 10) || 0);
+        $('#deleteSelectedField').prop('disabled', @json($type === 'soa_a') && field === 'serial');
     }
     function updatePosition(el, x, y) {
         x = Math.max(0, Math.min(Math.round(x), sheet.clientWidth - el.offsetWidth));
@@ -312,6 +315,7 @@ $(function () {
         $('#layoutSheet').css('font-family', control.find(':selected').data('stack'));
     }
     function hideOrDelete(field) {
+        if (@json($type === 'soa_a') && field === 'serial') return;
         var el = $('.drag-field[data-field="' + field + '"]');
         if (!el.length) return;
         if (el.data('kind') === 'custom') {

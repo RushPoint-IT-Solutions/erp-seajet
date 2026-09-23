@@ -26,7 +26,7 @@
             <div class="col-md-3"><label class="form-label">Class</label><select name="class_code" class="form-select erp-select"><option>MANILA</option><option>PAMPANGA</option><option>CEBU</option></select></div>
             <div class="col-md-3"><label class="form-label">Currency</label><select name="currency" class="form-select erp-select"><option>PHP</option><option>USD</option></select></div>
             <div class="col-md-3"><label class="form-label">Amount</label><input name="amount" class="form-control" value="98500.00" required></div>
-            <div class="col-md-12"><label class="form-label">AR Account</label><select name="ar_account" class="form-select erp-select"><option>A/Trade-Billing Invoice</option><option>A/R Reimbursable Charges</option><option>A/R Trade-SOA A</option><option>A/R Trade-Debit Note</option></select></div>
+            <div class="col-md-12"><label class="form-label">AR Account</label><select name="ar_account" class="form-select erp-select"><option>A/Trade-Billing Invoice</option><option>A/R Reimbursable Charges</option><option>A/R Trade Metro</option><option>A/R Trade-Debit Note</option></select></div>
             <div class="col-md-3"><label class="form-label">MAWB B/L No.</label><input name="mawb_no" class="form-control" value="OOLU32322350120"></div>
             <div class="col-md-3"><label class="form-label">HAWB B/L No.</label><input name="hawb_no" class="form-control" value="2GJXM412-G1"></div>
             <div class="col-md-3"><label class="form-label">Date Shipped</label><input name="date_shipped" type="date" class="form-control" value="2026-05-19"></div>

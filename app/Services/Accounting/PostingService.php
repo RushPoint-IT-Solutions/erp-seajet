@@ -78,7 +78,7 @@ class PostingService
             }
             if ($reimbursement > 0) {
                 $lines[] = $this->line(
-                    $this->controlAccount($document->company_id, 'ar_reimbursable'),
+                    $this->reimbursableReceivableAccount($document->company_id, $currency),
                     'Reimbursable receivable - '.$document->document_no,
                     $reimbursement,
                     0,
@@ -91,22 +91,52 @@ class PostingService
                 );
             }
             if ($serviceRevenue > 0) {
-                $lines[] = $this->line(
-                    $this->controlAccount($document->company_id, 'service_revenue'),
-                    'Service revenue - '.$document->document_no,
-                    0,
-                    $serviceRevenue,
-                    $currency,
-                    $rate,
-                    $document->customer_id,
-                    null,
-                    $document->job_shipment_id,
-                    $document->class_code
-                );
+                $isSoaA = in_array(strtolower((string) $document->document_type), ['soa_a', 'statement_of_account_a'], true)
+                    || ($document->template_code ?? '') === 'SOA_A';
+                if ($isSoaA) {
+                    $incomeAmounts = ['Service Income-SOA A' => $serviceRevenue];
+                } elseif (strtolower((string) $document->document_type) === 'debit_note') {
+                    $incomeAmounts = ['Service Income-DN' => $serviceRevenue];
+                } else {
+                    $remaining = round($serviceRevenue, 2);
+                    $incomeAmounts = [];
+                    foreach (['Service Income- Vatable' => 'vatable_amount',
+                        'Service Income-Zero rated' => 'zero_rated_amount',
+                        'Service Income-Vat exempt' => 'vat_exempt_amount'] as $accountName => $column) {
+                        $amount = min($remaining, max(0, round((float) ($document->$column ?? 0), 2)));
+                        if ($amount > 0) {
+                            $incomeAmounts[$accountName] = $amount;
+                            $remaining = round($remaining - $amount, 2);
+                        }
+                    }
+                    if ($remaining > 0) {
+                        $classification = strtolower((string) ($document->vat_classification ?? ''));
+                        $accountName = $tax > 0 || strpos($classification, '12%') !== false
+                            ? 'Service Income- Vatable'
+                            : (strpos($classification, 'zero') !== false
+                                ? 'Service Income-Zero rated' : 'Service Income-Vat exempt');
+                        $incomeAmounts[$accountName] = ($incomeAmounts[$accountName] ?? 0) + $remaining;
+                    }
+                }
+
+                foreach ($incomeAmounts as $accountName => $incomeAmount) {
+                    $lines[] = $this->line(
+                        $this->salesIncomeAccount($document->company_id, $accountName),
+                        $accountName.' - '.$document->document_no,
+                        0,
+                        $incomeAmount,
+                        $currency,
+                        $rate,
+                        $document->customer_id,
+                        null,
+                        $document->job_shipment_id,
+                        $document->class_code
+                    );
+                }
             }
             if ($reimbursement > 0) {
                 $lines[] = $this->line(
-                    $this->controlAccount($document->company_id, 'reimbursable_recovery'),
+                    $this->reimbursableChargesAccount($document->company_id),
                     'Reimbursable cost recovery - '.$document->document_no,
                     0,
                     $reimbursement,
@@ -304,7 +334,7 @@ class PostingService
                     $application->component === 'soa'
                         && !in_array(strtolower((string) $application->document_type), ['soa', 'soa_a', 'statement_of_account_a'], true)
                         ? ($this->openingBalanceControlAccount($application)
-                            ?: $this->controlAccount($receipt->company_id, 'ar_reimbursable'))
+                            ?: $this->reimbursableReceivableAccount($receipt->company_id, $currency))
                         : $this->salesReceivableAccount($application),
                     'Applied to '.$application->document_no,
                     0,
@@ -614,6 +644,37 @@ class PostingService
             'AR_TRADE_DN' => 'ar_debit_note',
         ];
         $mappingCode = $document->ar_account_code ?? 'AR_TRADE_BI';
+        $currency = strtoupper($document->currency ?: 'PHP');
+
+        if ($mappingCode === 'AR_TRADE_BI') {
+            $bdoAccount = DB::table('accounts')
+                ->where('company_id', $document->company_id)
+                ->where('name', 'like', 'A/R%Trade%BDO%'.$currency.'%')
+                ->where('is_active', true)
+                ->value('id');
+            if ($bdoAccount) {
+                return $bdoAccount;
+            }
+        }
+
+        if ($mappingCode === 'AR_REIMBURSABLE') {
+            return $this->reimbursableReceivableAccount($document->company_id, $currency);
+        }
+
+        if ($mappingCode === 'AR_TRADE_SOAA') {
+            $metroAccount = DB::table('accounts')
+                ->where('company_id', $document->company_id)
+                ->where('name', 'like', 'A/R%Trade%Metro%'.$currency.'%')
+                ->where('is_active', true)
+                ->value('id');
+            if ($metroAccount) {
+                return $metroAccount;
+            }
+
+            throw ValidationException::withMessages([
+                'posting' => 'An active A/R Trade Metro account for '.$currency.' is required to post SOA A.',
+            ]);
+        }
 
         if (Schema::hasTable('ar_account_mappings')) {
             $mapping = DB::table('ar_account_mappings')
@@ -627,6 +688,39 @@ class PostingService
         }
 
         return $this->controlAccount($document->company_id, $keyMap[$mappingCode] ?? 'accounts_receivable');
+    }
+
+    private function reimbursableReceivableAccount($companyId, $currency)
+    {
+        $accountId = DB::table('accounts')
+            ->where('company_id', $companyId)
+            ->where('name', 'like', 'A/R%Reimbursable%'.strtoupper($currency).'%')
+            ->where('is_active', true)
+            ->value('id');
+
+        return $accountId ?: $this->controlAccount($companyId, 'ar_reimbursable');
+    }
+
+    private function salesIncomeAccount($companyId, $name)
+    {
+        $accountId = DB::table('accounts')
+            ->where('company_id', $companyId)
+            ->where('name', $name)
+            ->where('is_active', true)
+            ->value('id');
+
+        return $accountId ?: $this->controlAccount($companyId, 'service_revenue');
+    }
+
+    private function reimbursableChargesAccount($companyId)
+    {
+        $accountId = DB::table('accounts')
+            ->where('company_id', $companyId)
+            ->where('name', 'Reimbursable charges')
+            ->where('is_active', true)
+            ->value('id');
+
+        return $accountId ?: $this->controlAccount($companyId, 'reimbursable_recovery');
     }
 
     private function purchaseExpenseAccount($document)

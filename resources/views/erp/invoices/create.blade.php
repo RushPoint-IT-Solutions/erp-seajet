@@ -394,7 +394,7 @@
                                     <option value=""></option>
                                     <option>A/R-Reimbursable Charges</option>
                                     <option>A/Trade-Billing Invoice</option>
-                                    <option>A/R Trade-SOA A</option>
+                                    <option>A/R Trade Metro</option>
                                     <option>A/R Trade-Debit Note</option>
                                 </select>
                             </td>
@@ -471,12 +471,14 @@
         var isEdit = @json($isEdit);
         var editInvoice = @json($editingInvoice);
         var invoiceSeries = @json($invoiceSeries);
+        var soaASeries = @json($soaASeries);
 
         function updateInvoiceNumberPreview() {
             var classCode = $('#classCode').val();
             var templates = $('#invoiceTemplate').val() || [];
             var isSoaA = templates.indexOf('SOA_A') !== -1;
-            $('#invoiceNo').attr('placeholder', isSoaA ? 'SOA A number assigned on save' : (invoiceSeries[classCode] || 'Select a class for the next number'));
+            $('#invoiceNo').attr('placeholder', isSoaA ? soaASeries + ' (assigned on save)' : (invoiceSeries[classCode] || 'Select a class for the next number'));
+            $('input[name="soa_no"]').attr('placeholder', isSoaA ? soaASeries + ' (assigned on save)' : 'SOA number');
         }
 
         function numberValue(value) {
@@ -571,7 +573,7 @@
             var terms = String(option.data('terms') || '');
             $('#creditTerms').val(terms.replace(/[^0-9]/g, ''));
             $('#customerTaxCode').val(isVatable ? 'VAT12' : (taxClass === 'zero-rated' ? 'ZERO' : 'EXEMPT'));
-            $('#arAccount').val(isVatable ? 'A/Trade-Billing Invoice' : 'A/R Trade-SOA A');
+            $('#arAccount').val(isVatable ? 'A/Trade-Billing Invoice' : 'A/R Trade Metro');
             $('.line-account').each(function () {
                 if (!$(this).val()) {
                     $(this).val($('#arAccount').val());

@@ -129,6 +129,44 @@ class RecordPaymentPayableTest extends TestCase
         $this->assertFalse(DB::table('receipts')->where('amount', 110.01)->exists());
     }
 
+    public function test_old_opening_balance_remains_available_after_many_newer_invoices()
+    {
+        $source = (array) DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
+        unset($source['id']);
+        $source['paid_total'] = 0;
+        $source['grand_total'] = 100;
+        $source['invoice_amount'] = 100;
+        $source['freight_total'] = 0;
+        $source['withholding_tax_amount'] = 0;
+        $source['status'] = 'posted';
+        $source['currency'] = 'PHP';
+
+        $openingBalance = $source;
+        $openingBalance['document_no'] = 'OB-OLD-001';
+        $openingBalance['transaction_no'] = 'OPEN-123';
+        $openingBalance['soa_no'] = null;
+        $openingBalance['document_date'] = '2025-01-01';
+        $openingBalance['opening_balance_control_account_id'] = DB::table('accounts')->where('company_id', $source['company_id'])->value('id');
+        DB::table('sales_documents')->insert($openingBalance);
+
+        for ($index = 0; $index < 310; $index++) {
+            $recent = $source;
+            $recent['document_no'] = 'BI-NEW-'.str_pad((string) $index, 4, '0', STR_PAD_LEFT);
+            $recent['transaction_no'] = $recent['document_no'];
+            $recent['soa_no'] = null;
+            $recent['document_date'] = '2026-09-01';
+            $recent['opening_balance_control_account_id'] = null;
+            DB::table('sales_documents')->insert($recent);
+        }
+
+        $page = $this->get(route('erp.payments.create'));
+        $page->assertOk()
+            ->assertSee('value="OB-OLD-001"', false)
+            ->assertSee('data-bi-reference="OPEN-123"', false)
+            ->assertSee('data-bi-balance="100.00"', false);
+        $this->assertGreaterThan(300, count($page->original->getData()['invoices']));
+    }
+
     public function test_new_payment_requires_one_billing_component()
     {
         $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
@@ -215,7 +253,7 @@ class RecordPaymentPayableTest extends TestCase
         $soaJournal = DB::table('journal_entries')->where('source_type', 'receipt')
             ->where('source_id', $soaReceipt->id)->first();
         $reimbursableAccountId = DB::table('accounts')->where('company_id', $invoice->company_id)
-            ->where('code', '1220')->value('id');
+            ->where('code', '1060')->value('id');
         $this->assertDatabaseHas('journal_entry_lines', [
             'journal_entry_id' => $soaJournal->id,
             'account_id' => $reimbursableAccountId,
