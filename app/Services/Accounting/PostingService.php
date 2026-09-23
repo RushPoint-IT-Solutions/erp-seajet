@@ -889,12 +889,28 @@ class PostingService
         }
 
         $next = (int) $series->current_number + 1;
+        $prefix = $series->prefix ?: 'JV-';
+        $padding = (int) $series->padding;
+        $journalNo = $prefix.str_pad($next, $padding, '0', STR_PAD_LEFT);
+
+        // Imported or manually entered journals can legitimately move the
+        // ledger ahead of its number-series counter. Reconcile the allocator
+        // with the ledger while the series row is locked so automatic posting
+        // never attempts an already-issued journal number.
+        while (DB::table('journal_entries')
+            ->where('company_id', $companyId)
+            ->where('journal_no', $journalNo)
+            ->exists()) {
+            $next++;
+            $journalNo = $prefix.str_pad($next, $padding, '0', STR_PAD_LEFT);
+        }
+
         DB::table('number_series')->where('id', $series->id)->update([
             'current_number' => $next,
             'updated_at' => now(),
         ]);
 
-        return ($series->prefix ?: 'JV-').str_pad($next, (int) $series->padding, '0', STR_PAD_LEFT);
+        return $journalNo;
     }
 
     private function rate($currency, $rate)

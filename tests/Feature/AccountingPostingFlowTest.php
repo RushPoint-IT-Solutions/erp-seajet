@@ -314,6 +314,49 @@ class AccountingPostingFlowTest extends TestCase
         $this->assertSame(2, DB::table('bank_transactions')->where('source_id', $receiptId)->whereIn('source_type', ['receipt', 'receipt_reversal'])->count());
     }
 
+    public function test_journal_number_allocation_skips_numbers_already_present_in_the_ledger()
+    {
+        $customer = DB::table('customers')->where('company_id', 1)->first();
+        $series = DB::table('number_series')
+            ->where('company_id', $customer->company_id)
+            ->where('document_type', 'journal_voucher')
+            ->first();
+
+        DB::table('number_series')->where('id', $series->id)->update([
+            'prefix' => '1-JV-',
+            'current_number' => 7756,
+            'padding' => 6,
+        ]);
+        DB::table('journal_entries')->insert([
+            'company_id' => $customer->company_id,
+            'journal_no' => '1-JV-007757',
+            'journal_date' => '2026-09-01',
+            'source_module' => 'GL',
+            'status' => 'posted',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $receiptId = DB::table('receipts')->insertGetId([
+            'company_id' => $customer->company_id,
+            'customer_id' => $customer->id,
+            'receipt_no' => 'CR-JOURNAL-SEQUENCE-TEST',
+            'receipt_type' => 'collection_receipt',
+            'receipt_date' => '2026-09-02',
+            'payment_method' => 'Cash',
+            'currency' => 'PHP',
+            'exchange_rate' => 1,
+            'amount' => 100,
+            'status' => 'posted',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $journal = app(PostingService::class)->postReceipt($receiptId);
+
+        $this->assertSame('1-JV-007758', $journal->journal_no);
+        $this->assertSame(7758, (int) DB::table('number_series')->where('id', $series->id)->value('current_number'));
+    }
+
     public function test_usd_supplier_payment_posts_at_exchange_rate_and_updates_cashbook()
     {
         $bill = DB::table('purchase_documents')->orderBy('id')->first();
