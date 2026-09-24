@@ -235,6 +235,13 @@ class ControlledCheckLifecycleTest extends TestCase
         ]);
 
         $payment = DB::table('payments')->where('bill_no', $bill->document_no)->first();
+        $this->get(route('erp.payables.check-voucher', $payment->id))
+            ->assertOk()
+            ->assertSee($payment->voucher_no);
+        $this->postJson(route('erp.payables.check-voucher.print.event', $payment->id))
+            ->assertOk();
+        $this->assertDatabaseHas('check_voucher_print_events', ['payment_id' => $payment->id]);
+
         $this->actingAsFinance($bill->company_id);
         $this->post(route('erp.payables.payments.approve', $payment->id))
             ->assertRedirect(route('erp.payables.approvals'));
@@ -245,6 +252,36 @@ class ControlledCheckLifecycleTest extends TestCase
             'approval_status' => 'Released',
             'posting_status' => 'posted',
         ]);
+    }
+
+    public function test_usd_non_cheque_payment_can_print_its_voucher_without_a_check_number()
+    {
+        list($bill, $bank) = $this->billAndBank();
+        DB::table('purchase_documents')->where('id', $bill->id)->update(['currency' => 'USD']);
+        DB::table('bank_accounts')->where('id', $bank->id)->update(['currency' => 'USD']);
+        $bill->currency = 'USD';
+        $bank->currency = 'USD';
+
+        $this->post(route('erp.payables.payments.review'), $this->paymentPayload($bill, $bank, [
+            'payment_method' => 'Online Transfer',
+            'check_no' => null,
+            'currency' => 'USD',
+            'exchange_rate' => '58.25',
+            'amount' => '10.50',
+        ]))->assertOk();
+
+        $payment = DB::table('payments')->where('bill_no', $bill->document_no)->first();
+        $this->assertNotNull($payment);
+        $this->assertSame('USD', $payment->currency);
+        $this->assertNull($payment->check_no);
+
+        $this->get(route('erp.payables.check-voucher', $payment->id))
+            ->assertOk()
+            ->assertSee($payment->voucher_no)
+            ->assertSee('USD');
+        $this->postJson(route('erp.payables.check-voucher.print.event', $payment->id))
+            ->assertOk();
+        $this->assertDatabaseHas('check_voucher_print_events', ['payment_id' => $payment->id]);
     }
 
     public function test_automatic_payment_number_skips_an_existing_stale_preview()

@@ -119,7 +119,7 @@ class RecordPaymentPayableTest extends TestCase
         $statement = $this->get(route('erp.reports.client-soa', ['customer_id' => $invoice->customer_id]));
         $statement->assertOk()
             ->assertSee('INV AMT')
-            ->assertSee('(LESS W-TAX)')
+            ->assertDontSee('(LESS W-TAX)')
             ->assertSee('(INV + SOA)')
             ->assertSee('BI-2026-REIMB')
             ->assertSee('SOA-7370');

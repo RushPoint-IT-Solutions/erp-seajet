@@ -3859,7 +3859,8 @@ class ModuleController extends Controller
         if (!$hasValidBank) {
             $errors['bank_account'] = 'Select an active bank before preparing the Check Voucher.';
         }
-        if (!$payment || trim((string) $payment->check_no) === '') {
+        $isCheque = $payment && strcasecmp((string) $payment->payment_method, 'Cheque') === 0;
+        if ($isCheque && trim((string) $payment->check_no) === '') {
             $errors['check_no'] = 'Enter the check number before preparing the Check Voucher.';
         }
 
