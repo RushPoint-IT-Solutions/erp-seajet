@@ -11101,13 +11101,16 @@ class ModuleController extends Controller
         $periodDocuments = $this->trialBalanceDocumentMovements($startDate, $endDate, $accounts, $normals);
         $periodMovements = $this->mergeMovementMaps($periodJournal, $periodDocuments);
 
-        return $accounts->map(function ($account) use ($beginningMovements, $periodMovements) {
-            $opening = (float) ($account->opening_balance ?? 0) + (float) ($beginningMovements[$account->id]['TOTAL'] ?? 0);
-            $sales = (float) ($periodMovements[$account->id]['SALES BOOK'] ?? 0);
-            $soa = (float) ($periodMovements[$account->id]['SOA'] ?? 0);
-            $receipts = (float) ($periodMovements[$account->id]['CASH RECEIPTS BOOK'] ?? 0);
-            $disbursements = (float) ($periodMovements[$account->id]['CASH DISBURSEMENT BOOK'] ?? 0);
-            $journal = (float) ($periodMovements[$account->id]['JOURNAL BOOK'] ?? 0);
+        return $accounts->map(function ($account) use ($beginningMovements, $periodMovements, $normals) {
+            $normal = $normals[$account->id] ?? 'debit';
+            $storedOpening = (float) ($account->opening_balance ?? 0);
+            $opening = ($normal === 'credit' ? -abs($storedOpening) : $storedOpening)
+                + $this->trialBalanceReportAmount((float) ($beginningMovements[$account->id]['TOTAL'] ?? 0), $normal);
+            $sales = $this->trialBalanceReportAmount((float) ($periodMovements[$account->id]['SALES BOOK'] ?? 0), $normal);
+            $soa = $this->trialBalanceReportAmount((float) ($periodMovements[$account->id]['SOA'] ?? 0), $normal);
+            $receipts = $this->trialBalanceReportAmount((float) ($periodMovements[$account->id]['CASH RECEIPTS BOOK'] ?? 0), $normal);
+            $disbursements = $this->trialBalanceReportAmount((float) ($periodMovements[$account->id]['CASH DISBURSEMENT BOOK'] ?? 0), $normal);
+            $journal = $this->trialBalanceReportAmount((float) ($periodMovements[$account->id]['JOURNAL BOOK'] ?? 0), $normal);
             $ending = $opening + $sales + $soa + $receipts + $disbursements + $journal;
             $title = trim(($account->code ? $account->code.' - ' : '').$account->name);
 
@@ -11122,6 +11125,13 @@ class ModuleController extends Controller
                 'ENDING TRIAL BALANCE' => $ending,
             ];
         })->all();
+    }
+
+    private function trialBalanceReportAmount($amount, $normal)
+    {
+        $amount = (float) $amount;
+
+        return $normal === 'credit' ? -$amount : $amount;
     }
 
     private function trialBalanceTotals(array $rows, array $columns)

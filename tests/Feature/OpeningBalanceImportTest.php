@@ -467,6 +467,23 @@ class OpeningBalanceImportTest extends TestCase
             ->assertSee('(1,250.00)');
     }
 
+    public function test_trial_balance_displays_positive_ap_beginning_balance_as_negative()
+    {
+        $account = DB::table('accounts')
+            ->where('company_id', 1)
+            ->where('name', 'A/P-Trade (BDO - PHP)')
+            ->first();
+
+        DB::table('accounts')->where('id', $account->id)->update([
+            'opening_balance' => 2735853.29,
+        ]);
+
+        $this->get(route('erp.reports.trial-balance', ['period' => '2000-01']))
+            ->assertOk()
+            ->assertSee($account->code.' - '.$account->name)
+            ->assertSee('(2,735,853.29)');
+    }
+
     public function test_dedicated_seeder_imports_the_workbook_and_is_safe_to_run_again()
     {
         $this->accountMapping();
