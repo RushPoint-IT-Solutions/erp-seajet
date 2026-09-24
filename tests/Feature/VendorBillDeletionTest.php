@@ -19,6 +19,7 @@ class VendorBillDeletionTest extends TestCase
         DB::purge('sqlite');
         Artisan::call('migrate:fresh', ['--seed' => true]);
         $this->actingAsAdmin();
+        $this->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class);
     }
 
     public function test_unposted_vendor_bill_can_be_deleted_with_its_lines_and_attachments()
@@ -44,7 +45,7 @@ class VendorBillDeletionTest extends TestCase
 
         $this->delete(route('erp.payables.vendor-bills.delete', $billId))
             ->assertRedirect(route('erp.expenses.index'))
-            ->assertSessionHas('status', 'Vendor bill BILL-DELETE-001 deleted.');
+            ->assertSessionHas('status', 'Vendor bill BILL-DELETE-001 and its connected accounting entries deleted.');
 
         $this->assertDatabaseMissing('purchase_documents', ['id' => $billId]);
         $this->assertDatabaseMissing('vendor_bill_lines', ['purchase_document_id' => $billId]);
@@ -59,16 +60,45 @@ class VendorBillDeletionTest extends TestCase
         ]);
     }
 
-    public function test_posted_vendor_bill_cannot_be_deleted()
+    public function test_posted_unpaid_vendor_bill_is_deleted_with_its_accounting_entries()
     {
-        $billId = $this->createVendorBill('BILL-DELETE-002', ['posting_status' => 'posted']);
+        $billId = $this->createVendorBill('BILL-DELETE-002', [
+            'status' => 'posted',
+            'posting_status' => 'posted',
+        ]);
+        $companyId = DB::table('companies')->orderBy('id')->value('id');
+        $accountId = DB::table('accounts')->where('company_id', $companyId)->orderBy('id')->value('id');
+        $journalId = DB::table('journal_entries')->insertGetId([
+            'company_id' => $companyId,
+            'journal_no' => 'JV-BILL-DELETE-002',
+            'journal_date' => '2026-09-01',
+            'source_module' => 'AP',
+            'source_type' => 'purchase_document',
+            'source_id' => $billId,
+            'posting_type' => 'original',
+            'reference_no' => 'BILL-DELETE-002',
+            'status' => 'posted',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('journal_entry_lines')->insert([
+            'journal_entry_id' => $journalId,
+            'account_id' => $accountId,
+            'description' => 'Connected vendor bill journal',
+            'debit' => 100,
+            'credit' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('purchase_documents')->where('id', $billId)->update(['journal_entry_id' => $journalId]);
 
-        $this->from(route('erp.payables.vendor-bills.create', ['bill' => 'BILL-DELETE-002']))
-            ->delete(route('erp.payables.vendor-bills.delete', $billId))
-            ->assertRedirect(route('erp.payables.vendor-bills.create', ['bill' => 'BILL-DELETE-002']))
-            ->assertSessionHasErrors('bill');
+        $this->delete(route('erp.payables.vendor-bills.delete', $billId))
+            ->assertRedirect(route('erp.expenses.index'))
+            ->assertSessionHas('status', 'Vendor bill BILL-DELETE-002 and its connected accounting entries deleted.');
 
-        $this->assertDatabaseHas('purchase_documents', ['id' => $billId]);
+        $this->assertDatabaseMissing('purchase_documents', ['id' => $billId]);
+        $this->assertDatabaseMissing('journal_entry_lines', ['journal_entry_id' => $journalId]);
+        $this->assertDatabaseMissing('journal_entries', ['id' => $journalId]);
     }
 
     public function test_vendor_bill_linked_to_a_payment_cannot_be_deleted()

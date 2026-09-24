@@ -455,7 +455,7 @@
             </div>
         </form>
         @if(!empty($bill['id']))
-            <form method="post" action="{{ route('erp.payables.vendor-bills.delete', $bill['id']) }}" id="deleteVendorBillForm" class="d-none" onsubmit="return confirm('Delete this vendor bill? This cannot be undone.');">
+            <form method="post" action="{{ route('erp.payables.vendor-bills.delete', $bill['id']) }}" id="deleteVendorBillForm" class="d-none" onsubmit="return confirm('Delete this vendor bill and its connected accounting entries? This cannot be undone.');">
                 {{ csrf_field() }}
                 {{ method_field('DELETE') }}
             </form>

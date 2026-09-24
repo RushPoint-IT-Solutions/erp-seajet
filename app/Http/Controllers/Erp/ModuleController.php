@@ -1733,21 +1733,6 @@ class ModuleController extends Controller
                 : $query->where('document_no', $bill)->first();
             abort_unless($record, 404);
 
-            $hasJournal = Schema::hasTable('journal_entries') && DB::table('journal_entries')
-                ->where('company_id', $companyId)
-                ->where('source_type', 'purchase_document')
-                ->where('source_id', $record->id)
-                ->exists();
-            $isPosted = in_array(strtolower((string) $record->status), ['posted', 'approved', 'paid'], true)
-                || ($record->posting_status ?? 'unposted') !== 'unposted'
-                || !empty($record->journal_entry_id)
-                || $hasJournal;
-            if ($isPosted) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'bill' => 'A posted vendor bill cannot be deleted because it has accounting entries.',
-                ]);
-            }
-
             if ((float) $record->paid_total > 0) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'bill' => 'A paid or partially paid vendor bill cannot be deleted.',
@@ -1774,10 +1759,42 @@ class ModuleController extends Controller
                     ->get()
                 : collect();
 
+            $journalIds = collect();
+            if (Schema::hasTable('journal_entries')) {
+                $journalIds = DB::table('journal_entries')
+                    ->where('company_id', $companyId)
+                    ->where(function ($journalQuery) use ($record) {
+                        $journalQuery
+                            ->where(function ($sourceQuery) use ($record) {
+                                $sourceQuery->where('source_type', 'purchase_document')
+                                    ->where('source_id', $record->id);
+                            });
+
+                        if (!empty($record->journal_entry_id)) {
+                            $journalQuery->orWhere(function ($directQuery) use ($record) {
+                                $directQuery->where('id', $record->journal_entry_id)
+                                    ->where(function ($typeQuery) {
+                                        $typeQuery->whereNull('source_type')
+                                            ->orWhere('source_type', 'purchase_document');
+                                    });
+                            });
+                        }
+                    })
+                    ->pluck('id');
+
+                if ($journalIds->isNotEmpty() && Schema::hasColumn('journal_entries', 'reversed_entry_id')) {
+                    $journalIds = $journalIds
+                        ->merge(DB::table('journal_entries')->whereIn('reversed_entry_id', $journalIds)->pluck('id'))
+                        ->unique()
+                        ->values();
+                }
+            }
+
             app(ActivityLogger::class)->log('deleted', 'purchase_document', $record->id, [
                 'document_no' => $record->document_no,
                 'status' => $record->status,
                 'grand_total' => $record->grand_total,
+                'journal_entry_ids' => $journalIds->all(),
             ], [], $companyId);
 
             foreach (['vendor_bill_lines', 'purchase_document_lines'] as $lineTable) {
@@ -1791,9 +1808,13 @@ class ModuleController extends Controller
                     ->where('document_id', $record->id)
                     ->delete();
             }
+            if ($journalIds->isNotEmpty()) {
+                DB::table('journal_entry_lines')->whereIn('journal_entry_id', $journalIds)->delete();
+                DB::table('journal_entries')->whereIn('id', $journalIds)->delete();
+            }
             DB::table('purchase_documents')->where('id', $record->id)->delete();
 
-            return ['record' => $record, 'attachments' => $attachments];
+            return ['record' => $record, 'attachments' => $attachments, 'journal_count' => $journalIds->count()];
         });
 
         foreach ($deleted['attachments'] as $attachment) {
@@ -1806,7 +1827,7 @@ class ModuleController extends Controller
 
         return redirect()
             ->route('erp.expenses.index')
-            ->with('status', 'Vendor bill '.$deleted['record']->document_no.' deleted.');
+            ->with('status', 'Vendor bill '.$deleted['record']->document_no.' and its connected accounting entries deleted.');
     }
 
     public function uploadVendorBillAttachments($bill)
