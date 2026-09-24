@@ -391,6 +391,7 @@ class OpeningBalanceImportTest extends TestCase
         $this->get($manualApUrl)
             ->assertOk()
             ->assertSee('value="ap_trade" checked', false)
+            ->assertSee('class="col-12" id="manualDescriptionGroup"', false)
             ->assertSee('name="description"', false)
             ->assertSee('This will appear in the vendor bill memo, bill line, and journal entry.');
 

@@ -1,6 +1,7 @@
 @extends('erp.layout')
 
 @php($selectedBalanceType = old('balance_type', request('balance_type', 'ar_trade')))
+@php($isPayableOpening = $selectedBalanceType === 'ap_trade')
 
 @section('title', 'Manual Trade Opening Balance')
 @section('page-title', 'Manual Trade Opening Balance')
@@ -36,9 +37,9 @@
                     <label class="form-check-label"><input class="form-check-input me-1" type="radio" name="balance_type" value="ap_trade" {{ $selectedBalanceType === 'ap_trade' ? 'checked' : '' }}> A/P Trade (Vendor — BDO / Metro)</label>
                 </div>
             </div>
-            <div class="col-lg-6" id="manualCustomerGroup">
+            <div class="col-lg-6 {{ $isPayableOpening ? 'd-none' : '' }}" id="manualCustomerGroup">
                 <label class="form-label fw-semibold">Client <span class="text-danger">*</span></label>
-                <select name="customer_id" id="manualCustomer" class="form-select erp-select">
+                <select name="customer_id" id="manualCustomer" class="form-select erp-select" {{ $isPayableOpening ? 'disabled' : 'required' }}>
                     <option value="">Select client...</option>
                     @foreach($customers as $customer)
                         <option value="{{ $customer->id }}" {{ (string) old('customer_id') === (string) $customer->id ? 'selected' : '' }}>
@@ -47,9 +48,9 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-lg-6 d-none" id="manualSupplierGroup">
+            <div class="col-lg-6 {{ $isPayableOpening ? '' : 'd-none' }}" id="manualSupplierGroup">
                 <label class="form-label fw-semibold">Vendor <span class="text-danger">*</span></label>
-                <select name="supplier_id" id="manualSupplier" class="form-select erp-select">
+                <select name="supplier_id" id="manualSupplier" class="form-select erp-select" {{ $isPayableOpening ? 'required' : 'disabled' }}>
                     <option value="">Select vendor...</option>
                     @foreach($suppliers as $supplier)
                         <option value="{{ $supplier->id }}" {{ (string) old('supplier_id') === (string) $supplier->id ? 'selected' : '' }}>
@@ -59,13 +60,13 @@
                 </select>
             </div>
             <div class="col-lg-6">
-                <label class="form-label fw-semibold"><span id="manualReferenceLabel">BI / SOA Reference</span> <span class="text-danger">*</span></label>
-                <input name="reference_no" id="manualReference" class="form-control" value="{{ old('reference_no') }}" maxlength="100" placeholder="Original BI or SOA number" required>
-                <div class="form-text" id="manualReferenceHelp">This reference must not already exist in Accounts Receivable.</div>
+                <label class="form-label fw-semibold"><span id="manualReferenceLabel">{{ $isPayableOpening ? 'Vendor Bill Reference' : 'BI / SOA Reference' }}</span> <span class="text-danger">*</span></label>
+                <input name="reference_no" id="manualReference" class="form-control" value="{{ old('reference_no') }}" maxlength="100" placeholder="{{ $isPayableOpening ? 'Original vendor bill number' : 'Original BI or SOA number' }}" required>
+                <div class="form-text" id="manualReferenceHelp">This reference must not already exist in {{ $isPayableOpening ? 'Accounts Payable' : 'Accounts Receivable' }}.</div>
             </div>
-            <div class="col-12 d-none" id="manualDescriptionGroup">
+            <div class="{{ $isPayableOpening ? 'col-12' : 'col-12 d-none' }}" id="manualDescriptionGroup">
                 <label class="form-label fw-semibold">Description</label>
-                <textarea name="description" id="manualDescription" class="form-control" rows="3" maxlength="1000" placeholder="Enter the vendor bill particulars or reason for this opening balance">{{ old('description') }}</textarea>
+                <textarea name="description" id="manualDescription" class="form-control" rows="3" maxlength="1000" placeholder="Enter the vendor bill particulars or reason for this opening balance" {{ $isPayableOpening ? '' : 'disabled' }}>{{ old('description') }}</textarea>
                 <div class="form-text">This will appear in the vendor bill memo, bill line, and journal entry.</div>
             </div>
             <div class="col-md-6 col-lg-3">
