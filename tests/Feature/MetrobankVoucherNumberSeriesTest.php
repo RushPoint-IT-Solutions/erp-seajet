@@ -91,4 +91,15 @@ class MetrobankVoucherNumberSeriesTest extends TestCase
             ->where('class_code', '')
             ->value('current_number'));
     }
+
+    public function test_payment_form_exposes_the_correct_cv_preview_for_each_bank_series()
+    {
+        $response = $this->get(route('erp.payables.payments.create'));
+
+        $response->assertOk()
+            ->assertSee('CV No')
+            ->assertSee('Select a bank account')
+            ->assertSee('data-next-voucher-no="CV-MB-00001"', false)
+            ->assertSee('data-next-voucher-no="CV-00426"', false);
+    }
 }

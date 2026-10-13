@@ -36,8 +36,9 @@
         {{ csrf_field() }}
         <div class="row g-3">
             <div class="col-md-3">
-                <label class="form-label">Payment No</label>
-                <input name="payment_no" class="form-control bg-light" value="{{ $nextPaymentNo }}" readonly required>
+                <label class="form-label">CV No</label>
+                <input id="checkVoucherNumber" class="form-control bg-light" value="" placeholder="Select a bank account" readonly>
+                <input name="payment_no" type="hidden" value="{{ $nextPaymentNo }}">
             </div>
             <div class="col-md-3">
                 <label class="form-label">Payment Date</label>
@@ -98,7 +99,7 @@
                 <select name="bank_account" id="bankAccount" class="form-select erp-select" required>
                     <option value="">Select account...</option>
                     @foreach($bankAccounts as $bank)
-                        <option value="{{ $bank['account_no'] }}" data-next-check-no="{{ $bank['next_check_no'] ?? '000001' }}" {{ old('bank_account') === $bank['account_no'] ? 'selected' : '' }}>{{ $bank['bank'] }} - {{ $bank['name'] }} ({{ $bank['currency'] }})</option>
+                        <option value="{{ $bank['account_no'] }}" data-next-check-no="{{ $bank['next_check_no'] ?? '000001' }}" data-next-voucher-no="{{ $bank['next_voucher_no'] ?? '' }}" {{ old('bank_account') === $bank['account_no'] ? 'selected' : '' }}>{{ $bank['bank'] }} - {{ $bank['name'] }} ({{ $bank['currency'] }})</option>
                     @endforeach
                 </select>
             </div>
@@ -177,15 +178,24 @@
             }
         }
 
+        function syncVoucherNumber() {
+            var voucherNo = $('#bankAccount option:selected').data('next-voucher-no') || '';
+            $('#checkVoucherNumber').val(voucherNo);
+        }
+
         $('#billSelect').on('change', syncBill);
         $('#currencySelect').on('change', syncCurrency);
         $('#paymentMethod').on('change', function () { syncCheckRequirements(true); });
-        $('#bankAccount').on('change', function () { syncCheckRequirements(true); });
+        $('#bankAccount').on('change', function () {
+            syncCheckRequirements(true);
+            syncVoucherNumber();
+        });
         if (!hasOldInput) {
             syncBill();
         }
         syncCurrency();
         syncCheckRequirements(false);
+        syncVoucherNumber();
     });
 </script>
 @endpush

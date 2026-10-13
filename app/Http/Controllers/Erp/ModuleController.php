@@ -1923,6 +1923,9 @@ class ModuleController extends Controller
             : 'Bank';
         $bankAccounts = collect($this->bankAccounts())->map(function ($bank) {
             $bank['next_check_no'] = $this->nextCheckNumberForBank($bank['id']);
+            $seriesClass = $this->numberSeriesClassForBankAccount($bank['id']);
+            $prefix = $seriesClass === 'METROBANK' ? 'CV-MB-' : 'CV-';
+            $bank['next_voucher_no'] = $this->nextDocumentNumber('check_voucher', $prefix, 5, false, $seriesClass);
 
             return $bank;
         })->all();
