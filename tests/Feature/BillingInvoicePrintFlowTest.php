@@ -206,6 +206,24 @@ class BillingInvoicePrintFlowTest extends TestCase
         $show->assertDontSee('Print SOA A');
     }
 
+    public function test_soa_a_cannot_be_combined_with_a_billing_invoice_template()
+    {
+        $payload = $this->payload([
+            'invoice_no' => 'BI-MIXED-SOA-A',
+            'transaction_no' => 'BI-MIXED-SOA-A',
+            'invoice_template' => ['Billing Invoice', 'SOA_A'],
+        ]);
+
+        $this->from(route('erp.invoices.create'))
+            ->post('/erp/invoices/review', $payload)
+            ->assertRedirect(route('erp.invoices.create'))
+            ->assertSessionHasErrors('invoice_template');
+
+        $this->assertDatabaseMissing('sales_documents', [
+            'document_no' => 'BI-MIXED-SOA-A',
+        ]);
+    }
+
     public function test_billing_invoice_hides_empty_soa_number()
     {
         $withoutSoa = $this->get('/erp/billings/print/invoice?invoice_no=BI-NO-SOA&soa_no=');

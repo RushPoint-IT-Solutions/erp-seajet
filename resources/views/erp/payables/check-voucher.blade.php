@@ -137,13 +137,55 @@
 @endpush
 
 @section('content')
+    @if(session('status'))
+        <div class="alert alert-success no-print"><i class="bi bi-check-circle-fill me-1"></i>{{ session('status') }}</div>
+    @endif
+    @if($errors->any())
+        <div class="alert alert-danger no-print">
+            @foreach($errors->all() as $error)<div>{{ $error }}</div>@endforeach
+        </div>
+    @endif
     <div class="d-flex justify-content-end gap-2 mb-3 no-print">
+        @if(!empty($voucher['id']) && ($canEditVoucher ?? false))
+            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editVoucherModal"><i class="bi bi-pencil-square me-1"></i> Edit Voucher</button>
+        @endif
         <a href="{{ route('erp.payables.check-voucher.layout', array_filter(['payment' => $voucher['id']])) }}" class="btn btn-outline-secondary"><i class="bi bi-sliders me-1"></i> Adjust Layout</a>
         <button type="button" class="btn btn-outline-secondary" id="printVoucherButton"><i class="bi bi-printer me-1"></i> Print Check Voucher</button>
         @if(!empty($voucher['id']))
             <a href="{{ route('erp.payables.check-print', $voucher['id']) }}" class="btn btn-primary {{ $voucherPrinted ? '' : 'd-none' }}" id="printCheckButton"><i class="bi bi-bank me-1"></i> Print Check</a>
         @endif
     </div>
+
+    @if(!empty($voucher['id']) && ($canEditVoucher ?? false))
+        <div class="modal fade no-print" id="editVoucherModal" tabindex="-1" aria-labelledby="editVoucherModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <form method="post" action="{{ route('erp.payables.check-voucher.update', $voucher['id']) }}">
+                        @csrf
+                        <div class="modal-header">
+                            <h2 class="modal-title fs-5" id="editVoucherModalLabel">Edit Check Voucher</h2>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Document Date</label>
+                                <input type="date" name="document_date" class="form-control" value="{{ old('document_date', $voucher['document_date_raw'] ?? '') }}" required>
+                            </div>
+                            <div>
+                                <label class="form-label fw-semibold">Description</label>
+                                <textarea name="description" class="form-control" rows="4" maxlength="2000">{{ old('description', $voucher['description'] ?? '') }}</textarea>
+                                <div class="form-text">CV number, amount, bank, and accounting entries remain locked.</div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Voucher</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <div class="cv-print-wrap">
         <div class="cv-print-sheet">

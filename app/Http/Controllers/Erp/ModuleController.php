@@ -2476,7 +2476,60 @@ class ModuleController extends Controller
             'layout' => $this->checkVoucherPrintLayoutPayload(),
             'fields' => $this->checkVoucherPrintFields(),
             'voucherPrinted' => $payment ? $this->hasRecordedCheckVoucherPrint($payment) : false,
+            'canEditVoucher' => $payment ? $this->canEditCheckVoucher($record) : false,
         ]);
+    }
+
+    public function updateCheckVoucher($payment)
+    {
+        $this->authorizeAccountingPosting('payables', 'edit');
+        $data = request()->validate([
+            'document_date' => 'required|date',
+            'description' => 'nullable|string|max:2000',
+        ]);
+        $companyId = $this->defaultCompanyId();
+
+        DB::transaction(function () use ($payment, $data, $companyId) {
+            $record = DB::table('payments')
+                ->where('company_id', $companyId)
+                ->where('id', $payment)
+                ->lockForUpdate()
+                ->first();
+            abort_unless($record, 404);
+
+            if (!$this->canEditCheckVoucher($record)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'voucher' => 'A released, posted, voided, or cancelled Check Voucher can no longer be edited.',
+                ]);
+            }
+
+            $description = trim((string) ($data['description'] ?? ''));
+            $before = [
+                'document_date' => $record->payment_date,
+                'description' => $record->voucher_description ?? null,
+            ];
+            DB::table('payments')->where('id', $record->id)->update([
+                'payment_date' => $data['document_date'],
+                'voucher_description' => $description !== '' ? $description : null,
+                'updated_at' => now(),
+            ]);
+
+            $issuance = $this->activeCheckIssuance($record->id, true);
+            if ($issuance && !in_array($issuance->status, ['released', 'cleared', 'voided'], true)) {
+                DB::table('check_issuances')->where('id', $issuance->id)->update([
+                    'check_date' => $data['document_date'],
+                    'updated_at' => now(),
+                ]);
+            }
+
+            app(ActivityLogger::class)->log('updated', 'check_voucher', $record->id, $before, [
+                'document_date' => $data['document_date'],
+                'description' => $description !== '' ? $description : null,
+            ], $companyId);
+        });
+
+        return redirect()->route('erp.payables.check-voucher', $payment)
+            ->with('status', 'Check Voucher updated.');
     }
 
     public function recordCheckVoucherPrint($payment)
@@ -3766,6 +3819,7 @@ class ModuleController extends Controller
             'voucher_no' => $payment->voucher_no ?: 'CV-'.$payment->id,
             'document_no' => $payment->voucher_no ?: 'CV-'.$payment->id,
             'document_date' => $documentDate,
+            'document_date_raw' => $payment->payment_date,
             'payment_no' => $payment->payment_no,
             'company' => DB::table('companies')->where('id', $payment->company_id)->value('name') ?: 'SeaJet Holdings Inc.',
             'supplier' => $payment->payee_snapshot ?: ($payment->supplier_name ?: '-'),
@@ -3778,7 +3832,9 @@ class ModuleController extends Controller
             'account_no' => $clientAccountNo !== '' ? $clientAccountNo : '-',
             'check_no' => $payment->check_no ?: '-',
             'bill_no' => $payment->bill_no,
-            'description' => $vendorBillMemo,
+            'description' => trim((string) ($payment->voucher_description ?? '')) !== ''
+                ? $payment->voucher_description
+                : $vendorBillMemo,
             'currency' => $currency,
             'gross' => $gross,
             'withholding' => $wht,
@@ -3787,6 +3843,18 @@ class ModuleController extends Controller
             'credit_account_title' => $cashInBankTitle,
             'amount_words' => $payment->amount_words_snapshot ?: $this->amountToWords($net, $payment->currency ?: 'PHP'),
         ];
+    }
+
+    private function canEditCheckVoucher($payment)
+    {
+        if (!$payment || !app(RbacService::class)->allows(auth()->user(), 'payables', 'edit')) {
+            return false;
+        }
+
+        $status = strtolower((string) ($payment->approval_status ?: $payment->status));
+
+        return !in_array($status, ['released', 'voided', 'cancelled'], true)
+            && strtolower((string) ($payment->posting_status ?? 'unposted')) !== 'posted';
     }
 
     private function paymentRecordForCompany($paymentId)
@@ -9209,6 +9277,11 @@ class ModuleController extends Controller
 
         $originalInvoiceNo = trim((string) ($data['original_invoice_no'] ?? ''));
         $selectedTemplates = array_values(array_filter(array_map('trim', (array) ($data['invoice_template'] ?? []))));
+        if (in_array('SOA_A', $selectedTemplates, true) && count($selectedTemplates) > 1) {
+            return redirect()->back()->withInput()->withErrors([
+                'invoice_template' => 'SOA A must be used by itself. For a Billing Invoice with reimbursable charges, select SOA B instead.',
+            ]);
+        }
         $invoiceNo = trim((string) ($data['invoice_no'] ?? ''));
         $transactionNo = trim((string) ($data['transaction_no'] ?? ''));
         $autoNumber = $invoiceNo === '' && $transactionNo === '' && $originalInvoiceNo === '';

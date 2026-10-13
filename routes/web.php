@@ -76,6 +76,7 @@ Route::middleware(['auth', 'permission.access'])->group(function () {
     Route::post('/erp/payables/check-voucher/print-layout/save', 'Erp\ModuleController@saveCheckVoucherPrintLayout')->name('erp.payables.check-voucher.layout.save');
     Route::get('/erp/payables/check-voucher/bill/{bill}', 'Erp\ModuleController@checkVoucherForBill')->name('erp.payables.check-voucher.bill');
     Route::get('/erp/payables/check-voucher/preview/{payment?}', 'Erp\ModuleController@checkVoucherPreview')->name('erp.payables.check-voucher');
+    Route::post('/erp/payables/check-voucher/{payment}/update', 'Erp\ModuleController@updateCheckVoucher')->name('erp.payables.check-voucher.update');
     Route::post('/erp/payables/check-voucher/print/{payment}/event', 'Erp\ModuleController@recordCheckVoucherPrint')->name('erp.payables.check-voucher.print.event');
     Route::post('/erp/payables/check/print-layout/save', 'Erp\ModuleController@saveCheckPrintLayout')->name('erp.payables.check-print.layout.save');
     Route::post('/erp/payables/check/print/{payment}/payee', 'Erp\ModuleController@updateCheckPayee')->name('erp.payables.check-print.payee.update');

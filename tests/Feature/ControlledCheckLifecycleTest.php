@@ -415,6 +415,45 @@ class ControlledCheckLifecycleTest extends TestCase
         ]);
     }
 
+    public function test_approved_check_voucher_date_and_description_can_be_edited_before_release()
+    {
+        list($bill, $bank) = $this->billAndBank();
+
+        $this->post(route('erp.payables.payments.review'), $this->paymentPayload($bill, $bank))
+            ->assertOk();
+        $payment = DB::table('payments')->where('payment_no', 'PV-CONTROL-1001')->first();
+        $this->post(route('erp.payables.payments.approve', $payment->id))
+            ->assertRedirect(route('erp.payables.approvals'));
+
+        $this->post(route('erp.payables.check-voucher.update', $payment->id), [
+            'document_date' => '2026-10-12',
+            'description' => 'Updated voucher description for payment processing.',
+        ])->assertRedirect(route('erp.payables.check-voucher', $payment->id));
+
+        $this->assertDatabaseHas('payments', [
+            'id' => $payment->id,
+            'payment_date' => '2026-10-12',
+            'voucher_description' => 'Updated voucher description for payment processing.',
+        ]);
+        $this->assertDatabaseHas('check_issuances', [
+            'payment_id' => $payment->id,
+            'check_date' => '2026-10-12',
+        ]);
+        $this->get(route('erp.payables.check-voucher', $payment->id))
+            ->assertOk()
+            ->assertSee('Edit Voucher')
+            ->assertSee('10/12/2026')
+            ->assertSee('Updated voucher description for payment processing.');
+
+        DB::table('payments')->where('id', $payment->id)->update(['posting_status' => 'posted']);
+        $this->from(route('erp.payables.check-voucher', $payment->id))
+            ->post(route('erp.payables.check-voucher.update', $payment->id), [
+                'document_date' => '2026-10-11',
+                'description' => 'Should not save',
+            ])->assertRedirect(route('erp.payables.check-voucher', $payment->id))
+            ->assertSessionHasErrors('voucher');
+    }
+
     public function test_edit_vendor_bill_allows_bill_number_change_and_updates_linked_payment()
     {
         list($bill, $bank) = $this->billAndBank();
