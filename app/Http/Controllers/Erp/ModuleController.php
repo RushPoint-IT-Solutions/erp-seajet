@@ -1937,6 +1937,7 @@ class ModuleController extends Controller
             'selectedPaymentMethod' => $selectedPaymentMethod,
             'nextPaymentNo' => $this->nextDocumentNumber('payment_voucher', 'PV-', 5, false),
             'bankAccounts' => $bankAccounts,
+            'initialApprovalStatus' => $this->shouldAutoApproveApPayment() ? 'Approved' : 'For Approval',
         ]);
     }
 
@@ -2140,7 +2141,7 @@ class ModuleController extends Controller
 
     public function approveApPayment($payment)
     {
-        $this->authorizeAccountingPosting('payables', 'view');
+        $this->authorizeAccountingPosting('payables', 'approve');
         $companyId = $this->defaultCompanyId();
 
         DB::transaction(function () use ($payment, $companyId) {
@@ -3259,6 +3260,7 @@ class ModuleController extends Controller
     {
         return DB::transaction(function () use ($data) {
             $companyId = $this->defaultCompanyId();
+            $autoApprove = $this->shouldAutoApproveApPayment();
             $bill = $this->apBillRecordByNumber($data['bill_no']);
             $supplierId = $bill ? $bill->supplier_id : $this->supplierIdForAp($companyId, $data);
             $amount = $this->moneyToFloat($data['amount']);
@@ -3308,10 +3310,12 @@ class ModuleController extends Controller
                 'currency' => $currency,
                 'exchange_rate' => $exchangeRate,
                 'amount' => $amount,
-                'status' => 'for_approval',
-                'approval_status' => 'For Approval',
+                'status' => $autoApprove ? 'approved' : 'for_approval',
+                'approval_status' => $autoApprove ? 'Approved' : 'For Approval',
                 'created_by' => auth()->id(),
                 'submitted_at' => now(),
+                'approved_by' => $autoApprove ? auth()->id() : null,
+                'approved_at' => $autoApprove ? now() : null,
                 'payee_snapshot' => trim($data['payee_name']),
                 'amount_words_snapshot' => $this->amountToWords($amount, $currency),
                 'created_at' => now(),
@@ -3338,8 +3342,16 @@ class ModuleController extends Controller
                 'payment_no' => $paymentNo,
                 'bill_no' => $data['bill_no'],
                 'amount' => $amount,
-                'status' => 'For Approval',
+                'status' => $autoApprove ? 'Approved' : 'For Approval',
             ], $companyId);
+
+            if ($autoApprove) {
+                app(ActivityLogger::class)->log('approved', 'payment', $paymentId, [], [
+                    'approval_status' => 'Approved',
+                    'approved_by' => auth()->id(),
+                    'approval_mode' => 'AP & AR role auto-approval',
+                ], $companyId);
+            }
 
             return $this->paymentArrayById($paymentId);
         });
@@ -3564,7 +3576,7 @@ class ModuleController extends Controller
         }
 
         $rbac = app(RbacService::class);
-        $canApprove = $rbac->allows(auth()->user(), 'payables', 'view');
+        $canApprove = $rbac->allows(auth()->user(), 'payables', 'approve');
         $canControlChecks = $rbac->allows(auth()->user(), 'payables', 'release');
 
         return DB::table('payments')
@@ -5146,6 +5158,19 @@ class ModuleController extends Controller
             ->value('bank_name');
 
         return stripos((string) $bankName, 'metro') !== false ? 'METROBANK' : '';
+    }
+
+    private function shouldAutoApproveApPayment()
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        $rbac = app(RbacService::class);
+
+        return $rbac->normalizeRole($user->role ?? '') === 'ap_ar'
+            && $rbac->allows($user, 'payables', 'approve');
     }
 
     private function syncDocumentNumberSeries($documentType, $number)

@@ -510,7 +510,7 @@ class ControlledCheckLifecycleTest extends TestCase
             'updated_at' => now(),
         ]);
         $permissionIds = DB::table('permissions')
-            ->where('slug', 'payables.view')
+            ->whereIn('slug', ['payables.view', 'payables.approve'])
             ->pluck('id');
         foreach ($permissionIds as $permissionId) {
             DB::table('permission_role')->insert([
@@ -538,6 +538,57 @@ class ControlledCheckLifecycleTest extends TestCase
             'id' => $payment->id,
             'approval_status' => 'Approved',
             'approved_by' => 901,
+        ]);
+    }
+
+    public function test_ap_ar_role_payments_are_approved_automatically()
+    {
+        list($bill, $bank) = $this->billAndBank();
+        $roleId = DB::table('roles')->insertGetId([
+            'company_id' => $bill->company_id,
+            'name' => 'AP & AR',
+            'slug' => 'ap_ar',
+            'description' => 'Combined AP and AR role',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $permissionIds = DB::table('permissions')
+            ->whereIn('slug', ['payables.view', 'payables.create', 'payables.approve', 'payables.release'])
+            ->pluck('id');
+        foreach ($permissionIds as $permissionId) {
+            DB::table('permission_role')->insert([
+                'role_id' => $roleId,
+                'permission_id' => $permissionId,
+            ]);
+        }
+
+        $user = new User();
+        $user->id = 902;
+        $user->name = 'AP AR User';
+        $user->email = 'ap-ar@seajet.test';
+        $user->role = 'ap_ar';
+        $user->company_id = $bill->company_id;
+        $user->is_active = true;
+        $this->actingAs($user);
+
+        $this->get(route('erp.payables.payments.create'))
+            ->assertOk()
+            ->assertSee('value="Approved"', false)
+            ->assertSee('AP &amp; AR transactions are approved automatically.', false);
+
+        $this->post(route('erp.payables.payments.review'), $this->paymentPayload($bill, $bank, [
+            'payment_method' => 'Bank',
+            'check_no' => null,
+            'amount' => '5.00',
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('payments', [
+            'payment_no' => 'PV-CONTROL-1001',
+            'status' => 'approved',
+            'approval_status' => 'Approved',
+            'created_by' => 902,
+            'approved_by' => 902,
         ]);
     }
 

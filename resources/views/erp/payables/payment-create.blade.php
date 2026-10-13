@@ -123,8 +123,14 @@
             </div>
             <div class="col-md-3">
                 <label class="form-label">Workflow Status</label>
-                <input class="form-control" value="For Approval" readonly>
-                <div class="form-text">The preparer cannot approve or release this payment.</div>
+                <input class="form-control" value="{{ $initialApprovalStatus ?? 'For Approval' }}" readonly>
+                <div class="form-text">
+                    @if(($initialApprovalStatus ?? 'For Approval') === 'Approved')
+                        AP &amp; AR transactions are approved automatically. Release and posting remain separately controlled.
+                    @else
+                        This payment will enter the approval queue before release.
+                    @endif
+                </div>
             </div>
             <div class="col-md-6">
                 <label class="form-label">Attach Documents</label>
