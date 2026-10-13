@@ -241,12 +241,12 @@
 
         <section class="erp-card p-3" id="number-series">
             <h2 class="h6 fw-bold mb-1">Number Series</h2>
-            <p class="small text-muted mb-3">Set Current No. to one less than the first BI, OR, or AR number you want to issue for each class.</p>
+            <p class="small text-muted mb-3">Set Current No. to one less than the first document number you want to issue for each class or bank series.</p>
             <form method="post" action="{{ route('erp.settings.number-series.save') }}" class="settings-form settings-edit-form mb-3">
                 {{ csrf_field() }}<input type="hidden" name="id">
                 <div class="row g-2">
                     <div class="col-md-3"><label class="form-label small text-muted">Document Type</label><input name="document_type" class="form-control form-control-sm" required></div>
-                    <div class="col-md-2"><label class="form-label small text-muted">Class</label><select name="class_code" class="form-select form-select-sm"><option value="">Global / legacy</option><option>MANILA</option><option>PAMPANGA</option><option>CEBU</option></select></div>
+                    <div class="col-md-2"><label class="form-label small text-muted">Class / Bank</label><select name="class_code" class="form-select form-select-sm"><option value="">Global / legacy</option><option>MANILA</option><option>PAMPANGA</option><option>CEBU</option><option>METROBANK</option></select></div>
                     <div class="col-md-2"><label class="form-label small text-muted">Prefix</label><input name="prefix" class="form-control form-control-sm"></div>
                     <div class="col-md-2"><label class="form-label small text-muted">Current No.</label><input name="current_number" type="number" min="0" class="form-control form-control-sm" required></div>
                     <div class="col-md-2"><label class="form-label small text-muted">Padding</label><input name="padding" type="number" class="form-control form-control-sm" value="5" required></div>
@@ -256,7 +256,7 @@
             </form>
             <div class="settings-table table-responsive">
                 <table class="table table-sm table-hover align-middle mb-0">
-                    <thead><tr><th>Document</th><th>Class</th><th>Prefix</th><th>Current</th><th>Next</th><th>Padding</th><th>Status</th><th></th></tr></thead>
+                    <thead><tr><th>Document</th><th>Class / Bank</th><th>Prefix</th><th>Current</th><th>Next</th><th>Padding</th><th>Status</th><th></th></tr></thead>
                     <tbody>
                     @forelse($numberSeries as $series)
                         <tr>

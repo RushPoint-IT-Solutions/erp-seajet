@@ -187,12 +187,34 @@ class SeaJetTestDataSeeder extends Seeder
             ['check_voucher', 'CV-', 425, 5],
             ['journal_voucher', 'JV-', 220, 5],
         ] as $row) {
-            $this->upsert('number_series', ['company_id' => $companyId, 'document_type' => $row[0]], [
+            $this->upsert('number_series', ['company_id' => $companyId, 'document_type' => $row[0], 'class_code' => ''], [
                 'company_id' => $companyId,
                 'document_type' => $row[0],
+                'class_code' => '',
                 'prefix' => $row[1],
                 'current_number' => $row[2],
                 'padding' => $row[3],
+                'is_active' => true,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        foreach ([
+            ['check_voucher', 'CV-MB-', 5],
+            ['journal_voucher', 'JV-MB-', 6],
+        ] as $row) {
+            $this->upsert('number_series', [
+                'company_id' => $companyId,
+                'document_type' => $row[0],
+                'class_code' => 'METROBANK',
+            ], [
+                'company_id' => $companyId,
+                'document_type' => $row[0],
+                'class_code' => 'METROBANK',
+                'prefix' => $row[1],
+                'current_number' => 0,
+                'padding' => $row[2],
                 'is_active' => true,
                 'created_at' => $now,
                 'updated_at' => $now,

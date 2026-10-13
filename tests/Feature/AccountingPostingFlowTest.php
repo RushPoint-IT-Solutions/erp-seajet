@@ -380,6 +380,12 @@ class AccountingPostingFlowTest extends TestCase
         ]);
 
         $journal = app(PostingService::class)->postSupplierPayment($paymentId);
+        $this->assertStringStartsWith('JV-MB-', $journal->journal_no);
+        $this->assertSame(1, (int) DB::table('number_series')
+            ->where('company_id', $bill->company_id)
+            ->where('document_type', 'journal_voucher')
+            ->where('class_code', 'METROBANK')
+            ->value('current_number'));
         $totals = DB::table('journal_entry_lines')->where('journal_entry_id', $journal->id)
             ->selectRaw('SUM(debit) as debits, SUM(credit) as credits')->first();
         $this->assertEquals(5825.0, (float) $totals->debits);

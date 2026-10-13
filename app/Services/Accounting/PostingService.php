@@ -527,7 +527,7 @@ class PostingService
     private function createJournal($companyId, $branchId, $date, $module, $sourceType, $sourceId, $reference, $jobId, $memo, array $lines, $postingType = 'original', $reversedEntryId = null, $reversalReason = null)
     {
         $this->assertBalanced($lines);
-        $journalNo = $this->nextJournalNumber($companyId);
+        $journalNo = $this->nextJournalNumber($companyId, $sourceType, $sourceId);
         $hash = hash('sha256', json_encode([$companyId, $sourceType, $sourceId, $postingType, $date, $lines]));
         $journalId = DB::table('journal_entries')->insertGetId([
             'company_id' => $companyId,
@@ -859,22 +859,27 @@ class PostingService
         return $accountId;
     }
 
-    private function nextJournalNumber($companyId)
+    private function nextJournalNumber($companyId, $sourceType = null, $sourceId = null)
     {
         if (!Schema::hasTable('number_series')) {
             return 'JV-'.date('YmdHis');
         }
 
+        $seriesClass = $this->journalNumberSeriesClass($companyId, $sourceType, $sourceId);
+        $defaultPrefix = $seriesClass === 'METROBANK' ? 'JV-MB-' : 'JV-';
+
         $series = DB::table('number_series')
             ->where('company_id', $companyId)
             ->where('document_type', 'journal_voucher')
+            ->where('class_code', $seriesClass)
             ->lockForUpdate()
             ->first();
         if (!$series) {
             DB::table('number_series')->insert([
                 'company_id' => $companyId,
                 'document_type' => 'journal_voucher',
-                'prefix' => 'JV-',
+                'class_code' => $seriesClass,
+                'prefix' => $defaultPrefix,
                 'current_number' => 0,
                 'padding' => 6,
                 'is_active' => true,
@@ -884,12 +889,13 @@ class PostingService
             $series = DB::table('number_series')
                 ->where('company_id', $companyId)
                 ->where('document_type', 'journal_voucher')
+                ->where('class_code', $seriesClass)
                 ->lockForUpdate()
                 ->first();
         }
 
         $next = (int) $series->current_number + 1;
-        $prefix = $series->prefix ?: 'JV-';
+        $prefix = $series->prefix ?: $defaultPrefix;
         $padding = (int) $series->padding;
         $journalNo = $prefix.str_pad($next, $padding, '0', STR_PAD_LEFT);
 
@@ -911,6 +917,36 @@ class PostingService
         ]);
 
         return $journalNo;
+    }
+
+    private function journalNumberSeriesClass($companyId, $sourceType, $sourceId)
+    {
+        if (!Schema::hasTable('bank_accounts')) {
+            return '';
+        }
+
+        $sourceTables = [
+            'payment' => 'payments',
+            'receipt' => 'receipts',
+        ];
+        if (!isset($sourceTables[$sourceType]) || !$sourceId || !Schema::hasTable($sourceTables[$sourceType])) {
+            return '';
+        }
+
+        $bankAccountId = DB::table($sourceTables[$sourceType])
+            ->where('company_id', $companyId)
+            ->where('id', $sourceId)
+            ->value('bank_account_id');
+        if (!$bankAccountId) {
+            return '';
+        }
+
+        $bankName = DB::table('bank_accounts')
+            ->where('company_id', $companyId)
+            ->where('id', $bankAccountId)
+            ->value('bank_name');
+
+        return stripos((string) $bankName, 'metro') !== false ? 'METROBANK' : '';
     }
 
     private function rate($currency, $rate)

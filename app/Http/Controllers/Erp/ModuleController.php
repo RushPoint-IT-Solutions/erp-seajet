@@ -3269,7 +3269,6 @@ class ModuleController extends Controller
                     'payment_no' => 'Payment No. already exists. Use a different custom payment number.',
                 ]);
             }
-            $voucherNo = $this->nextDocumentNumber('check_voucher', 'CV-', 5);
             $bankAccountId = null;
             if (!empty($data['bank_account_id'])) {
                 $bankAccountId = (int) $data['bank_account_id'];
@@ -3282,6 +3281,9 @@ class ModuleController extends Controller
                     })
                     ->value('id');
             }
+            $voucherSeriesClass = $this->numberSeriesClassForBankAccount($bankAccountId);
+            $voucherPrefix = $voucherSeriesClass === 'METROBANK' ? 'CV-MB-' : 'CV-';
+            $voucherNo = $this->nextDocumentNumber('check_voucher', $voucherPrefix, 5, true, $voucherSeriesClass);
 
             if (strcasecmp($data['payment_method'], 'Cheque') === 0 && trim((string) ($data['check_no'] ?? '')) === '') {
                 DB::table('bank_accounts')->where('id', $bankAccountId)->lockForUpdate()->first();
@@ -5127,6 +5129,20 @@ class ModuleController extends Controller
         }
 
         return ['document_type' => 'vendor_bill', 'prefix' => 'BILL-'];
+    }
+
+    private function numberSeriesClassForBankAccount($bankAccountId)
+    {
+        if (!$bankAccountId || !Schema::hasTable('bank_accounts')) {
+            return '';
+        }
+
+        $bankName = DB::table('bank_accounts')
+            ->where('company_id', $this->defaultCompanyId())
+            ->where('id', $bankAccountId)
+            ->value('bank_name');
+
+        return stripos((string) $bankName, 'metro') !== false ? 'METROBANK' : '';
     }
 
     private function syncDocumentNumberSeries($documentType, $number)
@@ -12458,7 +12474,7 @@ class ModuleController extends Controller
         $data = request()->validate([
             'id' => 'nullable|integer',
             'document_type' => 'required|string|max:100',
-            'class_code' => 'nullable|in:MANILA,PAMPANGA,CEBU',
+            'class_code' => 'nullable|in:MANILA,PAMPANGA,CEBU,METROBANK',
             'prefix' => 'nullable|string|max:20',
             'current_number' => 'required|integer|min:0',
             'padding' => 'required|integer|min:1|max:12',
