@@ -326,7 +326,8 @@ class RecordPaymentPayableTest extends TestCase
         $form = $this->get(route('erp.payments.create'));
         $form->assertOk()
             ->assertSee('Billing Invoice (BI) only')
-            ->assertSee('Statement of Account (SOA) only')
+            ->assertSee('Statement of Account B (SOA B) only')
+            ->assertSee('Statement of Account A (SOA A) only')
             ->assertSee('Next Receipt No.')
             ->assertSee('data-bi-balance="112.00"', false)
             ->assertSee('data-soa-balance="50.00"', false)
@@ -390,6 +391,59 @@ class RecordPaymentPayableTest extends TestCase
         $paymentRows = $this->get(route('erp.payments.create'))->original->getData()['payments'];
         $this->assertSame('SOA-7370', $paymentRows[0]['document_reference']);
         $this->assertSame('BI-2026-REIMB', $paymentRows[1]['document_reference']);
+    }
+
+    public function test_standalone_soa_a_can_be_selected_and_paid_from_its_own_option()
+    {
+        $this->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class);
+        $this->seed(\BillingReimbursementSampleSeeder::class);
+
+        $source = (array) DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
+        unset($source['id']);
+        $source['document_type'] = 'statement_of_account_a';
+        $source['document_no'] = 'SOAA-PAY-001';
+        $source['soa_no'] = 'SOAA-PAY-001';
+        $source['invoice_amount'] = 75;
+        $source['freight_total'] = 0;
+        $source['grand_total'] = 75;
+        $source['withholding_tax_amount'] = 0;
+        $source['paid_total'] = 0;
+        $source['balance_due'] = 75;
+        $source['status'] = 'posted';
+        DB::table('sales_documents')->insert($source);
+
+        $form = $this->get(route('erp.payments.create'));
+        $form->assertOk()
+            ->assertSee('<option value="soa_a">Statement of Account A (SOA A) only</option>', false)
+            ->assertSee('data-document-type="statement_of_account_a"', false)
+            ->assertSee('value="SOAA-PAY-001"', false)
+            ->assertSee('data-soa-balance="75.00"', false);
+        $this->assertStringStartsWith('AR-', $form->original->getData()['receiptSeries']['soa_a']);
+
+        $this->post(route('erp.payments.receipt'), [
+            'customer_id' => (string) $source['customer_id'],
+            'invoice_no' => 'SOAA-PAY-001',
+            'payment_for' => 'soa_a',
+            'payment_date' => '2026-09-12',
+            'payment_method' => 'Cash',
+            'currency' => 'PHP',
+            'exchange_rate' => 1,
+            'amount' => '75.00',
+            'cwt_amount' => '0.00',
+        ])->assertOk()
+            ->assertSee('VAT Acknowledgement Receipt')
+            ->assertDontSee('VAT Official Receipt');
+
+        $receipt = DB::table('receipts')->orderBy('id', 'desc')->first();
+        $documentId = DB::table('sales_documents')->where('document_no', 'SOAA-PAY-001')->value('id');
+        $this->assertSame('acknowledgement_receipt', $receipt->receipt_type);
+        $this->assertDatabaseHas('receipt_applications', [
+            'receipt_id' => $receipt->id,
+            'sales_document_id' => $documentId,
+            'component' => 'soa',
+            'amount_applied' => 75,
+        ]);
+        $this->assertSame('paid', DB::table('sales_documents')->where('id', $documentId)->value('status'));
     }
 
     public function test_receipt_series_and_class_follow_the_invoice_class()

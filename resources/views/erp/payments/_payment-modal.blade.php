@@ -66,7 +66,7 @@
             <div class="modal-header">
                 <div>
                     <h5 class="modal-title mb-1">{{ $paymentModalTitle }}</h5>
-                    <div class="text-muted small">Record BI and SOA payments separately. Each payment gets its own receipt number and document reference.</div>
+                    <div class="text-muted small">Record BI, SOA B, and SOA A payments separately. Each payment gets its own receipt number and document reference.</div>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -80,9 +80,10 @@
                         <div class="col-lg-4">
                             <label class="form-label fw-semibold">Payment For</label>
                             <select name="payment_for" class="form-select payment-for-select" required>
-                                <option value="" selected>Select BI or SOA...</option>
+                                <option value="" selected>Select BI, SOA B, or SOA A...</option>
                                 <option value="bi">Billing Invoice (BI) only</option>
-                                <option value="soa">Statement of Account (SOA) only</option>
+                                <option value="soa">Statement of Account B (SOA B) only</option>
+                                <option value="soa_a">Statement of Account A (SOA A) only</option>
                             </select>
                             <div class="form-text">Save a separate payment if the client pays the other portion.</div>
                         </div>
@@ -184,6 +185,7 @@
                     <select name="invoice_no[]" class="payment-invoice-select visually-hidden" multiple tabindex="-1" aria-hidden="true">
                         @foreach($invoices as $invoice)
                             <option value="{{ $invoice['document_no'] }}"
+                                    data-document-type="{{ $invoice['document_type'] }}"
                                     data-customer-id="{{ $invoice['customer_id'] }}"
                                     data-class-code="{{ $invoice['class_code'] }}"
                                     data-customer-name="{{ $invoice['customer_name'] }}"
@@ -214,6 +216,7 @@
                             @foreach($invoices as $invoice)
                                 <tr class="payment-invoice-row d-none"
                                     data-invoice="{{ $invoice['document_no'] }}"
+                                    data-document-type="{{ $invoice['document_type'] }}"
                                     data-customer-id="{{ $invoice['customer_id'] }}"
                                     data-class-code="{{ $invoice['class_code'] }}"
                                     data-currency="{{ $invoice['currency'] }}"
@@ -330,7 +333,9 @@
                     var soa = numberValue(item.attr('data-soa-balance'));
                     var totalCwt = numberValue(item.attr('data-cwt-balance-original') || item.attr('data-cwt-balance'));
                     if (!item.attr('data-cwt-balance-original')) { item.attr('data-cwt-balance-original', totalCwt); }
-                    var due = mode === 'bi' ? bi : (mode === 'soa' ? soa : 0);
+                    var documentType = String(item.attr('data-document-type') || '').toLowerCase();
+                    var isSoaA = ['soa', 'soa_a', 'statement_of_account_a'].indexOf(documentType) !== -1;
+                    var due = mode === 'bi' ? bi : (mode === 'soa_a' ? (isSoaA ? soa : 0) : (mode === 'soa' ? (isSoaA ? 0 : soa) : 0));
                     var cwt = mode === 'bi' ? Math.min(bi, totalCwt) : 0;
                     item.data('settlement-balance', due).data('cwt-balance', cwt).data('balance', Math.max(0, due - cwt));
                     if (item.is('option') && due <= 0.005) { item.prop('selected', false); }
@@ -338,8 +343,10 @@
                         item.find('.payment-row-due').text(money(due));
                         item.find('.payment-row-cash').text(money(Math.max(0, due - cwt)));
                         item.find('.invoice-cwt-note').toggleClass('d-none', cwt <= 0.005);
-                        var reference = mode === 'soa' ? item.attr('data-soa-reference') : item.attr('data-bi-reference');
-                        item.find('.payment-document-reference').text((mode === 'soa' ? 'SOA: ' : 'BI: ') + reference);
+                        var isSoaMode = mode === 'soa' || mode === 'soa_a';
+                        var reference = isSoaMode ? item.attr('data-soa-reference') : item.attr('data-bi-reference');
+                        var referenceLabel = mode === 'soa_a' ? 'SOA A: ' : (mode === 'soa' ? 'SOA B: ' : 'BI: ');
+                        item.find('.payment-document-reference').text(referenceLabel + reference);
                     }
                 });
             }

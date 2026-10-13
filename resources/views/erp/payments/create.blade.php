@@ -300,7 +300,9 @@
             var requestedPaymentFor = @json(request('payment_for', ''));
             var requestedOption = form.find('.payment-invoice-select option').filter(function () { return this.value === requestedInvoice; });
             if (!requestedPaymentFor && requestedOption.length) {
-                requestedPaymentFor = (parseFloat(requestedOption.attr('data-bi-balance')) || 0) > 0 ? 'bi' : 'soa';
+                var documentType = String(requestedOption.attr('data-document-type') || '').toLowerCase();
+                var isSoaA = ['soa', 'soa_a', 'statement_of_account_a'].indexOf(documentType) !== -1;
+                requestedPaymentFor = (parseFloat(requestedOption.attr('data-bi-balance')) || 0) > 0 ? 'bi' : (isSoaA ? 'soa_a' : 'soa');
             }
             form.find('.payment-for-select').val(requestedPaymentFor).trigger('change');
             form.find('.payment-invoice-select').val([requestedInvoice]).trigger('change');

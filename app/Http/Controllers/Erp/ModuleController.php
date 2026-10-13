@@ -9255,7 +9255,8 @@ class ModuleController extends Controller
         return [
             'bi' => $orNumbers['MANILA'],
             'soa' => $arNumbers['MANILA'],
-            'by_class' => ['bi' => $orNumbers, 'soa' => $arNumbers],
+            'soa_a' => $arNumbers['MANILA'],
+            'by_class' => ['bi' => $orNumbers, 'soa' => $arNumbers, 'soa_a' => $arNumbers],
         ];
     }
 
@@ -9443,6 +9444,7 @@ class ModuleController extends Controller
 
                 return [
                     'id' => $invoice->id,
+                    'document_type' => strtolower((string) $invoice->document_type),
                     'document_no' => $invoice->document_no,
                     'document_date' => $invoice->document_date,
                     'currency' => $invoice->currency ?: 'PHP',
@@ -9529,7 +9531,7 @@ class ModuleController extends Controller
             'job_shipment_id' => 'nullable|string|max:100',
             'invoice_no' => 'nullable|array',
             'invoice_no.*' => 'string|max:100|distinct',
-            'payment_for' => 'required|in:bi,soa',
+            'payment_for' => 'required|in:bi,soa,soa_a',
             'class_code' => 'nullable|in:MANILA,PAMPANGA,CEBU',
             'payment_date' => 'required|date',
             'payment_method' => 'required|string|max:100',
@@ -9620,8 +9622,20 @@ class ModuleController extends Controller
 
         $settlementAmount = $amount + $cwtAmount;
         $paymentFor = $data['payment_for'];
-        if ($paymentFor === 'soa' && $cwtAmount > 0.005) {
+        $receiptComponent = $paymentFor === 'bi' ? 'bi' : 'soa';
+        if ($receiptComponent === 'soa' && $cwtAmount > 0.005) {
             return back()->withInput()->withErrors(['cwt_amount' => 'CWT can only be applied to the Billing Invoice portion.']);
+        }
+        $soaADocumentTypes = ['soa', 'soa_a', 'statement_of_account_a'];
+        if ($paymentFor === 'soa_a' && $invoices->contains(function ($invoice) use ($soaADocumentTypes) {
+            return !in_array(strtolower((string) $invoice->document_type), $soaADocumentTypes, true);
+        })) {
+            return back()->withInput()->withErrors(['invoice_no' => 'SOA A payments can only be applied to SOA A documents.']);
+        }
+        if ($paymentFor === 'soa' && $invoices->contains(function ($invoice) use ($soaADocumentTypes) {
+            return in_array(strtolower((string) $invoice->document_type), $soaADocumentTypes, true);
+        })) {
+            return back()->withInput()->withErrors(['invoice_no' => 'Use the SOA A payment option for SOA A documents.']);
         }
         $invoiceAmounts = $invoices->mapWithKeys(function ($invoice) {
             return [$invoice->id => $this->paymentInvoiceAmounts($invoice)];
@@ -9640,7 +9654,7 @@ class ModuleController extends Controller
         }
         $exchangeRate = $currency === 'PHP' ? 1 : max(0.000001, $this->moneyToFloat($data['exchange_rate'] ?? 1));
 
-        $receiptResult = DB::transaction(function () use ($customer, $companyId, $invoices, $invoiceAmounts, $amount, $cwtAmount, $settlementAmount, $currency, $exchangeRate, $data, $paymentFor, $classCode) {
+        $receiptResult = DB::transaction(function () use ($customer, $companyId, $invoices, $invoiceAmounts, $amount, $cwtAmount, $settlementAmount, $currency, $exchangeRate, $data, $paymentFor, $receiptComponent, $classCode) {
             $receiptNo = $paymentFor === 'bi'
                 ? $this->nextDocumentNumber('official_receipt', $this->classNumberPrefix('official_receipt', $classCode), 5, true, $classCode)
                 : $this->nextDocumentNumber('acknowledgement_receipt', $this->classNumberPrefix('acknowledgement_receipt', $classCode), 6, true, $classCode);
@@ -9685,7 +9699,7 @@ class ModuleController extends Controller
                     DB::table('receipt_applications')->insert([
                         'receipt_id' => $receiptId,
                         'sales_document_id' => $invoice->id,
-                        'component' => $paymentFor,
+                        'component' => $receiptComponent,
                         'amount_applied' => $amountApplied,
                         'created_at' => now(),
                         'updated_at' => now(),
@@ -9737,7 +9751,7 @@ class ModuleController extends Controller
         ];
         if ($paymentFor === 'bi') {
             $receiptDocuments = array_slice($receiptDocuments, 0, 2);
-        } elseif ($paymentFor === 'soa') {
+        } elseif ($paymentFor === 'soa' || $paymentFor === 'soa_a') {
             $receiptDocuments = array_slice($receiptDocuments, 2);
         }
 
@@ -9825,11 +9839,16 @@ class ModuleController extends Controller
             }
 
             $firstApplication = $applications->first();
-            $invoiceNo = $firstApplication
-                ? DB::table('sales_documents')->where('id', $firstApplication->sales_document_id)->value('document_no')
+            $firstDocument = $firstApplication
+                ? DB::table('sales_documents')->where('id', $firstApplication->sales_document_id)->first()
                 : null;
+            $invoiceNo = $firstDocument ? $firstDocument->document_no : null;
             $components = $applications->pluck('component')->unique()->filter()->values();
             $paymentFor = $components->count() === 1 ? $components->first() : 'bi';
+            if ($paymentFor === 'soa' && $firstDocument
+                && in_array(strtolower((string) $firstDocument->document_type), ['soa', 'soa_a', 'statement_of_account_a'], true)) {
+                $paymentFor = 'soa_a';
+            }
 
             app(ActivityLogger::class)->log($activityAction, 'receipt', $record->id, [
                 'status' => $record->status,
