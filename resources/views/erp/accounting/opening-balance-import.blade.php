@@ -185,6 +185,7 @@
     @endif
     <div class="erp-card p-4 mt-4">
         <h2 class="h6 fw-bold">Imported A/R beginning balances</h2>
+        <p class="text-muted mb-2">Showing workbook imports by admin@seajet.test only.</p>
         <p class="text-muted">Delete removes the selected balance from Client SOA and AR Aging and posts its accounting reversal. Original records remain in the audit history.</p>
         <div class="table-responsive">
             <table class="table table-hover align-middle">

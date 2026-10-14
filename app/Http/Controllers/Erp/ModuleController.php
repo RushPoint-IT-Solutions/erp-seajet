@@ -6029,6 +6029,9 @@ class ModuleController extends Controller
             ? DB::table('opening_balance_import_batches')
                 ->leftJoin('journal_entries', 'journal_entries.id', '=', 'opening_balance_import_batches.journal_entry_id')
                 ->where('opening_balance_import_batches.company_id', $this->defaultCompanyId())
+                ->whereIn('opening_balance_import_batches.imported_by', function ($query) {
+                    $query->select('id')->from('users')->where('email', 'admin@seajet.test');
+                })
                 ->select('opening_balance_import_batches.*', 'journal_entries.journal_no')
                 ->orderBy('opening_balance_import_batches.id', 'desc')
                 ->limit(10)
@@ -6053,6 +6056,8 @@ class ModuleController extends Controller
         $importedArBalances = DB::table('opening_balance_import_rows')
             ->join('sales_documents', 'sales_documents.id', '=', 'opening_balance_import_rows.sales_document_id')
             ->join('opening_balance_import_batches', 'opening_balance_import_batches.id', '=', 'opening_balance_import_rows.batch_id')
+            ->join('users as import_author', 'import_author.id', '=', 'opening_balance_import_batches.imported_by')
+            ->where('import_author.email', 'admin@seajet.test')
             ->where('opening_balance_import_batches.original_filename', 'not like', 'Manual AR Opening Balance - %')
             ->where('opening_balance_import_rows.company_id', $this->defaultCompanyId())
             ->whereIn('opening_balance_import_rows.balance_type', ['ar_trade', 'ar_reimbursable'])

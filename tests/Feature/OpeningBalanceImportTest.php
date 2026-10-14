@@ -619,6 +619,17 @@ class OpeningBalanceImportTest extends TestCase
         app(OpeningBalanceImportService::class)->import($path, 1, $mapping, hash_file('sha256', $path), basename($path), auth()->id());
         $row = DB::table('opening_balance_import_rows')->where('reference_no', 'DELETE-AR-001')->first();
         $other = DB::table('opening_balance_import_rows')->where('reference_no', 'KEEP-AR-002')->first();
+        $otherUserId = DB::table('users')->insertGetId([
+            'name' => 'Other encoder', 'email' => 'encoder@seajet.test', 'password' => bcrypt('test-password'),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $otherPath = $this->workbook([
+            ['MAIN', 'A/R TRADE', 'BILLING INVOICE', '2026-09-01', $customer->name, 'OTHER-ENCODER-001', 500, '', ''],
+        ]);
+        app(OpeningBalanceImportService::class)->import($otherPath, 1, $mapping, hash_file('sha256', $otherPath), 'other-encoder.xlsx', $otherUserId);
+        $filteredPage = $this->get(route('erp.accounting.opening-balances.import', ['manage_ar' => 1]))->assertOk();
+        $this->assertSame(['KEEP-AR-002', 'DELETE-AR-001'], $filteredPage->original->getData()['importedArBalances']->pluck('reference_no')->all());
+        $this->assertFalse($filteredPage->original->getData()['recentImports']->contains('imported_by', $otherUserId));
         $this->get(route('erp.accounting.opening-balances.import'))->assertOk()->assertSee('Imported A/R beginning balances')
             ->assertSee(route('erp.accounting.opening-balances.ar.delete', $row->id));
         $this->delete(route('erp.accounting.opening-balances.ar.delete', $row->id), ['reason' => 'Correct imported balance'])
