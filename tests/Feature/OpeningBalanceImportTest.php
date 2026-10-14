@@ -776,6 +776,32 @@ class OpeningBalanceImportTest extends TestCase
         $this->assertSame('voided', $after['receipts'][0]['status']);
     }
 
+    public function test_uncorrected_historical_import_deletion_reverses_its_actual_posted_direction()
+    {
+        $accounts = $this->accountMapping();
+        $mapping = [];
+        foreach ($accounts as $key => $id) { $mapping[str_replace('_account_id', '', $key)] = $id; }
+        $customer = DB::table('customers')->where('company_id', 1)->where('is_active', true)->first();
+        $path = $this->workbook([
+            ['MAIN', 'A/R TRADE', 'BILLING INVOICE', '2026-09-01', $customer->name, 'OLD-WRONG-AR', 1000, '', ''],
+        ]);
+        app(OpeningBalanceImportService::class)->import($path, 1, $mapping, hash_file('sha256', $path), basename($path), auth()->id());
+        $row = DB::table('opening_balance_import_rows')->where('reference_no', 'OLD-WRONG-AR')->first();
+        DB::table('journal_entry_lines')->where('journal_entry_id', $row->journal_entry_id)
+            ->where('account_id', $accounts['ar_trade_php_account_id'])->update(['debit' => 0, 'credit' => 1000]);
+        DB::table('journal_entry_lines')->where('journal_entry_id', $row->journal_entry_id)
+            ->where('account_id', $accounts['opening_balance_account_id'])->update(['debit' => 1000, 'credit' => 0]);
+        $this->delete(route('erp.accounting.opening-balances.ar.delete', $row->id), ['reason' => 'Remove erroneous historical import'])
+            ->assertRedirect();
+        $reversal = DB::table('journal_entries')->where('source_type', 'opening_balance_row')->where('source_id', $row->id)->first();
+        $this->assertDatabaseHas('journal_entry_lines', ['journal_entry_id' => $reversal->id,
+            'account_id' => $accounts['ar_trade_php_account_id'], 'debit' => 1000, 'credit' => 0]);
+        $this->assertDatabaseHas('journal_entry_lines', ['journal_entry_id' => $reversal->id,
+            'account_id' => $accounts['opening_balance_account_id'], 'debit' => 0, 'credit' => 1000]);
+        $this->assertDatabaseHas('sales_documents', ['id' => $row->sales_document_id, 'status' => 'voided']);
+        $this->assertSame(0, DB::table('journal_entries')->where('source_type', 'opening_balance_import_correction')->count());
+    }
+
     private function accountMapping()
     {
         $equityCategoryId = DB::table('account_categories')->where('name', 'Equity')->value('id');

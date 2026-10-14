@@ -490,13 +490,14 @@ class PostingService
                 ->where('status', 'posted')->first();
             $correctionLines = $correction ? DB::table('journal_entry_lines')->where('journal_entry_id', $correction->id)->get() : collect();
             $offset = $offsets->first();
-            if ($correctionLines->count() !== 2
+            if ($correction && ($correctionLines->count() !== 2
                 || abs($correctionLines->where('account_id', $control->account_id)->sum('debit') - 2 * (float) $row->base_amount) > 0.0001
-                || abs($correctionLines->where('account_id', $offset->account_id)->sum('credit') - 2 * (float) $row->base_amount) > 0.0001) {
+                || abs($correctionLines->where('account_id', $offset->account_id)->sum('credit') - 2 * (float) $row->base_amount) > 0.0001)) {
                 throw ValidationException::withMessages(['balance' => 'This historical import requires a verified correcting journal before deletion.']);
             }
-            // The correction offsets the wrong original and restores a normal A/R debit.
-            foreach ([$control, $offset] as $line) {
+            // Without a posted correction, reverse the original's actual direction.
+            // With a correction, reverse the corrected net A/R debit instead.
+            foreach ($correction ? [$control, $offset] : [] as $line) {
                 $debit = $line->debit; $line->debit = $line->credit; $line->credit = $debit;
                 $foreignDebit = $line->foreign_debit; $line->foreign_debit = $line->foreign_credit; $line->foreign_credit = $foreignDebit;
             }
