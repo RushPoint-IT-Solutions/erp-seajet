@@ -644,6 +644,24 @@ class OpeningBalanceImportTest extends TestCase
         $this->withExceptionHandling();
         $this->delete(route('erp.accounting.opening-balances.ar.delete', $other->id), ['reason' => 'Delete paid balance'])->assertSessionHasErrors('balance');
         $this->assertDatabaseHas('sales_documents', ['id' => $other->sales_document_id, 'status' => 'posted']);
+        DB::table('sales_documents')->where('id', $other->sales_document_id)->update(['paid_total' => 0]);
+        $document = DB::table('sales_documents')->where('id', $other->sales_document_id)->first();
+        $this->post(route('erp.payments.receipt'), [
+            'customer_id' => (string) $customer->id, 'invoice_no' => [$document->document_no],
+            'payment_for' => 'soa', 'payment_date' => '2026-10-14', 'payment_method' => 'Cash',
+            'currency' => 'PHP', 'amount' => 2000,
+        ])->assertOk();
+        $receipt = DB::table('receipts')->orderBy('id', 'desc')->first();
+        $this->get(route('erp.accounting.opening-balances.import', ['manage_ar' => 1]))->assertOk()
+            ->assertSee($receipt->receipt_no)->assertSee('Void payment')->assertDontSee('name="file"', false);
+        $this->post(route('erp.accounting.opening-balances.ar.payment.void', [$other->id, $receipt->id]), [
+            'reason' => 'Void payment to correct opening balance',
+        ])->assertRedirect(route('erp.accounting.opening-balances.import', ['manage_ar' => 1]));
+        $this->assertDatabaseHas('receipts', ['id' => $receipt->id, 'status' => 'voided', 'posting_status' => 'reversed']);
+        $this->assertDatabaseHas('sales_documents', ['id' => $other->sales_document_id, 'paid_total' => 0]);
+        $this->delete(route('erp.accounting.opening-balances.ar.delete', $other->id), ['reason' => 'Delete after payment void'])
+            ->assertRedirect();
+        $this->assertDatabaseHas('sales_documents', ['id' => $other->sales_document_id, 'status' => 'voided']);
     }
 
     private function accountMapping()

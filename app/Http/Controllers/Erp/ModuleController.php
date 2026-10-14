@@ -5966,6 +5966,22 @@ class ModuleController extends Controller
                 .number_format($result['total_amount'], 2).'. Created '.$result['journal_count'].' journal(s) using the Excel dates.');
     }
 
+    public function voidImportedArPayment($row, $receipt)
+    {
+        $this->authorizeAccountingPosting('payments', 'delete');
+        $data = request()->validate(['reason' => 'required|string|min:5|max:1000']);
+        DB::transaction(function () use ($row, $receipt, $data) {
+            $record = DB::table('opening_balance_import_rows')->where('company_id', $this->defaultCompanyId())
+                ->where('id', $row)->whereIn('balance_type', ['ar_trade', 'ar_reimbursable'])->lockForUpdate()->first();
+            abort_unless($record && $record->sales_document_id, 404);
+            abort_unless(DB::table('receipt_applications')->where('sales_document_id', $record->sales_document_id)
+                ->where('receipt_id', $receipt)->exists(), 404);
+            $this->reverseCustomerPayment($receipt, trim($data['reason']), 'voided');
+        });
+        return redirect()->route('erp.accounting.opening-balances.import', ['manage_ar' => 1])
+            ->with('status', 'Linked payment voided and invoice balances reopened. You can now delete the imported balance when all its payments are voided.');
+    }
+
     public function deleteImportedArBalance($row)
     {
         $this->authorizeAccountingPosting('accounting', 'delete');
@@ -6036,11 +6052,22 @@ class ModuleController extends Controller
 
         $importedArBalances = DB::table('opening_balance_import_rows')
             ->join('sales_documents', 'sales_documents.id', '=', 'opening_balance_import_rows.sales_document_id')
+            ->join('opening_balance_import_batches', 'opening_balance_import_batches.id', '=', 'opening_balance_import_rows.batch_id')
+            ->where('opening_balance_import_batches.original_filename', 'not like', 'Manual AR Opening Balance - %')
             ->where('opening_balance_import_rows.company_id', $this->defaultCompanyId())
             ->whereIn('opening_balance_import_rows.balance_type', ['ar_trade', 'ar_reimbursable'])
             ->whereNotIn('sales_documents.status', ['voided', 'cancelled'])
             ->select('opening_balance_import_rows.*', 'sales_documents.document_no', 'sales_documents.paid_total')
             ->orderBy('opening_balance_import_rows.id', 'desc')->paginate(30);
+        $importedArBalances->appends(['manage_ar' => request('manage_ar')]);
+        $linkedPayments = DB::table('receipt_applications')->join('receipts', 'receipts.id', '=', 'receipt_applications.receipt_id')
+            ->whereIn('sales_document_id', $importedArBalances->pluck('sales_document_id')->all())
+            ->where('receipts.company_id', $this->defaultCompanyId())
+            ->select('receipt_applications.sales_document_id', 'receipts.id', 'receipts.receipt_no', 'receipts.status', 'receipts.amount')
+            ->distinct()->get()->groupBy('sales_document_id');
+        foreach ($importedArBalances as $balance) {
+            $balance->linked_payments = $linkedPayments->get($balance->sales_document_id, collect());
+        }
         return view('erp.accounting.opening-balance-import', compact('accounts', 'defaults', 'preview', 'token', 'recentImports', 'importedArBalances'));
     }
 
