@@ -5998,7 +5998,88 @@ class ModuleController extends Controller
             ->with('status', 'Linked payment voided and invoice balances reopened. You can now delete the imported balance when all its payments are voided.');
     }
 
-    public function deleteImportedArBalance($row)
+    private function managedImportedArRows($activeOnly = true)
+    {
+        $query = DB::table('opening_balance_import_rows as import_row')
+            ->join('opening_balance_import_batches as batch', 'batch.id', '=', 'import_row.batch_id')
+            ->join('users as author', 'author.id', '=', 'batch.imported_by')
+            ->join('sales_documents as document', 'document.id', '=', 'import_row.sales_document_id')
+            ->where('import_row.company_id', $this->defaultCompanyId())
+            ->where('author.email', 'admin@seajet.test')
+            ->where('batch.original_filename', 'not like', 'Manual AR Opening Balance - %')
+            ->whereIn('import_row.balance_type', ['ar_trade', 'ar_reimbursable']);
+        if ($activeOnly) {
+            $query->whereNotIn('document.status', ['voided', 'cancelled']);
+        }
+        return $query->select('import_row.*')->orderBy('import_row.id');
+    }
+
+    public function exportImportedArBalances()
+    {
+        $this->authorizeAccountingPosting('accounting', 'view');
+        $rows = $this->managedImportedArRows(false)->get();
+        $documentIds = $rows->pluck('sales_document_id')->unique()->all();
+        $applications = DB::table('receipt_applications')->whereIn('sales_document_id', $documentIds)->get();
+        $receiptIds = $applications->pluck('receipt_id')->unique()->all();
+        $allApplications = DB::table('receipt_applications')->whereIn('receipt_id', $receiptIds)->get();
+        $allDocumentIds = collect($documentIds)->merge($allApplications->pluck('sales_document_id'))->unique()->all();
+        $receipts = DB::table('receipts')->where('company_id', $this->defaultCompanyId())->whereIn('id', $receiptIds)->get();
+        $journalIds = $rows->pluck('journal_entry_id')->merge($receipts->pluck('journal_entry_id'))->filter()->unique();
+        $extraJournals = DB::table('journal_entries')->where('company_id', $this->defaultCompanyId())
+            ->where(function ($query) use ($rows, $receiptIds) {
+                $query->where(function ($query) use ($rows) {
+                    $query->whereIn('source_type', ['opening_balance_row', 'opening_balance_import_correction'])
+                        ->whereIn('source_id', $rows->pluck('id')->all());
+                })->orWhere(function ($query) use ($receiptIds) {
+                    $query->where('source_type', 'receipt')->whereIn('source_id', $receiptIds);
+                });
+            })->pluck('id');
+        $journalIds = $journalIds->merge($extraJournals)->unique()->all();
+        $data = [
+            'exported_at' => now()->toIso8601String(), 'importer' => 'admin@seajet.test',
+            'scope' => 'All workbook-imported A/R balances, including removed balances; client filter and pagination do not limit this export.',
+            'import_rows' => $rows,
+            'import_batches' => DB::table('opening_balance_import_batches')->whereIn('id', $rows->pluck('batch_id')->unique()->all())->get(),
+            'sales_documents' => DB::table('sales_documents')->where('company_id', $this->defaultCompanyId())->whereIn('id', $allDocumentIds)->get(),
+            'sales_document_lines' => DB::table('sales_document_lines')->whereIn('sales_document_id', $allDocumentIds)->get(),
+            'receipts' => $receipts, 'receipt_applications' => $allApplications,
+            'journal_entries' => DB::table('journal_entries')->whereIn('id', $journalIds)->get(),
+            'journal_entry_lines' => DB::table('journal_entry_lines')->whereIn('journal_entry_id', $journalIds)->get(),
+            'customers' => DB::table('customers')->where('company_id', $this->defaultCompanyId())
+                ->whereIn('id', DB::table('sales_documents')->whereIn('id', $allDocumentIds)->pluck('customer_id')->all())->get(),
+            'accounts' => DB::table('accounts')->where('company_id', $this->defaultCompanyId())
+                ->whereIn('id', DB::table('journal_entry_lines')->whereIn('journal_entry_id', $journalIds)->pluck('account_id')->unique()->all())->get(),
+            'branches' => DB::table('branches')->where('company_id', $this->defaultCompanyId())->get(),
+        ];
+        return response()->json($data, 200, [
+            'Content-Disposition' => 'attachment; filename="imported-ar-backup-'.date('Ymd-His').'.json"',
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    }
+
+    public function deleteAllImportedArBalances()
+    {
+        $this->authorizeAccountingPosting('accounting', 'delete');
+        $this->authorizeAccountingPosting('payments', 'delete');
+        request()->validate(['reason' => 'required|string|min:5|max:1000', 'confirmation' => 'required|in:DELETE ALL IMPORTED AR']);
+        $count = DB::transaction(function () {
+            $rows = $this->managedImportedArRows()->lockForUpdate()->get();
+            $receiptIds = DB::table('receipt_applications')->join('receipts', 'receipts.id', '=', 'receipt_applications.receipt_id')
+                ->whereIn('sales_document_id', $rows->pluck('sales_document_id')->all())
+                ->where('receipts.company_id', $this->defaultCompanyId())
+                ->whereNotIn('receipts.status', ['voided', 'cancelled'])->distinct()->pluck('receipts.id');
+            foreach ($receiptIds as $receiptId) {
+                $this->reverseCustomerPayment($receiptId, trim(request('reason')), 'voided');
+            }
+            foreach ($rows as $row) {
+                $this->deleteImportedArBalance($row->id, false);
+            }
+            return $rows->count();
+        });
+        return redirect()->route('erp.accounting.opening-balances.import', ['manage_ar' => 1])
+            ->with('status', $count.' imported A/R balances removed; linked payments voided and accounting entries reversed. Audit records retained.');
+    }
+
+    public function deleteImportedArBalance($row, $redirect = true)
     {
         $this->authorizeAccountingPosting('accounting', 'delete');
         $data = request()->validate(['reason' => 'required|string|min:5|max:1000']);
@@ -6027,6 +6108,9 @@ class ModuleController extends Controller
                 (array) $document, ['import_row_id' => $record->id, 'reversal_journal_id' => $reversal->id,
                     'reason' => trim($data['reason'])], $record->company_id);
         });
+        if (!$redirect) {
+            return;
+        }
         return redirect()->route('erp.accounting.opening-balances.import')
             ->with('status', 'Imported A/R balance removed from Client SOA and AR Aging. Its accounting entry was reversed and audit history retained.');
     }
@@ -6096,7 +6180,8 @@ class ModuleController extends Controller
         foreach ($importedArBalances as $balance) {
             $balance->linked_payments = $linkedPayments->get($balance->sales_document_id, collect());
         }
-        return view('erp.accounting.opening-balance-import', compact('accounts', 'defaults', 'preview', 'token', 'recentImports', 'importedArBalances', 'importedArClients'));
+        $allImportedArCount = $this->managedImportedArRows()->count();
+        return view('erp.accounting.opening-balance-import', compact('accounts', 'defaults', 'preview', 'token', 'recentImports', 'importedArBalances', 'importedArClients', 'allImportedArCount'));
     }
 
     private function openingBalanceMappingRules()

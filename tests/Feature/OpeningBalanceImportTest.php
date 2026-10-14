@@ -693,6 +693,7 @@ class OpeningBalanceImportTest extends TestCase
         ];
         $this->get(route('erp.accounting.opening-balances.manual'))->assertOk()->assertSee('BI Amount')
             ->assertSee('SOA Amount')->assertSee('Total (BI + SOA)');
+        DB::table('sales_documents')->where('customer_id', $customer->id)->update(['status' => 'voided']);
         $this->post(route('erp.accounting.opening-balances.manual.store'), $fields)->assertRedirect(route('erp.payments.create'))
             ->assertSessionHas('status');
         $this->assertStringContainsString('1,250.00', session('status'));
@@ -704,6 +705,20 @@ class OpeningBalanceImportTest extends TestCase
         $this->assertEquals($accounts['ar_reimbursable_php_account_id'], $soa->opening_balance_control_account_id);
         $this->assertDatabaseHas('journal_entry_lines', ['journal_entry_id' => $soa->journal_entry_id,
             'account_id' => $accounts['ar_reimbursable_php_account_id'], 'debit' => 350]);
+        $statement = $this->get(route('erp.reports.client-soa', [
+            'customer_id' => $customer->id, 'as_of' => '2026-10-14',
+        ]))->assertOk()->assertSee('BI-SPLIT-001')->assertSee('SOA-SPLIT-001')
+            ->assertSee('900.00')->assertSee('350.00')->assertSee('1,250.00');
+        $rows = $statement->original->getData()['invoices'];
+        $this->assertCount(2, $rows);
+        $biRow = $rows->firstWhere('document_no', $bi->document_no);
+        $soaRow = $rows->firstWhere('document_no', $soa->document_no);
+        $this->assertEquals(900, $biRow->invoice_amount);
+        $this->assertEquals(0, $biRow->soa_amount);
+        $this->assertSame('SOA-SPLIT-001', $soaRow->soa_no);
+        $this->assertEquals(0, $soaRow->invoice_amount);
+        $this->assertEquals(350, $soaRow->soa_amount);
+        $this->assertEquals(1250, $statement->original->getData()['currencyTotals']['PHP']);
         $fields['reference_no'] = 'BI-ROLLBACK-001';
         $this->withExceptionHandling();
         $this->post(route('erp.accounting.opening-balances.manual.store'), $fields)->assertSessionHasErrors('reference_no');
@@ -711,6 +726,54 @@ class OpeningBalanceImportTest extends TestCase
         $fields['bi_amount'] = 0; $fields['reference_no'] = ''; $fields['soa_reference_no'] = 'SOA-ONLY-001';
         $this->post(route('erp.accounting.opening-balances.manual.store'), $fields)->assertRedirect(route('erp.payments.create'));
         $this->assertDatabaseHas('sales_documents', ['transaction_no' => 'SOA-ONLY-001', 'freight_total' => 350]);
+        $this->get(route('erp.reports.client-soa', ['customer_id' => $customer->id, 'as_of' => '2026-10-14']))
+            ->assertOk()->assertSee('SOA-ONLY-001')->assertSee('1,600.00');
+    }
+
+    public function test_bulk_import_delete_exports_data_voids_payments_and_rolls_back_on_failure()
+    {
+        $accounts = $this->accountMapping();
+        $mapping = [];
+        foreach ($accounts as $key => $id) { $mapping[str_replace('_account_id', '', $key)] = $id; }
+        $customer = DB::table('customers')->where('company_id', 1)->where('is_active', true)->first();
+        $path = $this->workbook([
+            ['MAIN', 'A/R TRADE', 'BILLING INVOICE', '2026-09-01', $customer->name, 'BULK-BI-001', 1000, '', ''],
+            ['MAIN', 'A/R REIMBURSABLE', 'SOA B', '2026-09-01', $customer->name, 'BULK-SOA-001', 2000, '', ''],
+        ]);
+        app(OpeningBalanceImportService::class)->import($path, 1, $mapping, hash_file('sha256', $path), basename($path), auth()->id());
+        $rows = DB::table('opening_balance_import_rows')->whereIn('reference_no', ['BULK-BI-001', 'BULK-SOA-001'])->get();
+        $bi = DB::table('sales_documents')->where('id', $rows[0]->sales_document_id)->first();
+        $this->post(route('erp.payments.receipt'), [
+            'customer_id' => (string) $customer->id, 'invoice_no' => [$bi->document_no],
+            'payment_for' => 'bi', 'payment_date' => '2026-10-14', 'payment_method' => 'Cash', 'currency' => 'PHP', 'amount' => 500,
+        ])->assertOk();
+        $receipt = DB::table('receipts')->orderBy('id', 'desc')->first();
+        $export = $this->get(route('erp.accounting.opening-balances.ar.export', ['client_id' => 99999]))->assertOk();
+        $data = json_decode($export->getContent(), true);
+        $this->assertCount(2, $data['import_rows']);
+        $this->assertCount(1, $data['receipts']);
+        $this->assertSame($receipt->receipt_no, $data['receipts'][0]['receipt_no']);
+        $this->assertNotEmpty($data['journal_entry_lines']);
+        $line = DB::table('journal_entry_lines')->where('journal_entry_id', $rows[1]->journal_entry_id)
+            ->where('account_id', $accounts['ar_reimbursable_php_account_id'])->first();
+        DB::table('journal_entry_lines')->where('id', $line->id)->update(['debit' => 0]);
+        $this->withExceptionHandling();
+        $fields = ['reason' => 'Reset imported client opening balances', 'confirmation' => 'DELETE ALL IMPORTED AR'];
+        $this->delete(route('erp.accounting.opening-balances.ar.delete-all'), $fields)->assertSessionHasErrors('balance');
+        $this->assertDatabaseHas('receipts', ['id' => $receipt->id, 'status' => 'posted']);
+        $this->assertDatabaseHas('sales_documents', ['id' => $bi->id, 'paid_total' => 500]);
+        $this->assertSame(0, DB::table('journal_entries')->where('source_type', 'opening_balance_row')->count());
+        DB::table('journal_entry_lines')->where('id', $line->id)->update(['debit' => 2000]);
+        $this->delete(route('erp.accounting.opening-balances.ar.delete-all'), $fields)
+            ->assertRedirect(route('erp.accounting.opening-balances.import', ['manage_ar' => 1]));
+        $this->assertDatabaseHas('receipts', ['id' => $receipt->id, 'status' => 'voided', 'posting_status' => 'reversed']);
+        foreach ($rows as $row) {
+            $this->assertDatabaseHas('sales_documents', ['id' => $row->sales_document_id, 'status' => 'voided']);
+        }
+        $this->assertSame(2, DB::table('journal_entries')->where('source_type', 'opening_balance_row')->count());
+        $after = json_decode($this->get(route('erp.accounting.opening-balances.ar.export'))->getContent(), true);
+        $this->assertCount(2, $after['import_rows']);
+        $this->assertSame('voided', $after['receipts'][0]['status']);
     }
 
     private function accountMapping()

@@ -186,6 +186,12 @@
     <div class="erp-card p-4 mt-4">
         <h2 class="h6 fw-bold">Imported A/R beginning balances</h2>
         <p class="text-muted mb-2">Showing workbook imports by admin@seajet.test only.</p>
+        <div class="d-flex gap-2 flex-wrap mb-3">
+            <a class="btn btn-outline-success" href="{{ route('erp.accounting.opening-balances.ar.export') }}">Export All (JSON Backup)</a>
+            @if(auth()->user()->canAccess('accounting', 'delete') && auth()->user()->canAccess('payments', 'delete'))
+                <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteAllImportedArModal" {{ $allImportedArCount ? '' : 'disabled' }}>Delete All Imported A/R ({{ $allImportedArCount }})</button>
+            @endif
+        </div>
         <form method="get" action="{{ route('erp.accounting.opening-balances.import') }}" class="row g-2 align-items-end mb-3">
             <input type="hidden" name="manage_ar" value="1">
             <div class="col-md-6">
@@ -269,6 +275,22 @@
                 <textarea id="voidImportedPaymentReason" name="reason" class="form-control" minlength="5" maxlength="1000" required></textarea>
             </div>
             <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-warning">Void payment</button></div>
+        </form></div>
+    </div>
+    <div class="modal fade" id="deleteAllImportedArModal" tabindex="-1" aria-labelledby="deleteAllImportedArTitle" aria-hidden="true">
+        <div class="modal-dialog"><form method="post" action="{{ route('erp.accounting.opening-balances.ar.delete-all') }}" class="modal-content">
+            {{ csrf_field() }} {{ method_field('DELETE') }}
+            <div class="modal-header"><h5 class="modal-title" id="deleteAllImportedArTitle">Delete all imported A/R balances</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <p>This removes <strong>{{ $allImportedArCount }} balances across all clients and pages</strong> imported by admin@seajet.test. The current client filter does not limit this action.</p>
+                <p>Linked active payments will be voided in full, including their applications to other invoices. Accounting entries will be reversed and audit history retained.</p>
+                <p><a href="{{ route('erp.accounting.opening-balances.ar.export') }}">Download Export All backup</a> before proceeding.</p>
+                <label for="deleteAllArReason" class="form-label">Reason</label>
+                <textarea id="deleteAllArReason" name="reason" class="form-control mb-3" minlength="5" maxlength="1000" required></textarea>
+                <label for="deleteAllArConfirmation" class="form-label">Type DELETE ALL IMPORTED AR to confirm</label>
+                <input id="deleteAllArConfirmation" name="confirmation" class="form-control" required pattern="DELETE ALL IMPORTED AR">
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-danger">Void payments and delete all</button></div>
         </form></div>
     </div>
 @endsection

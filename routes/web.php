@@ -109,6 +109,8 @@ Route::middleware(['auth', 'permission.access'])->group(function () {
     Route::post('/erp/accounting/opening-balances/manual', 'Erp\ModuleController@storeManualOpeningBalance')->name('erp.accounting.opening-balances.manual.store');
     Route::get('/erp/accounting/opening-balances/import', 'Erp\ModuleController@openingBalanceImport')->name('erp.accounting.opening-balances.import');
     Route::delete('/erp/accounting/opening-balances/ar/{row}', 'Erp\ModuleController@deleteImportedArBalance')->name('erp.accounting.opening-balances.ar.delete');
+    Route::get('/erp/accounting/opening-balances/ar-export', 'Erp\ModuleController@exportImportedArBalances')->name('erp.accounting.opening-balances.ar.export');
+    Route::delete('/erp/accounting/opening-balances/ar-delete-all', 'Erp\ModuleController@deleteAllImportedArBalances')->name('erp.accounting.opening-balances.ar.delete-all');
     Route::post('/erp/accounting/opening-balances/ar/{row}/payments/{receipt}/void', 'Erp\ModuleController@voidImportedArPayment')->name('erp.accounting.opening-balances.ar.payment.void');
     Route::post('/erp/accounting/opening-balances/import/preview', 'Erp\ModuleController@openingBalanceImportPreview')->name('erp.accounting.opening-balances.preview');
     Route::post('/erp/accounting/opening-balances/import/commit', 'Erp\ModuleController@openingBalanceImportCommit')->name('erp.accounting.opening-balances.commit');
