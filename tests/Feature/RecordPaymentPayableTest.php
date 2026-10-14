@@ -199,7 +199,7 @@ class RecordPaymentPayableTest extends TestCase
         $statement->assertOk()
             ->assertSee('INV AMT')
             ->assertDontSee('(LESS W-TAX)')
-            ->assertSee('(INV + SOA)')
+            ->assertSee('<th>TOTAL</th>', false)
             ->assertSee('BI-2026-REIMB')
             ->assertSee('SOA-7370');
 
@@ -211,6 +211,25 @@ class RecordPaymentPayableTest extends TestCase
         $this->assertEquals(110, (float) $row->invoice_amount);
         $this->assertEquals(50, (float) $row->soa_amount);
         $this->assertEquals(160, (float) $row->total);
+    }
+
+    public function test_client_soa_uses_exact_as_of_aging_and_paginates_long_statements()
+    {
+        $source = (array) DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
+        DB::table('sales_documents')->where('customer_id', $source['customer_id'])->update(['status' => 'voided']);
+        unset($source['id']);
+        for ($index = 0; $index < 13; $index++) {
+            DB::table('sales_documents')->insert(array_merge($source, [
+                'document_no' => 'BI-QA-'.$index, 'document_date' => '2026-03-31',
+                'due_date' => '2026-04-30', 'status' => 'posted', 'paid_total' => 0,
+            ]));
+        }
+        $response = $this->get(route('erp.reports.client-soa', [
+            'customer_id' => $source['customer_id'], 'as_of' => '2026-10-01',
+        ]))->assertOk()->assertSee('184 Days')->assertSee('1-Oct-26')
+            ->assertSee('Page 1 of 2')->assertSee('Page 2 of 2');
+        $this->assertSame(2, substr_count($response->getContent(), 'class="client-soa-sheet"'));
+        $this->assertCount(13, $response->original->getData()['invoices']);
     }
 
     public function test_overpayment_shows_a_warning_and_cannot_be_saved()

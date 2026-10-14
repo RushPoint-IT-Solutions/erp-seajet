@@ -452,6 +452,72 @@ class PostingService
         });
     }
 
+    public function reverseImportedReceivable($row, $document, $reason)
+    {
+        $original = DB::table('journal_entries')->where('id', $row->journal_entry_id)
+            ->where('company_id', $row->company_id)->where('status', 'posted')->lockForUpdate()->first();
+        if (!$original || $original->source_type !== 'opening_balance_import') {
+            throw ValidationException::withMessages(['balance' => 'The opening-balance journal is not available for reversal.']);
+        }
+        $existing = DB::table('journal_entries')->where('company_id', $row->company_id)
+            ->where('source_type', 'opening_balance_row')->where('source_id', $row->id)->exists();
+        if ($existing) {
+            throw ValidationException::withMessages(['balance' => 'This imported balance has already been reversed.']);
+        }
+        $controlLines = DB::table('journal_entry_lines')->where('journal_entry_id', $original->id)
+            ->where('account_id', $document->opening_balance_control_account_id)
+            ->where('customer_id', $document->customer_id)->where('currency', $row->currency)
+            ->where(function ($query) use ($row) {
+                $query->where('debit', $row->base_amount)->orWhere('credit', $row->base_amount);
+            })->get()
+            ->filter(function ($line) use ($row) {
+                return strpos($line->description, ' opening balance '.$row->reference_no.' | '.$row->party_name.' | '.$row->source_date) !== false;
+            });
+        if ($controlLines->count() !== 1) {
+            throw ValidationException::withMessages(['balance' => 'The exact imported balance journal lines could not be identified.']);
+        }
+        $control = $controlLines->first();
+        $offsets = DB::table('journal_entry_lines')->where('journal_entry_id', $original->id)
+            ->where('description', $control->description)
+            ->where((float) $control->debit > 0 ? 'credit' : 'debit', $row->base_amount)
+            ->where('currency', $row->currency)->whereNull('customer_id')->whereNull('supplier_id')->get();
+        if ($offsets->count() !== 1) {
+            throw ValidationException::withMessages(['balance' => 'The opening-balance offset could not be identified.']);
+        }
+        if ((float) $control->credit > 0) {
+            $correction = DB::table('journal_entries')->where('company_id', $row->company_id)
+                ->where('source_type', 'opening_balance_import_correction')->where('source_id', $row->id)
+                ->where('status', 'posted')->first();
+            $correctionLines = $correction ? DB::table('journal_entry_lines')->where('journal_entry_id', $correction->id)->get() : collect();
+            $offset = $offsets->first();
+            if ($correctionLines->count() !== 2
+                || abs($correctionLines->where('account_id', $control->account_id)->sum('debit') - 2 * (float) $row->base_amount) > 0.0001
+                || abs($correctionLines->where('account_id', $offset->account_id)->sum('credit') - 2 * (float) $row->base_amount) > 0.0001) {
+                throw ValidationException::withMessages(['balance' => 'This historical import requires a verified correcting journal before deletion.']);
+            }
+            // The correction offsets the wrong original and restores a normal A/R debit.
+            foreach ([$control, $offset] as $line) {
+                $debit = $line->debit; $line->debit = $line->credit; $line->credit = $debit;
+                $foreignDebit = $line->foreign_debit; $line->foreign_debit = $line->foreign_credit; $line->foreign_credit = $foreignDebit;
+            }
+        }
+        $this->periods->assertOpen($row->company_id, date('Y-m-d'));
+        $lines = [];
+        foreach ([$control, $offsets->first()] as $line) {
+            $lines[] = [
+                'account_id' => $line->account_id, 'description' => 'Reversal: '.$line->description,
+                'currency' => $line->currency, 'exchange_rate' => $line->exchange_rate,
+                'foreign_debit' => $line->foreign_credit, 'foreign_credit' => $line->foreign_debit,
+                'debit' => $line->credit, 'credit' => $line->debit,
+                'customer_id' => $line->customer_id, 'supplier_id' => $line->supplier_id,
+                'shipment_job_id' => $line->shipment_job_id, 'class_code' => $line->class_code,
+            ];
+        }
+        return $this->createJournal($row->company_id, $document->branch_id, date('Y-m-d'), 'GL',
+            'opening_balance_row', $row->id, $document->document_no, null,
+            'Remove imported A/R balance: '.$reason, $lines, 'reversal', $original->id, $reason);
+    }
+
     public function reverseSource($sourceType, $sourceId, $reason)
     {
         return DB::transaction(function () use ($sourceType, $sourceId, $reason) {

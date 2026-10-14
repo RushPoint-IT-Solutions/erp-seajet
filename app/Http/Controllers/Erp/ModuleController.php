@@ -5966,6 +5966,39 @@ class ModuleController extends Controller
                 .number_format($result['total_amount'], 2).'. Created '.$result['journal_count'].' journal(s) using the Excel dates.');
     }
 
+    public function deleteImportedArBalance($row)
+    {
+        $this->authorizeAccountingPosting('accounting', 'delete');
+        $data = request()->validate(['reason' => 'required|string|min:5|max:1000']);
+        DB::transaction(function () use ($row, $data) {
+            $record = DB::table('opening_balance_import_rows')->where('company_id', $this->defaultCompanyId())
+                ->where('id', $row)->whereIn('balance_type', ['ar_trade', 'ar_reimbursable'])->lockForUpdate()->first();
+            abort_unless($record && $record->sales_document_id, 404);
+            $document = DB::table('sales_documents')->where('company_id', $record->company_id)
+                ->where('id', $record->sales_document_id)->lockForUpdate()->first();
+            abort_unless($document && $document->opening_balance_control_account_id, 404);
+            if (in_array($document->status, ['voided', 'cancelled'], true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['balance' => 'This imported balance is already removed.']);
+            }
+            $hasPayment = DB::table('receipt_applications')->join('receipts', 'receipts.id', '=', 'receipt_applications.receipt_id')
+                ->where('sales_document_id', $document->id)->where(function ($query) {
+                    $query->whereNotIn('receipts.status', ['voided', 'cancelled'])->orWhere('receipts.posting_status', 'posted');
+                })->exists();
+            if ($hasPayment || (float) $document->paid_total > 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['balance' => 'Void the linked customer payment before deleting this imported balance.']);
+            }
+            $reversal = app(PostingService::class)->reverseImportedReceivable($record, $document, trim($data['reason']));
+            DB::table('sales_documents')->where('id', $document->id)->update([
+                'status' => 'voided', 'posting_status' => 'reversed', 'updated_at' => now(),
+            ]);
+            app(ActivityLogger::class)->log('deleted_imported_ar_balance', 'sales_document', $document->id,
+                (array) $document, ['import_row_id' => $record->id, 'reversal_journal_id' => $reversal->id,
+                    'reason' => trim($data['reason'])], $record->company_id);
+        });
+        return redirect()->route('erp.accounting.opening-balances.import')
+            ->with('status', 'Imported A/R balance removed from Client SOA and AR Aging. Its accounting entry was reversed and audit history retained.');
+    }
+
     private function openingBalanceImportView($preview = null, $token = null, array $input = [])
     {
         $accounts = $this->glAccountOptions();
@@ -6001,7 +6034,14 @@ class ModuleController extends Controller
             $batch->ap_rows = $dateSummary ? (int) $dateSummary->ap_rows : 0;
         }
 
-        return view('erp.accounting.opening-balance-import', compact('accounts', 'defaults', 'preview', 'token', 'recentImports'));
+        $importedArBalances = DB::table('opening_balance_import_rows')
+            ->join('sales_documents', 'sales_documents.id', '=', 'opening_balance_import_rows.sales_document_id')
+            ->where('opening_balance_import_rows.company_id', $this->defaultCompanyId())
+            ->whereIn('opening_balance_import_rows.balance_type', ['ar_trade', 'ar_reimbursable'])
+            ->whereNotIn('sales_documents.status', ['voided', 'cancelled'])
+            ->select('opening_balance_import_rows.*', 'sales_documents.document_no', 'sales_documents.paid_total')
+            ->orderBy('opening_balance_import_rows.id', 'desc')->paginate(30);
+        return view('erp.accounting.opening-balance-import', compact('accounts', 'defaults', 'preview', 'token', 'recentImports', 'importedArBalances'));
     }
 
     private function openingBalanceMappingRules()
@@ -11048,15 +11088,16 @@ class ModuleController extends Controller
             ? DB::table('customers')->where('id', $customerId)->first()
             : null;
 
+        $asOfDate = request('as_of', date('Y-m-d'));
+        request()->validate(['as_of' => 'nullable|date_format:Y-m-d']);
         $invoices = $customer ? $this->clientSoaOpenInvoices($customer->id) : collect();
         $currencyTotals = $this->clientSoaCurrencyTotals($invoices);
-        $asOfDate = request('as_of', date('Y-m-d'));
         $soaNo = 'SOA-'.date('Ymd').'-'.str_pad((string) ($customer->id ?? 0), 4, '0', STR_PAD_LEFT);
         $bankDetails = [
             'ACCOUNT NAME: SEA-JET INTERNATIONAL FORWARDERS, INC.',
-            'BANK NAME: BDO',
             'ACCOUNT NUMBER: 00 489 000 1371',
-            'BRANCH: STO. NINO',
+            'BANK NAME: BDO UNIBANK INC.',
+            'BRANCH: STO. NIÑO PARAÑAQUE CITY',
         ];
 
         return view('erp.reports.client-soa', compact('company', 'customers', 'customerId', 'customer', 'invoices', 'currencyTotals', 'asOfDate', 'soaNo', 'bankDetails'));
@@ -11091,6 +11132,7 @@ class ModuleController extends Controller
 
         return DB::table('sales_documents')
             ->where('customer_id', $customerId)
+            ->where('document_date', '<=', request('as_of', date('Y-m-d')))
             ->whereNotIn('status', ['cancelled', 'voided', 'paid'])
             ->whereIn('document_type', ['invoice', 'billing_invoice', 'statement_of_account_a', 'soa_a', 'debit_note'])
             ->whereRaw($balanceExpression.' > 0')
@@ -11109,7 +11151,7 @@ class ModuleController extends Controller
                     'invoice_amount' => $invoicePayable,
                     'soa_amount' => $amounts['soa_balance'],
                     'total' => $invoicePayable + $amounts['soa_balance'],
-                    'aging' => $this->clientSoaAgingLabel($invoice->due_date ?: $invoice->document_date),
+                    'aging' => $this->clientSoaAgingLabel($invoice->document_date),
                     'due_date' => $invoice->due_date,
                 ];
             });
@@ -11145,21 +11187,9 @@ class ModuleController extends Controller
             return 'Current';
         }
 
-        $days = max(0, now()->diffInDays(\Carbon\Carbon::parse($date), false) * -1);
-        if ($days <= 0) {
-            return 'Current';
-        }
-        if ($days <= 30) {
-            return $days.' days';
-        }
-        if ($days <= 60) {
-            return '31-60 days';
-        }
-        if ($days <= 90) {
-            return '61-90 days';
-        }
-
-        return 'Over 90 days';
+        $asOf = \Carbon\Carbon::parse(request('as_of', date('Y-m-d')))->startOfDay();
+        $days = max(0, \Carbon\Carbon::parse($date)->startOfDay()->diffInDays($asOf, false));
+        return $days.' Days';
     }
 
     private function clientSoaCurrencyTotals($invoices)

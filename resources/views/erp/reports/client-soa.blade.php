@@ -10,7 +10,7 @@
         width: 215.9mm;
         min-height: 279.4mm;
         margin: 0 auto;
-        padding: 42mm 12mm 34mm;
+        padding: 51mm 25mm 39mm;
         background: #fff url('{{ asset('images/background.jpg') }}') center / 100% 100% no-repeat;
         color: #000;
         border: 1px solid #d8dde6;
@@ -18,7 +18,8 @@
         font-family: Arial, Calibri, sans-serif;
         font-size: 10pt;
         line-height: 1.2;
-        overflow: hidden;
+        box-sizing: border-box;
+        margin-bottom: 24px;
     }
     .client-soa-letterhead {
         position: absolute;
@@ -34,38 +35,47 @@
         position: relative;
         z-index: 1;
     }
+    .client-soa-sheet::before {
+        content: '';
+        position: absolute;
+        inset: 40.5mm 0 55mm;
+        background: #fff;
+        z-index: 1;
+    }
     .client-soa-to {
         display: grid;
-        grid-template-columns: 44px minmax(0, 1fr) 148px;
+        grid-template-columns: 9mm minmax(0, 1fr) 45mm;
         gap: 6px;
-        min-height: 76px;
+        min-height: 21mm;
         margin-top: 2px;
         margin-bottom: 0;
-        font-size: 10pt;
-        line-height: 15pt;
+        font-size: 9pt;
+        line-height: 11pt;
     }
     .client-soa-date-box {
         align-self: center;
-        border-bottom: 1px solid #000;
+        display: flex;
+        gap: 5mm;
         text-align: center;
         padding-bottom: 2px;
         font-weight: 700;
     }
+    .client-soa-date-box span { flex: 1; border-bottom: 1px solid #000; }
     .client-soa-title {
         text-align: center;
-        margin: 0 0 29px;
+        margin: 0 0 7mm;
         font-weight: 700;
         letter-spacing: .02em;
     }
     .client-soa-title h2 {
         margin: 0;
-        font-size: 12pt;
+        font-size: 10pt;
         line-height: 15.75pt;
         font-weight: 700;
     }
     .client-soa-title div {
         margin-top: 0;
-        font-size: 10pt;
+        font-size: 9pt;
         line-height: 15pt;
         font-weight: 700;
     }
@@ -73,20 +83,24 @@
         width: 100%;
         border-collapse: collapse;
         table-layout: fixed;
-        font-size: 10pt;
+        font-size: 9pt;
+        border: 1px solid #000;
         margin-bottom: 0;
     }
     .client-soa-table th,
     .client-soa-table td {
         border: 1px solid #000;
-        height: 15.75pt;
+        height: 7.8mm;
         padding: 1px 4px;
         vertical-align: middle;
     }
     .client-soa-table th {
         text-align: center;
         font-weight: 700;
+        height: 5mm;
     }
+    .client-soa-table tbody td { border-top: 0; border-bottom: 0; }
+    .client-soa-table td:last-child { text-align: center; }
     .client-soa-table .amount {
         text-align: right;
         font-variant-numeric: tabular-nums;
@@ -97,10 +111,10 @@
     }
     .client-soa-bank {
         margin-top: 12px;
-        margin-left: 44px;
-        font-size: 10pt;
-        font-weight: 700;
-        line-height: 15pt;
+        margin-left: 0;
+        font-size: 9pt;
+        font-weight: 400;
+        line-height: 11pt;
     }
     .client-soa-bank strong {
         display: block;
@@ -123,6 +137,8 @@
         min-height: 15.75pt;
         padding: 0;
     }
+    .client-soa-page-number { position: absolute !important; right: 25mm; bottom: 43mm; font-size: 8pt; }
+    .client-soa-preview { overflow-x: auto; }
     .client-soa-empty-row td {
         color: transparent;
     }
@@ -140,13 +156,15 @@
             border: 0;
             box-shadow: none;
             width: 215.9mm;
-            height: 279.4mm;
             min-height: 279.4mm;
             margin: 0;
             background: #fff url('{{ asset('images/background.jpg') }}') center / 100% 100% no-repeat !important;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
+        .client-soa-sheet { break-after: page; page-break-after: always; }
+        .client-soa-sheet:last-child { break-after: auto; page-break-after: auto; }
+        .client-soa-preview { overflow: visible; }
     }
 </style>
 @endpush
@@ -158,7 +176,7 @@
     };
     $totalBalance = array_sum($currencyTotals);
     $invoiceRows = $invoices->count();
-    $blankRows = max(0, 12 - $invoiceRows);
+    $pages = $invoices->isEmpty() ? collect([collect()]) : $invoices->chunk(12);
 @endphp
 
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 no-print">
@@ -194,6 +212,9 @@
         </div>
     </form>
 
+    <div class="client-soa-preview">
+    @foreach($pages as $pageIndex => $pageInvoices)
+    @php $blankRows = max(0, 12 - max(1, $pageInvoices->count())); @endphp
     <div class="client-soa-sheet">
         <img src="{{ asset('images/background.jpg') }}" class="client-soa-letterhead" alt="" aria-hidden="true">
 
@@ -203,7 +224,7 @@
                 <strong>{{ $customer->name ?? 'No client with unpaid active invoices' }}</strong><br>
                 {!! nl2br(e($customer->billing_address ?? '')) !!}
             </div>
-            <div class="client-soa-date-box">{{ date('m/d/Y', strtotime($asOfDate)) }}</div>
+            <div class="client-soa-date-box"><strong>DATE:</strong><span>{{ date('j-M-y', strtotime($asOfDate)) }}</span></div>
         </div>
 
         <div class="client-soa-title">
@@ -214,12 +235,12 @@
         <table class="client-soa-table">
             <colgroup>
                 <col style="width: 11.4%">
-                <col style="width: 14.6%">
-                <col style="width: 12.4%">
-                <col style="width: 10.4%">
+                <col style="width: 11%">
+                <col style="width: 17%">
+                <col style="width: 9%">
                 <col style="width: 15%">
-                <col style="width: 13.6%">
-                <col style="width: 22.6%">
+                <col style="width: 17%">
+                <col style="width: 19.6%">
             </colgroup>
             <thead>
             <tr>
@@ -228,15 +249,15 @@
                 <th>INV AMT</th>
                 <th>SOA#</th>
                 <th>SOA AMT</th>
-                <th>TOTAL<br><small>(INV + SOA)</small></th>
+                <th>TOTAL</th>
                 <th>AGING</th>
             </tr>
             </thead>
             <tbody>
-            @forelse($invoices as $invoice)
+            @forelse($pageInvoices as $invoice)
                 <tr>
-                    <td>{{ $invoice->document_date ? date('m/d/Y', strtotime($invoice->document_date)) : '' }}</td>
-                    <td>{{ $invoice->document_no }}</td>
+                    <td>{{ $invoice->document_date ? date('j M y', strtotime($invoice->document_date)) : '' }}</td>
+                    <td>{{ $invoice->invoice_amount > 0 ? preg_replace('/^BI(?:-(?:MNL|PAM|CEB))?-(?=\d+$)/', '', $invoice->document_no) : '' }}</td>
                     <td class="amount">{{ $invoice->invoice_amount > 0 ? $money($invoice->invoice_amount) : '-' }}</td>
                     <td>{{ $invoice->soa_no }}</td>
                     <td class="amount">{{ $invoice->soa_amount > 0 ? $money($invoice->soa_amount) : '-' }}</td>
@@ -262,12 +283,11 @@
             </tbody>
             <tfoot>
             <tr>
+                <td colspan="2" class="text-center">{{ $pages->count() > 1 ? 'PAGE TOTAL' : 'TOTAL' }}</td>
+                <td class="amount">{{ $money($pageInvoices->sum('invoice_amount')) }}</td>
                 <td></td>
-                <td class="text-end">TOTAL</td>
-                <td class="amount">{{ $money($invoices->sum('invoice_amount')) }}</td>
-                <td></td>
-                <td class="amount">{{ $money($invoices->sum('soa_amount')) }}</td>
-                <td class="amount">{{ $money($totalBalance) }}</td>
+                <td class="amount">{{ $money($pageInvoices->sum('soa_amount')) }}</td>
+                <td class="amount">{{ $money($pageInvoices->sum('total')) }}</td>
                 <td></td>
             </tr>
             </tfoot>
@@ -294,5 +314,8 @@
                 </div>
             @endforelse
         </div>
+        @if($pages->count() > 1)<div class="client-soa-page-number">Page {{ $pageIndex + 1 }} of {{ $pages->count() }}</div>@endif
+    </div>
+    @endforeach
     </div>
 @endsection

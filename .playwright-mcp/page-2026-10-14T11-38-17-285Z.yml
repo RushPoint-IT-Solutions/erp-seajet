@@ -1,0 +1,611 @@
+- generic [ref=f4e2]:
+  - complementary [ref=f4e3]:
+    - img "SeaJet ERP logo" [ref=f4e5]
+    - navigation [ref=f4e6]:
+      - link " Dashboard" [ref=f4e8] [cursor=pointer]:
+        - /url: http://localhost/seajet/public
+        - generic [ref=f4e9]: 
+        - generic [ref=f4e10]: Dashboard
+      - link " Clients" [ref=f4e12] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/customers
+        - generic [ref=f4e13]: 
+        - generic [ref=f4e14]: Clients
+      - link " AR Invoices" [ref=f4e16] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/invoices
+        - generic [ref=f4e17]: 
+        - generic [ref=f4e18]: AR Invoices
+      - link " AR Collections" [ref=f4e20] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/payments/create
+        - generic [ref=f4e21]: 
+        - generic [ref=f4e22]: AR Collections
+      - link " Vendors" [ref=f4e24] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/suppliers
+        - generic [ref=f4e25]: 
+        - generic [ref=f4e26]: Vendors
+      - link " Accounts Payable (AP)" [ref=f4e28] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/expenses
+        - generic [ref=f4e29]: 
+        - generic [ref=f4e30]: Accounts Payable (AP)
+      - link " Check Preparation" [ref=f4e32] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/payables/payment-approvals
+        - generic [ref=f4e33]: 
+        - generic [ref=f4e34]: Check Preparation
+      - link " Journal Entries" [ref=f4e36] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/accounting/journal-entries
+        - generic [ref=f4e37]: 
+        - generic [ref=f4e38]: Journal Entries
+      - generic [ref=f4e39]:
+        - button " Reports " [ref=f4e40] [cursor=pointer]:
+          - generic [ref=f4e41]: 
+          - generic [ref=f4e42]: Reports
+          - generic [ref=f4e43]: 
+        - text:      
+      - link " User Access Control" [ref=f4e45] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/users
+        - generic [ref=f4e46]: 
+        - generic [ref=f4e47]: User Access Control
+      - link " Finance Settings" [ref=f4e49] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/settings
+        - generic [ref=f4e50]: 
+        - generic [ref=f4e51]: Finance Settings
+  - main [ref=f4e52]:
+    - generic [ref=f4e53]:
+      - generic [ref=f4e54]:
+        - generic [ref=f4e55]: Import Opening Invoices & Bills
+        - text: Multi-company | Multi-branch | Multi-currency ready
+      - generic [ref=f4e56]:
+        - link " System Update" [ref=f4e57] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/system-update
+          - generic [ref=f4e58]: 
+          - text: System Update
+        - link "" [ref=f4e59] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/notifications
+        - link " Quick Entry" [ref=f4e61] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/invoices/create
+          - generic [ref=f4e62]: 
+          - text: Quick Entry
+        - generic [ref=f4e63]:
+          - button " QA" [ref=f4e64] [cursor=pointer]:
+            - generic [ref=f4e65]: 
+            - text: QA
+          - text: 
+    - generic [ref=f4e66]:
+      - generic [ref=f4e67]:
+        - generic [ref=f4e68]:
+          - heading "Import Opening Invoices & Bills" [level=1] [ref=f4e69]
+          - paragraph [ref=f4e70]: Create payment-ready customer invoices and vendor bills with balanced opening-balance journals dated from the workbook.
+        - link " Journal Entries" [ref=f4e71] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/accounting/journal-entries
+          - generic [ref=f4e72]: 
+          - text: Journal Entries
+      - generic [ref=f4e73]:
+        - strong [ref=f4e74]: "Posting rule:"
+        - text: A/R rows debit the selected receivable account and credit Opening Balance Equity. A/P rows debit Opening Balance Equity and credit the selected payable account. A/R rows become open invoices visible in AR Aging and Receive Payment; A/P rows become approved open vendor bills in Pay Bills. Each journal, invoice, and bill uses the date in its Excel row. Rows with the same Excel date are combined into one balanced journal.
+      - generic [ref=f4e75]:
+        - generic [ref=f4e77]:
+          - generic [ref=f4e78]: Opening-balance workbook (.xlsx)
+          - button "Choose File" [ref=f4e79] [cursor=pointer]
+          - generic [ref=f4e80]: Rows with blank totals/footer labels are ignored. Missing A/R customers are created during import. Unmatched vendors, branches, or previously imported rows are skipped and listed in the preview.
+        - separator [ref=f4e81]
+        - heading "Account mapping" [level=2] [ref=f4e82]
+        - generic [ref=f4e83]:
+          - generic [ref=f4e85]:
+            - generic [ref=f4e86]: Offset account
+            - generic [ref=f4e87]: Opening Balance
+            - combobox [aria-hidden] [ref=f4e88]
+            - combobox [ref=f4e91] [cursor=pointer]:
+              - textbox "3030 - Opening Balance Equity" [ref=f4e92]
+          - generic [ref=f4e94]:
+            - generic [ref=f4e95]: Receivable and payable accounts
+            - generic [ref=f4e96]:
+              - generic [ref=f4e97]: A/R Trade
+              - generic [ref=f4e98]:
+                - generic [ref=f4e99]:
+                  - combobox [aria-hidden] [ref=f4e100]
+                  - combobox [ref=f4e103] [cursor=pointer]:
+                    - textbox "1080 - A/R-Trade( BDO-PHP )" [ref=f4e104]
+                - generic [ref=f4e105]:
+                  - combobox [aria-hidden] [ref=f4e106]
+                  - combobox [ref=f4e109] [cursor=pointer]:
+                    - textbox "1090 - A/R-Trade( BDO-USD )" [ref=f4e110]
+            - generic [ref=f4e111]:
+              - generic [ref=f4e112]: A/R Reimbursable
+              - generic [ref=f4e113]:
+                - generic [ref=f4e114]:
+                  - combobox [aria-hidden] [ref=f4e115]
+                  - combobox [ref=f4e118] [cursor=pointer]:
+                    - textbox "1060 - A/R-Reimbursable Charges (PHP)" [ref=f4e119]
+                - generic [ref=f4e120]:
+                  - combobox [aria-hidden] [ref=f4e121]
+                  - combobox [ref=f4e124] [cursor=pointer]:
+                    - textbox "1070 - A/R-Reimbursable Charges (USD)" [ref=f4e125]
+            - generic [ref=f4e126]:
+              - generic [ref=f4e127]: A/P Trade
+              - generic [ref=f4e128]:
+                - generic [ref=f4e129]:
+                  - combobox [aria-hidden] [ref=f4e130]
+                  - combobox [ref=f4e133] [cursor=pointer]:
+                    - textbox "2000 - A/P-Trade (BDO - PHP)" [ref=f4e134]
+                - generic [ref=f4e135]:
+                  - combobox [aria-hidden] [ref=f4e136]
+                  - combobox [ref=f4e139] [cursor=pointer]:
+                    - textbox "2010 - A/P-Trade (BDO - USD)" [ref=f4e140]
+        - button " Preview Import" [ref=f4e142] [cursor=pointer]:
+          - generic [ref=f4e143]: 
+          - text: Preview Import
+      - generic [ref=f4e144]:
+        - heading "Recent opening-balance imports" [level=2] [ref=f4e145]
+        - table [ref=f4e147]:
+          - rowgroup [ref=f4e148]:
+            - row [ref=f4e149]:
+              - columnheader "Imported" [ref=f4e150]
+              - columnheader "File" [ref=f4e151]
+              - columnheader "Excel posting dates" [ref=f4e152]
+              - columnheader "Rows" [ref=f4e153]
+              - columnheader "AR invoices" [ref=f4e154]
+              - columnheader "AP bills" [ref=f4e155]
+              - columnheader "Skipped" [ref=f4e156]
+              - columnheader "Amount" [ref=f4e157]
+              - columnheader "Journals" [ref=f4e158]
+          - rowgroup [ref=f4e159]:
+            - row [ref=f4e160]:
+              - cell "2026-09-29 17:05:31" [ref=f4e161]
+              - cell "Manual AP Opening Balance - M-5895" [ref=f4e162]
+              - cell "2026-09-29" [ref=f4e163]
+              - cell "1" [ref=f4e164]
+              - cell "0" [ref=f4e165]
+              - cell "1" [ref=f4e166]
+              - cell "0" [ref=f4e167]
+              - cell "11,099.49" [ref=f4e168]
+              - cell [ref=f4e169]:
+                - link "1 journal(s)" [ref=f4e170] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/accounting/journal-entries/378
+            - row [ref=f4e171]:
+              - cell "2026-09-29 17:04:04" [ref=f4e172]
+              - cell "Manual AP Opening Balance - M-5894" [ref=f4e173]
+              - cell "2026-07-20" [ref=f4e174]
+              - cell "1" [ref=f4e175]
+              - cell "0" [ref=f4e176]
+              - cell "1" [ref=f4e177]
+              - cell "0" [ref=f4e178]
+              - cell "16,260.68" [ref=f4e179]
+              - cell [ref=f4e180]:
+                - link "1 journal(s)" [ref=f4e181] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/accounting/journal-entries/377
+            - row [ref=f4e182]:
+              - cell "2026-09-29 16:59:48" [ref=f4e183]
+              - cell "Manual AP Opening Balance - M-6079" [ref=f4e184]
+              - cell "2026-08-28" [ref=f4e185]
+              - cell "1" [ref=f4e186]
+              - cell "0" [ref=f4e187]
+              - cell "1" [ref=f4e188]
+              - cell "0" [ref=f4e189]
+              - cell "20,000.00" [ref=f4e190]
+              - cell [ref=f4e191]:
+                - link "1 journal(s)" [ref=f4e192] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/accounting/journal-entries/376
+            - row [ref=f4e193]:
+              - cell "2026-09-29 16:58:37" [ref=f4e194]
+              - cell "Manual AP Opening Balance - M-6078" [ref=f4e195]
+              - cell "2026-08-28" [ref=f4e196]
+              - cell "1" [ref=f4e197]
+              - cell "0" [ref=f4e198]
+              - cell "1" [ref=f4e199]
+              - cell "0" [ref=f4e200]
+              - cell "28,571.20" [ref=f4e201]
+              - cell [ref=f4e202]:
+                - link "1 journal(s)" [ref=f4e203] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/accounting/journal-entries/375
+            - row [ref=f4e204]:
+              - cell "2026-09-29 16:56:45" [ref=f4e205]
+              - cell "Manual AP Opening Balance - M-6042" [ref=f4e206]
+              - cell "2026-09-29" [ref=f4e207]
+              - cell "1" [ref=f4e208]
+              - cell "0" [ref=f4e209]
+              - cell "1" [ref=f4e210]
+              - cell "0" [ref=f4e211]
+              - cell "470,009.19" [ref=f4e212]
+              - cell [ref=f4e213]:
+                - link "1 journal(s)" [ref=f4e214] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/accounting/journal-entries/374
+            - row [ref=f4e215]:
+              - cell "2026-09-29 16:47:40" [ref=f4e216]
+              - cell "Manual AP Opening Balance - M-6011" [ref=f4e217]
+              - cell "2026-08-24" [ref=f4e218]
+              - cell "1" [ref=f4e219]
+              - cell "0" [ref=f4e220]
+              - cell "1" [ref=f4e221]
+              - cell "0" [ref=f4e222]
+              - cell "583,343.20" [ref=f4e223]
+              - cell [ref=f4e224]:
+                - link "1 journal(s)" [ref=f4e225] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/accounting/journal-entries/373
+            - row [ref=f4e226]:
+              - cell "2026-09-29 16:43:15" [ref=f4e227]
+              - cell "Manual AP Opening Balance - M-5978" [ref=f4e228]
+              - cell "2026-08-12" [ref=f4e229]
+              - cell "1" [ref=f4e230]
+              - cell "0" [ref=f4e231]
+              - cell "1" [ref=f4e232]
+              - cell "0" [ref=f4e233]
+              - cell "20,000.00" [ref=f4e234]
+              - cell [ref=f4e235]:
+                - link "1 journal(s)" [ref=f4e236] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/accounting/journal-entries/372
+            - row [ref=f4e237]:
+              - cell "2026-09-29 16:32:41" [ref=f4e238]
+              - cell "Manual AP Opening Balance - M-5972" [ref=f4e239]
+              - cell "2026-08-11" [ref=f4e240]
+              - cell "1" [ref=f4e241]
+              - cell "0" [ref=f4e242]
+              - cell "1" [ref=f4e243]
+              - cell "0" [ref=f4e244]
+              - cell "180,334.59" [ref=f4e245]
+              - cell [ref=f4e246]:
+                - link "1 journal(s)" [ref=f4e247] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/accounting/journal-entries/371
+            - row [ref=f4e248]:
+              - cell "2026-09-24 18:55:00" [ref=f4e249]
+              - cell "Manual AP Opening Balance - 43" [ref=f4e250]
+              - cell "2026-08-28" [ref=f4e251]
+              - cell "1" [ref=f4e252]
+              - cell "0" [ref=f4e253]
+              - cell "1" [ref=f4e254]
+              - cell "0" [ref=f4e255]
+              - cell "169,742.79" [ref=f4e256]
+              - cell [ref=f4e257]:
+                - link "1 journal(s)" [ref=f4e258] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/accounting/journal-entries/339
+            - row [ref=f4e259]:
+              - cell "2026-09-24 18:54:04" [ref=f4e260]
+              - cell "Manual AP Opening Balance - 42" [ref=f4e261]
+              - cell "2026-08-28" [ref=f4e262]
+              - cell "1" [ref=f4e263]
+              - cell "0" [ref=f4e264]
+              - cell "1" [ref=f4e265]
+              - cell "0" [ref=f4e266]
+              - cell "291,834.38" [ref=f4e267]
+              - cell [ref=f4e268]:
+                - link "1 journal(s)" [ref=f4e269] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/accounting/journal-entries/338
+      - generic [ref=f4e270]:
+        - heading "Imported A/R beginning balances" [level=2] [ref=f4e271]
+        - paragraph [ref=f4e272]: Delete removes the selected balance from Client SOA and AR Aging and posts its accounting reversal. Original records remain in the audit history.
+        - table [ref=f4e274]:
+          - rowgroup [ref=f4e275]:
+            - row [ref=f4e276]:
+              - columnheader "Client" [ref=f4e277]
+              - columnheader "Type" [ref=f4e278]
+              - columnheader "Invoice / SOA" [ref=f4e279]
+              - columnheader "Date" [ref=f4e280]
+              - columnheader "Currency" [ref=f4e281]
+              - columnheader "Opening amount" [ref=f4e282]
+              - columnheader "Action" [ref=f4e283]
+          - rowgroup [ref=f4e284]:
+            - row [ref=f4e285]:
+              - cell "MOTO LUBRICANT AND POWER SERVICES, INC." [ref=f4e286]
+              - cell "A/R Trade" [ref=f4e287]
+              - cell "A-0941" [ref=f4e288]
+              - cell "2026-08-11" [ref=f4e289]
+              - cell "PHP" [ref=f4e290]
+              - cell "44,356.00" [ref=f4e291]
+              - cell [ref=f4e292]:
+                - button "Delete" [ref=f4e293] [cursor=pointer]
+            - row [ref=f4e294]:
+              - cell "BCA TRADING" [ref=f4e295]
+              - cell "A/R Trade" [ref=f4e296]
+              - cell "A-0938" [ref=f4e297]
+              - cell "2026-07-23" [ref=f4e298]
+              - cell "PHP" [ref=f4e299]
+              - cell "65,009.16" [ref=f4e300]
+              - cell [ref=f4e301]:
+                - button "Delete" [ref=f4e302] [cursor=pointer]
+            - row [ref=f4e303]:
+              - cell "BCA 1 TRADING" [ref=f4e304]
+              - cell "A/R Trade" [ref=f4e305]
+              - cell "A-0905" [ref=f4e306]
+              - cell "2026-05-15" [ref=f4e307]
+              - cell "PHP" [ref=f4e308]
+              - cell "65,185.86" [ref=f4e309]
+              - cell [ref=f4e310]:
+                - button "Delete" [ref=f4e311] [cursor=pointer]
+            - row [ref=f4e312]:
+              - cell "ASIAN CONSOLIDATORS" [ref=f4e313]
+              - cell "A/R Trade" [ref=f4e314]
+              - cell "A-0946" [ref=f4e315]
+              - cell "2026-08-27" [ref=f4e316]
+              - cell "PHP" [ref=f4e317]
+              - cell "88,600.00" [ref=f4e318]
+              - cell [ref=f4e319]:
+                - button "Delete" [ref=f4e320] [cursor=pointer]
+            - row [ref=f4e321]:
+              - cell "ASA COLOR & CHEMICAL INDUSTRIES INC." [ref=f4e322]
+              - cell "A/R Trade" [ref=f4e323]
+              - cell "A-0944" [ref=f4e324]
+              - cell "2026-08-27" [ref=f4e325]
+              - cell "PHP" [ref=f4e326]
+              - cell "30,000.00" [ref=f4e327]
+              - cell [ref=f4e328]:
+                - button "Delete" [ref=f4e329] [cursor=pointer]
+            - row [ref=f4e330]:
+              - cell "ANDUILLER INTERNATIONAL SALES CORP." [ref=f4e331]
+              - cell "A/R Trade" [ref=f4e332]
+              - cell "A-0943" [ref=f4e333]
+              - cell "2026-08-27" [ref=f4e334]
+              - cell "PHP" [ref=f4e335]
+              - cell "135,000.00" [ref=f4e336]
+              - cell [ref=f4e337]:
+                - button "Delete" [ref=f4e338] [cursor=pointer]
+            - row [ref=f4e339]:
+              - cell "PROTHEME GLOBAL INC" [ref=f4e340]
+              - cell "A/R Reimbursable" [ref=f4e341]
+              - cell "0052" [ref=f4e342]
+              - cell "2026-08-28" [ref=f4e343]
+              - cell "PHP" [ref=f4e344]
+              - cell "42,549.78" [ref=f4e345]
+              - cell [ref=f4e346]:
+                - button "Delete" [ref=f4e347] [cursor=pointer]
+            - row [ref=f4e348]:
+              - cell "HEINEN IMPORT AND EXPORT (HEINIMEX)CORP" [ref=f4e349]
+              - cell "A/R Reimbursable" [ref=f4e350]
+              - cell "00051" [ref=f4e351]
+              - cell "2026-08-28" [ref=f4e352]
+              - cell "PHP" [ref=f4e353]
+              - cell "29,257.60" [ref=f4e354]
+              - cell "Delete Void linked payment first." [ref=f4e355]:
+                - button "Delete" [disabled]
+                - generic [ref=f4e356]: Void linked payment first.
+            - row [ref=f4e357]:
+              - cell "HEINEN IMPORT AND EXPORT (HEINIMEX)CORP" [ref=f4e358]
+              - cell "A/R Reimbursable" [ref=f4e359]
+              - cell "00050" [ref=f4e360]
+              - cell "2026-08-28" [ref=f4e361]
+              - cell "PHP" [ref=f4e362]
+              - cell "28,628.58" [ref=f4e363]
+              - cell "Delete Void linked payment first." [ref=f4e364]:
+                - button "Delete" [disabled]
+                - generic [ref=f4e365]: Void linked payment first.
+            - row [ref=f4e366]:
+              - cell "MCC LABELS (MANILA) PHILIPPINES INC." [ref=f4e367]
+              - cell "A/R Reimbursable" [ref=f4e368]
+              - cell "7365" [ref=f4e369]
+              - cell "2026-08-28" [ref=f4e370]
+              - cell "PHP" [ref=f4e371]
+              - cell "9,680.64" [ref=f4e372]
+              - cell "Delete Void linked payment first." [ref=f4e373]:
+                - button "Delete" [disabled]
+                - generic [ref=f4e374]: Void linked payment first.
+            - row [ref=f4e375]:
+              - cell "AXELUM RESOURCES CORP" [ref=f4e376]
+              - cell "A/R Reimbursable" [ref=f4e377]
+              - cell "7366" [ref=f4e378]
+              - cell "2026-08-28" [ref=f4e379]
+              - cell "PHP" [ref=f4e380]
+              - cell "99,965.12" [ref=f4e381]
+              - cell [ref=f4e382]:
+                - button "Delete" [ref=f4e383] [cursor=pointer]
+            - row [ref=f4e384]:
+              - cell "APOLLO LENS MANUFACTURING PHILIPINES INC." [ref=f4e385]
+              - cell "A/R Reimbursable" [ref=f4e386]
+              - cell "7367" [ref=f4e387]
+              - cell "2026-08-28" [ref=f4e388]
+              - cell "PHP" [ref=f4e389]
+              - cell "77,485.78" [ref=f4e390]
+              - cell [ref=f4e391]:
+                - button "Delete" [ref=f4e392] [cursor=pointer]
+            - row [ref=f4e393]:
+              - cell "ASA COLOR TRADING CORPORATION" [ref=f4e394]
+              - cell "A/R Reimbursable" [ref=f4e395]
+              - cell "7364" [ref=f4e396]
+              - cell "2026-08-28" [ref=f4e397]
+              - cell "PHP" [ref=f4e398]
+              - cell "81,929.32" [ref=f4e399]
+              - cell "Delete Void linked payment first." [ref=f4e400]:
+                - button "Delete" [disabled]
+                - generic [ref=f4e401]: Void linked payment first.
+            - row [ref=f4e402]:
+              - cell "WOVEN FURNITURES DESIGN, INC." [ref=f4e403]
+              - cell "A/R Reimbursable" [ref=f4e404]
+              - cell "0014" [ref=f4e405]
+              - cell "2026-08-28" [ref=f4e406]
+              - cell "PHP" [ref=f4e407]
+              - cell "447,023.13" [ref=f4e408]
+              - cell "Delete Void linked payment first." [ref=f4e409]:
+                - button "Delete" [disabled]
+                - generic [ref=f4e410]: Void linked payment first.
+            - row [ref=f4e411]:
+              - cell "PHILIPPINE LIGHT LEATHER INC." [ref=f4e412]
+              - cell "A/R Reimbursable" [ref=f4e413]
+              - cell "0017" [ref=f4e414]
+              - cell "2026-08-28" [ref=f4e415]
+              - cell "USD" [ref=f4e416]
+              - cell "3,081.14" [ref=f4e417]
+              - cell [ref=f4e418]:
+                - button "Delete" [ref=f4e419] [cursor=pointer]
+            - row [ref=f4e420]:
+              - cell "PHILIPPINE LIGHT LEATHER INC." [ref=f4e421]
+              - cell "A/R Reimbursable" [ref=f4e422]
+              - cell "0016" [ref=f4e423]
+              - cell "2026-08-28" [ref=f4e424]
+              - cell "USD" [ref=f4e425]
+              - cell "4,663.40" [ref=f4e426]
+              - cell [ref=f4e427]:
+                - button "Delete" [ref=f4e428] [cursor=pointer]
+            - row [ref=f4e429]:
+              - cell "PHILIPPINE LIGHT LEATHER INC." [ref=f4e430]
+              - cell "A/R Reimbursable" [ref=f4e431]
+              - cell "0015" [ref=f4e432]
+              - cell "2026-08-28" [ref=f4e433]
+              - cell "USD" [ref=f4e434]
+              - cell "4,729.35" [ref=f4e435]
+              - cell [ref=f4e436]:
+                - button "Delete" [ref=f4e437] [cursor=pointer]
+            - row [ref=f4e438]:
+              - cell "PROTHEME GLOBAL INC" [ref=f4e439]
+              - cell "A/R Trade" [ref=f4e440]
+              - cell "BI-0000653" [ref=f4e441]
+              - cell "2026-08-28" [ref=f4e442]
+              - cell "PHP" [ref=f4e443]
+              - cell "47,547.50" [ref=f4e444]
+              - cell [ref=f4e445]:
+                - button "Delete" [ref=f4e446] [cursor=pointer]
+            - row [ref=f4e447]:
+              - cell "HEINEN IMPORT AND EXPORT (HEINIMEX)CORP" [ref=f4e448]
+              - cell "A/R Trade" [ref=f4e449]
+              - cell "BI-0000652" [ref=f4e450]
+              - cell "2026-08-28" [ref=f4e451]
+              - cell "PHP" [ref=f4e452]
+              - cell "4,900.00" [ref=f4e453]
+              - cell "Delete Void linked payment first." [ref=f4e454]:
+                - button "Delete" [disabled]
+                - generic [ref=f4e455]: Void linked payment first.
+            - row [ref=f4e456]:
+              - cell "HEINEN IMPORT AND EXPORT (HEINIMEX)CORP" [ref=f4e457]
+              - cell "A/R Trade" [ref=f4e458]
+              - cell "BI-0000651" [ref=f4e459]
+              - cell "2026-08-28" [ref=f4e460]
+              - cell "PHP" [ref=f4e461]
+              - cell "4,900.00" [ref=f4e462]
+              - cell "Delete Void linked payment first." [ref=f4e463]:
+                - button "Delete" [disabled]
+                - generic [ref=f4e464]: Void linked payment first.
+            - row [ref=f4e465]:
+              - cell "APOLLO LENS MANUFACTURING PHILIPINES INC." [ref=f4e466]
+              - cell "A/R Trade" [ref=f4e467]
+              - cell "BI-0001244" [ref=f4e468]
+              - cell "2026-08-28" [ref=f4e469]
+              - cell "PHP" [ref=f4e470]
+              - cell "75,945.00" [ref=f4e471]
+              - cell [ref=f4e472]:
+                - button "Delete" [ref=f4e473] [cursor=pointer]
+            - row [ref=f4e474]:
+              - cell "AXELUM RESOURCES CORP" [ref=f4e475]
+              - cell "A/R Trade" [ref=f4e476]
+              - cell "BI-0001243" [ref=f4e477]
+              - cell "2026-08-28" [ref=f4e478]
+              - cell "PHP" [ref=f4e479]
+              - cell "66,184.18" [ref=f4e480]
+              - cell [ref=f4e481]:
+                - button "Delete" [ref=f4e482] [cursor=pointer]
+            - row [ref=f4e483]:
+              - cell "MCC LABELS (MANILA) PHILIPPINES INC." [ref=f4e484]
+              - cell "A/R Trade" [ref=f4e485]
+              - cell "BI-0001242" [ref=f4e486]
+              - cell "2026-08-28" [ref=f4e487]
+              - cell "PHP" [ref=f4e488]
+              - cell "21,297.60" [ref=f4e489]
+              - cell "Delete Void linked payment first." [ref=f4e490]:
+                - button "Delete" [disabled]
+                - generic [ref=f4e491]: Void linked payment first.
+            - row [ref=f4e492]:
+              - cell "ASA COLOR TRADING CORPORATION" [ref=f4e493]
+              - cell "A/R Trade" [ref=f4e494]
+              - cell "BI-0001241" [ref=f4e495]
+              - cell "2026-08-28" [ref=f4e496]
+              - cell "PHP" [ref=f4e497]
+              - cell "28,470.20" [ref=f4e498]
+              - cell "Delete Void linked payment first." [ref=f4e499]:
+                - button "Delete" [disabled]
+                - generic [ref=f4e500]: Void linked payment first.
+            - row [ref=f4e501]:
+              - cell "HATANO FOOD SERVICES" [ref=f4e502]
+              - cell "A/R Trade" [ref=f4e503]
+              - cell "BI-0001240" [ref=f4e504]
+              - cell "2026-08-28" [ref=f4e505]
+              - cell "PHP" [ref=f4e506]
+              - cell "6,096.61" [ref=f4e507]
+              - cell "Delete Void linked payment first." [ref=f4e508]:
+                - button "Delete" [disabled]
+                - generic [ref=f4e509]: Void linked payment first.
+            - row [ref=f4e510]:
+              - cell "TASTEXPERTS INC." [ref=f4e511]
+              - cell "A/R Trade" [ref=f4e512]
+              - cell "BI-0001239" [ref=f4e513]
+              - cell "2026-08-28" [ref=f4e514]
+              - cell "PHP" [ref=f4e515]
+              - cell "4,125.86" [ref=f4e516]
+              - cell [ref=f4e517]:
+                - button "Delete" [ref=f4e518] [cursor=pointer]
+            - row [ref=f4e519]:
+              - cell "WOVEN FURNITURES DESIGN, INC." [ref=f4e520]
+              - cell "A/R Trade" [ref=f4e521]
+              - cell "BI-0000191" [ref=f4e522]
+              - cell "2026-08-28" [ref=f4e523]
+              - cell "PHP" [ref=f4e524]
+              - cell "15,703.20" [ref=f4e525]
+              - cell "Delete Void linked payment first." [ref=f4e526]:
+                - button "Delete" [disabled]
+                - generic [ref=f4e527]: Void linked payment first.
+            - row [ref=f4e528]:
+              - cell "PHILIPPINE LIGHT LEATHER INC." [ref=f4e529]
+              - cell "A/R Trade" [ref=f4e530]
+              - cell "BI-0000194" [ref=f4e531]
+              - cell "2026-08-28" [ref=f4e532]
+              - cell "USD" [ref=f4e533]
+              - cell "790.76" [ref=f4e534]
+              - cell [ref=f4e535]:
+                - button "Delete" [ref=f4e536] [cursor=pointer]
+            - row [ref=f4e537]:
+              - cell "PHILIPPINE LIGHT LEATHER INC." [ref=f4e538]
+              - cell "A/R Trade" [ref=f4e539]
+              - cell "BI-0000193" [ref=f4e540]
+              - cell "2026-08-28" [ref=f4e541]
+              - cell "USD" [ref=f4e542]
+              - cell "222.78" [ref=f4e543]
+              - cell [ref=f4e544]:
+                - button "Delete" [ref=f4e545] [cursor=pointer]
+            - row [ref=f4e546]:
+              - cell "PHILIPPINE LIGHT LEATHER INC." [ref=f4e547]
+              - cell "A/R Trade" [ref=f4e548]
+              - cell "BI-0000192" [ref=f4e549]
+              - cell "2026-08-28" [ref=f4e550]
+              - cell "USD" [ref=f4e551]
+              - cell "222.01" [ref=f4e552]
+              - cell [ref=f4e553]:
+                - button "Delete" [ref=f4e554] [cursor=pointer]
+        - navigation [ref=f4e555]:
+          - listitem "« Previous" [ref=f4e556]:
+            - generic [aria-hidden]: ‹
+          - listitem [ref=f4e557]:
+            - generic [ref=f4e558]: "1"
+          - listitem [ref=f4e559]:
+            - link "2" [ref=f4e560] [cursor=pointer]:
+              - /url: http://localhost/seajet/public/erp/accounting/opening-balances/import?page=2
+          - listitem [ref=f4e561]:
+            - link "3" [ref=f4e562] [cursor=pointer]:
+              - /url: http://localhost/seajet/public/erp/accounting/opening-balances/import?page=3
+          - listitem [ref=f4e563]:
+            - link "4" [ref=f4e564] [cursor=pointer]:
+              - /url: http://localhost/seajet/public/erp/accounting/opening-balances/import?page=4
+          - listitem [ref=f4e565]:
+            - link "5" [ref=f4e566] [cursor=pointer]:
+              - /url: http://localhost/seajet/public/erp/accounting/opening-balances/import?page=5
+          - listitem [ref=f4e567]:
+            - link "6" [ref=f4e568] [cursor=pointer]:
+              - /url: http://localhost/seajet/public/erp/accounting/opening-balances/import?page=6
+          - listitem [ref=f4e569]:
+            - link "7" [ref=f4e570] [cursor=pointer]:
+              - /url: http://localhost/seajet/public/erp/accounting/opening-balances/import?page=7
+          - listitem [ref=f4e571]:
+            - link "8" [ref=f4e572] [cursor=pointer]:
+              - /url: http://localhost/seajet/public/erp/accounting/opening-balances/import?page=8
+          - listitem [ref=f4e573]:
+            - link "9" [ref=f4e574] [cursor=pointer]:
+              - /url: http://localhost/seajet/public/erp/accounting/opening-balances/import?page=9
+          - listitem [ref=f4e575]:
+            - link "Next »" [ref=f4e576] [cursor=pointer]:
+              - /url: http://localhost/seajet/public/erp/accounting/opening-balances/import?page=2
+              - text: ›
+      - dialog [active] [ref=f4e577]:
+        - generic [ref=f4e578]:
+          - generic [ref=f4e579]:
+            - heading "Delete imported A/R balance" [level=5] [ref=f4e580]
+            - button "Close" [ref=f4e581] [cursor=pointer]
+          - generic [ref=f4e582]:
+            - paragraph [ref=f4e583]: AXELUM RESOURCES CORP — 7366
+            - paragraph [ref=f4e584]: Only this balance will be removed. Its accounting entry will be reversed. Other balances in the import remain unchanged.
+            - generic [ref=f4e585]: Reason
+            - textbox "Reason" [ref=f4e586]
+          - generic [ref=f4e587]:
+            - button "Cancel" [ref=f4e588] [cursor=pointer]
+            - button "Delete balance" [ref=f4e589] [cursor=pointer]

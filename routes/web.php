@@ -108,6 +108,7 @@ Route::middleware(['auth', 'permission.access'])->group(function () {
     Route::get('/erp/accounting/opening-balances/manual', 'Erp\ModuleController@manualOpeningBalance')->name('erp.accounting.opening-balances.manual');
     Route::post('/erp/accounting/opening-balances/manual', 'Erp\ModuleController@storeManualOpeningBalance')->name('erp.accounting.opening-balances.manual.store');
     Route::get('/erp/accounting/opening-balances/import', 'Erp\ModuleController@openingBalanceImport')->name('erp.accounting.opening-balances.import');
+    Route::delete('/erp/accounting/opening-balances/ar/{row}', 'Erp\ModuleController@deleteImportedArBalance')->name('erp.accounting.opening-balances.ar.delete');
     Route::post('/erp/accounting/opening-balances/import/preview', 'Erp\ModuleController@openingBalanceImportPreview')->name('erp.accounting.opening-balances.preview');
     Route::post('/erp/accounting/opening-balances/import/commit', 'Erp\ModuleController@openingBalanceImportCommit')->name('erp.accounting.opening-balances.commit');
     Route::get('/erp/accounting/journal-entries/{journal}', 'Erp\ModuleController@journalEntryShow')->name('erp.accounting.journals.show');

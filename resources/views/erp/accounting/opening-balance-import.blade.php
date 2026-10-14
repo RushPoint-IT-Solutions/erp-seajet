@@ -21,6 +21,7 @@
             </ul>
         </div>
     @endif
+    @if(session('status'))<div class="alert alert-success">{{ session('status') }}</div>@endif
 
     <div class="alert alert-info">
         <strong>Posting rule:</strong> A/R rows debit the selected receivable account and credit Opening Balance Equity. A/P rows debit Opening Balance Equity and credit the selected payable account. A/R rows become open invoices visible in AR Aging and Receive Payment; A/P rows become approved open vendor bills in Pay Bills. Each journal, invoice, and bill uses the date in its Excel row. Rows with the same Excel date are combined into one balanced journal.
@@ -179,4 +180,58 @@
             </div>
         </div>
     @endif
+    <div class="erp-card p-4 mt-4">
+        <h2 class="h6 fw-bold">Imported A/R beginning balances</h2>
+        <p class="text-muted">Delete removes the selected balance from Client SOA and AR Aging and posts its accounting reversal. Original records remain in the audit history.</p>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead><tr><th>Client</th><th>Type</th><th>Invoice / SOA</th><th>Date</th><th>Currency</th><th class="text-end">Opening amount</th><th>Action</th></tr></thead>
+                <tbody>
+                @forelse($importedArBalances as $balance)
+                    <tr>
+                        <td>{{ $balance->party_name }}</td>
+                        <td>{{ $balance->balance_type === 'ar_trade' ? 'A/R Trade' : 'A/R Reimbursable' }}</td>
+                        <td>{{ $balance->document_no }}</td><td>{{ $balance->source_date }}</td><td>{{ $balance->currency }}</td>
+                        <td class="text-end">{{ number_format($balance->currency === 'USD' ? $balance->foreign_amount : $balance->base_amount, 2) }}</td>
+                        <td>
+                        @if(auth()->user()->canAccess('accounting', 'delete'))
+                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteImportedArModal"
+                                data-delete-url="{{ route('erp.accounting.opening-balances.ar.delete', $balance->id) }}"
+                                data-balance-label="{{ $balance->party_name }} — {{ $balance->document_no }}"
+                                {{ (float) $balance->paid_total > 0 ? 'disabled' : '' }}>Delete</button>
+                            @if((float) $balance->paid_total > 0)<small class="d-block text-muted">Void linked payment first.</small>@endif
+                        @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr><td colspan="7" class="text-muted">No active imported A/R balances.</td></tr>
+                @endforelse
+                </tbody>
+            </table>
+        </div>
+        {{ $importedArBalances->links() }}
+    </div>
+    <div class="modal fade" id="deleteImportedArModal" tabindex="-1" aria-labelledby="deleteImportedArTitle" aria-hidden="true">
+        <div class="modal-dialog"><form method="post" class="modal-content" id="deleteImportedArForm">
+            {{ csrf_field() }} {{ method_field('DELETE') }}
+            <div class="modal-header"><h5 class="modal-title" id="deleteImportedArTitle">Delete imported A/R balance</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <p id="deleteImportedArLabel" class="fw-bold"></p>
+                <p>Only this balance will be removed. Its accounting entry will be reversed. Other balances in the import remain unchanged.</p>
+                <label for="deleteImportedArReason" class="form-label">Reason</label>
+                <textarea id="deleteImportedArReason" name="reason" class="form-control" minlength="5" maxlength="1000" required></textarea>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-danger">Delete balance</button></div>
+        </form></div>
+    </div>
 @endsection
+@push('scripts')
+<script>
+document.getElementById('deleteImportedArModal').addEventListener('show.bs.modal', function (event) {
+    var button = event.relatedTarget;
+    document.getElementById('deleteImportedArForm').action = button.getAttribute('data-delete-url');
+    document.getElementById('deleteImportedArLabel').textContent = button.getAttribute('data-balance-label');
+    document.getElementById('deleteImportedArReason').value = '';
+});
+</script>
+@endpush

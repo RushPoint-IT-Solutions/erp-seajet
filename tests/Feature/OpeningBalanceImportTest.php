@@ -25,6 +25,7 @@ class OpeningBalanceImportTest extends TestCase
         DB::purge('sqlite');
         Artisan::call('migrate:fresh', ['--seed' => true]);
         $this->actingAsAdmin();
+        $this->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class);
         $this->withoutExceptionHandling();
     }
 
@@ -595,6 +596,54 @@ class OpeningBalanceImportTest extends TestCase
             ->where('account_id', $accounts['ar_trade_php_account_id'])->value('debit'));
         $this->assertSame(0, Artisan::call('seajet:repair-imported-ar', ['--date' => '2026-09-22', '--apply' => true]));
         $this->assertSame(1, DB::table('journal_entries')->where('source_type', 'opening_balance_import_correction')->count());
+        $this->delete(route('erp.accounting.opening-balances.ar.delete', $row->id), ['reason' => 'Remove corrected historical opening balance'])
+            ->assertRedirect(route('erp.accounting.opening-balances.import'));
+        $reversal = DB::table('journal_entries')->where('source_type', 'opening_balance_row')->where('source_id', $row->id)->first();
+        $this->assertEquals(1000, DB::table('journal_entry_lines')->where('journal_entry_id', $reversal->id)
+            ->where('account_id', $accounts['ar_trade_php_account_id'])->value('credit'));
+        $this->assertDatabaseHas('sales_documents', ['id' => $row->sales_document_id, 'status' => 'voided']);
+    }
+
+    public function test_deleting_one_imported_ar_balance_reverses_only_its_lines_and_keeps_audit_history()
+    {
+        $accounts = $this->accountMapping();
+        $mapping = [];
+        foreach ($accounts as $key => $id) {
+            $mapping[str_replace('_account_id', '', $key)] = $id;
+        }
+        $customer = DB::table('customers')->where('company_id', 1)->where('is_active', true)->first();
+        $path = $this->workbook([
+            ['MAIN', 'A/R TRADE', 'BILLING INVOICE', '2026-09-01', $customer->name, 'DELETE-AR-001', 1000, '', ''],
+            ['MAIN', 'A/R REIMBURSABLE', 'SOA B', '2026-09-01', $customer->name, 'KEEP-AR-002', 2000, '', ''],
+        ]);
+        app(OpeningBalanceImportService::class)->import($path, 1, $mapping, hash_file('sha256', $path), basename($path), auth()->id());
+        $row = DB::table('opening_balance_import_rows')->where('reference_no', 'DELETE-AR-001')->first();
+        $other = DB::table('opening_balance_import_rows')->where('reference_no', 'KEEP-AR-002')->first();
+        $this->get(route('erp.accounting.opening-balances.import'))->assertOk()->assertSee('Imported A/R beginning balances')
+            ->assertSee(route('erp.accounting.opening-balances.ar.delete', $row->id));
+        $this->delete(route('erp.accounting.opening-balances.ar.delete', $row->id), ['reason' => 'Correct imported balance'])
+            ->assertRedirect(route('erp.accounting.opening-balances.import'));
+        $this->assertDatabaseHas('sales_documents', ['id' => $row->sales_document_id, 'status' => 'voided', 'posting_status' => 'reversed']);
+        $this->assertDatabaseHas('sales_documents', ['id' => $other->sales_document_id, 'status' => 'posted']);
+        $this->assertDatabaseHas('journal_entries', ['id' => $row->journal_entry_id, 'status' => 'posted']);
+        $reversal = DB::table('journal_entries')->where('source_type', 'opening_balance_row')->where('source_id', $row->id)->first();
+        $this->assertNotNull($reversal);
+        $lines = DB::table('journal_entry_lines')->where('journal_entry_id', $reversal->id)->get();
+        $this->assertCount(2, $lines);
+        $this->assertEquals(1000, $lines->sum('debit'));
+        $this->assertEquals(1000, $lines->sum('credit'));
+        $this->assertEquals(1000, $lines->where('account_id', $accounts['ar_trade_php_account_id'])->sum('credit'));
+        $this->get(route('erp.reports.client-soa', ['customer_id' => $customer->id]))->assertOk()
+            ->assertDontSee('DELETE-AR-001')->assertSee('KEEP-AR-002');
+        $this->assertDatabaseHas('activity_logs', ['action' => 'deleted_imported_ar_balance', 'auditable_id' => $row->sales_document_id]);
+        $this->withExceptionHandling();
+        $this->delete(route('erp.accounting.opening-balances.ar.delete', $row->id), ['reason' => 'Repeated deletion'])->assertSessionHasErrors('balance');
+        $this->assertSame(1, DB::table('journal_entries')->where('source_type', 'opening_balance_row')->count());
+        $this->withoutExceptionHandling();
+        DB::table('sales_documents')->where('id', $other->sales_document_id)->update(['paid_total' => 10]);
+        $this->withExceptionHandling();
+        $this->delete(route('erp.accounting.opening-balances.ar.delete', $other->id), ['reason' => 'Delete paid balance'])->assertSessionHasErrors('balance');
+        $this->assertDatabaseHas('sales_documents', ['id' => $other->sales_document_id, 'status' => 'posted']);
     }
 
     private function accountMapping()
