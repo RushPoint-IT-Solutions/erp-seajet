@@ -675,6 +675,44 @@ class OpeningBalanceImportTest extends TestCase
         $this->assertDatabaseHas('sales_documents', ['id' => $other->sales_document_id, 'status' => 'voided']);
     }
 
+    public function test_manual_ar_bi_and_soa_amounts_post_to_separate_accounts_with_a_computed_total()
+    {
+        $accounts = $this->accountMapping();
+        DB::table('accounts')->where('id', $accounts['ar_trade_php_account_id'])->update(['name' => 'A/R Trade - PHP']);
+        DB::table('accounts')->where('id', $accounts['ar_reimbursable_php_account_id'])->update(['name' => 'A/R Reimbursable - PHP']);
+        $customer = DB::table('customers')->where('company_id', 1)->where('is_active', true)->first();
+        $branch = DB::table('branches')->where('company_id', 1)->where('is_active', true)->first();
+        $fields = [
+            'balance_type' => 'ar_trade', 'customer_id' => $customer->id,
+            'reference_no' => 'BI-SPLIT-001', 'soa_reference_no' => 'SOA-SPLIT-001',
+            'source_date' => '2026-09-01', 'due_date' => '2026-09-30', 'branch_id' => $branch->id,
+            'currency' => 'PHP', 'bi_amount' => 900, 'soa_amount' => 350,
+            'target_account_id' => $accounts['ar_trade_php_account_id'],
+            'soa_account_id' => $accounts['ar_reimbursable_php_account_id'],
+            'opening_balance_account_id' => $accounts['opening_balance_account_id'],
+        ];
+        $this->get(route('erp.accounting.opening-balances.manual'))->assertOk()->assertSee('BI Amount')
+            ->assertSee('SOA Amount')->assertSee('Total (BI + SOA)');
+        $this->post(route('erp.accounting.opening-balances.manual.store'), $fields)->assertRedirect(route('erp.payments.create'))
+            ->assertSessionHas('status');
+        $this->assertStringContainsString('1,250.00', session('status'));
+        $bi = DB::table('sales_documents')->where('transaction_no', 'BI-SPLIT-001')->first();
+        $soa = DB::table('sales_documents')->where('transaction_no', 'SOA-SPLIT-001')->first();
+        $this->assertEquals(900, $bi->invoice_amount);
+        $this->assertEquals(350, $soa->freight_total);
+        $this->assertEquals(0, $soa->invoice_amount);
+        $this->assertEquals($accounts['ar_reimbursable_php_account_id'], $soa->opening_balance_control_account_id);
+        $this->assertDatabaseHas('journal_entry_lines', ['journal_entry_id' => $soa->journal_entry_id,
+            'account_id' => $accounts['ar_reimbursable_php_account_id'], 'debit' => 350]);
+        $fields['reference_no'] = 'BI-ROLLBACK-001';
+        $this->withExceptionHandling();
+        $this->post(route('erp.accounting.opening-balances.manual.store'), $fields)->assertSessionHasErrors('reference_no');
+        $this->assertDatabaseMissing('sales_documents', ['transaction_no' => 'BI-ROLLBACK-001']);
+        $fields['bi_amount'] = 0; $fields['reference_no'] = ''; $fields['soa_reference_no'] = 'SOA-ONLY-001';
+        $this->post(route('erp.accounting.opening-balances.manual.store'), $fields)->assertRedirect(route('erp.payments.create'));
+        $this->assertDatabaseHas('sales_documents', ['transaction_no' => 'SOA-ONLY-001', 'freight_total' => 350]);
+    }
+
     private function accountMapping()
     {
         $equityCategoryId = DB::table('account_categories')->where('name', 'Equity')->value('id');

@@ -186,6 +186,20 @@
     <div class="erp-card p-4 mt-4">
         <h2 class="h6 fw-bold">Imported A/R beginning balances</h2>
         <p class="text-muted mb-2">Showing workbook imports by admin@seajet.test only.</p>
+        <form method="get" action="{{ route('erp.accounting.opening-balances.import') }}" class="row g-2 align-items-end mb-3">
+            <input type="hidden" name="manage_ar" value="1">
+            <div class="col-md-6">
+                <label for="importedArClient" class="form-label">Client</label>
+                <select id="importedArClient" name="client_id" class="form-select erp-select">
+                    <option value="">All clients</option>
+                    @foreach($importedArClients as $client)
+                        <option value="{{ $client->id }}" {{ (string) request('client_id') === (string) $client->id ? 'selected' : '' }}>{{ $client->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-auto"><button type="submit" class="btn btn-primary">Filter</button></div>
+            <div class="col-auto"><a href="{{ route('erp.accounting.opening-balances.import', ['manage_ar' => 1]) }}" class="btn btn-outline-secondary">Clear</a></div>
+        </form>
         <p class="text-muted">Delete removes the selected balance from Client SOA and AR Aging and posts its accounting reversal. Original records remain in the audit history.</p>
         <div class="table-responsive">
             <table class="table table-hover align-middle">

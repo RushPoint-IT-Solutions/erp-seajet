@@ -119,9 +119,39 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-6" id="manualPayableAmountGroup">
                 <label class="form-label fw-semibold">Opening Amount <span class="text-danger">*</span></label>
                 <div class="input-group"><span class="input-group-text" id="manualOpeningCurrencyLabel">PHP</span><input name="amount" type="number" min="0.01" step="0.01" class="form-control text-end" value="{{ old('amount') }}" placeholder="0.00" required></div>
+            </div>
+            <div class="col-12" id="manualArAmountsGroup">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="manualBiAmount" class="form-label fw-semibold">BI Amount</label>
+                        <input id="manualBiAmount" name="bi_amount" type="number" min="0" step="0.01" class="form-control text-end" value="{{ old('bi_amount', old('amount', '0')) }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="manualSoaAmount" class="form-label fw-semibold">SOA Amount</label>
+                        <input id="manualSoaAmount" name="soa_amount" type="number" min="0" step="0.01" class="form-control text-end" value="{{ old('soa_amount', '0') }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="manualSoaReference" class="form-label">SOA Reference</label>
+                        <input id="manualSoaReference" name="soa_reference_no" maxlength="100" class="form-control" value="{{ old('soa_reference_no') }}" placeholder="Original SOA number">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="manualSoaAccount" class="form-label">A/R Reimbursable Account</label>
+                        <select id="manualSoaAccount" name="soa_account_id" class="form-select">
+                            <option value="">Select account...</option>
+                            @foreach($accounts->filter(function ($account) { return stripos($account->name, 'reimburs') !== false; }) as $account)
+                                <option value="{{ $account->id }}" {{ (string) old('soa_account_id', $defaultReimbursableId) === (string) $account->id ? 'selected' : '' }}>{{ $account->label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-12 border-top pt-3">
+                        <label for="manualArTotal" class="form-label fw-bold">Total (BI + SOA)</label>
+                        <div class="input-group"><span class="input-group-text" id="manualArTotalCurrency">PHP</span><input id="manualArTotal" class="form-control text-end fw-bold" value="0.00" readonly></div>
+                        <div class="form-text">BI and SOA are saved separately under their respective references and receivable accounts.</div>
+                    </div>
+                </div>
             </div>
             <div class="col-md-6" id="manualExchangeRateGroup">
                 <label class="form-label fw-semibold">Exchange Rate to PHP</label>
@@ -148,6 +178,8 @@
         function syncBalanceType() {
             var type = $('input[name="balance_type"]:checked').val() || 'ar_trade';
             var isPayable = type === 'ap_trade';
+            $('#manualPayableAmountGroup').toggleClass('d-none', !isPayable).find('input').prop('disabled', !isPayable).prop('required', isPayable);
+            $('#manualArAmountsGroup').toggleClass('d-none', isPayable).find('input, select').prop('disabled', isPayable);
             $('#manualCustomerGroup').toggleClass('d-none', isPayable);
             $('#manualSupplierGroup').toggleClass('d-none', !isPayable);
             $('#manualDescriptionGroup').toggleClass('d-none', !isPayable);
@@ -172,7 +204,7 @@
             $('#manualTradeAccountHelp').text(isPayable
                 ? 'Choose the BDO or Metro A/P Trade account for this vendor balance.'
                 : 'Choose the Metrobank A/R Trade account when applicable.');
-            $('#manualReferenceLabel').text(isPayable ? 'Vendor Bill Reference' : 'BI / SOA Reference');
+            $('#manualReferenceLabel').text(isPayable ? 'Vendor Bill Reference' : 'BI Reference');
             $('#manualReference').attr('placeholder', isPayable ? 'Original vendor bill number' : 'Original BI or SOA number');
             $('#manualReferenceHelp').text(isPayable
                 ? 'This reference must not already exist in Accounts Payable.'
@@ -185,12 +217,24 @@
         function syncCurrency() {
             var currency = $('#manualOpeningCurrency').val() || 'PHP';
             $('#manualOpeningCurrencyLabel').text(currency);
+            $('#manualArTotalCurrency').text(currency);
             $('#manualExchangeRateGroup').toggleClass('opacity-50', currency === 'PHP');
         }
+        function syncArTotal() {
+            var bi = Number($('#manualBiAmount').val()) || 0;
+            var soa = Number($('#manualSoaAmount').val()) || 0;
+            $('#manualArTotal').val(((Math.round(bi * 100) + Math.round(soa * 100)) / 100).toFixed(2));
+            var isPayable = $('input[name="balance_type"]:checked').val() === 'ap_trade';
+            $('#manualSoaReference, #manualSoaAccount').prop('required', !isPayable && soa > 0);
+            $('#manualReference').prop('required', isPayable || bi > 0);
+        }
+        $('#manualBiAmount, #manualSoaAmount').on('input change', syncArTotal);
+        $('input[name="balance_type"]').on('change', function () { syncArTotal(); });
         $('input[name="balance_type"]').on('change', syncBalanceType);
         $('#manualOpeningCurrency').on('change', syncCurrency);
         syncBalanceType();
         syncCurrency();
+        syncArTotal();
     });
 </script>
 @endpush

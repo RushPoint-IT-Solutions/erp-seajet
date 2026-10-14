@@ -5849,6 +5849,7 @@ class ModuleController extends Controller
             'defaultOpeningAccountId' => $defaults['opening_balance_account_id'] ?? null,
             'defaultReceivableId' => $defaultReceivableId,
             'defaultPayableId' => $defaults['ap_trade_php_account_id'] ?? null,
+            'defaultReimbursableId' => $defaults['ar_reimbursable_php_account_id'] ?? null,
         ]);
     }
 
@@ -5856,6 +5857,9 @@ class ModuleController extends Controller
     {
         $this->authorizeAccountingPosting('accounting', 'approve');
         request()->merge(['balance_type' => request('balance_type', 'ar_trade')]);
+        if (request('balance_type') === 'ar_trade' && (float) request('bi_amount', 0) <= 0 && (float) request('soa_amount', 0) > 0) {
+            request()->merge(['reference_no' => request('soa_reference_no')]);
+        }
         $data = request()->validate([
             'balance_type' => 'required|in:ar_trade,ap_trade',
             'customer_id' => 'nullable|required_if:balance_type,ar_trade|integer',
@@ -5867,15 +5871,27 @@ class ModuleController extends Controller
             'branch_id' => 'required|integer',
             'currency' => 'required|in:PHP,USD',
             'exchange_rate' => 'nullable|required_if:currency,USD|numeric|min:0.000001',
-            'amount' => 'required|numeric|min:0.01',
+            'amount' => 'required_if:balance_type,ap_trade|required_without_all:bi_amount,soa_amount|nullable|numeric|min:0.01',
+            'bi_amount' => 'nullable|numeric|min:0',
+            'soa_amount' => 'nullable|numeric|min:0',
+            'soa_reference_no' => 'nullable|string|max:100',
+            'soa_account_id' => 'nullable|integer',
             'target_account_id' => 'required|integer',
             'opening_balance_account_id' => 'required|integer',
         ]);
 
         $isPayable = $data['balance_type'] === 'ap_trade';
+        $splitAr = !$isPayable && (array_key_exists('bi_amount', $data) || array_key_exists('soa_amount', $data));
+        if ($splitAr) {
+            $data['amount'] = round((float) ($data['bi_amount'] ?? 0) + (float) ($data['soa_amount'] ?? 0), 2);
+            if ($data['amount'] <= 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['bi_amount' => 'Enter a BI amount or SOA amount greater than zero.']);
+            }
+        }
         $result = $isPayable
             ? $importer->importManualApTrade($this->defaultCompanyId(), $data, auth()->id())
-            : $importer->importManualArTrade($this->defaultCompanyId(), $data, auth()->id());
+            : ($splitAr ? $importer->importManualArBalances($this->defaultCompanyId(), $data, auth()->id())
+                : $importer->importManualArTrade($this->defaultCompanyId(), $data, auth()->id()));
 
         return redirect()->route($isPayable ? 'erp.payables.payments.create' : 'erp.payments.create')
             ->with('status', 'Manual '.($isPayable ? 'A/P' : 'A/R').' opening balance '.$data['reference_no'].' was posted. '
@@ -6053,7 +6069,7 @@ class ModuleController extends Controller
             $batch->ap_rows = $dateSummary ? (int) $dateSummary->ap_rows : 0;
         }
 
-        $importedArBalances = DB::table('opening_balance_import_rows')
+        $importedArQuery = DB::table('opening_balance_import_rows')
             ->join('sales_documents', 'sales_documents.id', '=', 'opening_balance_import_rows.sales_document_id')
             ->join('opening_balance_import_batches', 'opening_balance_import_batches.id', '=', 'opening_balance_import_rows.batch_id')
             ->join('users as import_author', 'import_author.id', '=', 'opening_balance_import_batches.imported_by')
@@ -6061,11 +6077,17 @@ class ModuleController extends Controller
             ->where('opening_balance_import_batches.original_filename', 'not like', 'Manual AR Opening Balance - %')
             ->where('opening_balance_import_rows.company_id', $this->defaultCompanyId())
             ->whereIn('opening_balance_import_rows.balance_type', ['ar_trade', 'ar_reimbursable'])
-            ->whereNotIn('sales_documents.status', ['voided', 'cancelled'])
+            ->whereNotIn('sales_documents.status', ['voided', 'cancelled']);
+        $importedArClients = (clone $importedArQuery)->join('customers', 'customers.id', '=', 'sales_documents.customer_id')
+            ->select('customers.id', 'customers.name')->distinct()->orderBy('customers.name')->get();
+        $importedArBalances = $importedArQuery
+            ->when(request('client_id'), function ($query) {
+                $query->where('sales_documents.customer_id', request('client_id'));
+            })
             ->select('opening_balance_import_rows.*', 'sales_documents.document_no', 'sales_documents.paid_total',
                 'import_author.name as encoded_by_name', 'import_author.email as encoded_by_email')
             ->orderBy('opening_balance_import_rows.id', 'desc')->paginate(30);
-        $importedArBalances->appends(['manage_ar' => request('manage_ar')]);
+        $importedArBalances->appends(['manage_ar' => request('manage_ar'), 'client_id' => request('client_id')]);
         $linkedPayments = DB::table('receipt_applications')->join('receipts', 'receipts.id', '=', 'receipt_applications.receipt_id')
             ->whereIn('sales_document_id', $importedArBalances->pluck('sales_document_id')->all())
             ->where('receipts.company_id', $this->defaultCompanyId())
@@ -6074,7 +6096,7 @@ class ModuleController extends Controller
         foreach ($importedArBalances as $balance) {
             $balance->linked_payments = $linkedPayments->get($balance->sales_document_id, collect());
         }
-        return view('erp.accounting.opening-balance-import', compact('accounts', 'defaults', 'preview', 'token', 'recentImports', 'importedArBalances'));
+        return view('erp.accounting.opening-balance-import', compact('accounts', 'defaults', 'preview', 'token', 'recentImports', 'importedArBalances', 'importedArClients'));
     }
 
     private function openingBalanceMappingRules()

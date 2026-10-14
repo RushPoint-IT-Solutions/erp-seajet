@@ -163,9 +163,35 @@ class OpeningBalanceImportService
         return $this->importManualTrade($companyId, $data, $userId);
     }
 
+    public function importManualArBalances($companyId, array $data, $userId)
+    {
+        return DB::transaction(function () use ($companyId, $data, $userId) {
+            $result = null;
+            if ((float) ($data['bi_amount'] ?? 0) > 0) {
+                $bi = $data;
+                $bi['amount'] = $data['bi_amount'];
+                $bi['balance_type'] = 'ar_trade';
+                $result = $this->importManualTrade($companyId, $bi, $userId);
+            }
+            if ((float) ($data['soa_amount'] ?? 0) > 0) {
+                if (empty($data['soa_reference_no']) || empty($data['soa_account_id'])) {
+                    throw ValidationException::withMessages(['soa_reference_no' => 'Enter the SOA reference and select its A/R Reimbursable account.']);
+                }
+                $soa = $data;
+                $soa['amount'] = $data['soa_amount'];
+                $soa['reference_no'] = $data['soa_reference_no'];
+                $soa['target_account_id'] = $data['soa_account_id'];
+                $soa['balance_type'] = 'ar_reimbursable';
+                $result = $this->importManualTrade($companyId, $soa, $userId);
+            }
+            return $result;
+        });
+    }
+
     private function importManualTrade($companyId, array $data, $userId)
     {
         $isPayable = ($data['balance_type'] ?? 'ar_trade') === 'ap_trade';
+        $isReimbursable = ($data['balance_type'] ?? '') === 'ar_reimbursable';
         $partyTable = $isPayable ? 'suppliers' : 'customers';
         $partyField = $isPayable ? 'supplier_id' : 'customer_id';
         $branch = DB::table('branches')
@@ -197,7 +223,8 @@ class OpeningBalanceImportService
         $targetName = $this->normalize($targetAccount->name);
         $validTarget = $isPayable
             ? strpos($targetName, 'APTRADE') !== false || strpos($targetName, 'ACCOUNTSPAYABLE') !== false
-            : strpos($targetName, 'ARTRADE') !== false || strpos($targetName, 'ACCOUNTSRECEIVABLE') !== false;
+            : ($isReimbursable ? strpos($targetName, 'REIMBURS') !== false || strpos($targetName, 'ACCOUNTSRECEIVABLE') !== false
+                : strpos($targetName, 'ARTRADE') !== false || strpos($targetName, 'ACCOUNTSRECEIVABLE') !== false);
         if (!$validTarget) {
             throw ValidationException::withMessages([
                 'target_account_id' => $isPayable
@@ -235,7 +262,7 @@ class OpeningBalanceImportService
             $isPayable ? 'manual-ap' : 'manual-ar', $companyId, $reference, microtime(true), random_int(1, PHP_INT_MAX),
         ]));
         $filename = 'Manual '.($isPayable ? 'AP' : 'AR').' Opening Balance - '.$reference;
-        $mappingKey = ($isPayable ? 'ap_trade_' : 'ar_trade_').strtolower($currency);
+        $mappingKey = ($isPayable ? 'ap_trade_' : ($isReimbursable ? 'ar_reimbursable_' : 'ar_trade_')).strtolower($currency);
         $mapping = [
             'opening_balance' => (int) $openingAccount->id,
             $mappingKey => (int) $targetAccount->id,
@@ -258,8 +285,8 @@ class OpeningBalanceImportService
             'foreign_amount' => $currency === 'USD' ? $transactionAmount : 0,
             'exchange_rate' => $exchangeRate,
             'base_amount' => $baseAmount,
-            'balance_type' => $isPayable ? 'ap_trade' : 'ar_trade',
-            'balance_type_label' => $isPayable ? 'A/P Trade' : 'A/R Trade',
+            'balance_type' => $isPayable ? 'ap_trade' : ($isReimbursable ? 'ar_reimbursable' : 'ar_trade'),
+            'balance_type_label' => $isPayable ? 'A/P Trade' : ($isReimbursable ? 'A/R Reimbursable' : 'A/R Trade'),
             'target_account_id' => $targetAccount->id,
             'target_account_code' => $targetAccount->code,
             'target_account_name' => $targetAccount->name,
