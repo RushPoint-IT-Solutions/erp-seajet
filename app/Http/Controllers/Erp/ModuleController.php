@@ -6062,7 +6062,8 @@ class ModuleController extends Controller
             ->where('opening_balance_import_rows.company_id', $this->defaultCompanyId())
             ->whereIn('opening_balance_import_rows.balance_type', ['ar_trade', 'ar_reimbursable'])
             ->whereNotIn('sales_documents.status', ['voided', 'cancelled'])
-            ->select('opening_balance_import_rows.*', 'sales_documents.document_no', 'sales_documents.paid_total')
+            ->select('opening_balance_import_rows.*', 'sales_documents.document_no', 'sales_documents.paid_total',
+                'import_author.name as encoded_by_name', 'import_author.email as encoded_by_email')
             ->orderBy('opening_balance_import_rows.id', 'desc')->paginate(30);
         $importedArBalances->appends(['manage_ar' => request('manage_ar')]);
         $linkedPayments = DB::table('receipt_applications')->join('receipts', 'receipts.id', '=', 'receipt_applications.receipt_id')

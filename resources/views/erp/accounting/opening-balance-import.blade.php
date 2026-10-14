@@ -189,13 +189,15 @@
         <p class="text-muted">Delete removes the selected balance from Client SOA and AR Aging and posts its accounting reversal. Original records remain in the audit history.</p>
         <div class="table-responsive">
             <table class="table table-hover align-middle">
-                <thead><tr><th>Client</th><th>Type</th><th>Invoice / SOA</th><th>Date</th><th>Currency</th><th class="text-end">Opening amount</th><th>Linked payments</th><th>Action</th></tr></thead>
+                <thead><tr><th>Client</th><th>Type</th><th>Invoice / SOA</th><th>Date</th><th>Encoded by</th><th>Currency</th><th class="text-end">Opening amount</th><th>Linked payments</th><th>Action</th></tr></thead>
                 <tbody>
                 @forelse($importedArBalances as $balance)
                     <tr>
                         <td>{{ $balance->party_name }}</td>
                         <td>{{ $balance->balance_type === 'ar_trade' ? 'A/R Trade' : 'A/R Reimbursable' }}</td>
-                        <td>{{ $balance->document_no }}</td><td>{{ $balance->source_date }}</td><td>{{ $balance->currency }}</td>
+                        <td>{{ $balance->document_no }}</td><td>{{ $balance->source_date }}</td>
+                        <td>{{ $balance->encoded_by_name }}<small class="d-block text-muted">{{ $balance->encoded_by_email }}</small></td>
+                        <td>{{ $balance->currency }}</td>
                         <td class="text-end">{{ number_format($balance->currency === 'USD' ? $balance->foreign_amount : $balance->base_amount, 2) }}</td>
                         <td>
                         @forelse($balance->linked_payments as $payment)
@@ -222,7 +224,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="8" class="text-muted">No active imported A/R balances.</td></tr>
+                    <tr><td colspan="9" class="text-muted">No active imported A/R balances.</td></tr>
                 @endforelse
                 </tbody>
             </table>
