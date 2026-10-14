@@ -1740,11 +1740,21 @@ class ModuleController extends Controller
             }
 
             $hasPaymentApplication = Schema::hasTable('payment_applications') && DB::table('payment_applications')
-                ->where('purchase_document_id', $record->id)
+                ->leftJoin('payments', 'payments.id', '=', 'payment_applications.payment_id')
+                ->where('payment_applications.purchase_document_id', $record->id)
+                ->where(function ($query) {
+                    $query->whereNull('payments.id')
+                        ->orWhereNotIn('payments.status', ['voided', 'cancelled'])
+                        ->orWhere('payments.posting_status', 'posted');
+                })
                 ->exists();
             $hasPayment = Schema::hasTable('payments') && DB::table('payments')
                 ->where('company_id', $companyId)
                 ->where('bill_no', $record->document_no)
+                ->where(function ($query) {
+                    $query->whereNotIn('status', ['voided', 'cancelled'])
+                        ->orWhere('posting_status', 'posted');
+                })
                 ->exists();
             if ($hasPaymentApplication || $hasPayment) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
@@ -1795,8 +1805,16 @@ class ModuleController extends Controller
                 'status' => $record->status,
                 'grand_total' => $record->grand_total,
                 'journal_entry_ids' => $journalIds->all(),
+                'payment_applications' => Schema::hasTable('payment_applications')
+                    ? DB::table('payment_applications')->where('purchase_document_id', $record->id)->get()->toArray()
+                    : [],
             ], [], $companyId);
 
+            if (Schema::hasTable('payment_applications')) {
+                // Retain voided payment applications and their amounts in the audit trail.
+                DB::table('payment_applications')->where('purchase_document_id', $record->id)
+                    ->update(['purchase_document_id' => null, 'updated_at' => now()]);
+            }
             foreach (['vendor_bill_lines', 'purchase_document_lines'] as $lineTable) {
                 if (Schema::hasTable($lineTable)) {
                     DB::table($lineTable)->where('purchase_document_id', $record->id)->delete();
@@ -9361,7 +9379,35 @@ class ModuleController extends Controller
 
         $bankAccounts = $this->bankAccounts();
 
-        return view('erp.payments.create', compact('customers', 'invoices', 'payments', 'bankAccounts', 'receiptSeries'));
+        $reentryPayment = null;
+        if (request('reenter_receipt')) {
+            $this->authorizeAccountingPosting('payments', 'create');
+            $receipt = DB::table('receipts')->where('company_id', $this->defaultCompanyId())
+                ->where('id', request('reenter_receipt'))->whereIn('status', ['voided', 'cancelled'])->first();
+            abort_unless($receipt, 404);
+            $documents = DB::table('receipt_applications')
+                ->join('sales_documents', 'sales_documents.id', '=', 'receipt_applications.sales_document_id')
+                ->where('receipt_id', $receipt->id)
+                ->get(['sales_documents.document_no', 'sales_documents.document_type', 'receipt_applications.component']);
+            $components = $documents->pluck('component')->filter()->unique();
+            $mode = $components->count() === 1 ? $components->first() : null;
+            if ($mode === 'soa' && $documents->every(function ($document) {
+                return in_array($document->document_type, ['soa', 'soa_a', 'statement_of_account_a'], true);
+            })) {
+                $mode = 'soa_a';
+            }
+            $reentryPayment = [
+                'customer_id' => $receipt->customer_id, 'class_code' => $receipt->class_code,
+                'invoice_numbers' => $documents->pluck('document_no')->unique()->values()->all(),
+                'payment_for' => $mode, 'amount' => $receipt->amount,
+                'payment_date' => $receipt->receipt_date, 'payment_method' => $receipt->payment_method,
+                'currency' => $receipt->currency, 'exchange_rate' => $receipt->exchange_rate,
+                'reference_no' => $receipt->reference_no, 'bank_account_id' => $receipt->bank_account_id,
+                'cwt_amount' => $receipt->cwt_amount,
+            ];
+        }
+
+        return view('erp.payments.create', compact('customers', 'invoices', 'payments', 'bankAccounts', 'receiptSeries', 'reentryPayment'));
     }
 
     private function paymentReceiptSeries()
@@ -9431,7 +9477,9 @@ class ModuleController extends Controller
                     $forPaymentAmount
                 )
                 ->where('receipts.company_id', $this->defaultCompanyId())
-                ->whereNotIn('receipts.status', ['voided', 'cancelled'])
+                ->when(!filter_var(request('show_voided'), FILTER_VALIDATE_BOOLEAN), function ($query) {
+                    $query->whereNotIn('receipts.status', ['voided', 'cancelled']);
+                })
                 ->groupBy(
                     'receipts.id',
                     'receipts.status',
@@ -9445,7 +9493,9 @@ class ModuleController extends Controller
                 )
                 ->orderBy('receipts.receipt_date', 'desc')
                 ->orderBy('receipts.id', 'desc')
-                ->limit(100)
+                ->when(!filter_var(request('show_voided'), FILTER_VALIDATE_BOOLEAN), function ($query) {
+                    $query->limit(100);
+                })
                 ->get()
                 ->map(function ($payment) {
                     return [
@@ -9646,7 +9696,7 @@ class ModuleController extends Controller
             'customer_id' => 'required|string|max:100',
             'customer_name' => 'nullable|string|max:255',
             'job_shipment_id' => 'nullable|string|max:100',
-            'invoice_no' => 'nullable|array',
+            'invoice_no' => 'required_with:reenter_receipt|nullable|array',
             'invoice_no.*' => 'string|max:100|distinct',
             'payment_for' => 'required|in:bi,soa,soa_a',
             'class_code' => 'nullable|in:MANILA,PAMPANGA,CEBU',
@@ -9659,8 +9709,14 @@ class ModuleController extends Controller
             'amount' => 'required',
             'cwt_amount' => 'nullable',
             'cwt_certificate_no' => 'nullable|string|max:100',
+            'receipt_no' => 'nullable|string|max:100|regex:/^[A-Za-z0-9-]+$/',
+            'reenter_receipt' => 'nullable|integer',
         ]);
         $this->authorizeAccountingPosting('payments', 'create');
+        if (!empty($data['receipt_no'])) {
+            abort_unless(app(RbacService::class)->normalizeRole(auth()->user()->role ?? '') === 'admin', 403);
+            $data['receipt_no'] = trim($data['receipt_no']);
+        }
 
         $payment = request()->only([
             'payment_for',
@@ -9698,6 +9754,11 @@ class ModuleController extends Controller
         }
 
         $companyId = $customer->company_id;
+        if (!empty($data['reenter_receipt'])) {
+            abort_unless(DB::table('receipts')->where('company_id', $companyId)
+                ->where('customer_id', $customer->id)->where('id', $data['reenter_receipt'])
+                ->whereIn('status', ['voided', 'cancelled'])->exists(), 422);
+        }
         $invoices = collect();
 
         if (Schema::hasTable('sales_documents') && count($invoiceNumbers) > 0) {
@@ -9772,9 +9833,17 @@ class ModuleController extends Controller
         $exchangeRate = $currency === 'PHP' ? 1 : max(0.000001, $this->moneyToFloat($data['exchange_rate'] ?? 1));
 
         $receiptResult = DB::transaction(function () use ($customer, $companyId, $invoices, $invoiceAmounts, $amount, $cwtAmount, $settlementAmount, $currency, $exchangeRate, $data, $paymentFor, $receiptComponent, $classCode) {
-            $receiptNo = $paymentFor === 'bi'
+            $receiptNo = !empty($data['receipt_no']) ? $data['receipt_no'] : ($paymentFor === 'bi'
                 ? $this->nextDocumentNumber('official_receipt', $this->classNumberPrefix('official_receipt', $classCode), 5, true, $classCode)
-                : $this->nextDocumentNumber('acknowledgement_receipt', $this->classNumberPrefix('acknowledgement_receipt', $classCode), 6, true, $classCode);
+                : $this->nextDocumentNumber('acknowledgement_receipt', $this->classNumberPrefix('acknowledgement_receipt', $classCode), 6, true, $classCode));
+            if (!empty($data['receipt_no'])) {
+                $receiptNo = $data['receipt_no'];
+                if (DB::table('receipts')->where('company_id', $companyId)->where('receipt_no', $receiptNo)->exists()) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'receipt_no' => 'This receipt number already exists, including voided receipts. Enter a unique number.',
+                    ]);
+                }
+            }
             $receiptId = DB::table('receipts')->insertGetId([
                 'company_id' => $companyId,
                 'customer_id' => $customer->id,
@@ -9836,6 +9905,16 @@ class ModuleController extends Controller
             }
 
             app(PostingService::class)->postReceipt($receiptId);
+            if (!empty($data['reenter_receipt'])) {
+                app(ActivityLogger::class)->log('recorded_again', 'receipt', $receiptId, [], [
+                    'original_receipt_id' => $data['reenter_receipt'], 'receipt_no' => $receiptNo,
+                ], $companyId);
+            }
+            if (!empty($data['receipt_no'])) {
+                app(ActivityLogger::class)->log('receipt_number_override', 'receipt', $receiptId, [], [
+                    'receipt_no' => $receiptNo,
+                ], $companyId);
+            }
 
             return ['id' => $receiptId, 'number' => $receiptNo];
         });

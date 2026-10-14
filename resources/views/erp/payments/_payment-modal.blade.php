@@ -147,6 +147,13 @@
                             <label class="form-label">Reference No.</label>
                             <input name="reference_no" class="form-control" value="">
                         </div>
+                        @if(app(\App\Services\Security\RbacService::class)->normalizeRole(auth()->user()->role ?? '') === 'admin')
+                        <div class="col-sm-6 col-lg-3">
+                            <label class="form-label">Receipt Number (Admin)</label>
+                            <input name="receipt_no" class="form-control" maxlength="100" pattern="[A-Za-z0-9-]+" value="{{ old('receipt_no') }}" placeholder="Automatic if blank">
+                            <div class="form-text">Enter the full receipt number. Existing numbers, including voided receipts, cannot be reused.</div>
+                        </div>
+                        @endif
                         <div class="col-sm-6 col-lg-3">
                             <label class="form-label">Deposit Bank Account</label>
                             <select name="bank_account_id" class="form-select">

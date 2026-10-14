@@ -64,6 +64,7 @@
             <p class="text-muted mb-0">Receive customer payments, apply them to invoices, and generate receipts.</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
+            <a href="{{ route('erp.payments.create', ['show_voided' => 1]) }}" class="btn btn-outline-secondary">Show voided payments</a>
             <a href="{{ route('erp.accounting.opening-balances.manual') }}" class="btn btn-outline-primary"><i class="bi bi-pencil-square me-1"></i> Manual Opening Balance</a>
             <a href="{{ route('erp.accounting.opening-balances.import') }}" class="btn btn-outline-primary"><i class="bi bi-upload me-1"></i> Import Invoices</a>
             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#paymentModal">
@@ -89,7 +90,7 @@
             <div class="erp-card p-3 h-100">
                 <div class="text-muted small">Total Collected</div>
                 <div class="h4 fw-bold mb-0">
-                    {{ number_format(array_sum(array_map(function ($payment) { return (float) str_replace(',', '', $payment['amount']); }, $payments)), 2) }}
+                    {{ number_format(array_sum(array_map(function ($payment) { return in_array($payment['status'], ['Voided', 'Cancelled'], true) ? 0 : (float) str_replace(',', '', $payment['amount']); }, $payments)), 2) }}
                 </div>
             </div>
         </div>
@@ -106,6 +107,8 @@
                     <option value="All">All Status</option>
                     <option value="Posted">Posted</option>
                     <option value="Draft">Draft</option>
+                    <option value="Voided">Voided</option>
+                    <option value="Cancelled">Cancelled</option>
                 </select>
                 <select class="form-select" id="typeFilter" style="width: 180px">
                     <option value="All">All Methods</option>
@@ -170,6 +173,9 @@
                         <td class="text-end">{{ $payment['currency'] === 'PHP' ? 'PHP' : $payment['currency'] }} {{ $payment['amount'] }}</td>
                         <td class="text-end">
                             <div class="d-inline-flex gap-1">
+                                @if(in_array($payment['status'], ['Voided', 'Cancelled'], true))
+                                <a class="btn btn-sm btn-outline-primary" href="{{ route('erp.payments.create', ['reenter_receipt' => $payment['id']]) }}">Record Again</a>
+                                @else
                                 <button type="button" class="btn btn-sm btn-outline-primary correct-payment"
                                         data-bs-toggle="modal" data-bs-target="#correctPaymentModal"
                                         data-url="{{ route('erp.payments.correct', $payment['id']) }}"
@@ -199,6 +205,7 @@
                                         <li><a class="dropdown-item" target="_blank" href="{{ route('erp.acknowledgement-receipt.preview', array_merge($receiptQuery, ['tax_print' => 'non_vat'])) }}">Non-VAT Print</a></li>
                                     </ul>
                                 </div>
+                                @endif
                                 @endif
                             </div>
                         </td>
@@ -295,7 +302,20 @@
             });
         }
 
-        if (requestedInvoice) {
+        var reentryPayment = @json($reentryPayment ?? null);
+        if (reentryPayment) {
+            var reentryForm = $('#paymentModal').find('form');
+            reentryForm.find('.payment-for-select').val(reentryPayment.payment_for || '').trigger('change');
+            reentryForm.find('.payment-customer-select').val(String(reentryPayment.customer_id)).trigger('change');
+            reentryForm.find('.payment-class-select').val(reentryPayment.class_code).trigger('change');
+            reentryForm.find('.payment-invoice-select').val(reentryPayment.invoice_numbers).trigger('change');
+            reentryForm.append($('<input>', { type: 'hidden', name: 'reenter_receipt', value: @json(request('reenter_receipt')) }));
+            if (paymentModal) { paymentModal.show(); }
+            $.each(['payment_date', 'payment_method', 'currency', 'exchange_rate', 'reference_no', 'bank_account_id', 'amount', 'cwt_amount'], function (_, name) {
+                reentryForm.find('[name="' + name + '"]').val(reentryPayment[name] == null ? '' : reentryPayment[name]);
+            });
+            reentryForm.find('.payment-amount-input').trigger('input');
+        } else if (requestedInvoice) {
             var form = $('#paymentModal').find('form');
             var requestedPaymentFor = @json(request('payment_for', ''));
             var requestedOption = form.find('.payment-invoice-select option').filter(function () { return this.value === requestedInvoice; });

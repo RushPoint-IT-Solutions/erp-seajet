@@ -19,8 +19,87 @@ class RecordPaymentPayableTest extends TestCase
 
         DB::purge('sqlite');
         Artisan::call('migrate:fresh', ['--seed' => true]);
+        $this->seed(\BillingReimbursementSampleSeeder::class);
+        $this->actingAsAdmin();
+        $this->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class);
+        $this->withoutExceptionHandling();
+    }
+
+    public function test_voided_reimbursable_soa_can_receive_a_new_payment_with_a_new_ar_number()
+    {
+        $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
+        DB::table('sales_documents')->where('id', $invoice->id)->update([
+            'document_no' => '7366', 'transaction_no' => '7366', 'soa_no' => '7366',
+            'invoice_amount' => 0, 'freight_total' => 99965.12, 'grand_total' => 99965.12,
+            'withholding_tax_amount' => 0, 'paid_total' => 0, 'balance_due' => 99965.12,
+            'document_type' => 'billing_invoice', 'class_code' => 'MANILA', 'status' => 'posted',
+        ]);
+        DB::table('number_series')->updateOrInsert([
+            'company_id' => $invoice->company_id,
+            'document_type' => 'acknowledgement_receipt', 'class_code' => 'MANILA',
+        ], [
+            'prefix' => 'AR-MNL-', 'current_number' => 7631, 'padding' => 7,
+            'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $fields = [
+            'customer_id' => (string) $invoice->customer_id, 'invoice_no' => ['7366'],
+            'payment_for' => 'soa', 'class_code' => 'MANILA', 'payment_date' => '2026-10-08',
+            'payment_method' => 'Cash', 'currency' => 'PHP', 'exchange_rate' => 1,
+            'amount' => '99965.12', 'cwt_amount' => 0,
+        ];
+        $this->post(route('erp.payments.receipt'), $fields)->assertOk();
+        $first = DB::table('receipts')->orderBy('id', 'desc')->first();
+        $this->assertSame('AR-MNL-0007632', $first->receipt_no);
+        $this->post(route('erp.payments.correct', $first->id), [
+            'reason' => 'Correct payment date',
+        ])->assertRedirect(route('erp.payments.create', ['invoice' => '7366', 'payment_for' => 'soa']));
+        $page = $this->get(route('erp.payments.create'))->assertOk();
+        $option = collect($page->original->getData()['invoices'])->firstWhere('id', $invoice->id);
+        $this->assertNotNull($option);
+        $this->assertEquals(99965.12, $option['soa_balance']);
+        $this->assertEquals(0, $option['bi_balance']);
+        $this->get(route('erp.payments.create', ['show_voided' => 1]))->assertOk()
+            ->assertSee($first->receipt_no)->assertSee('Record Again');
+        $reentry = $this->get(route('erp.payments.create', ['reenter_receipt' => $first->id]))->assertOk();
+        $this->assertSame(['7366'], $reentry->original->getData()['reentryPayment']['invoice_numbers']);
+        $this->assertSame('soa', $reentry->original->getData()['reentryPayment']['payment_for']);
+        $this->withExceptionHandling();
+        $this->post(route('erp.payments.receipt'), $fields + ['receipt_no' => $first->receipt_no])
+            ->assertSessionHasErrors('receipt_no');
+        $this->withoutExceptionHandling();
+        $this->post(route('erp.payments.receipt'), $fields)->assertOk();
+        $replacement = DB::table('receipts')->orderBy('id', 'desc')->first();
+        $this->assertSame('AR-MNL-0007633', $replacement->receipt_no);
+        $this->assertSame('voided', DB::table('receipts')->where('id', $first->id)->value('status'));
+        $this->assertDatabaseHas('sales_documents', ['id' => $invoice->id, 'status' => 'paid', 'balance_due' => 0]);
+        $this->assertDatabaseHas('receipt_applications', [
+            'receipt_id' => $replacement->id, 'sales_document_id' => $invoice->id,
+            'component' => 'soa', 'amount_applied' => 99965.12,
+        ]);
+    }
+
+    public function test_only_admin_can_override_the_receipt_number_and_the_override_is_audited()
+    {
+        $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
+        $fields = [
+            'customer_id' => (string) $invoice->customer_id, 'invoice_no' => [$invoice->document_no],
+            'payment_for' => 'soa', 'payment_date' => '2026-10-08', 'payment_method' => 'Cash',
+            'currency' => 'PHP', 'amount' => 50, 'receipt_no' => 'AR-MNL-0099999',
+        ];
+        $user = $this->actingAsAdmin();
+        $user->role = 'finance';
+        $this->withExceptionHandling();
+        $this->post(route('erp.payments.receipt'), $fields)->assertStatus(403);
+        $this->assertFalse(DB::table('receipts')->where('receipt_no', $fields['receipt_no'])->exists());
         $this->actingAsAdmin();
         $this->withoutExceptionHandling();
+        $this->post(route('erp.payments.receipt'), $fields)->assertOk();
+        $receipt = DB::table('receipts')->where('receipt_no', $fields['receipt_no'])->first();
+        $this->assertNotNull($receipt);
+        $this->assertDatabaseHas('activity_logs', [
+            'auditable_type' => 'receipt', 'auditable_id' => $receipt->id,
+            'action' => 'receipt_number_override',
+        ]);
     }
 
     public function test_record_payment_shows_only_unpaid_invoice_with_net_payable_amount()

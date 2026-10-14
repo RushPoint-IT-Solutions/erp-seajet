@@ -1,0 +1,48 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - img "SeaJet ERP logo" [ref=e8]
+          - generic [ref=e9]:
+            - generic [ref=e10]: 
+            - text: Secure ERP
+        - generic [ref=e11]:
+          - heading "SeaJet ERP" [level=1] [ref=e12]
+          - paragraph [ref=e13]: Finance, billing, collections, banking, and reporting in one controlled workspace.
+      - generic [ref=e14]:
+        - generic [ref=e15]:
+          - generic [ref=e16]:
+            - generic [ref=e17]: SeaJet Holdings
+            - text: Primary company workspace
+          - generic [ref=e18]: Ready
+        - generic [ref=e19]:
+          - generic [ref=e20]:
+            - generic [ref=e21]: Access Control
+            - text: Role-based permissions active
+          - generic [ref=e22]: Live
+    - generic [ref=e24]:
+      - generic [ref=e25]:
+        - generic [ref=e26]: Welcome Back
+        - heading "Sign in to your account" [level=2] [ref=e27]
+        - paragraph [ref=e28]: Use your ERP credentials to continue.
+      - generic [ref=e29]:
+        - generic [ref=e30]:
+          - generic [ref=e31]: Email address
+          - generic [ref=e32]:
+            - generic: 
+            - textbox "Email address" [active] [ref=e33]
+        - generic [ref=e34]:
+          - generic [ref=e35]: Password
+          - generic [ref=e36]:
+            - generic: 
+            - textbox "Password" [ref=e37]
+        - generic [ref=e39]:
+          - checkbox "Remember me" [ref=e40]
+          - generic [ref=e41]: Remember me
+        - button " Sign in" [ref=e42] [cursor=pointer]:
+          - generic [ref=e43]: 
+          - text: Sign in
+      - generic [ref=e44]:
+        - generic [ref=e45]: SeaJet ERP
+        - generic [ref=e46]: October 14, 2026
