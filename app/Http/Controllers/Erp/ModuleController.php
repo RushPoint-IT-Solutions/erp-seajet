@@ -11271,6 +11271,9 @@ class ModuleController extends Controller
                     'debit' => $effect > 0 ? $effect : 0,
                     'credit' => $effect < 0 ? abs($effect) : 0,
                     'effect' => $effect,
+                    '_journal_id' => null,
+                    '_source_type' => null,
+                    '_source_id' => null,
                 ];
             }
         }
@@ -11282,6 +11285,7 @@ class ModuleController extends Controller
                 ->where('journal_entries.company_id', $this->defaultCompanyId())
                 ->select(
                     'journal_entry_lines.account_id',
+                    'journal_entries.id as journal_entry_id',
                     'journal_entry_lines.description',
                     'journal_entry_lines.debit',
                     'journal_entry_lines.credit',
@@ -11289,6 +11293,8 @@ class ModuleController extends Controller
                     'journal_entries.journal_no',
                     'journal_entries.reference_no',
                     'journal_entries.source_module',
+                    'journal_entries.source_type',
+                    'journal_entries.source_id',
                     'journal_entries.memo',
                     'accounts.code as account_code',
                     'accounts.name as account_name'
@@ -11329,9 +11335,14 @@ class ModuleController extends Controller
                     'debit' => $debit,
                     'credit' => $credit,
                     'effect' => $debit - $credit,
+                    '_journal_id' => (int) $line->journal_entry_id,
+                    '_source_type' => strtolower((string) $line->source_type),
+                    '_source_id' => $line->source_id ? (int) $line->source_id : null,
                 ];
             }
         }
+
+        $entries = $this->trialBalanceDrilldownActions($entries);
 
         return response()->json([
             'column' => $column,
@@ -11342,6 +11353,114 @@ class ModuleController extends Controller
             'entries' => $entries,
             'total' => array_sum(array_column($entries, 'effect')),
         ]);
+    }
+
+    private function trialBalanceDrilldownActions(array $entries)
+    {
+        $salesSourceTypes = ['sales_document', 'invoice', 'billing_invoice', 'soa', 'soa_a', 'statement_of_account', 'statement_of_account_a'];
+        $purchaseSourceTypes = ['purchase_document', 'vendor_bill', 'bill'];
+        $salesIds = [];
+        $purchaseIds = [];
+
+        foreach ($entries as $entry) {
+            $sourceId = $entry['_source_id'] ?? null;
+            $sourceType = $entry['_source_type'] ?? '';
+            if ($sourceId && in_array($sourceType, $salesSourceTypes, true)) {
+                $salesIds[] = $sourceId;
+            }
+            if ($sourceId && in_array($sourceType, $purchaseSourceTypes, true)) {
+                $purchaseIds[] = $sourceId;
+            }
+        }
+
+        $salesDocuments = !empty($salesIds) && Schema::hasTable('sales_documents')
+            ? DB::table('sales_documents')->where('company_id', $this->defaultCompanyId())->whereIn('id', array_unique($salesIds))->get()->keyBy('id')
+            : collect();
+        $purchaseDocuments = !empty($purchaseIds) && Schema::hasTable('purchase_documents')
+            ? DB::table('purchase_documents')->where('company_id', $this->defaultCompanyId())->whereIn('id', array_unique($purchaseIds))->get()->keyBy('id')
+            : collect();
+
+        $salesWithActivePayments = collect();
+        if ($salesDocuments->isNotEmpty() && Schema::hasTable('receipt_applications') && Schema::hasTable('receipts')) {
+            $salesWithActivePayments = DB::table('receipt_applications')
+                ->join('receipts', 'receipts.id', '=', 'receipt_applications.receipt_id')
+                ->whereIn('receipt_applications.sales_document_id', $salesDocuments->keys()->all())
+                ->whereNotIn('receipts.status', ['cancelled', 'voided'])
+                ->where('receipt_applications.amount_applied', '>', 0)
+                ->pluck('receipt_applications.sales_document_id')
+                ->unique();
+        }
+
+        $purchaseWithActivePayments = collect();
+        if ($purchaseDocuments->isNotEmpty() && Schema::hasTable('payment_applications') && Schema::hasTable('payments')) {
+            $purchaseWithActivePayments = DB::table('payment_applications')
+                ->leftJoin('payments', 'payments.id', '=', 'payment_applications.payment_id')
+                ->whereIn('payment_applications.purchase_document_id', $purchaseDocuments->keys()->all())
+                ->where(function ($query) {
+                    $query->whereNull('payments.id')
+                        ->orWhereNotIn('payments.status', ['cancelled', 'voided'])
+                        ->orWhere('payments.posting_status', 'posted');
+                })
+                ->pluck('payment_applications.purchase_document_id')
+                ->unique();
+        }
+        if ($purchaseDocuments->isNotEmpty() && Schema::hasTable('payments')) {
+            $paidBillNumbers = DB::table('payments')
+                ->where('company_id', $this->defaultCompanyId())
+                ->whereIn('bill_no', $purchaseDocuments->pluck('document_no')->filter()->all())
+                ->where(function ($query) {
+                    $query->whereNotIn('status', ['cancelled', 'voided'])
+                        ->orWhere('posting_status', 'posted');
+                })
+                ->pluck('bill_no');
+            foreach ($purchaseDocuments as $document) {
+                if ($paidBillNumbers->contains($document->document_no)) {
+                    $purchaseWithActivePayments->push($document->id);
+                }
+            }
+            $purchaseWithActivePayments = $purchaseWithActivePayments->unique();
+        }
+
+        foreach ($entries as &$entry) {
+            $journalId = $entry['_journal_id'] ?? null;
+            $sourceId = $entry['_source_id'] ?? null;
+            $sourceType = $entry['_source_type'] ?? '';
+            $entry['journal_url'] = $journalId ? route('erp.accounting.journals.show', $journalId) : null;
+            $entry['source_url'] = null;
+            $entry['source_label'] = null;
+            $entry['delete_url'] = null;
+            $entry['delete_label'] = null;
+            $entry['can_delete'] = false;
+            $entry['delete_reason'] = $journalId ? 'Journal entries are view-only from this report.' : 'No source document is linked.';
+
+            if ($sourceId && in_array($sourceType, $salesSourceTypes, true) && ($document = $salesDocuments->get($sourceId))) {
+                $status = strtolower((string) $document->status);
+                $hasPayment = (float) ($document->paid_total ?? 0) > 0 || $salesWithActivePayments->contains($document->id);
+                $entry['source_url'] = route('erp.invoices.show', $document->id);
+                $entry['source_label'] = 'View Billing';
+                $entry['can_delete'] = !in_array($status, ['cancelled', 'voided', 'deleted'], true) && !$hasPayment;
+                $entry['delete_url'] = $entry['can_delete'] ? route('erp.billings.void', $document->id) : null;
+                $entry['delete_label'] = $entry['can_delete'] ? 'Review Void/Delete' : null;
+                $entry['delete_reason'] = $entry['can_delete']
+                    ? 'No active payment is linked; open the review screen to void or cancel.'
+                    : (in_array($status, ['cancelled', 'voided', 'deleted'], true) ? 'Billing is already voided or cancelled.' : 'Billing has an active or recorded payment.');
+            } elseif ($sourceId && in_array($sourceType, $purchaseSourceTypes, true) && ($document = $purchaseDocuments->get($sourceId))) {
+                $hasPayment = (float) ($document->paid_total ?? 0) > 0 || $purchaseWithActivePayments->contains($document->id);
+                $entry['source_url'] = route('erp.payables.vendor-bills.view', $document->id);
+                $entry['source_label'] = 'View Vendor Bill';
+                $entry['can_delete'] = !$hasPayment;
+                $entry['delete_url'] = $entry['can_delete'] ? route('erp.payables.vendor-bills.create', ['bill' => $document->document_no]) : null;
+                $entry['delete_label'] = $entry['can_delete'] ? 'Review Delete' : null;
+                $entry['delete_reason'] = $entry['can_delete']
+                    ? 'No active supplier payment is linked; deletion is available on the vendor bill.'
+                    : 'Vendor bill has an active or recorded supplier payment.';
+            }
+
+            unset($entry['_journal_id'], $entry['_source_type'], $entry['_source_id']);
+        }
+        unset($entry);
+
+        return $entries;
     }
 
     public function clientStatementOfAccount()

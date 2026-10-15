@@ -229,6 +229,8 @@
                                 <th class="text-end">Debit</th>
                                 <th class="text-end">Credit</th>
                                 <th class="text-end">Net Effect</th>
+                                <th>Status</th>
+                                <th>Actions</th>
                             </tr>
                             </thead>
                             <tbody id="trialDrilldownBody"></tbody>
@@ -275,7 +277,7 @@
 
                 title.textContent = button.dataset.column;
                 subtitle.textContent = button.dataset.account + ' · ' + period;
-                body.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-5"><span class="spinner-border spinner-border-sm me-2"></span>Loading raw data...</td></tr>';
+                body.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-5"><span class="spinner-border spinner-border-sm me-2"></span>Loading raw data...</td></tr>';
                 count.textContent = '';
                 total.textContent = '-';
                 modal.show();
@@ -294,7 +296,7 @@
                     .then(function (data) {
                         body.innerHTML = '';
                         if (!data.entries.length) {
-                            body.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-5">No journal lines found for this amount.</td></tr>';
+                            body.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-5">No journal lines found for this amount.</td></tr>';
                         } else {
                             data.entries.forEach(function (entry) {
                                 var tr = document.createElement('tr');
@@ -307,6 +309,35 @@
                                 tr.appendChild(cell(money(entry.debit), 'text-end'));
                                 tr.appendChild(cell(money(entry.credit), 'text-end'));
                                 tr.appendChild(cell(money(entry.effect), 'text-end fw-semibold'));
+                                var statusCell = document.createElement('td');
+                                var badge = document.createElement('span');
+                                badge.className = 'badge ' + (entry.can_delete ? 'text-bg-success' : 'text-bg-secondary');
+                                badge.textContent = entry.can_delete ? 'Can delete/void' : 'View only';
+                                badge.title = entry.delete_reason || '';
+                                statusCell.appendChild(badge);
+                                if (entry.delete_reason) {
+                                    var reason = document.createElement('div');
+                                    reason.className = 'small text-muted mt-1';
+                                    reason.textContent = entry.delete_reason;
+                                    statusCell.appendChild(reason);
+                                }
+                                tr.appendChild(statusCell);
+
+                                var actionCell = document.createElement('td');
+                                actionCell.className = 'text-nowrap';
+                                function addAction(url, label, className) {
+                                    if (!url) return;
+                                    var link = document.createElement('a');
+                                    link.href = url;
+                                    link.className = 'btn btn-sm ' + className + ' me-1 mb-1';
+                                    link.textContent = label;
+                                    actionCell.appendChild(link);
+                                }
+                                addAction(entry.source_url, entry.source_label, 'btn-outline-primary');
+                                addAction(entry.journal_url, 'View Journal', 'btn-outline-secondary');
+                                addAction(entry.delete_url, entry.delete_label, 'btn-outline-danger');
+                                if (!actionCell.children.length) actionCell.textContent = '-';
+                                tr.appendChild(actionCell);
                                 body.appendChild(tr);
                             });
                         }
@@ -314,7 +345,7 @@
                         total.textContent = money(data.total);
                     })
                     .catch(function (error) {
-                        body.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-5"></td></tr>';
+                        body.innerHTML = '<tr><td colspan="11" class="text-center text-danger py-5"></td></tr>';
                         body.querySelector('td').textContent = error.message;
                     });
             });
