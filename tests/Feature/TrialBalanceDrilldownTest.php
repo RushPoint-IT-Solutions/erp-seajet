@@ -247,4 +247,72 @@ class TrialBalanceDrilldownTest extends TestCase
             'total' => 0,
         ]);
     }
+
+    public function test_trial_balance_keeps_legacy_opening_line_when_active_invoice_matches_document_number()
+    {
+        $account = DB::table('accounts')->where('company_id', 1)->where('opening_balance', 0)->orderBy('id')->first();
+        $balancingAccount = DB::table('accounts')->where('company_id', 1)->where('id', '<>', $account->id)->orderBy('id')->first();
+        $invoice = DB::table('sales_documents')->where('company_id', 1)->first();
+        DB::table('sales_documents')->where('id', $invoice->id)->update([
+            'status' => 'draft',
+            'posting_status' => 'posted',
+        ]);
+
+        $journalId = DB::table('journal_entries')->insertGetId([
+            'company_id' => 1,
+            'journal_no' => 'OB-LEGACY-ACTIVE-BILLING',
+            'journal_date' => '2026-09-01',
+            'source_module' => 'GL',
+            'source_type' => 'opening_balance_import',
+            'source_id' => 1,
+            'reference_no' => $invoice->document_no,
+            'memo' => 'Legacy A/R opening balance '.$invoice->document_no,
+            'status' => 'posted',
+        ]);
+        DB::table('journal_entry_lines')->insert([
+            ['journal_entry_id' => $journalId, 'account_id' => $account->id, 'description' => 'Legacy A/R opening balance '.$invoice->document_no, 'debit' => 175, 'credit' => 0],
+            ['journal_entry_id' => $journalId, 'account_id' => $balancingAccount->id, 'description' => 'Legacy A/R opening balance '.$invoice->document_no, 'debit' => 0, 'credit' => 175],
+        ]);
+
+        $fileHash = str_repeat('a', 64);
+        $batchId = DB::table('opening_balance_import_batches')->insertGetId([
+            'company_id' => 1,
+            'original_filename' => 'legacy-active-invoice.xlsx',
+            'file_hash' => $fileHash,
+            'posting_date' => '2026-09-01',
+            'journal_entry_id' => $journalId,
+        ]);
+        DB::table('opening_balance_import_rows')->insert([
+            'batch_id' => $batchId,
+            'company_id' => 1,
+            'file_hash' => $fileHash,
+            'sheet_name' => 'AR',
+            'row_number' => 2,
+            'balance_type' => 'receivable',
+            'branch_name' => 'Main',
+            'party_name' => 'Legacy Customer',
+            'source_date' => '2026-09-01',
+            'reference_no' => $invoice->document_no,
+            'subledger_document_no' => $invoice->document_no,
+            'sales_document_id' => null,
+            'currency' => 'PHP',
+            'exchange_rate' => 1,
+            'base_amount' => 175,
+            'journal_entry_id' => $journalId,
+        ]);
+
+        $response = $this->getJson(route('erp.reports.trial-balance.drilldown', [
+            'period' => '2026-10',
+            'account_id' => $account->id,
+            'column' => 'BEGINNING BALANCE',
+        ]));
+
+        $response->assertStatus(200)
+            ->assertJsonFragment(['journal_no' => 'OB-LEGACY-ACTIVE-BILLING'])
+            ->assertJson(['total' => 175]);
+
+        $rows = $this->get(route('erp.reports.trial-balance', ['period' => '2026-10']))->original->getData()['rows'];
+        $row = collect($rows)->firstWhere('__account_id', (int) $account->id);
+        $this->assertEquals(175, (float) $row['BEGINNING BALANCE']);
+    }
 }
