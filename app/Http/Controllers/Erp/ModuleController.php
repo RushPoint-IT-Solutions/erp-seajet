@@ -9344,6 +9344,7 @@ class ModuleController extends Controller
 
         $soaParticulars = [];
         $soaAmounts = [];
+        $soaLines = [];
         foreach ($reimbursementLineIndexes as $index) {
             $description = trim((string) $lineValue($descriptions, $index));
             $amount = $this->moneyToFloat($lineValue($lineAmounts, $index));
@@ -9353,6 +9354,12 @@ class ModuleController extends Controller
             }
             if ($amount !== 0.0) {
                 $soaAmounts[] = number_format($amount, 2);
+            }
+            if ($description !== '' || $amount !== 0.0) {
+                $soaLines[] = [
+                    'description' => $description !== '' ? $description : trim((string) $lineValue($items, $index)),
+                    'amount' => $amount,
+                ];
             }
         }
 
@@ -9404,6 +9411,7 @@ class ModuleController extends Controller
             'billing_amounts' => implode("\n", $billingAmounts),
             'soa_particulars' => implode("\n", $soaParticulars),
             'soa_amounts' => implode("\n", $soaAmounts),
+            'soa_lines' => $soaLines,
             'vatable_sales' => $resolvedVatableSales,
             'vat_amount' => $this->moneyToFloat($read('vat_amount', '0')),
             'zero_rated_sales' => $resolvedZeroRatedSales,

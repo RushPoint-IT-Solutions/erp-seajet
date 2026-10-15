@@ -100,6 +100,30 @@
     .print-field-amounts {
         max-height: 395px;
     }
+    .soa-item-lines {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-height: 395px;
+        overflow: hidden;
+        box-sizing: border-box;
+    }
+    .soa-item-line {
+        display: grid;
+        align-items: start;
+        line-height: 1.12;
+        break-inside: avoid;
+    }
+    .soa-item-description {
+        white-space: pre-line;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+    .soa-item-amount {
+        text-align: right;
+        white-space: nowrap;
+    }
     .print-field-payment_note {
         max-height: 80px;
     }
@@ -182,6 +206,11 @@
         $soaAmounts = trim($print['soa_amounts'] ?? '') !== ''
             ? $print['soa_amounts']
             : number_format((float) ($print['reimbursement_total'] ?? 0), 2);
+        $soaLines = collect($print['soa_lines'] ?? [])
+            ->filter(function ($line) {
+                return trim((string) ($line['description'] ?? '')) !== '' || (float) ($line['amount'] ?? 0) !== 0.0;
+            })
+            ->values();
         $billingInvoiceAmount = max(0, (float) ($print['billing_total'] ?? 0) - (float) ($print['withholding_tax'] ?? 0));
         $soaBTotal = (float) ($print['reimbursement_total'] ?? 0);
         $combinedPayableTotal = $billingInvoiceAmount + $soaBTotal;
@@ -238,8 +267,19 @@
         <div class="print-field fit-multiline print-field-customer" data-fit-text style="left: {{ $p['customer'][0] }}px; top: {{ $p['customer'][1] }}px; {{ $fieldStyle('customer') }}">{{ $print['customer'] }}</div>
         <div class="print-field fit-multiline print-field-address" data-fit-text style="left: {{ $p['address'][0] }}px; top: {{ $p['address'][1] }}px; {{ $fieldStyle('address') }}">{{ $print['address'] }}</div>
         <div class="print-field fit-single-line print-field-date" data-fit-text style="left: {{ $p['date'][0] }}px; top: {{ $p['date'][1] }}px; {{ $fieldStyle('date') }}">{{ $print['invoice_date'] }}</div>
-        <div class="print-field fit-multiline print-field-particulars" data-fit-text data-min-font="6" style="left: {{ $p['particulars'][0] }}px; top: {{ $p['particulars'][1] }}px; {{ $fieldStyle('particulars') }}">{{ $soaParticulars }}</div>
-        <div class="print-field fit-multiline amount print-field-amounts" data-fit-text data-min-font="6" style="left: {{ $p['amounts'][0] }}px; top: {{ $p['amounts'][1] }}px; {{ $fieldStyle('amounts') }}">{{ $soaAmounts }}</div>
+        @if($soaLines->isNotEmpty())
+            <div class="soa-item-lines" style="left: {{ $p['particulars'][0] }}px; top: {{ min($p['particulars'][1], $p['amounts'][1]) }}px; width: {{ max($s['particulars']['width'], ($p['amounts'][0] - $p['particulars'][0]) + $s['amounts']['width']) }}px; font-size: {{ $s['particulars']['font_size'] }}px">
+                @foreach($soaLines as $line)
+                    <div class="soa-item-line" style="grid-template-columns: {{ $s['particulars']['width'] }}px {{ $s['amounts']['width'] }}px; column-gap: {{ max(0, $p['amounts'][0] - ($p['particulars'][0] + $s['particulars']['width'])) }}px">
+                        <div class="soa-item-description print-field-particulars" style="font-size: {{ $s['particulars']['font_size'] }}px">{{ $line['description'] ?? '' }}</div>
+                        <div class="soa-item-amount print-field-amounts" style="font-size: {{ $s['amounts']['font_size'] }}px">{{ (float) ($line['amount'] ?? 0) !== 0.0 ? number_format((float) $line['amount'], 2) : '' }}</div>
+                    </div>
+                @endforeach
+            </div>
+        @else
+            <div class="print-field fit-multiline print-field-particulars" data-fit-text data-min-font="6" style="left: {{ $p['particulars'][0] }}px; top: {{ $p['particulars'][1] }}px; {{ $fieldStyle('particulars') }}">{{ $soaParticulars }}</div>
+            <div class="print-field fit-multiline amount print-field-amounts" data-fit-text data-min-font="6" style="left: {{ $p['amounts'][0] }}px; top: {{ $p['amounts'][1] }}px; {{ $fieldStyle('amounts') }}">{{ $soaAmounts }}</div>
+        @endif
         <div class="soa-payment-note-line soa-payment-note-small print-field-payment_note" style="left: {{ $paymentNoteLeft }}px; top: {{ $paymentNoteTop }}px; width: {{ $paymentNoteWidth }}px; font-size: {{ $paymentNoteSmallFontSize }}px">
             PLEASE PAY THIS REIMBURSEMENT CHARGES TOGETHER WITH INVOICE NUMBER {{ $print['invoice_no'] ?? '' }}
         </div>

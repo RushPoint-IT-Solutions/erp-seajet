@@ -58,6 +58,31 @@
     .print-field-amounts {
         max-height: 510px;
     }
+    .soa-item-lines {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-height: 510px;
+        overflow: hidden;
+        box-sizing: border-box;
+    }
+    .soa-item-line {
+        display: grid;
+        align-items: start;
+        line-height: 1.12;
+        break-inside: avoid;
+    }
+    .soa-item-description {
+        white-space: pre-line;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+    .soa-item-amount {
+        text-align: right;
+        white-space: nowrap;
+        font-weight: 600;
+    }
     .print-field-customer,
     .print-field-address,
     .print-field-shipper {
@@ -109,6 +134,11 @@
         $soaAmounts = trim($print['billing_amounts'] ?? '') !== ''
             ? $print['billing_amounts']
             : number_format((float) ($print['billing_total'] ?? $print['soa_total'] ?? 0), 2);
+        $soaLines = collect($print['billing_lines'] ?? [])
+            ->filter(function ($line) {
+                return trim((string) ($line['description'] ?? '')) !== '' || (float) ($line['amount'] ?? 0) !== 0.0;
+            })
+            ->values();
         $shipperText = trim($print['shipper'] ?? '');
         if ($shipperText === '' && preg_match('/SHIPPER:\s*([^\r\n]+)/i', $soaParticulars, $shipperMatch)) {
             $shipperText = trim($shipperMatch[1]);
@@ -160,8 +190,19 @@
         <div class="label" style="left: 480px; top: 900px; font-size: 15px">Sea-Jet International Forwarders, Inc.</div>
         <div class="line" style="left: 505px; top: 948px; width: 300px"></div>
 
-        <div class="field fit-multiline print-field-particulars" data-fit-text data-min-font="6" style="left: {{ $p['particulars'][0] }}px; top: {{ $p['particulars'][1] }}px; {{ $fieldStyle('particulars') }}">{{ $soaParticulars }}</div>
-        <div class="field fit-multiline amount print-field-amounts" data-fit-text data-min-font="6" style="left: {{ $p['amounts'][0] }}px; top: {{ $p['amounts'][1] }}px; {{ $fieldStyle('amounts') }}">{{ $soaAmounts }}</div>
+        @if($soaLines->isNotEmpty())
+            <div class="soa-item-lines" style="left: {{ $p['particulars'][0] }}px; top: {{ min($p['particulars'][1], $p['amounts'][1]) }}px; width: {{ max($s['particulars']['width'], ($p['amounts'][0] - $p['particulars'][0]) + $s['amounts']['width']) }}px; font-size: {{ $s['particulars']['font_size'] }}px">
+                @foreach($soaLines as $line)
+                    <div class="soa-item-line" style="grid-template-columns: {{ $s['particulars']['width'] }}px {{ $s['amounts']['width'] }}px; column-gap: {{ max(0, $p['amounts'][0] - ($p['particulars'][0] + $s['particulars']['width'])) }}px">
+                        <div class="soa-item-description print-field-particulars" style="font-size: {{ $s['particulars']['font_size'] }}px">{{ $line['description'] ?? '' }}</div>
+                        <div class="soa-item-amount print-field-amounts" style="font-size: {{ $s['amounts']['font_size'] }}px">{{ (float) ($line['amount'] ?? 0) !== 0.0 ? number_format((float) $line['amount'], 2) : '' }}</div>
+                    </div>
+                @endforeach
+            </div>
+        @else
+            <div class="field fit-multiline print-field-particulars" data-fit-text data-min-font="6" style="left: {{ $p['particulars'][0] }}px; top: {{ $p['particulars'][1] }}px; {{ $fieldStyle('particulars') }}">{{ $soaParticulars }}</div>
+            <div class="field fit-multiline amount print-field-amounts" data-fit-text data-min-font="6" style="left: {{ $p['amounts'][0] }}px; top: {{ $p['amounts'][1] }}px; {{ $fieldStyle('amounts') }}">{{ $soaAmounts }}</div>
+        @endif
         <div class="field fit-single-line amount print-field-total_reimbursement" data-fit-text style="left: {{ $p['total_reimbursement'][0] }}px; top: {{ $p['total_reimbursement'][1] }}px; {{ $fieldStyle('total_reimbursement') }}">{{ number_format((float) ($print['soa_total'] ?? 0), 2) }}</div>
         <div class="field fit-multiline print-field-customer" data-fit-text style="left: {{ $p['customer'][0] }}px; top: {{ $p['customer'][1] }}px; {{ $fieldStyle('customer') }}">{{ $customerDisplay }}</div>
         <div class="field fit-multiline print-field-address" data-fit-text data-min-font="6" style="left: {{ $p['address'][0] }}px; top: {{ $p['address'][1] }}px; {{ $fieldStyle('address') }}">{{ $addressDisplay }}</div>

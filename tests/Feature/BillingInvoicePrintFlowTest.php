@@ -375,6 +375,32 @@ class BillingInvoicePrintFlowTest extends TestCase
         $this->assertRegExp('/print-field-total_reimbursement[^>]*>50\.00<\/div>/', $soaPrint->getContent());
     }
 
+    public function test_soa_print_keeps_each_amount_on_the_same_row_as_its_item()
+    {
+        $query = http_build_query([
+            'item' => ['Ocean freight', 'LSS', 'ERC'],
+            'item_description' => [
+                "OCEAN FREIGHT (95% OF FREIGHT CHARGES)\n(950 X 63.05 = 59,897.50 X 95%)",
+                'LSS',
+                'ERC',
+            ],
+            'line_ar_account' => [
+                'A/R-Reimbursable Charges',
+                'A/R-Reimbursable Charges',
+                'A/R-Reimbursable Charges',
+            ],
+            'line_amount' => ['56902.63', '12294.95', '11033.75'],
+            'reimbursement_total' => '80231.33',
+        ]);
+
+        $soa = $this->get('/erp/billings/print/statement-of-account?'.$query);
+
+        $soa->assertStatus(200);
+        $this->assertRegExp('/soa-item-line[^>]*>\s*<div class="soa-item-description print-field-particulars"[^>]*>OCEAN FREIGHT.*?<div class="soa-item-amount print-field-amounts"[^>]*>56,902\.63<\/div>/s', $soa->getContent());
+        $this->assertRegExp('/soa-item-line[^>]*>\s*<div class="soa-item-description print-field-particulars"[^>]*>LSS<\/div>\s*<div class="soa-item-amount print-field-amounts"[^>]*>12,294\.95<\/div>/s', $soa->getContent());
+        $this->assertRegExp('/soa-item-line[^>]*>\s*<div class="soa-item-description print-field-particulars"[^>]*>ERC<\/div>\s*<div class="soa-item-amount print-field-amounts"[^>]*>11,033\.75<\/div>/s', $soa->getContent());
+    }
+
     public function test_guest_or_non_tax_billing_review_can_print_soa_a_only()
     {
         $response = $this->post('/erp/invoices/review', $this->payload([
