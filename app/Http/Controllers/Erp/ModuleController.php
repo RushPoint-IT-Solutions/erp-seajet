@@ -11232,6 +11232,118 @@ class ModuleController extends Controller
         return view('erp.reports.trial-balance', compact('activeReport', 'company', 'period', 'rows', 'totals'));
     }
 
+    public function trialBalanceDrilldown()
+    {
+        request()->validate([
+            'period' => ['required', 'date_format:Y-m'],
+            'account_id' => ['required'],
+            'column' => ['required', 'in:BEGINNING BALANCE,SALES BOOK,SOA,CASH RECEIPTS BOOK,CASH DISBURSEMENT BOOK,JOURNAL BOOK,ENDING TRIAL BALANCE'],
+        ]);
+
+        $period = request('period');
+        $column = request('column');
+        $accountId = request('account_id') === 'all' ? null : (int) request('account_id');
+        list($startDate, $endDate) = $this->trialBalanceDateRange($period);
+        $accounts = $this->trialBalanceAccounts();
+
+        if ($accountId && !$accounts->contains('id', $accountId)) {
+            abort(404);
+        }
+
+        $selectedAccounts = $accountId ? $accounts->where('id', $accountId) : $accounts;
+        $entries = [];
+        $includeOpening = in_array($column, ['BEGINNING BALANCE', 'ENDING TRIAL BALANCE'], true);
+
+        if ($includeOpening) {
+            foreach ($selectedAccounts as $account) {
+                $opening = (float) ($account->opening_balance ?? 0);
+                $effect = $this->trialBalanceNormalBalance($account) === 'credit' ? -abs($opening) : $opening;
+                if (abs($effect) < .00005) {
+                    continue;
+                }
+                $entries[] = [
+                    'date' => null,
+                    'account' => trim(($account->code ? $account->code.' - ' : '').$account->name),
+                    'journal_no' => 'OPENING BALANCE',
+                    'reference_no' => null,
+                    'source' => 'Opening Balance',
+                    'description' => 'Stored chart of accounts opening balance',
+                    'debit' => $effect > 0 ? $effect : 0,
+                    'credit' => $effect < 0 ? abs($effect) : 0,
+                    'effect' => $effect,
+                ];
+            }
+        }
+
+        if (Schema::hasTable('journal_entry_lines') && Schema::hasTable('journal_entries')) {
+            $query = DB::table('journal_entry_lines')
+                ->join('journal_entries', 'journal_entries.id', '=', 'journal_entry_lines.journal_entry_id')
+                ->join('accounts', 'accounts.id', '=', 'journal_entry_lines.account_id')
+                ->where('journal_entries.company_id', $this->defaultCompanyId())
+                ->select(
+                    'journal_entry_lines.account_id',
+                    'journal_entry_lines.description',
+                    'journal_entry_lines.debit',
+                    'journal_entry_lines.credit',
+                    'journal_entries.journal_date',
+                    'journal_entries.journal_no',
+                    'journal_entries.reference_no',
+                    'journal_entries.source_module',
+                    'journal_entries.memo',
+                    'accounts.code as account_code',
+                    'accounts.name as account_name'
+                )
+                ->orderBy('journal_entries.journal_date')
+                ->orderBy('journal_entries.id')
+                ->orderBy('journal_entry_lines.id');
+
+            $this->excludeVoidedSalesDocumentJournals($query);
+
+            if ($accountId) {
+                $query->where('journal_entry_lines.account_id', $accountId);
+            }
+
+            if ($column === 'BEGINNING BALANCE') {
+                $query->where('journal_entries.journal_date', '<', $startDate);
+            } elseif ($column === 'ENDING TRIAL BALANCE') {
+                $query->where('journal_entries.journal_date', '<=', $endDate);
+            } else {
+                $query->whereBetween('journal_entries.journal_date', [$startDate, $endDate]);
+            }
+
+            foreach ($query->get() as $line) {
+                if (!in_array($column, ['BEGINNING BALANCE', 'ENDING TRIAL BALANCE'], true)
+                    && $this->trialBalanceColumnForSource($line->source_module) !== $column) {
+                    continue;
+                }
+
+                $debit = (float) $line->debit;
+                $credit = (float) $line->credit;
+                $entries[] = [
+                    'date' => $line->journal_date,
+                    'account' => trim(($line->account_code ? $line->account_code.' - ' : '').$line->account_name),
+                    'journal_no' => $line->journal_no,
+                    'reference_no' => $line->reference_no,
+                    'source' => $line->source_module,
+                    'description' => $line->description ?: $line->memo,
+                    'debit' => $debit,
+                    'credit' => $credit,
+                    'effect' => $debit - $credit,
+                ];
+            }
+        }
+
+        return response()->json([
+            'column' => $column,
+            'period' => $period,
+            'account' => $accountId
+                ? trim((optional($selectedAccounts->first())->code ? optional($selectedAccounts->first())->code.' - ' : '').optional($selectedAccounts->first())->name)
+                : 'All accounts',
+            'entries' => $entries,
+            'total' => array_sum(array_column($entries, 'effect')),
+        ]);
+    }
+
     public function clientStatementOfAccount()
     {
         $company = Schema::hasTable('companies') ? DB::table('companies')->where('id', $this->defaultCompanyId())->first() : null;
@@ -11588,6 +11700,7 @@ class ModuleController extends Controller
             $title = trim(($account->code ? $account->code.' - ' : '').$account->name);
 
             return [
+                '__account_id' => (int) $account->id,
                 'ACCOUNT TITLES' => $title,
                 'BEGINNING BALANCE' => $opening,
                 'SALES BOOK' => $sales,

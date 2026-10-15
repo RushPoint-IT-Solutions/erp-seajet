@@ -53,6 +53,33 @@
         text-align: right;
         font-variant-numeric: tabular-nums;
     }
+    .trial-amount-button {
+        appearance: none;
+        border: 0;
+        background: transparent;
+        color: #0d6efd;
+        padding: 0;
+        font: inherit;
+        font-variant-numeric: tabular-nums;
+        text-decoration: underline;
+        text-decoration-style: dotted;
+        text-underline-offset: 3px;
+        cursor: pointer;
+    }
+    .trial-amount-button:hover,
+    .trial-amount-button:focus {
+        color: #084298;
+        text-decoration-style: solid;
+    }
+    .trial-drilldown-table {
+        font-size: 12px;
+    }
+    .trial-drilldown-table th {
+        white-space: nowrap;
+    }
+    .trial-drilldown-table td {
+        vertical-align: top;
+    }
     .trial-table tfoot td {
         border-top: 2px solid #111827;
         font-weight: 800;
@@ -138,7 +165,14 @@
                         <tr>
                             @foreach($columns as $column)
                                 @php($value = $row[$column] ?? '')
-                                <td class="{{ is_numeric($value) ? 'amount' : '' }}">{{ is_numeric($value) ? $money($value) : $value }}</td>
+                                <td class="{{ is_numeric($value) ? 'amount' : '' }}">
+                                    @if(is_numeric($value) && abs((float) $value) >= .005)
+                                        <button type="button" class="trial-amount-button no-print" data-trial-drilldown data-account-id="{{ $row['__account_id'] }}" data-account="{{ $row['ACCOUNT TITLES'] }}" data-column="{{ $column }}">{{ $money($value) }}</button>
+                                        <span class="d-none d-print-inline">{{ $money($value) }}</span>
+                                    @else
+                                        {{ is_numeric($value) ? $money($value) : $value }}
+                                    @endif
+                                </td>
                             @endforeach
                         </tr>
                     @endforeach
@@ -155,7 +189,14 @@
                     <tr>
                         @foreach($columns as $column)
                             @php($value = $totals[$column] ?? '')
-                            <td class="{{ is_numeric($value) ? 'amount' : '' }}">{{ is_numeric($value) ? $money($value) : $value }}</td>
+                            <td class="{{ is_numeric($value) ? 'amount' : '' }}">
+                                @if(is_numeric($value) && abs((float) $value) >= .005)
+                                    <button type="button" class="trial-amount-button no-print" data-trial-drilldown data-account-id="all" data-account="All accounts" data-column="{{ $column }}">{{ $money($value) }}</button>
+                                    <span class="d-none d-print-inline">{{ $money($value) }}</span>
+                                @else
+                                    {{ is_numeric($value) ? $money($value) : $value }}
+                                @endif
+                            </td>
                         @endforeach
                     </tr>
                     </tfoot>
@@ -163,4 +204,120 @@
             </table>
         </div>
     </div>
+
+    <div class="modal fade" id="trialBalanceDrilldownModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h2 class="modal-title fs-5" id="trialDrilldownTitle">Trial Balance Raw Data</h2>
+                        <div class="small text-muted" id="trialDrilldownSubtitle"></div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover trial-drilldown-table mb-0">
+                            <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Date</th>
+                                <th>Account</th>
+                                <th>Journal No.</th>
+                                <th>Reference</th>
+                                <th>Source</th>
+                                <th>Description</th>
+                                <th class="text-end">Debit</th>
+                                <th class="text-end">Credit</th>
+                                <th class="text-end">Net Effect</th>
+                            </tr>
+                            </thead>
+                            <tbody id="trialDrilldownBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer justify-content-between">
+                    <span class="small text-muted" id="trialDrilldownCount"></span>
+                    <strong>Net total: <span id="trialDrilldownTotal">-</span></strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var modalElement = document.getElementById('trialBalanceDrilldownModal');
+            var modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+            var body = document.getElementById('trialDrilldownBody');
+            var title = document.getElementById('trialDrilldownTitle');
+            var subtitle = document.getElementById('trialDrilldownSubtitle');
+            var count = document.getElementById('trialDrilldownCount');
+            var total = document.getElementById('trialDrilldownTotal');
+            var endpoint = @json(route('erp.reports.trial-balance.drilldown'));
+            var period = @json($period);
+
+            function money(value) {
+                var amount = Number(value) || 0;
+                if (Math.abs(amount) < .005) return '-';
+                var formatted = Math.abs(amount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                return amount < 0 ? '(' + formatted + ')' : formatted;
+            }
+
+            function cell(value, className) {
+                var td = document.createElement('td');
+                td.textContent = value || '-';
+                if (className) td.className = className;
+                return td;
+            }
+
+            document.addEventListener('click', function (event) {
+                var button = event.target.closest('[data-trial-drilldown]');
+                if (!button) return;
+
+                title.textContent = button.dataset.column;
+                subtitle.textContent = button.dataset.account + ' · ' + period;
+                body.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-5"><span class="spinner-border spinner-border-sm me-2"></span>Loading raw data...</td></tr>';
+                count.textContent = '';
+                total.textContent = '-';
+                modal.show();
+
+                var params = new URLSearchParams({
+                    period: period,
+                    account_id: button.dataset.accountId,
+                    column: button.dataset.column
+                });
+
+                fetch(endpoint + '?' + params.toString(), {headers: {'Accept': 'application/json'}})
+                    .then(function (response) {
+                        if (!response.ok) throw new Error('Unable to load the trial balance raw data.');
+                        return response.json();
+                    })
+                    .then(function (data) {
+                        body.innerHTML = '';
+                        if (!data.entries.length) {
+                            body.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-5">No journal lines found for this amount.</td></tr>';
+                        } else {
+                            data.entries.forEach(function (entry) {
+                                var tr = document.createElement('tr');
+                                tr.appendChild(cell(entry.date));
+                                tr.appendChild(cell(entry.account));
+                                tr.appendChild(cell(entry.journal_no));
+                                tr.appendChild(cell(entry.reference_no));
+                                tr.appendChild(cell(entry.source));
+                                tr.appendChild(cell(entry.description));
+                                tr.appendChild(cell(money(entry.debit), 'text-end'));
+                                tr.appendChild(cell(money(entry.credit), 'text-end'));
+                                tr.appendChild(cell(money(entry.effect), 'text-end fw-semibold'));
+                                body.appendChild(tr);
+                            });
+                        }
+                        count.textContent = data.entries.length.toLocaleString() + (data.entries.length === 1 ? ' raw line' : ' raw lines');
+                        total.textContent = money(data.total);
+                    })
+                    .catch(function (error) {
+                        body.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-5"></td></tr>';
+                        body.querySelector('td').textContent = error.message;
+                    });
+            });
+        });
+    </script>
 @endsection
