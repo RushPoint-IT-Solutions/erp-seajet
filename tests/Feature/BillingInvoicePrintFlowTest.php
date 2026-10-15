@@ -194,7 +194,7 @@ class BillingInvoicePrintFlowTest extends TestCase
             'customer_name' => 'North Harbor Trading',
             'vat_classification' => '12%',
             'ar_account' => 'A/Trade-Billing Invoice',
-            'invoice_template' => 'SOA_B',
+            'invoice_template' => ['SOA_B', 'Billing Invoice'],
             'customer_tax_code' => 'VAT12',
         ]));
 
@@ -204,6 +204,59 @@ class BillingInvoicePrintFlowTest extends TestCase
         $show->assertSee('Print SOA B');
         $show->assertSee('Print Billing Invoice');
         $show->assertDontSee('Print SOA A');
+    }
+
+    public function test_soa_b_only_uses_its_soa_number_without_assigning_a_bi_number()
+    {
+        $this->withoutExceptionHandling();
+        $series = DB::table('number_series')
+            ->where('document_type', 'billing_invoice')
+            ->where('class_code', 'PAMPANGA');
+        $startingNumber = (int) (clone $series)->value('current_number');
+
+        $response = $this->post('/erp/invoices/review', $this->payload([
+            'invoice_no' => 'BI-PAM-000701',
+            'transaction_no' => 'BI-PAM-000701',
+            'soa_no' => '0090',
+            'class_code' => 'PAMPANGA',
+            'invoice_template' => 'SOA_B',
+            'vat_classification' => 'exempt',
+            'line_ar_account' => ['A/R-Reimbursable Charges'],
+            'tax_category' => ['exempt'],
+        ]));
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('sales_documents', [
+            'document_no' => '0090',
+            'transaction_no' => '0090',
+            'soa_no' => '0090',
+            'template_code' => 'SOA_B',
+        ]);
+        $this->assertDatabaseMissing('sales_documents', ['document_no' => 'BI-PAM-000701']);
+        $this->assertSame($startingNumber, (int) (clone $series)->value('current_number'));
+
+        $documentId = DB::table('sales_documents')->where('document_no', '0090')->value('id');
+        $edit = $this->get(route('erp.billings.edit', $documentId));
+        $edit->assertOk()
+            ->assertSee('name="original_invoice_no" value="0090"', false)
+            ->assertSee('Uses SOA number');
+    }
+
+    public function test_invoice_list_displays_the_soa_number_beside_its_billing_invoice_number()
+    {
+        $response = $this->post('/erp/invoices/review', $this->payload([
+            'invoice_no' => 'BI-LIST-001',
+            'transaction_no' => 'BI-LIST-001',
+            'soa_no' => 'SOA-LIST-0090',
+            'vat_classification' => '12%',
+            'invoice_template' => ['SOA_B', 'Billing Invoice'],
+        ]));
+
+        $response->assertRedirect();
+        $this->get(route('erp.invoices.index'))
+            ->assertOk()
+            ->assertSee('<span>BI-LIST-001</span>', false)
+            ->assertSee('<div class="small text-muted">SOA# SOA-LIST-0090</div>', false);
     }
 
     public function test_soa_a_cannot_be_combined_with_a_billing_invoice_template()
@@ -277,7 +330,7 @@ class BillingInvoicePrintFlowTest extends TestCase
             'customer_name' => 'North Harbor Trading',
             'vat_classification' => '12%',
             'ar_account' => 'A/Trade-Billing Invoice',
-            'invoice_template' => 'SOA_B',
+            'invoice_template' => ['SOA_B', 'Billing Invoice'],
             'customer_tax_code' => 'VAT12',
             'item' => ['Documentation VAT', 'Reimbursable Charges'],
             'item_description' => ['DOC / IDENTIFICATION FEE', 'REIMBURSABLE CHARGES'],
@@ -621,7 +674,7 @@ class BillingInvoicePrintFlowTest extends TestCase
             'customer_name' => 'North Harbor Trading',
             'vat_classification' => '12%',
             'ar_account' => 'A/Trade-Billing Invoice',
-            'invoice_template' => 'SOA_B',
+            'invoice_template' => ['SOA_B', 'Billing Invoice'],
             'customer_tax_code' => 'VAT12',
             'save_mode' => 'post',
         ]));

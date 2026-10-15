@@ -185,7 +185,16 @@
                         @foreach($invoices as $invoice)
                             @php $isFinal = in_array(strtolower((string) $invoice[7]), ['cancelled', 'voided'], true); @endphp
                             <tr>
-                                <td class="fw-semibold">{{ $invoice[0] }}</td>
+                                <td class="fw-semibold">
+                                    @if(!empty($invoice[10]) && $invoice[10] === $invoice[0])
+                                        <span>SOA# {{ $invoice[10] }}</span>
+                                    @else
+                                        <span>{{ $invoice[0] }}</span>
+                                        @if(!empty($invoice[10]))
+                                            <div class="small text-muted">SOA# {{ $invoice[10] }}</div>
+                                        @endif
+                                    @endif
+                                </td>
                                 <td>{{ $invoice[1] }}</td>
                                 <td>{{ $invoice[2] }}</td>
                                 <td>{{ $invoice[3] }}</td>

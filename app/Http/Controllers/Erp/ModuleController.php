@@ -8099,6 +8099,7 @@ class ModuleController extends Controller
             ->select(
                 'sales_documents.id',
                 'sales_documents.document_no',
+                'sales_documents.soa_no',
                 'sales_documents.job_shipment_id',
                 'sales_documents.shipment_reference',
                 'sales_documents.currency',
@@ -8132,6 +8133,7 @@ class ModuleController extends Controller
                     ucwords(str_replace('_', ' ', $invoice->status ?: 'draft')),
                     $invoice->document_date,
                     $invoice->id,
+                    $invoice->soa_no,
                 ];
             })
             ->all();
@@ -9480,12 +9482,20 @@ class ModuleController extends Controller
                 'invoice_template' => 'SOA A must be used by itself. For a Billing Invoice with reimbursable charges, select SOA B instead.',
             ]);
         }
+        $isSoaBOnly = in_array('SOA_B', $selectedTemplates, true)
+            && !in_array('Billing Invoice', $selectedTemplates, true);
+        $soaNo = trim((string) ($data['soa_no'] ?? ''));
+        if ($isSoaBOnly && $soaNo === '') {
+            return redirect()->back()->withInput()->withErrors([
+                'soa_no' => 'Enter the SOA number for an SOA B document.',
+            ]);
+        }
         $invoiceNo = trim((string) ($data['invoice_no'] ?? ''));
         $transactionNo = trim((string) ($data['transaction_no'] ?? ''));
-        $autoNumber = $invoiceNo === '' && $transactionNo === '' && $originalInvoiceNo === '';
-        $data['invoice_no'] = $invoiceNo !== ''
-            ? $invoiceNo
-            : ($transactionNo !== '' ? $transactionNo : $originalInvoiceNo);
+        $autoNumber = !$isSoaBOnly && $invoiceNo === '' && $transactionNo === '' && $originalInvoiceNo === '';
+        $data['invoice_no'] = $isSoaBOnly
+            ? $soaNo
+            : ($invoiceNo !== '' ? $invoiceNo : ($transactionNo !== '' ? $transactionNo : $originalInvoiceNo));
         $data['transaction_no'] = $data['invoice_no'];
 
         if (!$autoNumber) {
@@ -11270,7 +11280,7 @@ class ModuleController extends Controller
 
         $balanceExpression = $this->salesDocumentBalanceExpression();
 
-        return DB::table('sales_documents')
+        $invoices = DB::table('sales_documents')
             ->where('customer_id', $customerId)
             ->where('document_date', '<=', request('as_of', date('Y-m-d')))
             ->whereNotIn('status', ['cancelled', 'voided', 'paid'])
@@ -11284,6 +11294,7 @@ class ModuleController extends Controller
                 $invoicePayable = max(0, $amounts['bi_balance'] - $amounts['cwt_balance']);
 
                 return (object) [
+                    'source_id' => $invoice->id,
                     'document_date' => $invoice->document_date,
                     'document_no' => $invoice->document_no,
                     'soa_no' => $invoice->soa_no ?: ($invoice->template_code && stripos($invoice->template_code, 'SOA') !== false ? $invoice->document_no : ''),
@@ -11293,8 +11304,55 @@ class ModuleController extends Controller
                     'total' => $invoicePayable + $amounts['soa_balance'],
                     'aging' => $this->clientSoaAgingLabel($invoice->document_date),
                     'due_date' => $invoice->due_date,
+                    'pair_key' => $invoice->opening_balance_control_account_id
+                        ? implode('|', [
+                            $invoice->document_date,
+                            $invoice->due_date,
+                            $invoice->currency ?: 'PHP',
+                            $invoice->branch_id,
+                            $invoice->class_code,
+                            substr((string) $invoice->created_at, 0, 16),
+                        ])
+                        : null,
                 ];
             });
+
+        return $this->combineClientSoaOpeningBalanceRows($invoices);
+    }
+
+    private function combineClientSoaOpeningBalanceRows($invoices)
+    {
+        return $invoices
+            ->groupBy(function ($invoice) {
+                $isBiOnly = $invoice->invoice_amount > 0 && $invoice->soa_amount <= 0 && $invoice->soa_no === '';
+                $isSoaOnly = $invoice->invoice_amount <= 0 && $invoice->soa_amount > 0;
+
+                return $invoice->pair_key && ($isBiOnly || $isSoaOnly)
+                    ? 'pair:'.$invoice->pair_key
+                    : 'row:'.$invoice->source_id;
+            })
+            ->flatMap(function ($rows) {
+                if ($rows->count() !== 2) {
+                    return $rows;
+                }
+
+                $bi = $rows->first(function ($row) {
+                    return $row->invoice_amount > 0 && $row->soa_amount <= 0 && $row->soa_no === '';
+                });
+                $soa = $rows->first(function ($row) {
+                    return $row->invoice_amount <= 0 && $row->soa_amount > 0;
+                });
+                if (!$bi || !$soa) {
+                    return $rows;
+                }
+
+                $bi->soa_no = $soa->soa_no ?: $soa->document_no;
+                $bi->soa_amount = $soa->soa_amount;
+                $bi->total = $bi->invoice_amount + $bi->soa_amount;
+
+                return [$bi];
+            })
+            ->values();
     }
 
     private function salesDocumentBalanceExpression()

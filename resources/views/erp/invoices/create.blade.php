@@ -231,7 +231,7 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label text-muted">SOA Number</label>
-                                <input name="soa_no" class="form-control invoice-field" value="">
+                                <input name="soa_no" id="soaNo" class="form-control invoice-field" value="">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label text-muted">MAWB</label>
@@ -477,7 +477,15 @@
             var classCode = $('#classCode').val();
             var templates = $('#invoiceTemplate').val() || [];
             var isSoaA = templates.indexOf('SOA_A') !== -1;
-            $('#invoiceNo').attr('placeholder', isSoaA ? soaASeries + ' (assigned on save)' : (invoiceSeries[classCode] || 'Select a class for the next number'));
+            var isSoaBOnly = templates.indexOf('SOA_B') !== -1 && templates.indexOf('Billing Invoice') === -1;
+            var soaNumber = ($('#soaNo').val() || '').trim();
+            $('#invoiceNo, #transactionNo').prop('readonly', isSoaBOnly);
+            if (isSoaBOnly) {
+                $('#invoiceNo, #transactionNo').val(soaNumber);
+                syncInvoiceActionLinks();
+            }
+            $('#invoiceNo').attr('placeholder', isSoaBOnly ? 'Uses SOA number' : (isSoaA ? soaASeries + ' (assigned on save)' : (invoiceSeries[classCode] || 'Select a class for the next number')));
+            $('#transactionNo').attr('placeholder', isSoaBOnly ? 'Uses SOA number' : 'Auto-generated if blank');
             $('input[name="soa_no"]').attr('placeholder', isSoaA ? soaASeries + ' (assigned on save)' : 'SOA number');
         }
 
@@ -856,6 +864,7 @@
         $('#transactionNo').on('input', function () {
             syncInvoiceNumbers('transaction');
         });
+        $('#soaNo').on('input', updateInvoiceNumberPreview);
         $('#invoiceForm').on('submit', function () {
             syncDocumentAccount();
             syncInvoiceNumbers($('#invoiceNo').val() ? 'invoice' : 'transaction');

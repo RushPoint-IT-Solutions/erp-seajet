@@ -760,14 +760,13 @@ class OpeningBalanceImportTest extends TestCase
         ]))->assertOk()->assertSee('BI-SPLIT-001')->assertSee('SOA-SPLIT-001')
             ->assertSee('900.00')->assertSee('350.00')->assertSee('1,250.00');
         $rows = $statement->original->getData()['invoices'];
-        $this->assertCount(2, $rows);
-        $biRow = $rows->firstWhere('document_no', $bi->document_no);
-        $soaRow = $rows->firstWhere('document_no', $soa->document_no);
-        $this->assertEquals(900, $biRow->invoice_amount);
-        $this->assertEquals(0, $biRow->soa_amount);
-        $this->assertSame('SOA-SPLIT-001', $soaRow->soa_no);
-        $this->assertEquals(0, $soaRow->invoice_amount);
-        $this->assertEquals(350, $soaRow->soa_amount);
+        $this->assertCount(1, $rows);
+        $combinedRow = $rows->first();
+        $this->assertSame($bi->document_no, $combinedRow->document_no);
+        $this->assertSame('SOA-SPLIT-001', $combinedRow->soa_no);
+        $this->assertEquals(900, $combinedRow->invoice_amount);
+        $this->assertEquals(350, $combinedRow->soa_amount);
+        $this->assertEquals(1250, $combinedRow->total);
         $this->assertEquals(1250, $statement->original->getData()['currencyTotals']['PHP']);
         $fields['reference_no'] = 'BI-ROLLBACK-001';
         $this->withExceptionHandling();
