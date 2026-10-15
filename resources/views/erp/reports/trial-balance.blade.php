@@ -226,6 +226,7 @@
                                 <th>Reference</th>
                                 <th>Source</th>
                                 <th>Description</th>
+                                <th>Encoded By</th>
                                 <th class="text-end">Debit</th>
                                 <th class="text-end">Credit</th>
                                 <th class="text-end">Net Effect</th>
@@ -277,7 +278,7 @@
 
                 title.textContent = button.dataset.column;
                 subtitle.textContent = button.dataset.account + ' · ' + period;
-                body.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-5"><span class="spinner-border spinner-border-sm me-2"></span>Loading raw data...</td></tr>';
+                body.innerHTML = '<tr><td colspan="12" class="text-center text-muted py-5"><span class="spinner-border spinner-border-sm me-2"></span>Loading raw data...</td></tr>';
                 count.textContent = '';
                 total.textContent = '-';
                 modal.show();
@@ -296,7 +297,7 @@
                     .then(function (data) {
                         body.innerHTML = '';
                         if (!data.entries.length) {
-                            body.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-5">No journal lines found for this amount.</td></tr>';
+                            body.innerHTML = '<tr><td colspan="12" class="text-center text-muted py-5">No journal lines found for this amount.</td></tr>';
                         } else {
                             data.entries.forEach(function (entry) {
                                 var tr = document.createElement('tr');
@@ -306,6 +307,7 @@
                                 tr.appendChild(cell(entry.reference_no));
                                 tr.appendChild(cell(entry.source));
                                 tr.appendChild(cell(entry.description));
+                                tr.appendChild(cell(entry.encoded_by || 'Not recorded'));
                                 tr.appendChild(cell(money(entry.debit), 'text-end'));
                                 tr.appendChild(cell(money(entry.credit), 'text-end'));
                                 tr.appendChild(cell(money(entry.effect), 'text-end fw-semibold'));
@@ -345,7 +347,7 @@
                         total.textContent = money(data.total);
                     })
                     .catch(function (error) {
-                        body.innerHTML = '<tr><td colspan="11" class="text-center text-danger py-5"></td></tr>';
+                        body.innerHTML = '<tr><td colspan="12" class="text-center text-danger py-5"></td></tr>';
                         body.querySelector('td').textContent = error.message;
                     });
             });

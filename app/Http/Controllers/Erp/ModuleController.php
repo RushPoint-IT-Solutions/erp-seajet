@@ -11268,6 +11268,7 @@ class ModuleController extends Controller
                     'reference_no' => null,
                     'source' => 'Opening Balance',
                     'description' => 'Stored chart of accounts opening balance',
+                    'encoded_by' => null,
                     'debit' => $effect > 0 ? $effect : 0,
                     'credit' => $effect < 0 ? abs($effect) : 0,
                     'effect' => $effect,
@@ -11282,6 +11283,7 @@ class ModuleController extends Controller
             $query = DB::table('journal_entry_lines')
                 ->join('journal_entries', 'journal_entries.id', '=', 'journal_entry_lines.journal_entry_id')
                 ->join('accounts', 'accounts.id', '=', 'journal_entry_lines.account_id')
+                ->leftJoin('users as encoder', 'encoder.id', '=', 'journal_entries.created_by')
                 ->where('journal_entries.company_id', $this->defaultCompanyId())
                 ->select(
                     'journal_entry_lines.account_id',
@@ -11295,7 +11297,9 @@ class ModuleController extends Controller
                     'journal_entries.source_module',
                     'journal_entries.source_type',
                     'journal_entries.source_id',
+                    'journal_entries.created_by',
                     'journal_entries.memo',
+                    'encoder.name as encoder_name',
                     'accounts.code as account_code',
                     'accounts.name as account_name'
                 )
@@ -11332,6 +11336,7 @@ class ModuleController extends Controller
                     'reference_no' => $line->reference_no,
                     'source' => $line->source_module,
                     'description' => $line->description ?: $line->memo,
+                    'encoded_by' => $line->encoder_name ?: ($line->created_by ? 'User #'.$line->created_by : null),
                     'debit' => $debit,
                     'credit' => $credit,
                     'effect' => $debit - $credit,

@@ -37,6 +37,7 @@ class TrialBalanceDrilldownTest extends TestCase
             'source_id' => $invoice->id,
             'reference_no' => $invoice->document_no,
             'memo' => 'Trial balance drilldown test',
+            'created_by' => auth()->id(),
             'status' => 'posted',
         ]);
 
@@ -60,6 +61,7 @@ class TrialBalanceDrilldownTest extends TestCase
         $page = $this->get(route('erp.reports.trial-balance', ['period' => '2026-10']));
         $page->assertStatus(200)
             ->assertSee('data-trial-drilldown', false)
+            ->assertSee('Encoded By')
             ->assertSee('var endpoint =', false);
 
         $response = $this->getJson(route('erp.reports.trial-balance.drilldown', [
@@ -73,6 +75,7 @@ class TrialBalanceDrilldownTest extends TestCase
                 'journal_no' => 'JV-DRILL-001',
                 'reference_no' => $invoice->document_no,
                 'description' => 'Raw debit line',
+                'encoded_by' => DB::table('users')->where('id', auth()->id())->value('name'),
                 'debit' => 125.5,
                 'credit' => 0,
                 'effect' => 125.5,
