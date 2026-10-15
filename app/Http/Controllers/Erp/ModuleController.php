@@ -12272,15 +12272,42 @@ class ModuleController extends Controller
             return $query;
         }
 
+        $excludedStatuses = ['cancelled', 'voided', 'deleted'];
+        $invoiceSourceTypes = ['sales_document', 'invoice', 'billing_invoice', 'soa', 'soa_a', 'statement_of_account', 'statement_of_account_a'];
         $voidedDocumentIds = DB::table('sales_documents')
             ->select('id')
             ->where('company_id', $this->defaultCompanyId())
-            ->whereIn('status', ['cancelled', 'voided']);
+            ->whereIn(DB::raw('LOWER(status)'), $excludedStatuses);
 
-        return $query->where(function ($journalQuery) use ($voidedDocumentIds) {
+        $voidedDocumentNumbers = DB::table('sales_documents')
+            ->select('document_no')
+            ->where('company_id', $this->defaultCompanyId())
+            ->whereIn(DB::raw('LOWER(status)'), $excludedStatuses)
+            ->whereNotNull('document_no');
+
+        $voidedTransactionNumbers = DB::table('sales_documents')
+            ->select('transaction_no')
+            ->where('company_id', $this->defaultCompanyId())
+            ->whereIn(DB::raw('LOWER(status)'), $excludedStatuses)
+            ->whereNotNull('transaction_no');
+
+        $voidedSoaNumbers = DB::table('sales_documents')
+            ->select('soa_no')
+            ->where('company_id', $this->defaultCompanyId())
+            ->whereIn(DB::raw('LOWER(status)'), $excludedStatuses)
+            ->whereNotNull('soa_no');
+
+        return $query->where(function ($journalQuery) use ($voidedDocumentIds, $invoiceSourceTypes) {
             $journalQuery->whereNull('journal_entries.source_type')
-                ->orWhere('journal_entries.source_type', '<>', 'sales_document')
+                ->orWhereNotIn(DB::raw('LOWER(journal_entries.source_type)'), $invoiceSourceTypes)
                 ->orWhereNotIn('journal_entries.source_id', $voidedDocumentIds);
+        })->where(function ($journalQuery) use ($voidedDocumentNumbers, $voidedTransactionNumbers, $voidedSoaNumbers) {
+            $journalQuery->whereNull('journal_entries.reference_no')
+                ->orWhere(function ($referenceQuery) use ($voidedDocumentNumbers, $voidedTransactionNumbers, $voidedSoaNumbers) {
+                    $referenceQuery->whereNotIn('journal_entries.reference_no', $voidedDocumentNumbers)
+                        ->whereNotIn('journal_entries.reference_no', $voidedTransactionNumbers)
+                        ->whereNotIn('journal_entries.reference_no', $voidedSoaNumbers);
+                });
         });
     }
 
