@@ -351,6 +351,56 @@ class OpeningBalanceImportTest extends TestCase
             ->assertSee('data-bi-balance="1000.00"', false);
     }
 
+    public function test_manual_ar_opening_balance_allows_an_archived_reference_but_rejects_an_active_one()
+    {
+        $accounts = $this->accountMapping();
+        DB::table('accounts')->where('id', $accounts['ar_trade_php_account_id'])->update([
+            'name' => 'A/R Trade - PHP',
+        ]);
+        $customer = DB::table('customers')->where('company_id', 1)->where('is_active', true)->first();
+        $branch = DB::table('branches')->where('company_id', 1)->where('is_active', true)->first();
+        $fields = [
+            'balance_type' => 'ar_trade',
+            'customer_id' => $customer->id,
+            'reference_no' => 'ARCHIVED-BI-001',
+            'source_date' => '2026-09-01',
+            'due_date' => '2026-09-30',
+            'branch_id' => $branch->id,
+            'currency' => 'PHP',
+            'exchange_rate' => 1,
+            'amount' => 1000,
+            'target_account_id' => $accounts['ar_trade_php_account_id'],
+            'opening_balance_account_id' => $accounts['opening_balance_account_id'],
+        ];
+
+        $this->post(route('erp.accounting.opening-balances.manual.store'), $fields)
+            ->assertRedirect(route('erp.payments.create'));
+
+        $this->withExceptionHandling();
+        $this->post(route('erp.accounting.opening-balances.manual.store'), $fields)
+            ->assertSessionHasErrors('reference_no');
+
+        $originalInvoice = DB::table('sales_documents')
+            ->where('transaction_no', $fields['reference_no'])
+            ->first();
+        DB::table('sales_documents')->where('id', $originalInvoice->id)->update([
+            'status' => 'voided',
+            'posting_status' => 'reversed',
+        ]);
+
+        $this->post(route('erp.accounting.opening-balances.manual.store'), $fields)
+            ->assertRedirect(route('erp.payments.create'))
+            ->assertSessionHas('status');
+
+        $matchingInvoices = DB::table('sales_documents')
+            ->where('transaction_no', $fields['reference_no'])
+            ->orderBy('id')
+            ->get();
+        $this->assertCount(2, $matchingInvoices);
+        $this->assertSame('voided', $matchingInvoices[0]->status);
+        $this->assertSame('posted', $matchingInvoices[1]->status);
+    }
+
     public function test_manual_ap_opening_balance_supports_bdo_and_metro_and_creates_an_open_vendor_bill()
     {
         $accounts = $this->accountMapping();

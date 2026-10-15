@@ -241,10 +241,12 @@ class OpeningBalanceImportService
         $reference = trim((string) $data['reference_no']);
         $duplicate = $isPayable
             ? DB::table('purchase_documents')->where('company_id', $companyId)
+                ->whereNotIn('status', ['cancelled', 'voided'])
                 ->where(function ($query) use ($reference) {
                     $query->where('document_no', $reference)->orWhere('reference_no', $reference);
                 })->exists()
             : DB::table('sales_documents')->where('company_id', $companyId)
+                ->whereNotIn('status', ['cancelled', 'voided'])
                 ->where(function ($query) use ($reference) {
                     $query->where('document_no', $reference)->orWhere('transaction_no', $reference);
                 })->exists();
