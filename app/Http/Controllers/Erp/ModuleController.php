@@ -11308,6 +11308,7 @@ class ModuleController extends Controller
                 ->orderBy('journal_entry_lines.id');
 
             $this->excludeVoidedSalesDocumentJournals($query);
+            $this->excludeInactiveBillingInvoiceLines($query);
 
             if ($accountId) {
                 $query->where('journal_entry_lines.account_id', $accountId);
@@ -11933,6 +11934,7 @@ class ModuleController extends Controller
             ->groupBy('journal_entry_lines.account_id', 'journal_entries.source_module');
 
         $this->excludeVoidedSalesDocumentJournals($query);
+        $this->excludeInactiveBillingInvoiceLines($query);
 
         if ($startDate) {
             $query->where('journal_entries.journal_date', '>=', $startDate);
@@ -12398,10 +12400,7 @@ class ModuleController extends Controller
 
         $excludedStatuses = ['cancelled', 'voided', 'deleted'];
         $invoiceSourceTypes = ['sales_document', 'invoice', 'billing_invoice', 'soa', 'soa_a', 'statement_of_account', 'statement_of_account_a'];
-        $voidedDocumentIds = DB::table('sales_documents')
-            ->select('id')
-            ->where('company_id', $this->defaultCompanyId())
-            ->whereIn(DB::raw('LOWER(status)'), $excludedStatuses);
+        $companyId = $this->defaultCompanyId();
 
         $voidedDocumentNumbers = DB::table('sales_documents')
             ->select('document_no')
@@ -12421,10 +12420,21 @@ class ModuleController extends Controller
             ->whereIn(DB::raw('LOWER(status)'), $excludedStatuses)
             ->whereNotNull('soa_no');
 
-        return $query->where(function ($journalQuery) use ($voidedDocumentIds, $invoiceSourceTypes) {
+        return $query->where(function ($journalQuery) use ($companyId, $excludedStatuses, $invoiceSourceTypes) {
             $journalQuery->whereNull('journal_entries.source_type')
                 ->orWhereNotIn(DB::raw('LOWER(journal_entries.source_type)'), $invoiceSourceTypes)
-                ->orWhereNotIn('journal_entries.source_id', $voidedDocumentIds);
+                ->orWhereExists(function ($activeBilling) use ($companyId, $excludedStatuses) {
+                    $activeBilling->select(DB::raw(1))
+                        ->from('sales_documents as active_billing_documents')
+                        ->where('active_billing_documents.company_id', $companyId)
+                        ->whereNotIn(DB::raw('LOWER(active_billing_documents.status)'), $excludedStatuses)
+                        ->where(function ($linkedBilling) {
+                            $linkedBilling->whereColumn('active_billing_documents.id', 'journal_entries.source_id')
+                                ->orWhereColumn('active_billing_documents.document_no', 'journal_entries.reference_no')
+                                ->orWhereColumn('active_billing_documents.transaction_no', 'journal_entries.reference_no')
+                                ->orWhereColumn('active_billing_documents.soa_no', 'journal_entries.reference_no');
+                        });
+                });
         })->where(function ($journalQuery) use ($voidedDocumentNumbers, $voidedTransactionNumbers, $voidedSoaNumbers) {
             $journalQuery->whereNull('journal_entries.reference_no')
                 ->orWhere(function ($referenceQuery) use ($voidedDocumentNumbers, $voidedTransactionNumbers, $voidedSoaNumbers) {
@@ -12433,6 +12443,44 @@ class ModuleController extends Controller
                         ->whereNotIn('journal_entries.reference_no', $voidedSoaNumbers);
                 });
         });
+    }
+
+    private function excludeInactiveBillingInvoiceLines($query)
+    {
+        if (!Schema::hasTable('sales_documents') || !Schema::hasColumn('journal_entry_lines', 'description')) {
+            return $query;
+        }
+
+        $companyId = $this->defaultCompanyId();
+        $excludedStatuses = ['cancelled', 'voided', 'deleted'];
+
+        $query->whereNotExists(function ($inactiveBilling) use ($companyId, $excludedStatuses) {
+            $inactiveBilling->select(DB::raw(1))
+                ->from('sales_documents as inactive_billing_documents')
+                ->where('inactive_billing_documents.company_id', $companyId)
+                ->whereIn(DB::raw('LOWER(inactive_billing_documents.status)'), $excludedStatuses)
+                ->whereNotNull('inactive_billing_documents.document_no')
+                ->whereRaw("INSTR(COALESCE(journal_entry_lines.description, ''), inactive_billing_documents.document_no) > 0");
+        });
+
+        if (Schema::hasTable('opening_balance_import_rows')
+            && Schema::hasColumn('opening_balance_import_rows', 'subledger_document_no')
+            && Schema::hasColumn('opening_balance_import_rows', 'sales_document_id')) {
+            $query->whereNotExists(function ($orphanedOpeningBalance) use ($companyId, $excludedStatuses) {
+                $orphanedOpeningBalance->select(DB::raw(1))
+                    ->from('opening_balance_import_rows as billing_opening_rows')
+                    ->leftJoin('sales_documents as linked_billing_document', 'linked_billing_document.id', '=', 'billing_opening_rows.sales_document_id')
+                    ->where('billing_opening_rows.company_id', $companyId)
+                    ->whereNotNull('billing_opening_rows.subledger_document_no')
+                    ->whereRaw("INSTR(COALESCE(journal_entry_lines.description, ''), billing_opening_rows.subledger_document_no) > 0")
+                    ->where(function ($missingOrInactive) use ($excludedStatuses) {
+                        $missingOrInactive->whereNull('linked_billing_document.id')
+                            ->orWhereIn(DB::raw('LOWER(linked_billing_document.status)'), $excludedStatuses);
+                    });
+            });
+        }
+
+        return $query;
     }
 
     private function cashReceiptsWorkbookRows($branch, $period)

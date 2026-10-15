@@ -160,4 +160,91 @@ class TrialBalanceDrilldownTest extends TestCase
         $row = collect($rows)->firstWhere('__account_id', (int) $account->id);
         $this->assertEquals(0, (float) $row['SALES BOOK']);
     }
+
+    public function test_trial_balance_excludes_opening_and_payment_lines_when_billing_invoice_is_voided()
+    {
+        $account = DB::table('accounts')->where('company_id', 1)->where('opening_balance', 0)->orderBy('id')->first();
+        $balancingAccount = DB::table('accounts')->where('company_id', 1)->where('id', '<>', $account->id)->orderBy('id')->first();
+        $invoice = DB::table('sales_documents')->where('company_id', 1)->first();
+        DB::table('sales_documents')->where('id', $invoice->id)->update([
+            'status' => 'voided',
+            'posting_status' => 'reversed',
+            'paid_total' => 0,
+        ]);
+
+        $journals = [
+            ['OB-INACTIVE-BILLING', '2026-09-01', 'GL', 'opening_balance_import', 'A/R Trade opening balance '.$invoice->document_no, 250, 0],
+            ['OR-INACTIVE-BILLING', '2026-09-15', 'AR', 'receipt', 'Applied to '.$invoice->document_no, 0, 250],
+            ['OR-INACTIVE-REVERSAL', '2026-10-05', 'AR', 'receipt', 'Reversal: Applied to '.$invoice->document_no, 250, 0],
+            ['OB-INACTIVE-REVERSAL', '2026-10-05', 'GL', 'opening_balance_row', 'Reversal: A/R Trade opening balance '.$invoice->document_no, 0, 250],
+        ];
+
+        foreach ($journals as $index => $journal) {
+            $journalId = DB::table('journal_entries')->insertGetId([
+                'company_id' => 1,
+                'journal_no' => $journal[0],
+                'journal_date' => $journal[1],
+                'source_module' => $journal[2],
+                'source_type' => $journal[3],
+                'source_id' => $invoice->id + $index,
+                'reference_no' => $invoice->document_no,
+                'memo' => $journal[4],
+                'status' => 'posted',
+            ]);
+            DB::table('journal_entry_lines')->insert([
+                ['journal_entry_id' => $journalId, 'account_id' => $account->id, 'description' => $journal[4], 'debit' => $journal[5], 'credit' => $journal[6]],
+                ['journal_entry_id' => $journalId, 'account_id' => $balancingAccount->id, 'description' => $journal[4], 'debit' => $journal[6], 'credit' => $journal[5]],
+            ]);
+        }
+
+        $response = $this->getJson(route('erp.reports.trial-balance.drilldown', [
+            'period' => '2026-10',
+            'account_id' => $account->id,
+            'column' => 'ENDING TRIAL BALANCE',
+        ]));
+
+        $response->assertStatus(200)
+            ->assertJson(['entries' => [], 'total' => 0]);
+
+        $rows = $this->get(route('erp.reports.trial-balance', ['period' => '2026-10']))->original->getData()['rows'];
+        $row = collect($rows)->firstWhere('__account_id', (int) $account->id);
+        $this->assertEquals(0, (float) $row['BEGINNING BALANCE']);
+        $this->assertEquals(0, (float) $row['JOURNAL BOOK']);
+        $this->assertEquals(0, (float) $row['ENDING TRIAL BALANCE']);
+    }
+
+    public function test_trial_balance_excludes_orphaned_direct_invoice_journals()
+    {
+        $account = DB::table('accounts')->where('company_id', 1)->where('opening_balance', 0)->orderBy('id')->first();
+        $balancingAccount = DB::table('accounts')->where('company_id', 1)->where('id', '<>', $account->id)->orderBy('id')->first();
+        $invoice = DB::table('sales_documents')->where('company_id', 1)->first();
+        $journalId = DB::table('journal_entries')->insertGetId([
+            'company_id' => 1,
+            'journal_no' => 'JV-ORPHANED-BILLING',
+            'journal_date' => '2026-10-08',
+            'source_module' => 'Sales Invoice',
+            'source_type' => 'sales_document',
+            'source_id' => $invoice->id,
+            'reference_no' => $invoice->document_no,
+            'memo' => 'Orphaned billing journal',
+            'status' => 'posted',
+        ]);
+        DB::table('journal_entry_lines')->insert([
+            ['journal_entry_id' => $journalId, 'account_id' => $account->id, 'description' => 'Orphaned invoice debit', 'debit' => 99, 'credit' => 0],
+            ['journal_entry_id' => $journalId, 'account_id' => $balancingAccount->id, 'description' => 'Orphaned invoice credit', 'debit' => 0, 'credit' => 99],
+        ]);
+
+        DB::statement('PRAGMA foreign_keys = OFF');
+        DB::table('sales_documents')->where('id', $invoice->id)->delete();
+        DB::statement('PRAGMA foreign_keys = ON');
+
+        $this->getJson(route('erp.reports.trial-balance.drilldown', [
+            'period' => '2026-10',
+            'account_id' => $account->id,
+            'column' => 'SALES BOOK',
+        ]))->assertStatus(200)->assertJson([
+            'entries' => [],
+            'total' => 0,
+        ]);
+    }
 }
