@@ -12469,20 +12469,13 @@ class ModuleController extends Controller
             $query->whereNotExists(function ($orphanedOpeningBalance) use ($companyId, $excludedStatuses) {
                 $orphanedOpeningBalance->select(DB::raw(1))
                     ->from('opening_balance_import_rows as billing_opening_rows')
+                    ->leftJoin('sales_documents as linked_billing_document', 'linked_billing_document.id', '=', 'billing_opening_rows.sales_document_id')
                     ->where('billing_opening_rows.company_id', $companyId)
                     ->whereNotNull('billing_opening_rows.subledger_document_no')
                     ->whereRaw("INSTR(COALESCE(journal_entry_lines.description, ''), billing_opening_rows.subledger_document_no) > 0")
-                    ->whereNotExists(function ($activeBilling) use ($companyId, $excludedStatuses) {
-                        $activeBilling->select(DB::raw(1))
-                            ->from('sales_documents as active_opening_billing_documents')
-                            ->where('active_opening_billing_documents.company_id', $companyId)
-                            ->whereNotIn(DB::raw('LOWER(active_opening_billing_documents.status)'), $excludedStatuses)
-                            ->where(function ($linkedBilling) {
-                                $linkedBilling->whereColumn('active_opening_billing_documents.id', 'billing_opening_rows.sales_document_id')
-                                    ->orWhereColumn('active_opening_billing_documents.document_no', 'billing_opening_rows.subledger_document_no')
-                                    ->orWhereColumn('active_opening_billing_documents.transaction_no', 'billing_opening_rows.subledger_document_no')
-                                    ->orWhereColumn('active_opening_billing_documents.soa_no', 'billing_opening_rows.subledger_document_no');
-                            });
+                    ->where(function ($missingOrInactive) use ($excludedStatuses) {
+                        $missingOrInactive->whereNull('linked_billing_document.id')
+                            ->orWhereIn(DB::raw('LOWER(linked_billing_document.status)'), $excludedStatuses);
                     });
             });
         }
