@@ -11308,6 +11308,7 @@ class ModuleController extends Controller
 
             $this->excludeVoidedSalesDocumentJournals($query);
             $this->excludeInactiveBillingInvoiceLines($query);
+            $this->excludeVoidedTrialBalanceJournals($query);
 
             if ($accountId) {
                 $query->where('journal_entry_lines.account_id', $accountId);
@@ -11934,6 +11935,7 @@ class ModuleController extends Controller
 
         $this->excludeVoidedSalesDocumentJournals($query);
         $this->excludeInactiveBillingInvoiceLines($query);
+        $this->excludeVoidedTrialBalanceJournals($query);
 
         if ($startDate) {
             $query->where('journal_entries.journal_date', '>=', $startDate);
@@ -11951,6 +11953,38 @@ class ModuleController extends Controller
         }
 
         return $movements;
+    }
+
+    private function excludeVoidedTrialBalanceJournals($query)
+    {
+        $excludedStatuses = ['void', 'voided', 'cancelled', 'canceled', 'deleted', 'reversed'];
+        $query->whereNotIn(DB::raw('LOWER(journal_entries.status)'), $excludedStatuses)
+            ->where(function ($original) {
+                $original->whereNull('journal_entries.posting_type')
+                    ->orWhere('journal_entries.posting_type', '<>', 'reversal');
+            })
+            ->whereNull('journal_entries.reversed_entry_id')
+            ->whereNotExists(function ($reversal) {
+                $reversal->select(DB::raw(1))->from('journal_entries as reversing_journals')
+                    ->whereColumn('reversing_journals.company_id', 'journal_entries.company_id')
+                    ->whereColumn('reversing_journals.reversed_entry_id', 'journal_entries.id');
+            });
+
+        foreach ([
+            'receipt' => 'receipts',
+            'payment' => 'payments',
+            'purchase_document' => 'purchase_documents',
+        ] as $sourceType => $table) {
+            $query->whereNotExists(function ($inactive) use ($sourceType, $table, $excludedStatuses) {
+                $inactive->select(DB::raw(1))->from($table.' as inactive_source')
+                    ->where('journal_entries.source_type', $sourceType)
+                    ->whereColumn('inactive_source.company_id', 'journal_entries.company_id')
+                    ->whereColumn('inactive_source.id', 'journal_entries.source_id')
+                    ->whereIn(DB::raw('LOWER(inactive_source.status)'), $excludedStatuses);
+            });
+        }
+
+        return $query;
     }
 
     private function trialBalanceColumnForSource($source)

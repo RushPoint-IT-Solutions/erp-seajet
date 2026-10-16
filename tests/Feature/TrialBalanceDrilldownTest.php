@@ -19,7 +19,63 @@ class TrialBalanceDrilldownTest extends TestCase
 
         DB::purge('sqlite');
         Artisan::call('migrate:fresh', ['--seed' => true]);
+        $this->seed(\SeaJetTestDataSeeder::class);
+        $this->seed(\BillingReimbursementSampleSeeder::class);
         $this->actingAsAdmin();
+    }
+
+    public function test_voided_journals_and_their_reversals_are_hidden_from_all_trial_balance_columns()
+    {
+        $account = DB::table('accounts')->where('company_id', 1)->where('opening_balance', 0)->first();
+        $receipt = DB::table('receipts')->where('company_id', 1)->first();
+        $this->assertNotNull($receipt);
+        DB::table('receipts')->where('id', $receipt->id)->update(['status' => 'voided']);
+        $payment = DB::table('payments')->where('company_id', 1)->first();
+        $bill = DB::table('purchase_documents')->where('company_id', 1)->first();
+        $this->assertNotNull($payment);
+        $this->assertNotNull($bill);
+        DB::table('payments')->where('id', $payment->id)->update(['status' => 'voided']);
+        DB::table('purchase_documents')->where('id', $bill->id)->update(['status' => 'voided']);
+        $originalId = null;
+        foreach ([
+            ['voided', 'original', null, null, null, '2026-09-05', 100],
+            ['Voided', 'original', null, null, null, '2026-10-05', 200],
+            ['reversed', 'original', null, null, null, '2026-09-05', 300],
+            ['posted', 'reversal', null, null, 'previous', '2026-10-05', -300],
+            ['posted', 'original', 'receipt', $receipt->id, null, '2026-10-05', 400],
+            ['posted', 'original', 'payment', $payment->id, null, '2026-10-05', 500],
+            ['posted', 'original', 'purchase_document', $bill->id, null, '2026-10-05', 600],
+            ['posted', 'original', null, null, null, '2026-10-05', 25],
+        ] as $index => $entry) {
+            list($status, $postingType, $sourceType, $sourceId, $reversedId, $date, $amount) = $entry;
+            $id = DB::table('journal_entries')->insertGetId([
+                'company_id' => 1, 'journal_no' => 'JV-VOID-FILTER-'.$index,
+                'journal_date' => $date, 'source_module' => 'GL', 'status' => $status,
+                'posting_type' => $postingType, 'source_type' => $sourceType,
+                'source_id' => $sourceId, 'reversed_entry_id' => $reversedId ? $originalId : null,
+            ]);
+            if ($status === 'reversed') {
+                $originalId = $id;
+            }
+            DB::table('journal_entry_lines')->insert([
+                'journal_entry_id' => $id, 'account_id' => $account->id,
+                'description' => 'Void filtering fixture',
+                'debit' => max(0, $amount), 'credit' => max(0, -$amount),
+            ]);
+        }
+
+        foreach (['BEGINNING BALANCE' => 0, 'JOURNAL BOOK' => 25, 'ENDING TRIAL BALANCE' => 25] as $column => $total) {
+            $response = $this->getJson(route('erp.reports.trial-balance.drilldown', [
+                'period' => '2026-10', 'account_id' => $account->id, 'column' => $column,
+            ]))->assertOk()->assertJson(['total' => $total]);
+            $this->assertCount($total ? 1 : 0, $response->json('entries'));
+        }
+        $rows = $this->get(route('erp.reports.trial-balance', ['period' => '2026-10']))
+            ->assertOk()->original->getData()['rows'];
+        $row = collect($rows)->firstWhere('__account_id', (int) $account->id);
+        $this->assertEquals(0, $row['BEGINNING BALANCE']);
+        $this->assertEquals(25, $row['JOURNAL BOOK']);
+        $this->assertEquals(25, $row['ENDING TRIAL BALANCE']);
     }
 
     public function test_trial_balance_amount_opens_a_raw_journal_line_drilldown()
