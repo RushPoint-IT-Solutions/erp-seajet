@@ -9907,12 +9907,11 @@ class ModuleController extends Controller
             'amount' => 'required',
             'cwt_amount' => 'nullable',
             'cwt_certificate_no' => 'nullable|string|max:100',
-            'receipt_no' => 'nullable|string|max:100|regex:/^[A-Za-z0-9-]+$/',
+            'receipt_no' => 'required|string|max:100|regex:/^[A-Za-z0-9-]+$/',
             'reenter_receipt' => 'nullable|integer',
         ]);
         $this->authorizeAccountingPosting('payments', 'create');
         if (!empty($data['receipt_no'])) {
-            abort_unless(app(RbacService::class)->normalizeRole(auth()->user()->role ?? '') === 'admin', 403);
             $data['receipt_no'] = trim($data['receipt_no']);
         }
 
@@ -10031,14 +10030,12 @@ class ModuleController extends Controller
         $exchangeRate = $currency === 'PHP' ? 1 : max(0.000001, $this->moneyToFloat($data['exchange_rate'] ?? 1));
 
         $receiptResult = DB::transaction(function () use ($customer, $companyId, $invoices, $invoiceAmounts, $amount, $cwtAmount, $settlementAmount, $currency, $exchangeRate, $data, $paymentFor, $receiptComponent, $classCode) {
-            $receiptNo = !empty($data['receipt_no']) ? $data['receipt_no'] : ($paymentFor === 'bi'
-                ? $this->nextDocumentNumber('official_receipt', $this->classNumberPrefix('official_receipt', $classCode), 5, true, $classCode)
-                : $this->nextDocumentNumber('acknowledgement_receipt', $this->classNumberPrefix('acknowledgement_receipt', $classCode), 6, true, $classCode));
+            $receiptNo = $data['receipt_no'];
             if (!empty($data['receipt_no'])) {
                 $receiptNo = $data['receipt_no'];
-                if (DB::table('receipts')->where('company_id', $companyId)->where('receipt_no', $receiptNo)->exists()) {
+                if (DB::table('receipts')->where('company_id', $companyId)->where('receipt_no', $receiptNo)->where('status', '<>', 'voided')->exists()) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
-                        'receipt_no' => 'This receipt number already exists, including voided receipts. Enter a unique number.',
+                        'receipt_no' => 'This receipt number is already used by a non-voided receipt. Enter a different number or void that receipt first.',
                     ]);
                 }
             }
@@ -10492,6 +10489,8 @@ class ModuleController extends Controller
             ->when(in_array('job_shipment_id', $receiptColumns, true), function ($grouped) {
                 return $grouped->groupBy('receipts.job_shipment_id');
             })
+            ->groupBy('receipts.status')
+            ->orderByRaw("CASE WHEN receipts.status = 'voided' THEN 1 ELSE 0 END")
             ->orderBy('receipts.receipt_date', 'desc')
             ->orderBy('receipts.id', 'desc')
             ->first();
