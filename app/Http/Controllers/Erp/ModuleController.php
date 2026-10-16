@@ -12491,6 +12491,34 @@ class ModuleController extends Controller
 
     private function excludeInactiveBillingInvoiceLines($query)
     {
+        if (!Schema::hasTable('opening_balance_import_rows')) {
+            return $this->excludeLegacyInactiveBillingInvoiceLines($query);
+        }
+
+        // A re-entered balance can share its reference with a voided balance.
+        // Resolve imported lines through their own journal and subledger record.
+        $descriptionKey = DB::getDriverName() === 'sqlite'
+            ? "' opening balance ' || encoded_balance.reference_no || ' | ' || encoded_balance.party_name || ' | ' || encoded_balance.source_date"
+            : "CONCAT(' opening balance ', encoded_balance.reference_no, ' | ', encoded_balance.party_name, ' | ', encoded_balance.source_date)";
+
+        return $query->where(function ($lines) use ($descriptionKey) {
+            $lines->whereExists(function ($encoded) use ($descriptionKey) {
+                $encoded->select(DB::raw(1))->from('opening_balance_import_rows as encoded_balance')
+                    ->join('sales_documents as encoded_document', 'encoded_document.id', '=', 'encoded_balance.sales_document_id')
+                    ->where('journal_entries.source_type', 'opening_balance_import')
+                    ->whereColumn('encoded_balance.company_id', 'journal_entries.company_id')
+                    ->whereColumn('encoded_balance.journal_entry_id', 'journal_entries.id')
+                    ->whereColumn('encoded_document.company_id', 'journal_entries.company_id')
+                    ->whereNotIn(DB::raw('LOWER(encoded_document.status)'), ['cancelled', 'voided', 'deleted'])
+                    ->whereRaw("INSTR(COALESCE(journal_entry_lines.description, ''), {$descriptionKey}) > 0");
+            })->orWhere(function ($legacy) {
+                $this->excludeLegacyInactiveBillingInvoiceLines($legacy);
+            });
+        });
+    }
+
+    private function excludeLegacyInactiveBillingInvoiceLines($query)
+    {
         if (!Schema::hasTable('sales_documents') || !Schema::hasColumn('journal_entry_lines', 'description')) {
             return $query;
         }

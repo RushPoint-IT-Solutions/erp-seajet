@@ -399,6 +399,15 @@ class OpeningBalanceImportTest extends TestCase
         $this->assertCount(2, $matchingInvoices);
         $this->assertSame('voided', $matchingInvoices[0]->status);
         $this->assertSame('posted', $matchingInvoices[1]->status);
+        $this->getJson(route('erp.reports.trial-balance.drilldown', [
+            'period' => '2026-10', 'account_id' => $accounts['ar_trade_php_account_id'],
+            'column' => 'BEGINNING BALANCE',
+        ]))->assertOk()->assertJson(['total' => 1000]);
+        $rows = $this->get(route('erp.reports.trial-balance', ['period' => '2026-10']))
+            ->assertOk()->original->getData()['rows'];
+        $trialRow = collect($rows)->firstWhere('__account_id', (int) $accounts['ar_trade_php_account_id']);
+        $this->assertEquals(1000, $trialRow['BEGINNING BALANCE']);
+        $this->assertEquals(1000, $trialRow['ENDING TRIAL BALANCE']);
     }
 
     public function test_manual_ap_opening_balance_supports_bdo_and_metro_and_creates_an_open_vendor_bill()
