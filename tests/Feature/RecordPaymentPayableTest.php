@@ -247,6 +247,16 @@ class RecordPaymentPayableTest extends TestCase
             ->assertSee('Page 1 of 2')->assertSee('Page 2 of 2');
         $this->assertSame(2, substr_count($response->getContent(), 'class="client-soa-sheet"'));
         $this->assertCount(13, $response->original->getData()['invoices']);
+        $sheets = explode('<div class="client-soa-sheet">', $response->getContent());
+        $this->assertStringNotContainsString('<tfoot>', $sheets[1]);
+        $this->assertStringNotContainsString('OVERDUE ACCOUNTS', $sheets[1]);
+        $this->assertSame(1, substr_count($sheets[2], '<tfoot>'));
+        $this->assertStringContainsString('OVERDUE ACCOUNTS', $sheets[2]);
+        $invoices = $response->original->getData()['invoices'];
+        $this->assertStringContainsString(
+            '<td class="amount">'.number_format($invoices->sum('total'), 2).'</td>',
+            $sheets[2]
+        );
     }
 
     public function test_overpayment_shows_a_warning_and_cannot_be_saved()
