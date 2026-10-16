@@ -7232,12 +7232,35 @@ class ModuleController extends Controller
         return view('erp.invoices.create', [
             'isEdit' => true,
             'editingInvoice' => $this->billingPrintInvoiceDataFromReference($record->id),
+            'openingBalanceRecord' => $record->opening_balance_control_account_id ? $record : null,
+            'openingBalanceAccounts' => $record->opening_balance_control_account_id ? $this->glAccountOptions()->filter(function ($account) use ($record) {
+                $name = strtoupper($account->name);
+                $isReimbursable = $record->ar_account_code === 'AR_REIMBURSABLE';
+                return strpos($name, strtoupper($record->currency)) !== false
+                    && ($isReimbursable ? strpos($name, 'REIMBURS') !== false
+                        : (strpos($name, 'A/R') !== false || strpos($name, 'RECEIVABLE') !== false) && strpos($name, 'REIMBURS') === false);
+            }) : collect(),
             'customers' => $this->customerSelectOptions(),
             'invoiceTemplates' => $this->invoiceTemplates(),
             'items' => $this->invoiceItemOptions(),
             'invoiceSeries' => $this->classNumberPreview('billing_invoice', 6),
             'soaASeries' => $this->nextDocumentNumber('statement_of_account_a', 'SOAA-', 4, false),
         ]);
+    }
+
+    public function updateOpeningBalanceAccount($invoice, OpeningBalanceImportService $importer)
+    {
+        $this->authorizeAccountingPosting('accounting', 'approve');
+        $record = $this->salesDocumentRecordByReference($invoice);
+        $data = request()->validate([
+            'opening_account_id' => 'required|integer',
+            'account_change_reason' => 'required|string|max:1000',
+        ]);
+        $importer->updateReceivableAccount($this->defaultCompanyId(), $record->id,
+            $data['opening_account_id'], $data['account_change_reason']);
+
+        return redirect()->route('erp.billings.edit', $record->id)
+            ->with('status', 'Opening balance A/R account and journal account updated.');
     }
 
     public function billingVoid($invoice)
@@ -11306,8 +11329,7 @@ class ModuleController extends Controller
                 ->orderBy('journal_entries.id')
                 ->orderBy('journal_entry_lines.id');
 
-            $this->excludeVoidedSalesDocumentJournals($query);
-            $this->excludeInactiveBillingInvoiceLines($query);
+            $this->excludeTrialBalanceBillingJournals($query);
             $this->excludeVoidedTrialBalanceJournals($query);
 
             if ($accountId) {
@@ -11933,8 +11955,7 @@ class ModuleController extends Controller
             ->where('journal_entries.company_id', $this->defaultCompanyId())
             ->groupBy('journal_entry_lines.account_id', 'journal_entries.source_module');
 
-        $this->excludeVoidedSalesDocumentJournals($query);
-        $this->excludeInactiveBillingInvoiceLines($query);
+        $this->excludeTrialBalanceBillingJournals($query);
         $this->excludeVoidedTrialBalanceJournals($query);
 
         if ($startDate) {
@@ -11953,6 +11974,23 @@ class ModuleController extends Controller
         }
 
         return $movements;
+    }
+
+    private function excludeTrialBalanceBillingJournals($query)
+    {
+        return $query->where(function ($journals) {
+            // Manual GL references and descriptions are free text, not invoice links.
+            $journals->where(function ($manual) {
+                $manual->whereIn(DB::raw('LOWER(journal_entries.source_module)'), ['gl', 'general journal'])
+                    ->where(function ($source) {
+                        $source->whereNull('journal_entries.source_type')
+                            ->orWhere('journal_entries.source_type', '');
+                    });
+            })->orWhere(function ($linked) {
+                $this->excludeVoidedSalesDocumentJournals($linked);
+                $this->excludeInactiveBillingInvoiceLines($linked);
+            });
+        });
     }
 
     private function excludeVoidedTrialBalanceJournals($query)

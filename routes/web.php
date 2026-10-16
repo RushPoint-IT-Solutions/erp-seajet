@@ -130,6 +130,7 @@ Route::middleware(['auth', 'permission.access'])->group(function () {
 
     Route::get('/erp/billings', 'Erp\ModuleController@billingIndex')->name('erp.billings.index');
     Route::get('/erp/billings/{invoice}/edit', 'Erp\ModuleController@billingEdit')->name('erp.billings.edit');
+    Route::put('/erp/billings/{invoice}/opening-account', 'Erp\ModuleController@updateOpeningBalanceAccount')->name('erp.billings.opening-account.update');
     Route::get('/erp/billings/{invoice}/void', 'Erp\ModuleController@billingVoid')->name('erp.billings.void');
     Route::post('/erp/billings/{invoice}/void', 'Erp\ModuleController@billingVoidStore')->name('erp.billings.void.store');
     Route::get('/erp/billings/status/update', 'Erp\ModuleController@billingStatus')->name('erp.billings.status');

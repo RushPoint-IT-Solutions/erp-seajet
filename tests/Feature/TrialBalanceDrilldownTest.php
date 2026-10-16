@@ -144,6 +144,38 @@ class TrialBalanceDrilldownTest extends TestCase
         $this->assertEquals(250, $row['JOURNAL BOOK']);
     }
 
+    public function test_expense_beginning_balance_keeps_stored_and_manual_journal_amounts()
+    {
+        $accountId = DB::table('accounts')->insertGetId([
+            'company_id' => 1, 'code' => '5999-QA', 'name' => 'Expense beginning balance test',
+            'type' => 'Expenses', 'opening_balance' => 100,
+            'account_category_id' => DB::table('account_categories')->where('name', 'Expenses')->value('id'),
+        ]);
+        $account = DB::table('accounts')->where('id', $accountId)->first();
+        $invoice = DB::table('sales_documents')->where('company_id', 1)->first();
+        DB::table('sales_documents')->where('id', $invoice->id)->update(['status' => 'voided']);
+        foreach ([['posted', 250, 0], ['posted', 0, 25], ['voided', 500, 0]] as $index => $entry) {
+            $journalId = DB::table('journal_entries')->insertGetId([
+                'company_id' => 1, 'journal_no' => 'JV-EXPENSE-OPENING-'.$index,
+                'journal_date' => '2026-09-01', 'source_module' => 'GL',
+                'reference_no' => $invoice->document_no, 'status' => $entry[0],
+            ]);
+            DB::table('journal_entry_lines')->insert([
+                'journal_entry_id' => $journalId, 'account_id' => $account->id,
+                'description' => 'Expense opening adjustment '.$invoice->document_no,
+                'debit' => $entry[1], 'credit' => $entry[2],
+            ]);
+        }
+        $this->getJson(route('erp.reports.trial-balance.drilldown', [
+            'period' => '2026-10', 'account_id' => $account->id, 'column' => 'BEGINNING BALANCE',
+        ]))->assertOk()->assertJson(['total' => 325])->assertJsonCount(3, 'entries');
+        $rows = $this->get(route('erp.reports.trial-balance', ['period' => '2026-10']))
+            ->assertOk()->original->getData()['rows'];
+        $row = collect($rows)->firstWhere('__account_id', (int) $account->id);
+        $this->assertEquals(325, $row['BEGINNING BALANCE']);
+        $this->assertEquals(325, $row['ENDING TRIAL BALANCE']);
+    }
+
     public function test_trial_balance_amount_opens_a_raw_journal_line_drilldown()
     {
         $account = DB::table('accounts')->where('company_id', 1)->orderBy('id')->first();
