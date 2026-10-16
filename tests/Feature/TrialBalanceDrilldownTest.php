@@ -78,6 +78,72 @@ class TrialBalanceDrilldownTest extends TestCase
         $this->assertEquals(25, $row['ENDING TRIAL BALANCE']);
     }
 
+    public function test_voiding_one_imported_balance_keeps_the_other_encoded_balances_in_the_batch()
+    {
+        $account = DB::table('accounts')->where('company_id', 1)->where('opening_balance', 0)->first();
+        $offset = DB::table('accounts')->where('company_id', 1)->where('id', '<>', $account->id)->first();
+        $invoice = DB::table('sales_documents')->where('company_id', 1)->first();
+        DB::table('sales_documents')->where('id', $invoice->id)->update(['status' => 'voided']);
+        $original = DB::table('journal_entries')->insertGetId([
+            'company_id' => 1, 'journal_no' => 'OB-PARTIAL-VOID', 'journal_date' => '2026-09-01',
+            'source_module' => 'GL', 'source_type' => 'opening_balance_import', 'status' => 'posted',
+        ]);
+        $reversal = DB::table('journal_entries')->insertGetId([
+            'company_id' => 1, 'journal_no' => 'OB-ROW-REVERSAL', 'journal_date' => '2026-10-05',
+            'source_module' => 'GL', 'source_type' => 'opening_balance_row', 'status' => 'posted',
+            'posting_type' => 'reversal', 'reversed_entry_id' => $original,
+        ]);
+        foreach ([
+            [$original, 'A/R Trade opening balance '.$invoice->document_no, 100],
+            [$original, 'A/R Trade opening balance ACTIVE-ENCODED-2026', 175],
+            [$reversal, 'Reversal: A/R Trade opening balance '.$invoice->document_no, -100],
+        ] as $entry) {
+            DB::table('journal_entry_lines')->insert([
+                ['journal_entry_id' => $entry[0], 'account_id' => $account->id,
+                    'description' => $entry[1], 'debit' => max(0, $entry[2]), 'credit' => max(0, -$entry[2])],
+                ['journal_entry_id' => $entry[0], 'account_id' => $offset->id,
+                    'description' => $entry[1], 'credit' => max(0, $entry[2]), 'debit' => max(0, -$entry[2])],
+            ]);
+        }
+        $this->getJson(route('erp.reports.trial-balance.drilldown', [
+            'period' => '2026-10', 'account_id' => $account->id, 'column' => 'BEGINNING BALANCE',
+        ]))->assertOk()->assertJson(['total' => 175])->assertJsonFragment([
+            'description' => 'A/R Trade opening balance ACTIVE-ENCODED-2026',
+        ])->assertJsonCount(1, 'entries');
+        $rows = $this->get(route('erp.reports.trial-balance', ['period' => '2026-10']))
+            ->assertOk()->original->getData()['rows'];
+        $row = collect($rows)->firstWhere('__account_id', (int) $account->id);
+        $this->assertEquals(175, $row['BEGINNING BALANCE']);
+        $this->assertEquals(175, $row['ENDING TRIAL BALANCE']);
+    }
+
+    public function test_blank_voided_document_numbers_do_not_hide_encoded_journals()
+    {
+        $invoice = (array) DB::table('sales_documents')->where('company_id', 1)->first();
+        unset($invoice['id']);
+        DB::table('sales_documents')->insert(array_merge($invoice, [
+            'document_no' => '', 'transaction_no' => '', 'soa_no' => '', 'status' => 'voided',
+        ]));
+        $account = DB::table('accounts')->where('company_id', 1)->where('opening_balance', 0)->first();
+        $journalId = DB::table('journal_entries')->insertGetId([
+            'company_id' => 1, 'journal_no' => 'JV-ENCODED-NO-REFERENCE',
+            'journal_date' => '2026-10-05', 'source_module' => 'GL',
+            'reference_no' => '', 'status' => 'posted',
+        ]);
+        DB::table('journal_entry_lines')->insert([
+            'journal_entry_id' => $journalId, 'account_id' => $account->id,
+            'description' => 'Manually encoded active entry', 'debit' => 250, 'credit' => 0,
+        ]);
+        $this->getJson(route('erp.reports.trial-balance.drilldown', [
+            'period' => '2026-10', 'account_id' => $account->id, 'column' => 'JOURNAL BOOK',
+        ]))->assertOk()->assertJson(['total' => 250])
+            ->assertJsonFragment(['journal_no' => 'JV-ENCODED-NO-REFERENCE']);
+        $rows = $this->get(route('erp.reports.trial-balance', ['period' => '2026-10']))
+            ->assertOk()->original->getData()['rows'];
+        $row = collect($rows)->firstWhere('__account_id', (int) $account->id);
+        $this->assertEquals(250, $row['JOURNAL BOOK']);
+    }
+
     public function test_trial_balance_amount_opens_a_raw_journal_line_drilldown()
     {
         $account = DB::table('accounts')->where('company_id', 1)->orderBy('id')->first();

@@ -696,6 +696,9 @@ class OpeningBalanceImportTest extends TestCase
         $this->assertEquals(1000, $lines->where('account_id', $accounts['ar_trade_php_account_id'])->sum('credit'));
         $this->get(route('erp.reports.client-soa', ['customer_id' => $customer->id]))->assertOk()
             ->assertDontSee('DELETE-AR-001')->assertSee('KEEP-AR-002');
+        $this->getJson(route('erp.reports.trial-balance.drilldown', [
+            'period' => '2026-10', 'account_id' => 'all', 'column' => 'BEGINNING BALANCE',
+        ]))->assertOk()->assertSee('KEEP-AR-002')->assertDontSee('DELETE-AR-001');
         $this->assertDatabaseHas('activity_logs', ['action' => 'deleted_imported_ar_balance', 'auditable_id' => $row->sales_document_id]);
         $this->withExceptionHandling();
         $this->delete(route('erp.accounting.opening-balances.ar.delete', $row->id), ['reason' => 'Repeated deletion'])->assertSessionHasErrors('balance');
@@ -710,7 +713,7 @@ class OpeningBalanceImportTest extends TestCase
         $this->post(route('erp.payments.receipt'), [
             'customer_id' => (string) $customer->id, 'invoice_no' => [$document->document_no],
             'payment_for' => 'soa', 'payment_date' => '2026-10-14', 'payment_method' => 'Cash',
-            'currency' => 'PHP', 'amount' => 2000,
+            'currency' => 'PHP', 'amount' => 2000, 'receipt_no' => 'AR-KEEP-002',
         ])->assertOk();
         $receipt = DB::table('receipts')->orderBy('id', 'desc')->first();
         $this->get(route('erp.accounting.opening-balances.import', ['manage_ar' => 1]))->assertOk()

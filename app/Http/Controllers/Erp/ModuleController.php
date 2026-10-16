@@ -11967,7 +11967,15 @@ class ModuleController extends Controller
             ->whereNotExists(function ($reversal) {
                 $reversal->select(DB::raw(1))->from('journal_entries as reversing_journals')
                     ->whereColumn('reversing_journals.company_id', 'journal_entries.company_id')
-                    ->whereColumn('reversing_journals.reversed_entry_id', 'journal_entries.id');
+                    ->whereColumn('reversing_journals.reversed_entry_id', 'journal_entries.id')
+                    ->where(function ($wholeJournalReversal) {
+                        // An imported batch contains many balances. A row reversal
+                        // invalidates only that balance, not every line in the batch.
+                        $wholeJournalReversal->whereNull('journal_entries.source_type')
+                            ->orWhere('journal_entries.source_type', '<>', 'opening_balance_import')
+                            ->orWhereNull('reversing_journals.source_type')
+                            ->orWhere('reversing_journals.source_type', '<>', 'opening_balance_row');
+                    });
             });
 
         foreach ([
@@ -12439,19 +12447,22 @@ class ModuleController extends Controller
             ->select('document_no')
             ->where('company_id', $this->defaultCompanyId())
             ->whereIn(DB::raw('LOWER(status)'), $excludedStatuses)
-            ->whereNotNull('document_no');
+            ->whereNotNull('document_no')
+            ->whereRaw("TRIM(document_no) <> ''");
 
         $voidedTransactionNumbers = DB::table('sales_documents')
             ->select('transaction_no')
             ->where('company_id', $this->defaultCompanyId())
             ->whereIn(DB::raw('LOWER(status)'), $excludedStatuses)
-            ->whereNotNull('transaction_no');
+            ->whereNotNull('transaction_no')
+            ->whereRaw("TRIM(transaction_no) <> ''");
 
         $voidedSoaNumbers = DB::table('sales_documents')
             ->select('soa_no')
             ->where('company_id', $this->defaultCompanyId())
             ->whereIn(DB::raw('LOWER(status)'), $excludedStatuses)
-            ->whereNotNull('soa_no');
+            ->whereNotNull('soa_no')
+            ->whereRaw("TRIM(soa_no) <> ''");
 
         return $query->where(function ($journalQuery) use ($companyId, $excludedStatuses, $invoiceSourceTypes) {
             $journalQuery->whereNull('journal_entries.source_type')
@@ -12493,6 +12504,7 @@ class ModuleController extends Controller
                 ->where('inactive_billing_documents.company_id', $companyId)
                 ->whereIn(DB::raw('LOWER(inactive_billing_documents.status)'), $excludedStatuses)
                 ->whereNotNull('inactive_billing_documents.document_no')
+                ->whereRaw("TRIM(inactive_billing_documents.document_no) <> ''")
                 ->whereRaw("INSTR(COALESCE(journal_entry_lines.description, ''), inactive_billing_documents.document_no) > 0");
         });
 
@@ -12504,6 +12516,7 @@ class ModuleController extends Controller
                     ->from('opening_balance_import_rows as billing_opening_rows')
                     ->where('billing_opening_rows.company_id', $companyId)
                     ->whereNotNull('billing_opening_rows.subledger_document_no')
+                    ->whereRaw("TRIM(billing_opening_rows.subledger_document_no) <> ''")
                     ->whereRaw("INSTR(COALESCE(journal_entry_lines.description, ''), billing_opening_rows.subledger_document_no) > 0")
                     ->whereNotExists(function ($activeBilling) use ($companyId, $excludedStatuses) {
                         $activeBilling->select(DB::raw(1))
