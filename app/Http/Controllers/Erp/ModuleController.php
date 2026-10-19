@@ -12581,6 +12581,8 @@ class ModuleController extends Controller
                 $orphanedOpeningBalance->select(DB::raw(1))
                     ->from('opening_balance_import_rows as billing_opening_rows')
                     ->where('billing_opening_rows.company_id', $companyId)
+                    // Payable imports link to purchase documents, not sales invoices.
+                    ->where('billing_opening_rows.balance_type', '<>', 'ap_trade')
                     ->whereNotNull('billing_opening_rows.subledger_document_no')
                     ->whereRaw("TRIM(billing_opening_rows.subledger_document_no) <> ''")
                     ->whereRaw("INSTR(COALESCE(journal_entry_lines.description, ''), billing_opening_rows.subledger_document_no) > 0")
