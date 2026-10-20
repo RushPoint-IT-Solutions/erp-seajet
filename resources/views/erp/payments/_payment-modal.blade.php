@@ -121,18 +121,16 @@
                                 <option>PAMPANGA</option>
                                 <option>CEBU</option>
                             </select>
-                            <div class="form-text">Uses this class's OR or AR series.</div>
+                            <div class="form-text">Select the class for this payment.</div>
                         </div>
                         <div class="col-sm-6 col-lg-3">
                             <label class="form-label fw-semibold">Payment Date</label>
                             <input name="payment_date" type="date" class="form-control" value="{{ date('Y-m-d') }}" required>
                         </div>
                         <div class="col-sm-6 col-lg-3">
-                            <label class="form-label fw-semibold">Next Receipt No.</label>
-                            <input class="form-control payment-receipt-preview" readonly
-                                   data-series='@json($receiptSeries['by_class'])'
-                                   placeholder="Choose class and BI or SOA">
-                            <div class="form-text">Confirmed number appears after saving.</div>
+                            <label class="form-label fw-semibold">O.R. / A.R. Number <span class="text-danger">*</span></label>
+                            <input name="receipt_no" class="form-control" maxlength="100" pattern="[A-Za-z0-9-]+" value="{{ old('receipt_no') }}" placeholder="Enter original O.R. / A.R. number" autocomplete="off" required>
+                            <div class="form-text">Enter the full original receipt number, including any prefix and leading zeros. Receipt numbers are entered manually for now.</div>
                         </div>
                         <div class="col-sm-6 col-lg-3">
                             <label class="form-label fw-semibold">Payment Method</label>
@@ -147,13 +145,6 @@
                             <label class="form-label">Reference No.</label>
                             <input name="reference_no" class="form-control" value="">
                         </div>
-                        @if(app(\App\Services\Security\RbacService::class)->normalizeRole(auth()->user()->role ?? '') === 'admin')
-                        <div class="col-sm-6 col-lg-3">
-                            <label class="form-label">Receipt Number (Admin)</label>
-                            <input name="receipt_no" class="form-control" maxlength="100" pattern="[A-Za-z0-9-]+" value="{{ old('receipt_no') }}" placeholder="Automatic if blank">
-                            <div class="form-text">Enter the full receipt number. Existing numbers, including voided receipts, cannot be reused.</div>
-                        </div>
-                        @endif
                         <div class="col-sm-6 col-lg-3">
                             <label class="form-label">Deposit Bank Account</label>
                             <select name="bank_account_id" class="form-select">
@@ -473,11 +464,6 @@
                 if (firstInvoice.length && !form.find('.payment-class-select').val()) {
                     form.find('.payment-class-select').val(String(firstInvoice.data('class-code') || 'MANILA'));
                 }
-                var preview = form.find('.payment-receipt-preview');
-                var mode = form.find('.payment-for-select').val();
-                var classCode = form.find('.payment-class-select').val();
-                var series = preview.data('series') || {};
-                preview.val((series[mode] || {})[classCode] || '');
                 setCustomerDetails(form);
                 syncRowsFromSelect(form);
                 syncTotals(form, fillPaymentAmount);

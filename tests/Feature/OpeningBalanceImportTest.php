@@ -399,6 +399,66 @@ class OpeningBalanceImportTest extends TestCase
         $this->assertCount(2, $matchingInvoices);
         $this->assertSame('voided', $matchingInvoices[0]->status);
         $this->assertSame('posted', $matchingInvoices[1]->status);
+        $this->getJson(route('erp.reports.trial-balance.drilldown', [
+            'period' => '2026-10', 'account_id' => $accounts['ar_trade_php_account_id'],
+            'column' => 'BEGINNING BALANCE',
+        ]))->assertOk()->assertJson(['total' => 1000]);
+        $rows = $this->get(route('erp.reports.trial-balance', ['period' => '2026-10']))
+            ->assertOk()->original->getData()['rows'];
+        $trialRow = collect($rows)->firstWhere('__account_id', (int) $accounts['ar_trade_php_account_id']);
+        $this->assertEquals(1000, $trialRow['BEGINNING BALANCE']);
+        $this->assertEquals(1000, $trialRow['ENDING TRIAL BALANCE']);
+    }
+
+    public function test_manual_usd_reimbursable_opening_account_can_be_corrected_without_deleting_the_balance()
+    {
+        $accounts = $this->accountMapping();
+        $customer = DB::table('customers')->where('company_id', 1)->where('is_active', true)->first();
+        $branch = DB::table('branches')->where('company_id', 1)->where('is_active', true)->first();
+        $wrongId = $accounts['ar_reimbursable_php_account_id'];
+        DB::table('accounts')->where('id', $wrongId)->update(['name' => 'A/R Reimbursable Charges (PHP)']);
+        $copy = (array) DB::table('accounts')->where('id', $wrongId)->first();
+        unset($copy['id']);
+        $correctId = DB::table('accounts')->insertGetId(array_merge($copy, [
+            'code' => '1221-USD', 'name' => 'A/R Reimbursable Charges (USD)',
+        ]));
+        $this->post(route('erp.accounting.opening-balances.manual.store'), [
+            'balance_type' => 'ar_trade', 'customer_id' => $customer->id,
+            'reference_no' => 'RC-USD-CORRECT', 'soa_reference_no' => 'RC-USD-CORRECT',
+            'source_date' => '2026-06-03', 'due_date' => '2026-07-03',
+            'branch_id' => $branch->id, 'currency' => 'USD', 'exchange_rate' => 60,
+            'bi_amount' => 0, 'soa_amount' => 100, 'target_account_id' => $wrongId,
+            'soa_account_id' => $wrongId, 'opening_balance_account_id' => $accounts['opening_balance_account_id'],
+        ])->assertRedirect(route('erp.payments.create'));
+        $document = DB::table('sales_documents')->where('transaction_no', 'RC-USD-CORRECT')->first();
+        $this->assertNotNull($document);
+        $this->get(route('erp.billings.edit', $document->id))->assertOk()
+            ->assertSee('Update A/R Account')->assertSee('Opening Balance A/R Account (USD)');
+        $fields = ['opening_account_id' => $correctId, 'account_change_reason' => 'Choose USD reimbursable account'];
+        $this->put(route('erp.billings.opening-account.update', $document->id), $fields)
+            ->assertRedirect(route('erp.billings.edit', $document->id));
+        $this->assertDatabaseHas('sales_documents', ['id' => $document->id,
+            'opening_balance_control_account_id' => $correctId, 'currency' => 'USD', 'grand_total' => 100]);
+        $this->assertDatabaseHas('journal_entry_lines', ['journal_entry_id' => $document->journal_entry_id,
+            'account_id' => $correctId, 'debit' => 6000, 'foreign_debit' => 100]);
+        $this->assertFalse(DB::table('journal_entry_lines')->where('journal_entry_id', $document->journal_entry_id)
+            ->where('account_id', $wrongId)->exists());
+        $this->assertDatabaseHas('activity_logs', ['action' => 'opening_balance_account_changed', 'auditable_id' => $document->id]);
+        $this->getJson(route('erp.reports.trial-balance.drilldown', [
+            'period' => '2026-10', 'account_id' => $correctId, 'column' => 'BEGINNING BALANCE',
+        ]))->assertOk()->assertJson(['total' => 6000]);
+        $this->withExceptionHandling();
+        $this->put(route('erp.billings.opening-account.update', $document->id), [
+            'opening_account_id' => $wrongId, 'account_change_reason' => 'Wrong currency',
+        ])->assertSessionHasErrors('opening_account_id');
+        DB::table('sales_documents')->where('id', $document->id)->update(['paid_total' => 1]);
+        $this->put(route('erp.billings.opening-account.update', $document->id), $fields)
+            ->assertSessionHasErrors('opening_account_id');
+        DB::table('sales_documents')->where('id', $document->id)->update(['paid_total' => 0]);
+        $row = DB::table('opening_balance_import_rows')->where('sales_document_id', $document->id)->first();
+        $this->delete(route('erp.accounting.opening-balances.ar.delete', $row->id), ['reason' => 'Verify corrected balance reversal'])
+            ->assertRedirect();
+        $this->assertDatabaseHas('sales_documents', ['id' => $document->id, 'status' => 'voided']);
     }
 
     public function test_manual_ap_opening_balance_supports_bdo_and_metro_and_creates_an_open_vendor_bill()
@@ -696,6 +756,9 @@ class OpeningBalanceImportTest extends TestCase
         $this->assertEquals(1000, $lines->where('account_id', $accounts['ar_trade_php_account_id'])->sum('credit'));
         $this->get(route('erp.reports.client-soa', ['customer_id' => $customer->id]))->assertOk()
             ->assertDontSee('DELETE-AR-001')->assertSee('KEEP-AR-002');
+        $this->getJson(route('erp.reports.trial-balance.drilldown', [
+            'period' => '2026-10', 'account_id' => 'all', 'column' => 'BEGINNING BALANCE',
+        ]))->assertOk()->assertSee('KEEP-AR-002')->assertDontSee('DELETE-AR-001');
         $this->assertDatabaseHas('activity_logs', ['action' => 'deleted_imported_ar_balance', 'auditable_id' => $row->sales_document_id]);
         $this->withExceptionHandling();
         $this->delete(route('erp.accounting.opening-balances.ar.delete', $row->id), ['reason' => 'Repeated deletion'])->assertSessionHasErrors('balance');
@@ -710,7 +773,7 @@ class OpeningBalanceImportTest extends TestCase
         $this->post(route('erp.payments.receipt'), [
             'customer_id' => (string) $customer->id, 'invoice_no' => [$document->document_no],
             'payment_for' => 'soa', 'payment_date' => '2026-10-14', 'payment_method' => 'Cash',
-            'currency' => 'PHP', 'amount' => 2000,
+            'currency' => 'PHP', 'amount' => 2000, 'receipt_no' => 'AR-KEEP-002',
         ])->assertOk();
         $receipt = DB::table('receipts')->orderBy('id', 'desc')->first();
         $this->get(route('erp.accounting.opening-balances.import', ['manage_ar' => 1]))->assertOk()

@@ -22,6 +22,64 @@ class OpeningBalanceImportService
         $this->activity = $activity;
     }
 
+    public function updateReceivableAccount($companyId, $documentId, $accountId, $reason)
+    {
+        return DB::transaction(function () use ($companyId, $documentId, $accountId, $reason) {
+            $document = DB::table('sales_documents')->where('company_id', $companyId)
+                ->where('id', $documentId)->lockForUpdate()->first();
+            $row = DB::table('opening_balance_import_rows')->where('company_id', $companyId)
+                ->where('sales_document_id', $documentId)->lockForUpdate()->first();
+            if (!$document || !$row || !$document->opening_balance_control_account_id
+                || in_array(strtolower($document->status), ['voided', 'cancelled', 'deleted'], true)) {
+                throw ValidationException::withMessages(['opening_account_id' => 'Select an active imported or manual A/R opening balance.']);
+            }
+            $hasPayments = DB::table('receipt_applications')->join('receipts', 'receipts.id', '=', 'receipt_applications.receipt_id')
+                ->where('receipt_applications.sales_document_id', $documentId)
+                ->whereNotIn('receipts.status', ['voided', 'cancelled'])->exists();
+            if ((float) $document->paid_total > 0 || $hasPayments) {
+                throw ValidationException::withMessages(['opening_account_id' => 'Void linked payments before changing this opening balance account.']);
+            }
+            $account = DB::table('accounts')->where('company_id', $companyId)->where('id', $accountId)
+                ->where('is_active', true)->first();
+            $name = $account ? strtoupper($account->name) : '';
+            $isReimbursable = $document->ar_account_code === 'AR_REIMBURSABLE';
+            $validFamily = $isReimbursable ? strpos($name, 'REIMBURS') !== false
+                : (strpos($name, 'A/R') !== false || strpos($name, 'RECEIVABLE') !== false) && strpos($name, 'REIMBURS') === false;
+            if (!$account || !$validFamily || strpos($name, strtoupper($document->currency)) === false) {
+                throw ValidationException::withMessages(['opening_account_id' => 'Select an active '.($isReimbursable ? 'A/R Reimbursable' : 'A/R Trade').' account for '.$document->currency.'.']);
+            }
+            $journal = DB::table('journal_entries')->where('company_id', $companyId)
+                ->where('id', $row->journal_entry_id)->lockForUpdate()->first();
+            if (!$journal || $journal->status !== 'posted' || $journal->source_type !== 'opening_balance_import') {
+                throw ValidationException::withMessages(['opening_account_id' => 'The original opening balance journal is not available for correction.']);
+            }
+            $this->periods->assertOpen($companyId, $journal->journal_date);
+            $oldAccountId = (int) $document->opening_balance_control_account_id;
+            $lines = DB::table('journal_entry_lines')->where('journal_entry_id', $journal->id)
+                ->where('account_id', $oldAccountId)->where('customer_id', $document->customer_id)
+                ->where('currency', $row->currency)->where('debit', $row->base_amount)->where('credit', 0)
+                ->lockForUpdate()->get()->filter(function ($line) use ($row) {
+                    return strpos($line->description, ' opening balance '.$row->reference_no.' | '.$row->party_name.' | '.$row->source_date) !== false;
+                });
+            if ($lines->count() !== 1) {
+                throw ValidationException::withMessages(['opening_account_id' => 'The exact opening balance journal line could not be identified.']);
+            }
+            if ($oldAccountId === (int) $accountId) {
+                return;
+            }
+            DB::table('journal_entry_lines')->where('id', $lines->first()->id)->update([
+                'account_id' => $accountId, 'updated_at' => now(),
+            ]);
+            DB::table('sales_documents')->where('id', $documentId)->update([
+                'opening_balance_control_account_id' => $accountId, 'updated_at' => now(),
+            ]);
+            $this->activity->log('opening_balance_account_changed', 'sales_document', $documentId,
+                ['account_id' => $oldAccountId],
+                ['account_id' => (int) $accountId, 'journal_entry_id' => $journal->id,
+                    'journal_line_id' => $lines->first()->id, 'reason' => $reason], $companyId);
+        });
+    }
+
     public function preview($path, $companyId, array $mapping, $fileHash)
     {
         $accounts = $this->mappedAccounts($companyId, $mapping);

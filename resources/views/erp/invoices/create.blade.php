@@ -127,6 +127,26 @@
 
 @section('content')
     <div class="invoice-workspace">
+        @if(!empty($openingBalanceRecord))
+        <form method="post" action="{{ route('erp.billings.opening-account.update', $openingBalanceRecord->id) }}" class="erp-card p-3 mb-3">
+            {{ csrf_field() }}
+            {{ method_field('PUT') }}
+            <label class="form-label fw-semibold" for="opening_account_id">Opening Balance A/R Account ({{ $openingBalanceRecord->currency }})</label>
+            <div class="row g-2 align-items-end">
+                <div class="col-md-5">
+                    <select id="opening_account_id" name="opening_account_id" class="form-select" required>
+                        <option value="">Select the correct A/R account...</option>
+                        @foreach($openingBalanceAccounts as $account)
+                        <option value="{{ $account->id }}" {{ (int) $openingBalanceRecord->opening_balance_control_account_id === (int) $account->id ? 'selected' : '' }}>{{ $account->code }} - {{ $account->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-5"><input name="account_change_reason" class="form-control" placeholder="Reason for account correction" maxlength="1000" required></div>
+                <div class="col-md-2"><button class="btn btn-primary" type="submit">Update A/R Account</button></div>
+            </div>
+            <div class="form-text">Correct the account without deleting this opening balance. Linked payments must be voided first.</div>
+        </form>
+        @endif
         @if($errors->any())
             <div class="alert alert-danger">
                 <div class="fw-semibold mb-1">Please fix the invoice before saving.</div>

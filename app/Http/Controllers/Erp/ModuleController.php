@@ -7232,12 +7232,35 @@ class ModuleController extends Controller
         return view('erp.invoices.create', [
             'isEdit' => true,
             'editingInvoice' => $this->billingPrintInvoiceDataFromReference($record->id),
+            'openingBalanceRecord' => $record->opening_balance_control_account_id ? $record : null,
+            'openingBalanceAccounts' => $record->opening_balance_control_account_id ? $this->glAccountOptions()->filter(function ($account) use ($record) {
+                $name = strtoupper($account->name);
+                $isReimbursable = $record->ar_account_code === 'AR_REIMBURSABLE';
+                return strpos($name, strtoupper($record->currency)) !== false
+                    && ($isReimbursable ? strpos($name, 'REIMBURS') !== false
+                        : (strpos($name, 'A/R') !== false || strpos($name, 'RECEIVABLE') !== false) && strpos($name, 'REIMBURS') === false);
+            }) : collect(),
             'customers' => $this->customerSelectOptions(),
             'invoiceTemplates' => $this->invoiceTemplates(),
             'items' => $this->invoiceItemOptions(),
             'invoiceSeries' => $this->classNumberPreview('billing_invoice', 6),
             'soaASeries' => $this->nextDocumentNumber('statement_of_account_a', 'SOAA-', 4, false),
         ]);
+    }
+
+    public function updateOpeningBalanceAccount($invoice, OpeningBalanceImportService $importer)
+    {
+        $this->authorizeAccountingPosting('accounting', 'approve');
+        $record = $this->salesDocumentRecordByReference($invoice);
+        $data = request()->validate([
+            'opening_account_id' => 'required|integer',
+            'account_change_reason' => 'required|string|max:1000',
+        ]);
+        $importer->updateReceivableAccount($this->defaultCompanyId(), $record->id,
+            $data['opening_account_id'], $data['account_change_reason']);
+
+        return redirect()->route('erp.billings.edit', $record->id)
+            ->with('status', 'Opening balance A/R account and journal account updated.');
     }
 
     public function billingVoid($invoice)
@@ -9907,12 +9930,11 @@ class ModuleController extends Controller
             'amount' => 'required',
             'cwt_amount' => 'nullable',
             'cwt_certificate_no' => 'nullable|string|max:100',
-            'receipt_no' => 'nullable|string|max:100|regex:/^[A-Za-z0-9-]+$/',
+            'receipt_no' => 'required|string|max:100|regex:/^[A-Za-z0-9-]+$/',
             'reenter_receipt' => 'nullable|integer',
         ]);
         $this->authorizeAccountingPosting('payments', 'create');
         if (!empty($data['receipt_no'])) {
-            abort_unless(app(RbacService::class)->normalizeRole(auth()->user()->role ?? '') === 'admin', 403);
             $data['receipt_no'] = trim($data['receipt_no']);
         }
 
@@ -10031,14 +10053,12 @@ class ModuleController extends Controller
         $exchangeRate = $currency === 'PHP' ? 1 : max(0.000001, $this->moneyToFloat($data['exchange_rate'] ?? 1));
 
         $receiptResult = DB::transaction(function () use ($customer, $companyId, $invoices, $invoiceAmounts, $amount, $cwtAmount, $settlementAmount, $currency, $exchangeRate, $data, $paymentFor, $receiptComponent, $classCode) {
-            $receiptNo = !empty($data['receipt_no']) ? $data['receipt_no'] : ($paymentFor === 'bi'
-                ? $this->nextDocumentNumber('official_receipt', $this->classNumberPrefix('official_receipt', $classCode), 5, true, $classCode)
-                : $this->nextDocumentNumber('acknowledgement_receipt', $this->classNumberPrefix('acknowledgement_receipt', $classCode), 6, true, $classCode));
+            $receiptNo = $data['receipt_no'];
             if (!empty($data['receipt_no'])) {
                 $receiptNo = $data['receipt_no'];
-                if (DB::table('receipts')->where('company_id', $companyId)->where('receipt_no', $receiptNo)->exists()) {
+                if (DB::table('receipts')->where('company_id', $companyId)->where('receipt_no', $receiptNo)->where('status', '<>', 'voided')->exists()) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
-                        'receipt_no' => 'This receipt number already exists, including voided receipts. Enter a unique number.',
+                        'receipt_no' => 'This receipt number is already used by a non-voided receipt. Enter a different number or void that receipt first.',
                     ]);
                 }
             }
@@ -10492,6 +10512,8 @@ class ModuleController extends Controller
             ->when(in_array('job_shipment_id', $receiptColumns, true), function ($grouped) {
                 return $grouped->groupBy('receipts.job_shipment_id');
             })
+            ->groupBy('receipts.status')
+            ->orderByRaw("CASE WHEN receipts.status = 'voided' THEN 1 ELSE 0 END")
             ->orderBy('receipts.receipt_date', 'desc')
             ->orderBy('receipts.id', 'desc')
             ->first();
@@ -11307,8 +11329,8 @@ class ModuleController extends Controller
                 ->orderBy('journal_entries.id')
                 ->orderBy('journal_entry_lines.id');
 
-            $this->excludeVoidedSalesDocumentJournals($query);
-            $this->excludeInactiveBillingInvoiceLines($query);
+            $this->excludeTrialBalanceBillingJournals($query);
+            $this->excludeVoidedTrialBalanceJournals($query);
 
             if ($accountId) {
                 $query->where('journal_entry_lines.account_id', $accountId);
@@ -11933,8 +11955,8 @@ class ModuleController extends Controller
             ->where('journal_entries.company_id', $this->defaultCompanyId())
             ->groupBy('journal_entry_lines.account_id', 'journal_entries.source_module');
 
-        $this->excludeVoidedSalesDocumentJournals($query);
-        $this->excludeInactiveBillingInvoiceLines($query);
+        $this->excludeTrialBalanceBillingJournals($query);
+        $this->excludeVoidedTrialBalanceJournals($query);
 
         if ($startDate) {
             $query->where('journal_entries.journal_date', '>=', $startDate);
@@ -11952,6 +11974,63 @@ class ModuleController extends Controller
         }
 
         return $movements;
+    }
+
+    private function excludeTrialBalanceBillingJournals($query)
+    {
+        return $query->where(function ($journals) {
+            // Manual GL references and descriptions are free text, not invoice links.
+            $journals->where(function ($manual) {
+                $manual->whereIn(DB::raw('LOWER(journal_entries.source_module)'), ['gl', 'general journal'])
+                    ->where(function ($source) {
+                        $source->whereNull('journal_entries.source_type')
+                            ->orWhere('journal_entries.source_type', '');
+                    });
+            })->orWhere(function ($linked) {
+                $this->excludeVoidedSalesDocumentJournals($linked);
+                $this->excludeInactiveBillingInvoiceLines($linked);
+            });
+        });
+    }
+
+    private function excludeVoidedTrialBalanceJournals($query)
+    {
+        $excludedStatuses = ['void', 'voided', 'cancelled', 'canceled', 'deleted', 'reversed'];
+        $query->whereNotIn(DB::raw('LOWER(journal_entries.status)'), $excludedStatuses)
+            ->where(function ($original) {
+                $original->whereNull('journal_entries.posting_type')
+                    ->orWhere('journal_entries.posting_type', '<>', 'reversal');
+            })
+            ->whereNull('journal_entries.reversed_entry_id')
+            ->whereNotExists(function ($reversal) {
+                $reversal->select(DB::raw(1))->from('journal_entries as reversing_journals')
+                    ->whereColumn('reversing_journals.company_id', 'journal_entries.company_id')
+                    ->whereColumn('reversing_journals.reversed_entry_id', 'journal_entries.id')
+                    ->where(function ($wholeJournalReversal) {
+                        // An imported batch contains many balances. A row reversal
+                        // invalidates only that balance, not every line in the batch.
+                        $wholeJournalReversal->whereNull('journal_entries.source_type')
+                            ->orWhere('journal_entries.source_type', '<>', 'opening_balance_import')
+                            ->orWhereNull('reversing_journals.source_type')
+                            ->orWhere('reversing_journals.source_type', '<>', 'opening_balance_row');
+                    });
+            });
+
+        foreach ([
+            'receipt' => 'receipts',
+            'payment' => 'payments',
+            'purchase_document' => 'purchase_documents',
+        ] as $sourceType => $table) {
+            $query->whereNotExists(function ($inactive) use ($sourceType, $table, $excludedStatuses) {
+                $inactive->select(DB::raw(1))->from($table.' as inactive_source')
+                    ->where('journal_entries.source_type', $sourceType)
+                    ->whereColumn('inactive_source.company_id', 'journal_entries.company_id')
+                    ->whereColumn('inactive_source.id', 'journal_entries.source_id')
+                    ->whereIn(DB::raw('LOWER(inactive_source.status)'), $excludedStatuses);
+            });
+        }
+
+        return $query;
     }
 
     private function trialBalanceColumnForSource($source)
@@ -12406,19 +12485,22 @@ class ModuleController extends Controller
             ->select('document_no')
             ->where('company_id', $this->defaultCompanyId())
             ->whereIn(DB::raw('LOWER(status)'), $excludedStatuses)
-            ->whereNotNull('document_no');
+            ->whereNotNull('document_no')
+            ->whereRaw("TRIM(document_no) <> ''");
 
         $voidedTransactionNumbers = DB::table('sales_documents')
             ->select('transaction_no')
             ->where('company_id', $this->defaultCompanyId())
             ->whereIn(DB::raw('LOWER(status)'), $excludedStatuses)
-            ->whereNotNull('transaction_no');
+            ->whereNotNull('transaction_no')
+            ->whereRaw("TRIM(transaction_no) <> ''");
 
         $voidedSoaNumbers = DB::table('sales_documents')
             ->select('soa_no')
             ->where('company_id', $this->defaultCompanyId())
             ->whereIn(DB::raw('LOWER(status)'), $excludedStatuses)
-            ->whereNotNull('soa_no');
+            ->whereNotNull('soa_no')
+            ->whereRaw("TRIM(soa_no) <> ''");
 
         return $query->where(function ($journalQuery) use ($companyId, $excludedStatuses, $invoiceSourceTypes) {
             $journalQuery->whereNull('journal_entries.source_type')
@@ -12447,6 +12529,34 @@ class ModuleController extends Controller
 
     private function excludeInactiveBillingInvoiceLines($query)
     {
+        if (!Schema::hasTable('opening_balance_import_rows')) {
+            return $this->excludeLegacyInactiveBillingInvoiceLines($query);
+        }
+
+        // A re-entered balance can share its reference with a voided balance.
+        // Resolve imported lines through their own journal and subledger record.
+        $descriptionKey = DB::getDriverName() === 'sqlite'
+            ? "' opening balance ' || encoded_balance.reference_no || ' | ' || encoded_balance.party_name || ' | ' || encoded_balance.source_date"
+            : "CONCAT(' opening balance ', encoded_balance.reference_no, ' | ', encoded_balance.party_name, ' | ', encoded_balance.source_date)";
+
+        return $query->where(function ($lines) use ($descriptionKey) {
+            $lines->whereExists(function ($encoded) use ($descriptionKey) {
+                $encoded->select(DB::raw(1))->from('opening_balance_import_rows as encoded_balance')
+                    ->join('sales_documents as encoded_document', 'encoded_document.id', '=', 'encoded_balance.sales_document_id')
+                    ->where('journal_entries.source_type', 'opening_balance_import')
+                    ->whereColumn('encoded_balance.company_id', 'journal_entries.company_id')
+                    ->whereColumn('encoded_balance.journal_entry_id', 'journal_entries.id')
+                    ->whereColumn('encoded_document.company_id', 'journal_entries.company_id')
+                    ->whereNotIn(DB::raw('LOWER(encoded_document.status)'), ['cancelled', 'voided', 'deleted'])
+                    ->whereRaw("INSTR(COALESCE(journal_entry_lines.description, ''), {$descriptionKey}) > 0");
+            })->orWhere(function ($legacy) {
+                $this->excludeLegacyInactiveBillingInvoiceLines($legacy);
+            });
+        });
+    }
+
+    private function excludeLegacyInactiveBillingInvoiceLines($query)
+    {
         if (!Schema::hasTable('sales_documents') || !Schema::hasColumn('journal_entry_lines', 'description')) {
             return $query;
         }
@@ -12460,6 +12570,7 @@ class ModuleController extends Controller
                 ->where('inactive_billing_documents.company_id', $companyId)
                 ->whereIn(DB::raw('LOWER(inactive_billing_documents.status)'), $excludedStatuses)
                 ->whereNotNull('inactive_billing_documents.document_no')
+                ->whereRaw("TRIM(inactive_billing_documents.document_no) <> ''")
                 ->whereRaw("INSTR(COALESCE(journal_entry_lines.description, ''), inactive_billing_documents.document_no) > 0");
         });
 
@@ -12471,7 +12582,10 @@ class ModuleController extends Controller
                     ->from('opening_balance_import_rows as billing_opening_rows')
                     ->leftJoin('sales_documents as linked_billing_document', 'linked_billing_document.id', '=', 'billing_opening_rows.sales_document_id')
                     ->where('billing_opening_rows.company_id', $companyId)
+                    // Payable imports link to purchase documents, not sales invoices.
+                    ->where('billing_opening_rows.balance_type', '<>', 'ap_trade')
                     ->whereNotNull('billing_opening_rows.subledger_document_no')
+                    ->whereRaw("TRIM(billing_opening_rows.subledger_document_no) <> ''")
                     ->whereRaw("INSTR(COALESCE(journal_entry_lines.description, ''), billing_opening_rows.subledger_document_no) > 0")
                     ->where(function ($missingOrInactive) use ($excludedStatuses) {
                         $missingOrInactive->whereNull('linked_billing_document.id')

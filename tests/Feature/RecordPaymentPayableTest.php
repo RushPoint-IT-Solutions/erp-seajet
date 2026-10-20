@@ -25,7 +25,7 @@ class RecordPaymentPayableTest extends TestCase
         $this->withoutExceptionHandling();
     }
 
-    public function test_voided_reimbursable_soa_can_receive_a_new_payment_with_a_new_ar_number()
+    public function test_voided_reimbursable_soa_can_reuse_its_original_ar_number()
     {
         $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
         DB::table('sales_documents')->where('id', $invoice->id)->update([
@@ -47,6 +47,7 @@ class RecordPaymentPayableTest extends TestCase
             'payment_method' => 'Cash', 'currency' => 'PHP', 'exchange_rate' => 1,
             'amount' => '99965.12', 'cwt_amount' => 0,
         ];
+        $fields['receipt_no'] = 'AR-MNL-0007632';
         $this->post(route('erp.payments.receipt'), $fields)->assertOk();
         $first = DB::table('receipts')->orderBy('id', 'desc')->first();
         $this->assertSame('AR-MNL-0007632', $first->receipt_no);
@@ -64,12 +65,10 @@ class RecordPaymentPayableTest extends TestCase
         $this->assertSame(['7366'], $reentry->original->getData()['reentryPayment']['invoice_numbers']);
         $this->assertSame('soa', $reentry->original->getData()['reentryPayment']['payment_for']);
         $this->withExceptionHandling();
-        $this->post(route('erp.payments.receipt'), $fields + ['receipt_no' => $first->receipt_no])
-            ->assertSessionHasErrors('receipt_no');
-        $this->withoutExceptionHandling();
         $this->post(route('erp.payments.receipt'), $fields)->assertOk();
+        $this->withoutExceptionHandling();
         $replacement = DB::table('receipts')->orderBy('id', 'desc')->first();
-        $this->assertSame('AR-MNL-0007633', $replacement->receipt_no);
+        $this->assertSame($first->receipt_no, $replacement->receipt_no);
         $this->assertSame('voided', DB::table('receipts')->where('id', $first->id)->value('status'));
         $this->assertDatabaseHas('sales_documents', ['id' => $invoice->id, 'status' => 'paid', 'balance_due' => 0]);
         $this->assertDatabaseHas('receipt_applications', [
@@ -78,7 +77,7 @@ class RecordPaymentPayableTest extends TestCase
         ]);
     }
 
-    public function test_only_admin_can_override_the_receipt_number_and_the_override_is_audited()
+    public function test_finance_can_enter_an_original_receipt_number_and_it_is_audited()
     {
         $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
         $fields = [
@@ -88,11 +87,9 @@ class RecordPaymentPayableTest extends TestCase
         ];
         $user = $this->actingAsAdmin();
         $user->role = 'finance';
-        $this->withExceptionHandling();
-        $this->post(route('erp.payments.receipt'), $fields)->assertStatus(403);
-        $this->assertFalse(DB::table('receipts')->where('receipt_no', $fields['receipt_no'])->exists());
-        $this->actingAsAdmin();
-        $this->withoutExceptionHandling();
+        $this->get(route('erp.payments.create'))->assertOk()
+            ->assertSee('Enter original O.R. / A.R. number')
+            ->assertDontSee('Next Receipt No.');
         $this->post(route('erp.payments.receipt'), $fields)->assertOk();
         $receipt = DB::table('receipts')->where('receipt_no', $fields['receipt_no'])->first();
         $this->assertNotNull($receipt);
@@ -100,6 +97,26 @@ class RecordPaymentPayableTest extends TestCase
             'auditable_type' => 'receipt', 'auditable_id' => $receipt->id,
             'action' => 'receipt_number_override',
         ]);
+        $this->withExceptionHandling();
+        $fields['invoice_no'] = [];
+        $this->post(route('erp.payments.receipt'), $fields)->assertSessionHasErrors('receipt_no');
+    }
+
+    public function test_receipt_number_is_required_without_generating_a_receipt()
+    {
+        $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
+        $count = DB::table('receipts')->count();
+        $this->withExceptionHandling();
+        foreach (['bi', 'soa'] as $paymentFor) {
+            $this->post(route('erp.payments.receipt'), [
+                'customer_id' => (string) $invoice->customer_id,
+                'invoice_no' => [$invoice->document_no],
+                'payment_for' => $paymentFor, 'payment_date' => '2026-10-08',
+                'payment_method' => 'Cash', 'currency' => 'PHP', 'amount' => 50,
+                'receipt_no' => '',
+            ])->assertSessionHasErrors('receipt_no');
+        }
+        $this->assertSame($count, DB::table('receipts')->count());
     }
 
     public function test_record_payment_shows_only_unpaid_invoice_with_net_payable_amount()
@@ -230,6 +247,16 @@ class RecordPaymentPayableTest extends TestCase
             ->assertSee('Page 1 of 2')->assertSee('Page 2 of 2');
         $this->assertSame(2, substr_count($response->getContent(), 'class="client-soa-sheet"'));
         $this->assertCount(13, $response->original->getData()['invoices']);
+        $sheets = explode('<div class="client-soa-sheet">', $response->getContent());
+        $this->assertStringNotContainsString('<tfoot>', $sheets[1]);
+        $this->assertStringNotContainsString('OVERDUE ACCOUNTS', $sheets[1]);
+        $this->assertSame(1, substr_count($sheets[2], '<tfoot>'));
+        $this->assertStringContainsString('OVERDUE ACCOUNTS', $sheets[2]);
+        $invoices = $response->original->getData()['invoices'];
+        $this->assertStringContainsString(
+            '<td class="amount">'.number_format($invoices->sum('total'), 2).'</td>',
+            $sheets[2]
+        );
     }
 
     public function test_overpayment_shows_a_warning_and_cannot_be_saved()

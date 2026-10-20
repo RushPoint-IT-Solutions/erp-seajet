@@ -281,16 +281,18 @@
                 </tr>
             @endfor
             </tbody>
+            @if($pageIndex === $pages->count() - 1)
             <tfoot>
             <tr>
-                <td colspan="2" class="text-center">{{ $pages->count() > 1 ? 'PAGE TOTAL' : 'TOTAL' }}</td>
-                <td class="amount">{{ $money($pageInvoices->sum('invoice_amount')) }}</td>
+                <td colspan="2" class="text-center">TOTAL</td>
+                <td class="amount">{{ $money($invoices->sum('invoice_amount')) }}</td>
                 <td></td>
-                <td class="amount">{{ $money($pageInvoices->sum('soa_amount')) }}</td>
-                <td class="amount">{{ $money($pageInvoices->sum('total')) }}</td>
+                <td class="amount">{{ $money($invoices->sum('soa_amount')) }}</td>
+                <td class="amount">{{ $money($invoices->sum('total')) }}</td>
                 <td></td>
             </tr>
             </tfoot>
+            @endif
         </table>
 
         <div class="client-soa-bank">
@@ -300,6 +302,7 @@
             @endforeach
         </div>
 
+        @if($pageIndex === $pages->count() - 1)
         <div class="client-soa-overdue">
             <div class="client-soa-overdue-title">OVERDUE ACCOUNTS</div>
             @forelse($currencyTotals as $currency => $amount)
@@ -314,6 +317,7 @@
                 </div>
             @endforelse
         </div>
+        @endif
         @if($pages->count() > 1)<div class="client-soa-page-number">Page {{ $pageIndex + 1 }} of {{ $pages->count() }}</div>@endif
     </div>
     @endforeach
