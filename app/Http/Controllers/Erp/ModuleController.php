@@ -2716,7 +2716,6 @@ class ModuleController extends Controller
         $rules = [
             'layout' => 'required|array',
             'layout.font_sizes' => 'required|array',
-            'bank_account_id' => 'required|integer',
             'profile_name' => 'nullable|string|max:100',
             'printer_name' => 'nullable|string|max:255',
             'paper_width_mm' => 'required|numeric|between:150,260',
@@ -2736,34 +2735,27 @@ class ModuleController extends Controller
         $validated = request()->validate($rules);
         $layout = $this->sanitizeBankCheckPrintLayout($validated['layout']);
         $companyId = $this->defaultCompanyId();
-        $bank = DB::table('bank_accounts')->where('company_id', $companyId)
-            ->where('id', $validated['bank_account_id'])->first();
-        abort_unless($bank, 422, 'The selected bank account is invalid for this company.');
-
         $profileName = trim((string) ($validated['profile_name'] ?? '')) ?: 'Default';
         $profileId = DB::transaction(function () use ($validated, $layout, $companyId, $profileName) {
             $current = DB::table('check_layout_profiles')
                 ->where('company_id', $companyId)
-                ->where('bank_account_id', $validated['bank_account_id'])
-                ->where('profile_name', $profileName)
+                ->whereNull('bank_account_id')
                 ->where('is_active', true)
                 ->lockForUpdate()
                 ->first();
             $version = ((int) DB::table('check_layout_profiles')
                 ->where('company_id', $companyId)
-                ->where('bank_account_id', $validated['bank_account_id'])
-                ->where('profile_name', $profileName)
+                ->whereNull('bank_account_id')
                 ->max('version')) + 1;
 
             DB::table('check_layout_profiles')
                 ->where('company_id', $companyId)
-                ->where('bank_account_id', $validated['bank_account_id'])
-                ->where('profile_name', $profileName)
+                ->whereNull('bank_account_id')
                 ->update(['is_active' => false, 'updated_at' => now()]);
 
             $id = DB::table('check_layout_profiles')->insertGetId([
                 'company_id' => $companyId,
-                'bank_account_id' => $validated['bank_account_id'],
+                'bank_account_id' => null,
                 'profile_name' => $profileName,
                 'printer_name' => $validated['printer_name'] ?? null,
                 'paper_width_mm' => $validated['paper_width_mm'],
@@ -2783,14 +2775,14 @@ class ModuleController extends Controller
             app(ActivityLogger::class)->log('versioned', 'check_layout_profile', $id, $current ? (array) $current : [], [
                 'profile_name' => $profileName,
                 'version' => $version,
-                'bank_account_id' => $validated['bank_account_id'],
+                'bank_account_id' => null,
             ], $companyId);
 
             return $id;
         });
 
         return response()->json([
-            'status' => 'Layout saved as a new bank/printer profile version.',
+            'status' => 'Shared check layout saved for all banks.',
             'layout' => $layout,
             'profile' => $this->checkLayoutProfileArray(DB::table('check_layout_profiles')->where('id', $profileId)->first()),
         ]);
@@ -3988,7 +3980,7 @@ class ModuleController extends Controller
     {
         $defaults = $this->defaultBankCheckPrintLayout();
 
-        if (Schema::hasTable('check_layout_profiles') && $bankAccountId) {
+        if (Schema::hasTable('check_layout_profiles')) {
             $profile = $this->bankCheckLayoutProfile($bankAccountId, $profileId);
             if (!empty($profile['id'])) {
                 $saved = DB::table('check_layout_profiles')->where('id', $profile['id'])->first();
@@ -4028,14 +4020,24 @@ class ModuleController extends Controller
     private function bankCheckLayoutProfile($bankAccountId, $profileId = null)
     {
         $profile = null;
-        if (Schema::hasTable('check_layout_profiles') && $bankAccountId) {
-            $query = DB::table('check_layout_profiles')
+        if (Schema::hasTable('check_layout_profiles')) {
+            // All banks use one company layout. Historical bank-specific IDs
+            // must not switch a check back to a different alignment.
+            $profile = DB::table('check_layout_profiles')
                 ->where('company_id', $this->defaultCompanyId())
-                ->where('bank_account_id', $bankAccountId);
-            if ($profileId) {
-                $profile = $query->where('id', $profileId)->first();
-            } else {
-                $profile = $query->where('is_active', true)->orderBy('version', 'desc')->orderBy('id', 'desc')->first();
+                ->whereNull('bank_account_id')
+                ->where('is_active', true)
+                ->orderBy('version', 'desc')->orderBy('id', 'desc')->first();
+
+            if (!$profile) {
+                // Preserve the calibrated BDO layout until the first shared save.
+                $profile = DB::table('check_layout_profiles as profiles')
+                    ->leftJoin('bank_accounts as banks', 'banks.id', '=', 'profiles.bank_account_id')
+                    ->where('profiles.company_id', $this->defaultCompanyId())
+                    ->where('profiles.is_active', true)
+                    ->orderByRaw("CASE WHEN LOWER(banks.bank_name) LIKE '%bdo%' THEN 0 ELSE 1 END")
+                    ->orderBy('profiles.version', 'desc')->orderBy('profiles.id', 'desc')
+                    ->select('profiles.*')->first();
             }
         }
 
@@ -4059,20 +4061,9 @@ class ModuleController extends Controller
 
     private function bankCheckLayoutProfiles($bankAccountId)
     {
-        if (!Schema::hasTable('check_layout_profiles') || !$bankAccountId) {
-            return [];
-        }
+        $profile = $this->bankCheckLayoutProfile($bankAccountId);
 
-        return DB::table('check_layout_profiles')
-            ->where('company_id', $this->defaultCompanyId())
-            ->where('bank_account_id', $bankAccountId)
-            ->where('is_active', true)
-            ->orderBy('profile_name')
-            ->get()
-            ->map(function ($profile) {
-                return $this->checkLayoutProfileArray($profile);
-            })
-            ->all();
+        return $profile['id'] ? [$profile] : [];
     }
 
     private function checkLayoutProfileArray($profile)

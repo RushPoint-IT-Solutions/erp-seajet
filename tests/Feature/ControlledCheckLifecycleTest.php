@@ -120,7 +120,7 @@ class ControlledCheckLifecycleTest extends TestCase
             ->assertOk()
             ->assertSee('id="checkPayeeName"', false)
             ->assertSee('Alternate Check Payee')
-            ->assertSee('size: A4 portrait', false)
+            ->assertSee('size: 210mm 297mm;', false)
             ->assertSee('font-family: Calibri, Arial, Helvetica, sans-serif', false)
             ->assertSee('font-weight: 700', false)
             ->assertDontSee('rotate(90deg)', false);

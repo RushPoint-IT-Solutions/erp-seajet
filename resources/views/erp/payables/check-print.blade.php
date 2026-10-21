@@ -186,7 +186,7 @@
             </div>
             @if(count($checkProfiles))
                 <label class="small">
-                    Profile
+                    Shared layout
                     <select class="form-select form-select-sm" onchange="window.location=this.value">
                         @foreach($checkProfiles as $savedProfile)
                             <option value="{{ route('erp.payables.check-print', ['payment' => $voucher['id'], 'profile' => $savedProfile['id']]) }}" {{ $checkProfile['id'] === $savedProfile['id'] ? 'selected' : '' }}>
@@ -254,7 +254,7 @@
 
     @if($canSaveLayout)
         <details class="erp-card p-3 mb-3 no-print">
-            <summary class="fw-semibold text-primary" style="cursor:pointer">Bank and printer profile settings</summary>
+            <summary class="fw-semibold text-primary" style="cursor:pointer">Shared check layout and printer settings</summary>
             <div class="row g-2 mt-2">
                 <div class="col-md-3"><label class="form-label small">Profile name</label><input id="profileName" class="form-control form-control-sm" value="{{ $checkProfile['profile_name'] }}"></div>
                 <div class="col-md-3"><label class="form-label small">Printer name</label><input id="printerName" class="form-control form-control-sm" value="{{ $checkProfile['printer_name'] }}"></div>
@@ -263,7 +263,7 @@
                 <div class="col-md-2"><label class="form-label small">Feed</label><select id="feedOrientation" class="form-select form-select-sm"><option value="top" {{ $checkProfile['feed_orientation'] === 'top' ? 'selected' : '' }}>Top</option><option value="left" {{ $checkProfile['feed_orientation'] === 'left' ? 'selected' : '' }}>Left</option><option value="right" {{ $checkProfile['feed_orientation'] === 'right' ? 'selected' : '' }}>Right</option></select></div>
                 <div class="col-md-2"><label class="form-label small">Global X offset</label><input id="offsetX" type="number" min="-50" max="50" step="0.1" class="form-control form-control-sm" value="{{ $offsetX }}"></div>
                 <div class="col-md-2"><label class="form-label small">Global Y offset</label><input id="offsetY" type="number" min="-50" max="50" step="0.1" class="form-control form-control-sm" value="{{ $offsetY }}"></div>
-                <div class="col-md-8 d-flex align-items-end"><div class="small text-muted">Saving creates a new version; prior versions remain in the audit history. Global offsets move every field together.</div></div>
+                <div class="col-md-8 d-flex align-items-end"><div class="small text-muted">This layout applies to all banks, including BDO and Metrobank. Saving creates a new version and keeps prior versions in the audit history. Global offsets move every field together.</div></div>
             </div>
         </details>
     @endif
@@ -489,7 +489,6 @@
                 },
                 body: JSON.stringify({
                     layout: layout,
-                    bank_account_id: {{ (int) $checkProfile['bank_account_id'] }},
                     profile_name: document.getElementById('profileName').value,
                     printer_name: document.getElementById('printerName').value,
                     paper_width_mm: document.getElementById('paperWidth').value,
