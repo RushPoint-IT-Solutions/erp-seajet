@@ -35,6 +35,7 @@ class CheckPrintLayoutTest extends TestCase
         $response->assertSee('data-font-key="date_m1"', false);
         $response->assertSee('data-font-key="payee"', false);
         $response->assertSee('Agenture Defaults');
+        $response->assertSee('size: 210mm 297mm;', false);
         $response->assertSee('data-font-key="payee" style="top:28mm;left:22mm;font-size:12pt"', false);
 
         $digits = str_split(date('mdY', strtotime($payment->payment_date)));
@@ -76,6 +77,16 @@ class CheckPrintLayoutTest extends TestCase
         $this->assertNotNull($saved);
         $this->assertNotNull($saved->company_id);
         $this->assertSame(31.4, (float) json_decode($saved->positions, true)['payee']['top']);
+
+        $payment = DB::table('payments')->orderBy('id')->first();
+        DB::table('payments')->where('id', $payment->id)->update(['bank_account_id' => $bank->id]);
+        $this->postJson(route('erp.payables.check-voucher.print.event', $payment->id))->assertOk();
+        $this->get(route('erp.payables.check-print', ['payment' => $payment->id, 'profile' => $saved->id]))
+            ->assertOk()
+            ->assertSee('size: 215.9mm 297mm;', false)
+            ->assertSee('width: var(--check-paper-width, 215.9mm);', false)
+            ->assertSee('data-font-key="payee" style="top:31mm;left:25.4mm;font-size:13pt"', false)
+            ->assertSee('id="checkPrintPageSize"', false);
     }
 
     public function test_finance_user_cannot_save_the_global_check_alignment()

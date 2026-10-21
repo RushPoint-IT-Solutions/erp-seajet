@@ -20,6 +20,7 @@
     $paperHeight = (float) $checkProfile['paper_height_mm'];
     $offsetX = (float) $checkProfile['offset_x_mm'];
     $offsetY = (float) $checkProfile['offset_y_mm'];
+    $printPageWidth = max(210, $paperWidth);
 @endphp
 
 @push('styles')
@@ -125,18 +126,22 @@
         min-height: 120px;
         resize: vertical;
     }
+    /* Keep the existing A4 feed, expanding it for wider bank profiles. */
     @page {
         margin: 0;
-        size: A4 portrait;
+        size: {{ $printPageWidth }}mm 297mm;
     }
+</style>
+<style id="checkPrintPageSize"></style>
+<style>
     @media print {
         html,
         body {
             background: #fff !important;
-            height: {{ $paperHeight }}mm;
+            height: var(--check-paper-height, {{ $paperHeight }}mm);
             margin: 0 !important;
             padding: 0 !important;
-            width: {{ $paperWidth }}mm;
+            width: var(--check-paper-width, {{ $paperWidth }}mm);
         }
         .erp-main > section {
             margin: 0 !important;
@@ -333,6 +338,10 @@
         sheet.style.width = profile.paper_width_mm + 'mm';
         sheet.style.minWidth = profile.paper_width_mm + 'mm';
         sheet.style.height = profile.paper_height_mm + 'mm';
+        document.documentElement.style.setProperty('--check-paper-width', profile.paper_width_mm + 'mm');
+        document.documentElement.style.setProperty('--check-paper-height', profile.paper_height_mm + 'mm');
+        document.getElementById('checkPrintPageSize').textContent =
+            '@page { margin: 0; size: ' + Math.max(210, parseFloat(profile.paper_width_mm)) + 'mm 297mm; }';
         output.value = JSON.stringify(layout, null, 2);
     }
 
