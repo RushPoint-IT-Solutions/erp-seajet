@@ -122,6 +122,7 @@
 @endpush
 
 @section('content')
+    @include('erp.partials.paid-indicator', ['paymentStatus' => $print['payment_status']['soa'] ?? []])
     @php
         $p = $positions;
         $s = $fieldStyles;

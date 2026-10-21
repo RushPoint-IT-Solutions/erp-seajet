@@ -117,6 +117,7 @@
 @endpush
 
 @section('content')
+    @include('erp.partials.paid-indicator', ['paymentStatus' => $bill['payment_status'] ?? []])
     <div class="bill-workspace">
         @php($bill = $bill ?? [])
         @php($lines = collect($lines ?? []))

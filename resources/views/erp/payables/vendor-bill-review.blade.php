@@ -6,7 +6,8 @@
 @section('content')
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
         <div>
-            <h1 class="h3 fw-bold mb-1">Vendor Bill Ready for Approval</h1>
+            <h1 class="h3 fw-bold mb-1">{{ !empty($bill['payment_status']['paid']) ? 'Vendor Bill' : 'Vendor Bill Ready for Approval' }}</h1>
+            @include('erp.partials.paid-indicator', ['paymentStatus' => $bill['payment_status'] ?? []])
             <p class="text-muted mb-0">Shipment-linked AP bill captured with withholding tax and multi-currency details.</p>
         </div>
         <div class="d-flex flex-wrap gap-2">

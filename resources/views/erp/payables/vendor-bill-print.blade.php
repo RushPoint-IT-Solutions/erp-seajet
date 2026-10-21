@@ -328,6 +328,7 @@
 @endpush
 
 @section('content')
+    @include('erp.partials.paid-indicator', ['paymentStatus' => $bill['payment_status'] ?? []])
     <div class="d-flex justify-content-end gap-2 mb-3 no-print">
         <a href="{{ route('erp.payables.vendor-bills.view', $bill['bill_no']) }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back to Bill</a>
         <a href="{{ route('erp.payables.vendor-bills.print-2307', $bill['bill_no']) }}" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-text me-1"></i> Print 2307</a>
