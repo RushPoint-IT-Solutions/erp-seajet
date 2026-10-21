@@ -12612,8 +12612,7 @@ class ModuleController extends Controller
 
         $query = DB::table('receipts')
             ->leftJoin('customers', 'customers.id', '=', 'receipts.customer_id')
-            ->leftJoin('receipt_applications', 'receipt_applications.receipt_id', '=', 'receipts.id')
-            ->leftJoin('sales_documents', 'sales_documents.id', '=', 'receipt_applications.sales_document_id');
+            ->whereNotIn('receipts.status', ['voided', 'cancelled']);
 
         if (Schema::hasColumn('receipts', 'class_code')) {
             $query->where('receipts.class_code', $branch);
@@ -12621,37 +12620,64 @@ class ModuleController extends Controller
 
         $this->applyMonthFilter($query, 'receipts.receipt_date', $period);
 
-        return $query
+        $receipts = $query
             ->orderBy('receipts.receipt_date')
             ->orderBy('receipts.id')
-            ->limit(500)
-            ->get([
-                'receipts.receipt_date',
-                'receipts.receipt_no',
-                'receipts.receipt_type',
-                'receipts.amount',
-                'receipts.currency',
-                'customers.name as customer_name',
-                'sales_documents.document_no',
-                'sales_documents.template_code',
-            ])
-            ->map(function ($receipt) {
-                $isAcknowledgement = $receipt->receipt_type === 'acknowledgement_receipt';
-                return [
-                    'DATE' => $receipt->receipt_date,
-                    'OFFICIAL RECEIPT NUMBER' => $isAcknowledgement ? '' : $receipt->receipt_no,
-                    'ACKNOWLEDGEMENT RECEIPT NUMBER' => $isAcknowledgement ? $receipt->receipt_no : '',
-                    'CUSTOMER NAME' => $receipt->customer_name,
-                    'A/R TRADE' => (float) $receipt->amount,
-                    'A/R REIMBURSABLES CHARGES' => 0,
-                    'WITHHOLDING-CWT (2307)' => 0,
-                    'CASH (PHP)' => strtoupper($receipt->currency) === 'USD' ? 0 : (float) $receipt->amount,
-                    'CASH (USD)' => strtoupper($receipt->currency) === 'USD' ? (float) $receipt->amount : 0,
-                    'BILLING INVOICE NUMBER' => strpos((string) $receipt->template_code, 'SOA') === false ? $receipt->document_no : '',
-                    'STATEMENT OF ACCOUNT NUMBER' => strpos((string) $receipt->template_code, 'SOA') !== false ? $receipt->document_no : '',
-                ];
-            })
-            ->all();
+            ->get(['receipts.*', 'customers.name as customer_name']);
+        $applications = DB::table('receipt_applications')
+            ->join('sales_documents', 'sales_documents.id', '=', 'receipt_applications.sales_document_id')
+            ->whereIn('receipt_applications.receipt_id', $receipts->pluck('id')->all())
+            ->orderBy('receipt_applications.id')
+            ->get(['receipt_applications.*', 'sales_documents.document_no',
+                'sales_documents.soa_no', 'sales_documents.template_code'])
+            ->groupBy('receipt_id');
+
+        // Presentation-only daily consolidation; count cash once per receipt,
+        // even when the receipt settles multiple invoices.
+        return $receipts->groupBy(function ($receipt) {
+            return json_encode([
+                $receipt->company_id, $receipt->customer_id, $receipt->receipt_date,
+                strtoupper($receipt->currency), trim((string) $receipt->reference_no),
+                $receipt->payment_method, $receipt->bank_account_id ?? null,
+            ]);
+        })->map(function ($group) use ($applications) {
+            $receipt = $group->first();
+            $officialNumbers = [];
+            $acknowledgementNumbers = [];
+            $billingNumbers = [];
+            $soaNumbers = [];
+            foreach ($group as $item) {
+                if ($item->receipt_type === 'acknowledgement_receipt') {
+                    $acknowledgementNumbers[] = $item->receipt_no;
+                } else {
+                    $officialNumbers[] = $item->receipt_no;
+                }
+                foreach ($applications->get($item->id, collect()) as $application) {
+                    $isSoa = ($application->component ?? null) === 'soa'
+                        || (empty($application->component) && strpos((string) $application->template_code, 'SOA') !== false);
+                    if ($isSoa) {
+                        $soaNumbers[] = $application->soa_no ?: $application->document_no;
+                    } else {
+                        $billingNumbers[] = $application->document_no;
+                    }
+                }
+            }
+            $amount = (float) $group->sum('amount');
+            return [
+                'DATE' => $receipt->receipt_date,
+                'OFFICIAL RECEIPT NUMBER' => implode(', ', array_unique($officialNumbers)),
+                'ACKNOWLEDGEMENT RECEIPT NUMBER' => implode(', ', array_unique($acknowledgementNumbers)),
+                'CUSTOMER NAME' => $receipt->customer_name,
+                'A/R TRADE' => $amount,
+                'A/R REIMBURSABLES CHARGES' => 0,
+                'WITHHOLDING-CWT (2307)' => 0,
+                'CASH (PHP)' => strtoupper($receipt->currency) === 'USD' ? 0 : $amount,
+                'CASH (USD)' => strtoupper($receipt->currency) === 'USD' ? $amount : 0,
+                'BILLING INVOICE NUMBER' => implode(', ', array_unique(array_filter($billingNumbers))),
+                'STATEMENT OF ACCOUNT NUMBER' => implode(', ', array_unique(array_filter($soaNumbers))),
+            ];
+        })
+            ->values()->all();
     }
 
     private function salesJournalWorkbookRows($branch, $period)
