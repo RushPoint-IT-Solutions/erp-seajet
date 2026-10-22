@@ -12683,19 +12683,35 @@ class ModuleController extends Controller
             $acknowledgementNumbers = [];
             $billingNumbers = [];
             $soaNumbers = [];
+            $tradeAmount = 0;
+            $reimbursableAmount = 0;
+            $cwtAmount = 0;
             foreach ($group as $item) {
+                $cwtAmount += (float) ($item->cwt_amount ?? 0);
                 if ($item->receipt_type === 'acknowledgement_receipt') {
                     $acknowledgementNumbers[] = $item->receipt_no;
                 } else {
                     $officialNumbers[] = $item->receipt_no;
                 }
-                foreach ($applications->get($item->id, collect()) as $application) {
+                $receiptApplications = $applications->get($item->id, collect());
+                foreach ($receiptApplications as $application) {
                     $isSoa = ($application->component ?? null) === 'soa'
                         || (empty($application->component) && strpos((string) $application->template_code, 'SOA') !== false);
                     if ($isSoa) {
                         $soaNumbers[] = $application->soa_no ?: $application->document_no;
+                        $reimbursableAmount += (float) $application->amount_applied;
                     } else {
                         $billingNumbers[] = $application->document_no;
+                        $tradeAmount += (float) $application->amount_applied;
+                    }
+                }
+                // Unapplied receipts retain their receipt-type classification.
+                if ($receiptApplications->isEmpty()) {
+                    $settlement = (float) $item->amount + (float) ($item->cwt_amount ?? 0);
+                    if ($item->receipt_type === 'acknowledgement_receipt') {
+                        $reimbursableAmount += $settlement;
+                    } else {
+                        $tradeAmount += $settlement;
                     }
                 }
             }
@@ -12705,9 +12721,9 @@ class ModuleController extends Controller
                 'OFFICIAL RECEIPT NUMBER' => implode(', ', array_unique($officialNumbers)),
                 'ACKNOWLEDGEMENT RECEIPT NUMBER' => implode(', ', array_unique($acknowledgementNumbers)),
                 'CUSTOMER NAME' => $receipt->customer_name,
-                'A/R TRADE' => $amount,
-                'A/R REIMBURSABLES CHARGES' => 0,
-                'WITHHOLDING-CWT (2307)' => 0,
+                'A/R TRADE' => $tradeAmount,
+                'A/R REIMBURSABLES CHARGES' => $reimbursableAmount,
+                'WITHHOLDING-CWT (2307)' => $cwtAmount,
                 'CASH (PHP)' => strtoupper($receipt->currency) === 'USD' ? 0 : $amount,
                 'CASH (USD)' => strtoupper($receipt->currency) === 'USD' ? $amount : 0,
                 'BILLING INVOICE NUMBER' => implode(', ', array_unique(array_filter($billingNumbers))),
