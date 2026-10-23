@@ -277,6 +277,63 @@ class PostingService
         });
     }
 
+    public function postOrRepairPurchaseDocument($documentId)
+    {
+        $journal = $this->postPurchaseDocument($documentId);
+
+        return DB::transaction(function () use ($documentId, $journal) {
+            $document = DB::table('purchase_documents')->where('id', $documentId)->lockForUpdate()->first();
+            $journal = DB::table('journal_entries')->where('id', $journal->id)->lockForUpdate()->first();
+            if (!$document || !$journal || strtolower((string) $journal->status) !== 'posted') {
+                throw ValidationException::withMessages([
+                    'posting' => 'The vendor bill does not have an active posted journal to repair.',
+                ]);
+            }
+
+            $payableAccountId = $this->purchasePayableAccount($document);
+            $payable = max(0, (float) $document->grand_total);
+            $line = DB::table('journal_entry_lines')
+                ->where('journal_entry_id', $journal->id)
+                ->where('credit', '>=', max(0, $payable - 0.005))
+                ->where('credit', '<=', $payable + 0.005)
+                ->where(function ($query) use ($document) {
+                    $query->where('description', 'Accounts payable - '.$document->document_no)
+                        ->orWhere(function ($supplierLine) use ($document) {
+                            $supplierLine->where('supplier_id', $document->supplier_id)
+                                ->where('description', 'like', '%payable%');
+                        });
+                })
+                ->orderBy('id', 'desc')
+                ->first();
+
+            if (!$line) {
+                throw ValidationException::withMessages([
+                    'posting' => 'The A/P Trade line in the posted vendor-bill journal could not be identified.',
+                ]);
+            }
+
+            if ((int) $line->account_id !== (int) $payableAccountId) {
+                DB::table('journal_entry_lines')->where('id', $line->id)->update([
+                    'account_id' => $payableAccountId,
+                    'updated_at' => now(),
+                ]);
+                $this->activity->log('ap_account_repaired', 'purchase_document', $document->id, [
+                    'account_id' => (int) $line->account_id,
+                ], [
+                    'account_id' => (int) $payableAccountId,
+                    'journal_entry_id' => (int) $journal->id,
+                ], $document->company_id);
+            }
+
+            $this->markPosted('purchase_documents', $document->id, $journal->id, [
+                'status' => (float) $document->paid_total >= $payable && $payable > 0 ? 'paid' : 'posted',
+                'approval_status' => 'Approved',
+            ]);
+
+            return $journal;
+        });
+    }
+
     public function postReceipt($receiptId)
     {
         return DB::transaction(function () use ($receiptId) {
@@ -827,6 +884,34 @@ class PostingService
             if ($accountId) {
                 return $accountId;
             }
+        }
+
+        $currency = strtoupper((string) ($document->currency ?: 'PHP'));
+        $payableQuery = DB::table('accounts')
+            ->where('company_id', $document->company_id)
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query->where('type', 'Accounts Payable')
+                    ->orWhere('name', 'like', 'A/P%Trade%')
+                    ->orWhere('name', 'like', 'Accounts Payable%');
+            });
+        if ($currency === 'USD') {
+            $payableQuery->where('name', 'like', '%USD%');
+        } else {
+            $payableQuery->where('name', 'not like', '%USD%');
+        }
+        $accountId = $payableQuery
+            ->orderByRaw("CASE WHEN name LIKE '%BDO%' THEN 0 ELSE 1 END")
+            ->orderBy('id')
+            ->value('id');
+        if ($accountId) {
+            if ($currency === 'PHP' && Schema::hasTable('accounting_control_accounts')) {
+                DB::table('accounting_control_accounts')->updateOrInsert(
+                    ['company_id' => $document->company_id, 'control_key' => 'accounts_payable'],
+                    ['account_id' => $accountId, 'updated_at' => now(), 'created_at' => now()]
+                );
+            }
+            return $accountId;
         }
 
         return $this->controlAccount($document->company_id, 'accounts_payable');

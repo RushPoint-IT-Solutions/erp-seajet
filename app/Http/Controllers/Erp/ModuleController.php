@@ -1720,6 +1720,110 @@ class ModuleController extends Controller
         ]);
     }
 
+    public function postVendorBill($bill, PostingService $posting)
+    {
+        $this->authorizeAccountingPosting('payables', 'approve');
+        $companyId = $this->defaultCompanyId();
+        $record = DB::table('purchase_documents')->where('company_id', $companyId)
+            ->where('id', $bill)->first();
+        abort_unless($record, 404);
+
+        if (!$this->vendorBillNeedsApPosting($record)) {
+            return redirect()->route('erp.expenses.index')->with(
+                'status',
+                'Vendor bill '.$record->document_no.' is already correctly posted or is not eligible for A/P repair.'
+            );
+        }
+
+        $posting->postOrRepairPurchaseDocument($record->id);
+        $account = DB::table('accounts')
+            ->join('journal_entry_lines', 'journal_entry_lines.account_id', '=', 'accounts.id')
+            ->join('journal_entries', 'journal_entries.id', '=', 'journal_entry_lines.journal_entry_id')
+            ->where('journal_entries.source_type', 'purchase_document')
+            ->where('journal_entries.source_id', $record->id)
+            ->where('journal_entry_lines.credit', '>', 0)
+            ->where(function ($query) {
+                $query->where('accounts.type', 'Accounts Payable')
+                    ->orWhere('accounts.name', 'like', 'A/P%Trade%');
+            })
+            ->orderBy('journal_entry_lines.id', 'desc')
+            ->value('accounts.name');
+
+        return redirect()->route('erp.expenses.index')->with(
+            'status',
+            'Vendor bill '.$record->document_no.' was posted to '.($account ?: 'A/P Trade').'.'
+        );
+    }
+
+    public function postApprovedPhpVendorBills(PostingService $posting)
+    {
+        $this->authorizeAccountingPosting('payables', 'approve');
+        $records = DB::table('purchase_documents')
+            ->where('company_id', $this->defaultCompanyId())
+            ->where(DB::raw('UPPER(currency)'), 'PHP')
+            ->where(DB::raw('LOWER(approval_status)'), 'approved')
+            ->whereNotIn(DB::raw('LOWER(status)'), ['cancelled', 'voided', 'paid'])
+            ->orderBy('document_date')
+            ->orderBy('id')
+            ->get();
+
+        $posted = 0;
+        $skipped = 0;
+        $failed = [];
+        foreach ($records as $record) {
+            if (!$this->vendorBillNeedsApPosting($record)) {
+                $skipped++;
+                continue;
+            }
+            try {
+                $posting->postOrRepairPurchaseDocument($record->id);
+                $posted++;
+            } catch (\Illuminate\Validation\ValidationException $exception) {
+                $failed[] = $record->document_no;
+            }
+        }
+
+        $response = redirect()->route('erp.expenses.index')->with(
+            'status',
+            $posted.' approved PHP vendor bill'.($posted === 1 ? '' : 's').' posted/repaired to A/P Trade. '
+                .$skipped.' already correct or not eligible.'
+        );
+
+        return empty($failed)
+            ? $response
+            : $response->withErrors(['posting' => 'Could not post/repair bill(s): '.implode(', ', $failed).'. Open each bill to review its posting details.']);
+    }
+
+    private function vendorBillNeedsApPosting($bill)
+    {
+        $isPosted = strtolower((string) ($bill->posting_status ?? '')) === 'posted'
+            && !empty($bill->journal_entry_id);
+        if (!$isPosted) {
+            if (!empty($bill->journal_entry_id)) {
+                $sourceType = DB::table('journal_entries')->where('id', $bill->journal_entry_id)->value('source_type');
+                if ($sourceType === 'opening_balance_import') {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        $journal = DB::table('journal_entries')->where('id', $bill->journal_entry_id)->first();
+        if (!$journal || $journal->source_type !== 'purchase_document') {
+            return false;
+        }
+
+        return !DB::table('journal_entry_lines')
+            ->join('accounts', 'accounts.id', '=', 'journal_entry_lines.account_id')
+            ->where('journal_entry_lines.journal_entry_id', $bill->journal_entry_id)
+            ->where('journal_entry_lines.credit', '>', 0)
+            ->where(function ($query) {
+                $query->where('accounts.type', 'Accounts Payable')
+                    ->orWhere('accounts.name', 'like', 'A/P%Trade%');
+            })
+            ->exists();
+    }
+
     public function deleteVendorBill($bill)
     {
         $this->authorizeAccountingPosting('payables', 'delete');
@@ -2899,6 +3003,8 @@ class ModuleController extends Controller
                 'purchase_documents.paid_total',
                 'purchase_documents.status',
                 'purchase_documents.approval_status',
+                'purchase_documents.posting_status',
+                'purchase_documents.journal_entry_id',
                 'purchase_documents.document_date',
                 'suppliers.name as supplier_name'
             )
@@ -2907,6 +3013,12 @@ class ModuleController extends Controller
             ->get()
             ->map(function ($bill) {
                 $balance = round(max(0, (float) $bill->grand_total - (float) $bill->paid_total), 2);
+                $isPosted = strtolower((string) $bill->posting_status) === 'posted' && !empty($bill->journal_entry_id);
+                $approvalLabel = $bill->approval_status ?: ucwords(str_replace('_', ' ', $bill->status));
+                $needsRepair = $isPosted && $this->vendorBillNeedsApPosting($bill);
+                $canPost = (!$isPosted || $needsRepair)
+                    && !in_array(strtolower((string) $bill->status), ['cancelled', 'voided', 'paid'], true)
+                    && strtolower((string) $approvalLabel) === 'approved';
                 return [
                     $bill->document_no,
                     $bill->supplier_name ?: '-',
@@ -2914,10 +3026,11 @@ class ModuleController extends Controller
                     $bill->client_customer_id ?: '-',
                     $bill->currency ?: 'PHP',
                     number_format($balance ?: (float) $bill->grand_total, 2),
-                    $bill->approval_status ?: ucwords(str_replace('_', ' ', $bill->status)),
+                    $approvalLabel.($canPost ? ($needsRepair ? ' / Repair A/P' : ' / Unposted') : ''),
                     $bill->document_date,
                     'id' => $bill->id,
                     'status_group' => $this->apWorkflowStatusGroup($bill->approval_status ?: $bill->status),
+                    'can_post' => $canPost,
                 ];
             })
             ->all();

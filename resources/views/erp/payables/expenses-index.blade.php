@@ -13,6 +13,10 @@
             <a href="{{ route('erp.accounting.opening-balances.manual', ['balance_type' => 'ap_trade']) }}" class="btn btn-outline-primary"><i class="bi bi-pencil-square me-1"></i> Manual A/P Opening Balance</a>
             <a href="{{ route('erp.accounting.opening-balances.import') }}" class="btn btn-outline-primary"><i class="bi bi-upload me-1"></i> Import Bills</a>
             <a href="{{ route('erp.payables.vendor-bills.create') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i> Vendor Bill</a>
+            <form method="post" action="{{ route('erp.payables.vendor-bills.post-approved-php') }}" onsubmit="return confirm('Post or repair all eligible Approved PHP bills to A/P Trade Peso?')">
+                @csrf
+                <button class="btn btn-warning"><i class="bi bi-journals me-1"></i>Post/Repair Approved A/P</button>
+            </form>
             <a href="{{ route('erp.payables.approvals') }}" class="btn btn-outline-secondary"><i class="bi bi-check2-square me-1"></i> Approvals</a>
             <a href="{{ route('erp.payables.payments.create') }}" class="btn btn-outline-secondary"><i class="bi bi-credit-card me-1"></i> Pay Bills</a>
             <a href="{{ route('erp.payables.aging') }}" class="btn btn-outline-secondary"><i class="bi bi-clock-history me-1"></i> AP Aging</a>
@@ -92,9 +96,17 @@
                                 <td><span class="badge badge-soft">{{ $expense[6] }}</span></td>
                                 <td>{{ $expense[7] }}</td>
                                 <td class="text-end no-print">
-                                    <a href="{{ route('erp.payables.vendor-bills.view', $expense[0]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="View bill"><i class="bi bi-eye"></i></a>
-                                    <a href="{{ route('erp.payables.vendor-bills.create', ['bill' => $expense[0]]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="Edit bill"><i class="bi bi-pencil"></i></a>
-                                    <a href="{{ route('erp.payables.payments.create', ['bill' => $expense[0]]) }}" class="btn btn-sm btn-primary" data-bs-toggle="tooltip" title="Process payment"><i class="bi bi-cash"></i></a>
+                                    <div class="d-flex justify-content-end gap-1">
+                                        <a href="{{ route('erp.payables.vendor-bills.view', $expense[0]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="View bill"><i class="bi bi-eye"></i></a>
+                                        <a href="{{ route('erp.payables.vendor-bills.create', ['bill' => $expense[0]]) }}" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="Edit bill"><i class="bi bi-pencil"></i></a>
+                                        @if(!empty($expense['can_post']))
+                                            <form method="post" action="{{ route('erp.payables.vendor-bills.post', $expense['id']) }}" onsubmit="return confirm('Post this approved bill to A/P Trade?')">
+                                                @csrf
+                                                <button class="btn btn-sm btn-warning" data-bs-toggle="tooltip" title="Post or repair A/P Trade"><i class="bi bi-journal-check"></i></button>
+                                            </form>
+                                        @endif
+                                        <a href="{{ route('erp.payables.payments.create', ['bill' => $expense[0]]) }}" class="btn btn-sm btn-primary" data-bs-toggle="tooltip" title="Process payment"><i class="bi bi-cash"></i></a>
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach

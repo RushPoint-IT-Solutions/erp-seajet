@@ -115,6 +115,105 @@ class VendorBillApAccountTest extends TestCase
         $this->assertNotSame($bdoBill->document_no, $metroBill->document_no);
     }
 
+    public function test_approved_legacy_php_bill_can_be_posted_and_repaired_to_ap_trade_php()
+    {
+        $supplier = DB::table('suppliers')->orderBy('id')->first();
+        $expense = DB::table('accounts')->whereIn('type', ['Expense', 'Other Expense'])->orderBy('id')->first();
+        DB::table('accounts')->where('id', $expense->id)->update(['show_in_ap' => true]);
+
+        $this->post(route('erp.payables.vendor-bills.review'), $this->billPayload(
+            $supplier,
+            $expense,
+            'Accounts Payable Trade',
+            'close'
+        ))->assertRedirect();
+
+        $bill = DB::table('purchase_documents')->orderBy('id', 'desc')->first();
+        DB::table('purchase_documents')->where('id', $bill->id)->update([
+            'document_date' => '2026-09-14',
+            'status' => 'approved',
+            'approval_status' => 'Approved',
+            'posting_status' => 'unposted',
+            'journal_entry_id' => null,
+        ]);
+
+        $this->get(route('erp.expenses.index'))->assertOk()
+            ->assertSee('Approved / Unposted')
+            ->assertSee(route('erp.payables.vendor-bills.post', $bill->id), false);
+        $this->post(route('erp.payables.vendor-bills.post', $bill->id))
+            ->assertRedirect(route('erp.expenses.index'));
+
+        $bill = DB::table('purchase_documents')->where('id', $bill->id)->first();
+        $apAccount = DB::table('accounts')->where('name', 'A/P-Trade (BDO - PHP)')->first();
+        $outputVat = DB::table('accounts')->where('name', 'like', 'Output V% Payable')->first();
+        $payableLine = DB::table('journal_entry_lines')->where('journal_entry_id', $bill->journal_entry_id)
+            ->where('description', 'Accounts payable - '.$bill->document_no)->first();
+        $this->assertSame((int) $apAccount->id, (int) $payableLine->account_id);
+        $this->assertEquals(1000, (float) $payableLine->credit);
+        $this->assertSame((int) $apAccount->id, (int) DB::table('accounting_control_accounts')
+            ->where('company_id', $bill->company_id)->where('control_key', 'accounts_payable')->value('account_id'));
+
+        DB::table('journal_entry_lines')->where('id', $payableLine->id)->update(['account_id' => $outputVat->id]);
+        $this->get(route('erp.expenses.index'))->assertOk()
+            ->assertSee('Approved / Repair A/P')
+            ->assertSee(route('erp.payables.vendor-bills.post', $bill->id), false);
+        $this->post(route('erp.payables.vendor-bills.post', $bill->id))->assertRedirect(route('erp.expenses.index'));
+        $this->assertSame((int) $apAccount->id, (int) DB::table('journal_entry_lines')->where('id', $payableLine->id)->value('account_id'));
+
+        $rows = $this->get(route('erp.reports.trial-balance', ['period' => '2026-10']))
+            ->assertOk()->original->getData()['rows'];
+        $row = collect($rows)->firstWhere('__account_id', (int) $apAccount->id);
+        $this->assertEquals(-1000, $row['BEGINNING BALANCE']);
+    }
+
+    public function test_bulk_action_posts_multiple_approved_php_bills_to_ap_trade_php()
+    {
+        $supplier = DB::table('suppliers')->orderBy('id')->first();
+        $expense = DB::table('accounts')->whereIn('type', ['Expense', 'Other Expense'])->orderBy('id')->first();
+        DB::table('accounts')->where('id', $expense->id)->update(['show_in_ap' => true]);
+        DB::table('purchase_documents')->update([
+            'status' => 'cancelled',
+            'approval_status' => 'Cancelled',
+        ]);
+
+        $billIds = [];
+        foreach (['2026-06-09', '2026-07-30'] as $date) {
+            $payload = $this->billPayload($supplier, $expense, 'Accounts Payable Trade', 'close');
+            $payload['bill_date'] = $date;
+            $this->post(route('erp.payables.vendor-bills.review'), $payload)->assertRedirect();
+            $billIds[] = DB::table('purchase_documents')->max('id');
+        }
+
+        $bills = DB::table('purchase_documents')->whereIn('id', $billIds)->orderBy('id')->get();
+        $this->assertCount(2, $bills);
+        DB::table('purchase_documents')->whereIn('id', $billIds)->update([
+            'status' => 'approved',
+            'approval_status' => 'Approved',
+            'posting_status' => 'unposted',
+            'journal_entry_id' => null,
+        ]);
+
+        $this->get(route('erp.expenses.index'))->assertOk()
+            ->assertSee('Post/Repair Approved A/P')
+            ->assertSee(route('erp.payables.vendor-bills.post-approved-php'), false);
+        $this->post(route('erp.payables.vendor-bills.post-approved-php'))
+            ->assertRedirect(route('erp.expenses.index'))
+            ->assertSessionHas(
+                'status',
+                '2 approved PHP vendor bills posted/repaired to A/P Trade. 0 already correct or not eligible.'
+            );
+
+        $apAccountId = DB::table('accounts')->where('name', 'A/P-Trade (BDO - PHP)')->value('id');
+        foreach (DB::table('purchase_documents')->whereIn('id', $billIds)->orderBy('id')->get() as $bill) {
+            $this->assertSame('posted', $bill->posting_status);
+            $this->assertNotNull($bill->journal_entry_id);
+            $this->assertEquals(1000, (float) DB::table('journal_entry_lines')
+                ->where('journal_entry_id', $bill->journal_entry_id)
+                ->where('account_id', $apAccountId)
+                ->value('credit'));
+        }
+    }
+
     private function billPayload($supplier, $expense, $apAccount, $saveMode, $currency = 'PHP')
     {
         return [
