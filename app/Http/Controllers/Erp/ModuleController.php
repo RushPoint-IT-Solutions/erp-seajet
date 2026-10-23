@@ -2716,7 +2716,6 @@ class ModuleController extends Controller
         $rules = [
             'layout' => 'required|array',
             'layout.font_sizes' => 'required|array',
-            'bank_account_id' => 'required|integer',
             'profile_name' => 'nullable|string|max:100',
             'printer_name' => 'nullable|string|max:255',
             'paper_width_mm' => 'required|numeric|between:150,260',
@@ -2736,34 +2735,27 @@ class ModuleController extends Controller
         $validated = request()->validate($rules);
         $layout = $this->sanitizeBankCheckPrintLayout($validated['layout']);
         $companyId = $this->defaultCompanyId();
-        $bank = DB::table('bank_accounts')->where('company_id', $companyId)
-            ->where('id', $validated['bank_account_id'])->first();
-        abort_unless($bank, 422, 'The selected bank account is invalid for this company.');
-
         $profileName = trim((string) ($validated['profile_name'] ?? '')) ?: 'Default';
         $profileId = DB::transaction(function () use ($validated, $layout, $companyId, $profileName) {
             $current = DB::table('check_layout_profiles')
                 ->where('company_id', $companyId)
-                ->where('bank_account_id', $validated['bank_account_id'])
-                ->where('profile_name', $profileName)
+                ->whereNull('bank_account_id')
                 ->where('is_active', true)
                 ->lockForUpdate()
                 ->first();
             $version = ((int) DB::table('check_layout_profiles')
                 ->where('company_id', $companyId)
-                ->where('bank_account_id', $validated['bank_account_id'])
-                ->where('profile_name', $profileName)
+                ->whereNull('bank_account_id')
                 ->max('version')) + 1;
 
             DB::table('check_layout_profiles')
                 ->where('company_id', $companyId)
-                ->where('bank_account_id', $validated['bank_account_id'])
-                ->where('profile_name', $profileName)
+                ->whereNull('bank_account_id')
                 ->update(['is_active' => false, 'updated_at' => now()]);
 
             $id = DB::table('check_layout_profiles')->insertGetId([
                 'company_id' => $companyId,
-                'bank_account_id' => $validated['bank_account_id'],
+                'bank_account_id' => null,
                 'profile_name' => $profileName,
                 'printer_name' => $validated['printer_name'] ?? null,
                 'paper_width_mm' => $validated['paper_width_mm'],
@@ -2783,14 +2775,14 @@ class ModuleController extends Controller
             app(ActivityLogger::class)->log('versioned', 'check_layout_profile', $id, $current ? (array) $current : [], [
                 'profile_name' => $profileName,
                 'version' => $version,
-                'bank_account_id' => $validated['bank_account_id'],
+                'bank_account_id' => null,
             ], $companyId);
 
             return $id;
         });
 
         return response()->json([
-            'status' => 'Layout saved as a new bank/printer profile version.',
+            'status' => 'Shared check layout saved for all banks.',
             'layout' => $layout,
             'profile' => $this->checkLayoutProfileArray(DB::table('check_layout_profiles')->where('id', $profileId)->first()),
         ]);
@@ -3988,7 +3980,7 @@ class ModuleController extends Controller
     {
         $defaults = $this->defaultBankCheckPrintLayout();
 
-        if (Schema::hasTable('check_layout_profiles') && $bankAccountId) {
+        if (Schema::hasTable('check_layout_profiles')) {
             $profile = $this->bankCheckLayoutProfile($bankAccountId, $profileId);
             if (!empty($profile['id'])) {
                 $saved = DB::table('check_layout_profiles')->where('id', $profile['id'])->first();
@@ -4028,14 +4020,24 @@ class ModuleController extends Controller
     private function bankCheckLayoutProfile($bankAccountId, $profileId = null)
     {
         $profile = null;
-        if (Schema::hasTable('check_layout_profiles') && $bankAccountId) {
-            $query = DB::table('check_layout_profiles')
+        if (Schema::hasTable('check_layout_profiles')) {
+            // All banks use one company layout. Historical bank-specific IDs
+            // must not switch a check back to a different alignment.
+            $profile = DB::table('check_layout_profiles')
                 ->where('company_id', $this->defaultCompanyId())
-                ->where('bank_account_id', $bankAccountId);
-            if ($profileId) {
-                $profile = $query->where('id', $profileId)->first();
-            } else {
-                $profile = $query->where('is_active', true)->orderBy('version', 'desc')->orderBy('id', 'desc')->first();
+                ->whereNull('bank_account_id')
+                ->where('is_active', true)
+                ->orderBy('version', 'desc')->orderBy('id', 'desc')->first();
+
+            if (!$profile) {
+                // Preserve the calibrated BDO layout until the first shared save.
+                $profile = DB::table('check_layout_profiles as profiles')
+                    ->leftJoin('bank_accounts as banks', 'banks.id', '=', 'profiles.bank_account_id')
+                    ->where('profiles.company_id', $this->defaultCompanyId())
+                    ->where('profiles.is_active', true)
+                    ->orderByRaw("CASE WHEN LOWER(banks.bank_name) LIKE '%bdo%' THEN 0 ELSE 1 END")
+                    ->orderBy('profiles.version', 'desc')->orderBy('profiles.id', 'desc')
+                    ->select('profiles.*')->first();
             }
         }
 
@@ -4059,20 +4061,9 @@ class ModuleController extends Controller
 
     private function bankCheckLayoutProfiles($bankAccountId)
     {
-        if (!Schema::hasTable('check_layout_profiles') || !$bankAccountId) {
-            return [];
-        }
+        $profile = $this->bankCheckLayoutProfile($bankAccountId);
 
-        return DB::table('check_layout_profiles')
-            ->where('company_id', $this->defaultCompanyId())
-            ->where('bank_account_id', $bankAccountId)
-            ->where('is_active', true)
-            ->orderBy('profile_name')
-            ->get()
-            ->map(function ($profile) {
-                return $this->checkLayoutProfileArray($profile);
-            })
-            ->all();
+        return $profile['id'] ? [$profile] : [];
     }
 
     private function checkLayoutProfileArray($profile)
@@ -4665,6 +4656,7 @@ class ModuleController extends Controller
             'net_amount' => number_format((float) ($bill->net_amount ?? $bill->grand_total), 2),
             'expense_total' => number_format($expenseTotal, 2),
             'expense_balance' => number_format($expenseBalance, 2),
+            'payment_status' => $this->billPaidStatus($bill),
             'line_amounts_exclude_vat' => $lineAmountsExcludeVat,
             'memo' => $bill->memo ?? $bill->remarks,
             'approval_status' => $bill->approval_status ?? $bill->status,
@@ -4774,6 +4766,7 @@ class ModuleController extends Controller
             'bill' => [
                 'id' => $record->id,
                 'vendor' => data_get($record, 'supplier_name') ?: '-',
+                'payment_status' => $this->billPaidStatus($record),
                 'vendor_address' => data_get($record, 'supplier_address') ?: (data_get($record, 'supplier_master_address') ?: ''),
                 'date' => data_get($record, 'document_date') ? \Carbon\Carbon::parse(data_get($record, 'document_date'))->format('m/d/Y') : '',
                 'ref_no' => data_get($record, 'reference_no') ?: data_get($record, 'document_no'),
@@ -8834,6 +8827,7 @@ class ModuleController extends Controller
                     $reimbursementTotal = (float) ($invoice->freight_total ?? 0);
 
                     $data = [
+                        'payment_status' => $this->salesDocumentPaidStatus($invoice),
                         'customer' => $column('customer_name', $fallback['customer'] ?? ''),
                         'customer_id' => $column('customer_id_text', $fallback['customer_id'] ?? ''),
                         'invoice_no' => $invoice->document_no,
@@ -9413,6 +9407,7 @@ class ModuleController extends Controller
 
         return [
             'customer' => $read('customer', ''),
+            'payment_status' => $invoiceData['payment_status'] ?? [],
             'invoice_no' => $read('invoice_no', $read('invoice', '')),
             'invoice_date' => $this->displayPrintDate($read('invoice_date'), ''),
             'soa_no' => $read('soa_no', ''),
@@ -9859,6 +9854,48 @@ class ModuleController extends Controller
             })
             ->values()
             ->all();
+    }
+
+    private function salesDocumentPaidStatus($invoice)
+    {
+        if (in_array(strtolower((string) $invoice->status), ['voided', 'cancelled', 'draft'], true)) {
+            return [];
+        }
+
+        $amounts = $this->paymentInvoiceAmounts($invoice);
+        $applications = DB::table('receipt_applications')
+            ->join('receipts', 'receipts.id', '=', 'receipt_applications.receipt_id')
+            ->where('receipt_applications.sales_document_id', $invoice->id)
+            ->whereNotIn('receipts.status', ['voided', 'cancelled'])
+            ->where('receipt_applications.amount_applied', '>', 0)
+            ->get(['receipt_applications.component', 'receipts.receipt_date']);
+        $biTotal = $amounts['invoice_total'] - (in_array(strtolower((string) $invoice->document_type), ['soa', 'soa_a', 'statement_of_account_a'], true)
+            ? $amounts['invoice_total'] : min($amounts['invoice_total'], max(0, (float) $invoice->freight_total)));
+        $status = [];
+        foreach (['bi' => [$biTotal, $amounts['bi_balance']],
+            'soa' => [$amounts['invoice_total'] - $biTotal, $amounts['soa_balance']],
+            'document' => [$amounts['invoice_total'], $amounts['settlement_balance']]] as $component => $values) {
+            $paid = $values[0] > 0 && $values[1] < 0.005;
+            $dates = $applications->filter(function ($application) use ($component) {
+                return $component === 'document' || empty($application->component) || $application->component === $component;
+            });
+            $status[$component] = ['paid' => $paid, 'date' => $paid ? $dates->max('receipt_date') : null];
+        }
+
+        return $status;
+    }
+
+    private function billPaidStatus($bill)
+    {
+        $paid = !in_array(strtolower((string) $bill->status), ['voided', 'cancelled', 'draft'], true)
+            && (float) $bill->grand_total > 0
+            && (float) $bill->paid_total >= (float) $bill->grand_total - 0.005;
+        $date = $paid ? DB::table('payments')->where('company_id', $bill->company_id)
+            ->where('bill_no', $bill->document_no)
+            ->whereNotIn('status', ['voided', 'cancelled'])
+            ->where('approval_status', 'Released')->max('payment_date') : null;
+
+        return ['paid' => $paid, 'date' => $date];
     }
 
     private function paymentInvoiceAmounts($invoice, $appliedCwt = 0, $componentApplications = null)
@@ -12605,8 +12642,7 @@ class ModuleController extends Controller
 
         $query = DB::table('receipts')
             ->leftJoin('customers', 'customers.id', '=', 'receipts.customer_id')
-            ->leftJoin('receipt_applications', 'receipt_applications.receipt_id', '=', 'receipts.id')
-            ->leftJoin('sales_documents', 'sales_documents.id', '=', 'receipt_applications.sales_document_id');
+            ->whereNotIn('receipts.status', ['voided', 'cancelled']);
 
         if (Schema::hasColumn('receipts', 'class_code')) {
             $query->where('receipts.class_code', $branch);
@@ -12614,37 +12650,102 @@ class ModuleController extends Controller
 
         $this->applyMonthFilter($query, 'receipts.receipt_date', $period);
 
-        return $query
+        $receipts = $query
             ->orderBy('receipts.receipt_date')
             ->orderBy('receipts.id')
-            ->limit(500)
-            ->get([
-                'receipts.receipt_date',
-                'receipts.receipt_no',
-                'receipts.receipt_type',
-                'receipts.amount',
-                'receipts.currency',
-                'customers.name as customer_name',
-                'sales_documents.document_no',
-                'sales_documents.template_code',
-            ])
-            ->map(function ($receipt) {
-                $isAcknowledgement = $receipt->receipt_type === 'acknowledgement_receipt';
-                return [
-                    'DATE' => $receipt->receipt_date,
-                    'OFFICIAL RECEIPT NUMBER' => $isAcknowledgement ? '' : $receipt->receipt_no,
-                    'ACKNOWLEDGEMENT RECEIPT NUMBER' => $isAcknowledgement ? $receipt->receipt_no : '',
-                    'CUSTOMER NAME' => $receipt->customer_name,
-                    'A/R TRADE' => (float) $receipt->amount,
-                    'A/R REIMBURSABLES CHARGES' => 0,
-                    'WITHHOLDING-CWT (2307)' => 0,
-                    'CASH (PHP)' => strtoupper($receipt->currency) === 'USD' ? 0 : (float) $receipt->amount,
-                    'CASH (USD)' => strtoupper($receipt->currency) === 'USD' ? (float) $receipt->amount : 0,
-                    'BILLING INVOICE NUMBER' => strpos((string) $receipt->template_code, 'SOA') === false ? $receipt->document_no : '',
-                    'STATEMENT OF ACCOUNT NUMBER' => strpos((string) $receipt->template_code, 'SOA') !== false ? $receipt->document_no : '',
-                ];
-            })
-            ->all();
+            ->get(['receipts.*', 'customers.name as customer_name']);
+        $applications = DB::table('receipt_applications')
+            ->join('sales_documents', 'sales_documents.id', '=', 'receipt_applications.sales_document_id')
+            ->whereIn('receipt_applications.receipt_id', $receipts->pluck('id')->all())
+            ->orderBy('receipt_applications.id')
+            ->get(['receipt_applications.*', 'sales_documents.document_no',
+                'sales_documents.soa_no', 'sales_documents.template_code'])
+            ->groupBy('receipt_id');
+
+        // Presentation-only daily consolidation; count cash once per receipt,
+        // even when the receipt settles multiple invoices.
+        return $receipts->groupBy(function ($receipt) {
+            return json_encode([
+                $receipt->company_id, $receipt->customer_id, $receipt->receipt_date,
+                strtoupper($receipt->currency), trim((string) $receipt->reference_no),
+                $receipt->payment_method, $receipt->bank_account_id ?? null,
+            ]);
+        })->map(function ($group) use ($applications) {
+            $receipt = $group->first();
+            $officialNumbers = [];
+            $acknowledgementNumbers = [];
+            $billingNumbers = [];
+            $soaNumbers = [];
+            $tradeAmount = 0;
+            $reimbursableAmount = 0;
+            $cwtAmount = 0;
+            foreach ($group as $item) {
+                $cwtAmount += (float) ($item->cwt_amount ?? 0);
+                if ($item->receipt_type === 'acknowledgement_receipt') {
+                    $acknowledgementNumbers[] = $item->receipt_no;
+                } else {
+                    $officialNumbers[] = $item->receipt_no;
+                }
+                $receiptApplications = $applications->get($item->id, collect());
+                foreach ($receiptApplications as $application) {
+                    $isSoa = ($application->component ?? null) === 'soa'
+                        || (empty($application->component) && strpos((string) $application->template_code, 'SOA') !== false);
+                    if ($isSoa) {
+                        $soaNumbers[] = $application->soa_no ?: $application->document_no;
+                        $reimbursableAmount += (float) $application->amount_applied;
+                    } else {
+                        $billingNumbers[] = $application->document_no;
+                        $tradeAmount += (float) $application->amount_applied;
+                    }
+                }
+                // Unapplied receipts retain their receipt-type classification.
+                if ($receiptApplications->isEmpty()) {
+                    $settlement = (float) $item->amount + (float) ($item->cwt_amount ?? 0);
+                    if ($item->receipt_type === 'acknowledgement_receipt') {
+                        $reimbursableAmount += $settlement;
+                    } else {
+                        $tradeAmount += $settlement;
+                    }
+                }
+            }
+            $amount = (float) $group->sum('amount');
+            return [
+                'DATE' => $receipt->receipt_date,
+                'OFFICIAL RECEIPT NUMBER' => implode(', ', array_unique($officialNumbers)),
+                'ACKNOWLEDGEMENT RECEIPT NUMBER' => implode(', ', array_unique($acknowledgementNumbers)),
+                'CUSTOMER NAME' => $receipt->customer_name,
+                'A/R TRADE' => $tradeAmount,
+                'A/R REIMBURSABLES CHARGES' => $reimbursableAmount,
+                'WITHHOLDING-CWT (2307)' => $cwtAmount,
+                'CASH (PHP)' => strtoupper($receipt->currency) === 'USD' ? 0 : $amount,
+                'CASH (USD)' => strtoupper($receipt->currency) === 'USD' ? $amount : 0,
+                'BILLING INVOICE NUMBER' => implode(', ', array_unique(array_filter($billingNumbers))),
+                'STATEMENT OF ACCOUNT NUMBER' => implode(', ', array_unique(array_filter($soaNumbers))),
+            ];
+        })
+            ->values()->all();
+    }
+
+    public function salesJournalHistory($invoice)
+    {
+        $document = $this->salesDocumentRecordByReference($invoice);
+        $customer = DB::table('customers')->where('company_id', $document->company_id)
+            ->where('id', $document->customer_id)->value('name');
+        $applications = DB::table('receipt_applications')
+            ->join('receipts', 'receipts.id', '=', 'receipt_applications.receipt_id')
+            ->where('receipt_applications.sales_document_id', $document->id)
+            ->where('receipts.company_id', $document->company_id)
+            ->orderBy('receipts.receipt_date')->orderBy('receipt_applications.id')
+            ->get(['receipts.receipt_date', 'receipts.receipt_no', 'receipts.status', 'receipts.currency',
+                'receipts.payment_method', 'receipts.reference_no', 'receipt_applications.component', 'receipt_applications.amount_applied']);
+        $history = Schema::hasTable('activity_logs') ? DB::table('activity_logs')
+            ->where('company_id', $document->company_id)->where('auditable_type', 'sales_document')
+            ->where('auditable_id', $document->id)->orderBy('created_at')->orderBy('id')
+            ->get(['action', 'created_at', 'old_values', 'new_values']) : collect();
+        $amounts = $this->paymentInvoiceAmounts($document);
+
+        return response()->view('erp.reports.sales-history', compact('document', 'customer', 'applications', 'history', 'amounts'))
+            ->header('Cache-Control', 'no-store');
     }
 
     private function salesJournalWorkbookRows($branch, $period)
@@ -12655,6 +12756,7 @@ class ModuleController extends Controller
 
         $query = DB::table('sales_documents')
             ->leftJoin('customers', 'customers.id', '=', 'sales_documents.customer_id')
+            ->where('sales_documents.company_id', $this->defaultCompanyId())
             ->whereNotIn('sales_documents.status', ['cancelled', 'voided']);
 
         if (Schema::hasColumn('sales_documents', 'class_code')) {
@@ -12666,10 +12768,13 @@ class ModuleController extends Controller
         return $query
             ->orderBy('sales_documents.document_date')
             ->orderBy('sales_documents.id')
-            ->limit(500)
             ->get([
+                'sales_documents.id',
                 'sales_documents.document_date',
                 'sales_documents.document_no',
+                'sales_documents.document_type',
+                'sales_documents.soa_no',
+                'sales_documents.freight_total',
                 'sales_documents.template_code',
                 'sales_documents.vat_classification',
                 'sales_documents.grand_total',
@@ -12678,22 +12783,25 @@ class ModuleController extends Controller
                 'customers.name as customer_name',
             ])
             ->map(function ($document) {
-                $subtotal = (float) ($document->subtotal ?: $document->grand_total);
+                $reimbursement = min((float) $document->grand_total, max(0, (float) $document->freight_total));
+                $billing = max(0, (float) $document->grand_total - $reimbursement);
+                $subtotal = max(0, $billing - (float) $document->tax_total);
                 $isZeroRated = $document->vat_classification === 'zero-rated';
-                $isSoa = strpos((string) $document->template_code, 'SOA') !== false;
+                $isSoa = in_array(strtolower((string) $document->document_type), ['soa', 'soa_a', 'statement_of_account', 'statement_of_account_a'], true);
 
                 return [
+                    '_history_url' => route('erp.reports.sales-history', $document->id),
                     'DATE' => $document->document_date,
                     'BILLING INVOICE' => $isSoa ? '' : $document->document_no,
-                    'STATEMENT OF ACCOUNT NUMBER' => $isSoa ? $document->document_no : '',
+                    'STATEMENT OF ACCOUNT NUMBER' => trim((string) $document->soa_no) !== '' ? $document->soa_no : ($isSoa ? $document->document_no : ''),
                     'NAME OF COMPANY' => $document->customer_name,
-                    'A/R TRADE' => (float) $document->grand_total,
-                    'A/R REIMBURSABLE CHARGES' => 0,
+                    'A/R TRADE' => $billing,
+                    'A/R REIMBURSABLE CHARGES' => $reimbursement,
                     'SERVICE INCOME ZERO RATED' => $isZeroRated ? $subtotal : 0,
                     'SERVICE INCOME VATABLE' => $isZeroRated ? 0 : $subtotal,
                     'OUTPUT VAT' => (float) $document->tax_total,
                     'CREDITABLE WITHHOLDING TAX' => 0,
-                    'REIMBURSABLE CHARGES (CR)' => 0,
+                    'REIMBURSABLE CHARGES (CR)' => $reimbursement,
                 ];
             })
             ->all();

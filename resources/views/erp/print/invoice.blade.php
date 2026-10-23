@@ -194,6 +194,7 @@
 @endpush
 
 @section('content')
+    @include('erp.partials.paid-indicator', ['paymentStatus' => $print['payment_status']['bi'] ?? []])
     <div class="d-flex flex-wrap justify-content-end gap-2 mb-3 no-print">
         <a href="{{ route('erp.billings.index') }}" class="btn btn-outline-secondary"><i class="bi bi-table me-1"></i> Billing CRUD</a>
         <a href="{{ route('erp.billings.print-layout.invoice', request()->query()) }}" class="btn btn-outline-secondary"><i class="bi bi-sliders me-1"></i> Adjust Layout</a>

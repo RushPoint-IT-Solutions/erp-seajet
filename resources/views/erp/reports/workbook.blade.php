@@ -66,7 +66,9 @@
         text-align: right;
         font-variant-numeric: tabular-nums;
     }
+    .sales-history-link { color: #1d4ed8; text-decoration: underline; }
     @media print {
+        .sales-history-link { color: inherit; text-decoration: none; }
         @page { size: A4 landscape; margin: 8mm; }
         .no-print, .erp-sidebar, .erp-topbar { display: none !important; }
         .erp-shell, .erp-main, .erp-content, main, section {
@@ -182,7 +184,13 @@
                     <tr>
                         @foreach($activeReport['columns'] as $column)
                             @php $value = $row[$column] ?? ''; @endphp
-                            <td class="{{ is_numeric($value) ? 'amount' : '' }}">{{ is_numeric($value) ? $money($value) : $value }}</td>
+                            <td class="{{ is_numeric($value) ? 'amount' : '' }}">
+                                @if(!empty($row['_history_url']) && in_array($column, ['BILLING INVOICE', 'STATEMENT OF ACCOUNT NUMBER'], true) && (string) $value !== '')
+                                    <a class="sales-history-link" href="{{ $row['_history_url'] }}" data-bs-toggle="modal" data-bs-target="#salesHistoryModal" data-history-url="{{ $row['_history_url'] }}">{{ $value }}</a>
+                                @else
+                                    {{ is_numeric($value) ? $money($value) : $value }}
+                                @endif
+                            </td>
                         @endforeach
                     </tr>
                 @empty
@@ -196,4 +204,41 @@
             </table>
         </div>
     </div>
+    @if(strpos($report, 'sales-') === 0)
+        <div class="modal fade no-print" id="salesHistoryModal" tabindex="-1" aria-labelledby="salesHistoryTitle" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header"><h2 class="modal-title fs-5" id="salesHistoryTitle">Document and Payment History</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                    <div class="modal-body" id="salesHistoryBody" aria-live="polite"></div>
+                </div>
+            </div>
+        </div>
+    @endif
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    var modal = document.getElementById('salesHistoryModal');
+    if (!modal) return;
+    var requestNumber = 0;
+    modal.addEventListener('show.bs.modal', function (event) {
+        var url = event.relatedTarget && event.relatedTarget.getAttribute('data-history-url');
+        if (!url) return;
+        var current = ++requestNumber;
+        var body = document.getElementById('salesHistoryBody');
+        body.textContent = 'Loading history...';
+        fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (response) {
+                if (!response.ok || response.redirected) throw new Error('History could not be loaded. Please refresh and try again.');
+                return response.text();
+            }).then(function (html) {
+                if (current === requestNumber) body.innerHTML = html;
+            }).catch(function (error) {
+                if (current === requestNumber) body.textContent = error.message;
+            });
+    });
+    modal.addEventListener('hidden.bs.modal', function () { requestNumber++; });
+}());
+</script>
+@endpush

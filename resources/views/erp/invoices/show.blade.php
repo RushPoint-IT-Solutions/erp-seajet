@@ -26,6 +26,7 @@
                 <span class="badge badge-soft">{{ $status }}</span>
             </div>
             <p class="text-muted mb-0">View invoice details, print templates, update status, or create payment.</p>
+            @include('erp.partials.paid-indicator', ['paymentStatus' => $invoice['payment_status']['document'] ?? []])
         </div>
         <div class="d-flex flex-wrap gap-2">
             <a href="{{ route('erp.invoices.index') }}" class="btn btn-outline-secondary">
