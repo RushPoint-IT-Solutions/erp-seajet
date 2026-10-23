@@ -7,6 +7,7 @@ use App\Services\Accounting\OpeningBalanceImportService;
 use App\Services\Accounting\PeriodLockService;
 use App\Services\Accounting\PostingService;
 use App\Services\Audit\ActivityLogger;
+use App\Services\Reports\XlsxReportExporter;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Services\Security\RbacService;
@@ -11279,6 +11280,47 @@ class ModuleController extends Controller
         return view('erp.reports.workbook', compact('reports', 'report', 'activeReport', 'company', 'period', 'rows', 'summaryCards'));
     }
 
+    public function workbookReportExcel($report = 'all')
+    {
+        $reports = $this->workbookReportDefinitions();
+        $report = $report ?: 'all';
+        if ($report !== 'all' && !isset($reports[$report])) {
+            abort(404);
+        }
+
+        $period = request('period', date('Y-m'));
+        if (!preg_match('/^\d{4}-\d{2}$/', $period) || !checkdate((int) substr($period, 5, 2), 1, (int) substr($period, 0, 4))) {
+            abort(422, 'The period must be a valid month in YYYY-MM format.');
+        }
+
+        $company = Schema::hasTable('companies') ? DB::table('companies')->where('id', $this->defaultCompanyId())->first() : null;
+        $companyName = $company && !empty($company->name) ? $company->name : 'SEA-JET INTERNATIONAL FORWARDERS, INC.';
+        $selectedReports = $report === 'all' ? $reports : [$report => $reports[$report]];
+        $sheets = [];
+
+        foreach ($selectedReports as $slug => $definition) {
+            $subtitle = in_array($slug, ['bank-recon', 'trial-balance'], true)
+                ? $definition['subtitle']
+                : 'FOR THE PERIOD ENDED '.strtoupper(date('F t, Y', strtotime($period.'-01')))
+                    .(!empty($definition['subtitle']) ? ' - '.$definition['subtitle'] : '');
+            $sheets[] = [
+                'name' => $definition['label'],
+                'company' => $companyName,
+                'title' => $definition['title'],
+                'period' => $subtitle,
+                'columns' => $definition['columns'],
+                'rows' => $this->workbookReportRows($slug, $period),
+            ];
+        }
+
+        $path = app(XlsxReportExporter::class)->create($sheets);
+        $filename = ($report === 'all' ? 'workbook-report-pack' : Str::slug($reports[$report]['label'])).'-'.$period.'.xlsx';
+
+        return response()->download($path, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+
     public function trialBalanceReport()
     {
         $reports = $this->workbookReportDefinitions();
@@ -12555,39 +12597,60 @@ class ModuleController extends Controller
                         });
                 });
         })->where(function ($journalQuery) use ($voidedDocumentNumbers, $voidedTransactionNumbers, $voidedSoaNumbers) {
-            $journalQuery->whereNull('journal_entries.reference_no')
-                ->orWhere(function ($referenceQuery) use ($voidedDocumentNumbers, $voidedTransactionNumbers, $voidedSoaNumbers) {
-                    $referenceQuery->whereNotIn('journal_entries.reference_no', $voidedDocumentNumbers)
-                        ->whereNotIn('journal_entries.reference_no', $voidedTransactionNumbers)
-                        ->whereNotIn('journal_entries.reference_no', $voidedSoaNumbers);
-                });
+            // Payables references belong to a separate numbering series and may
+            // legitimately match a voided sales document (for example, vendor
+            // bill 21 and billing invoice 21).
+            $journalQuery->where(function ($payablesSource) {
+                $payablesSource->whereIn(DB::raw('LOWER(journal_entries.source_type)'), [
+                    'purchase_document', 'vendor_bill', 'payment', 'supplier_payment', 'ap_payment',
+                ]);
+            })->orWhere(function ($legacySource) use ($voidedDocumentNumbers, $voidedTransactionNumbers, $voidedSoaNumbers) {
+                $legacySource->whereNull('journal_entries.reference_no')
+                    ->orWhere(function ($referenceQuery) use ($voidedDocumentNumbers, $voidedTransactionNumbers, $voidedSoaNumbers) {
+                        $referenceQuery->whereNotIn('journal_entries.reference_no', $voidedDocumentNumbers)
+                            ->whereNotIn('journal_entries.reference_no', $voidedTransactionNumbers)
+                            ->whereNotIn('journal_entries.reference_no', $voidedSoaNumbers);
+                    });
+            });
         });
     }
 
     private function excludeInactiveBillingInvoiceLines($query)
     {
-        if (!Schema::hasTable('opening_balance_import_rows')) {
-            return $this->excludeLegacyInactiveBillingInvoiceLines($query);
-        }
-
         // A re-entered balance can share its reference with a voided balance.
         // Resolve imported lines through their own journal and subledger record.
         $descriptionKey = DB::getDriverName() === 'sqlite'
             ? "' opening balance ' || encoded_balance.reference_no || ' | ' || encoded_balance.party_name || ' | ' || encoded_balance.source_date"
             : "CONCAT(' opening balance ', encoded_balance.reference_no, ' | ', encoded_balance.party_name, ' | ', encoded_balance.source_date)";
+        $hasImportedRows = Schema::hasTable('opening_balance_import_rows');
 
-        return $query->where(function ($lines) use ($descriptionKey) {
-            $lines->whereExists(function ($encoded) use ($descriptionKey) {
-                $encoded->select(DB::raw(1))->from('opening_balance_import_rows as encoded_balance')
-                    ->join('sales_documents as encoded_document', 'encoded_document.id', '=', 'encoded_balance.sales_document_id')
-                    ->where('journal_entries.source_type', 'opening_balance_import')
-                    ->whereColumn('encoded_balance.company_id', 'journal_entries.company_id')
-                    ->whereColumn('encoded_balance.journal_entry_id', 'journal_entries.id')
-                    ->whereColumn('encoded_document.company_id', 'journal_entries.company_id')
-                    ->whereNotIn(DB::raw('LOWER(encoded_document.status)'), ['cancelled', 'voided', 'deleted'])
-                    ->whereRaw("INSTR(COALESCE(journal_entry_lines.description, ''), {$descriptionKey}) > 0");
-            })->orWhere(function ($legacy) {
-                $this->excludeLegacyInactiveBillingInvoiceLines($legacy);
+        return $query->where(function ($journals) use ($descriptionKey, $hasImportedRows) {
+            // A/P bills and supplier payments must not be hidden by a coincidentally
+            // equal sales invoice number. Keep the legacy description checks for
+            // A/R receipts, reversals, and opening-balance import batches.
+            $journals->where(function ($payablesSource) {
+                $payablesSource->whereIn(DB::raw('LOWER(journal_entries.source_type)'), [
+                    'purchase_document', 'vendor_bill', 'payment', 'supplier_payment', 'ap_payment',
+                ]);
+            })->orWhere(function ($lines) use ($descriptionKey, $hasImportedRows) {
+                if ($hasImportedRows) {
+                    $lines->where(function ($importedOrLegacy) use ($descriptionKey) {
+                        $importedOrLegacy->whereExists(function ($encoded) use ($descriptionKey) {
+                            $encoded->select(DB::raw(1))->from('opening_balance_import_rows as encoded_balance')
+                                ->join('sales_documents as encoded_document', 'encoded_document.id', '=', 'encoded_balance.sales_document_id')
+                                ->where('journal_entries.source_type', 'opening_balance_import')
+                                ->whereColumn('encoded_balance.company_id', 'journal_entries.company_id')
+                                ->whereColumn('encoded_balance.journal_entry_id', 'journal_entries.id')
+                                ->whereColumn('encoded_document.company_id', 'journal_entries.company_id')
+                                ->whereNotIn(DB::raw('LOWER(encoded_document.status)'), ['cancelled', 'voided', 'deleted'])
+                                ->whereRaw("INSTR(COALESCE(journal_entry_lines.description, ''), {$descriptionKey}) > 0");
+                        })->orWhere(function ($legacy) {
+                            $this->excludeLegacyInactiveBillingInvoiceLines($legacy);
+                        });
+                    });
+                } else {
+                    $this->excludeLegacyInactiveBillingInvoiceLines($lines);
+                }
             });
         });
     }
@@ -12780,11 +12843,13 @@ class ModuleController extends Controller
                 'sales_documents.grand_total',
                 'sales_documents.subtotal',
                 'sales_documents.tax_total',
+                'sales_documents.withholding_tax_amount',
                 'customers.name as customer_name',
             ])
             ->map(function ($document) {
                 $reimbursement = min((float) $document->grand_total, max(0, (float) $document->freight_total));
                 $billing = max(0, (float) $document->grand_total - $reimbursement);
+                $withholding = min($billing, max(0, (float) $document->withholding_tax_amount));
                 $subtotal = max(0, $billing - (float) $document->tax_total);
                 $isZeroRated = $document->vat_classification === 'zero-rated';
                 $isSoa = in_array(strtolower((string) $document->document_type), ['soa', 'soa_a', 'statement_of_account', 'statement_of_account_a'], true);
@@ -12795,12 +12860,12 @@ class ModuleController extends Controller
                     'BILLING INVOICE' => $isSoa ? '' : $document->document_no,
                     'STATEMENT OF ACCOUNT NUMBER' => trim((string) $document->soa_no) !== '' ? $document->soa_no : ($isSoa ? $document->document_no : ''),
                     'NAME OF COMPANY' => $document->customer_name,
-                    'A/R TRADE' => $billing,
+                    'A/R TRADE' => max(0, $billing - $withholding),
                     'A/R REIMBURSABLE CHARGES' => $reimbursement,
                     'SERVICE INCOME ZERO RATED' => $isZeroRated ? $subtotal : 0,
                     'SERVICE INCOME VATABLE' => $isZeroRated ? 0 : $subtotal,
                     'OUTPUT VAT' => (float) $document->tax_total,
-                    'CREDITABLE WITHHOLDING TAX' => 0,
+                    'CREDITABLE WITHHOLDING TAX' => $withholding,
                     'REIMBURSABLE CHARGES (CR)' => $reimbursement,
                 ];
             })

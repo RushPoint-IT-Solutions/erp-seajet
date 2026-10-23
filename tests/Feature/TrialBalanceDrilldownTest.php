@@ -59,6 +59,42 @@ class TrialBalanceDrilldownTest extends TestCase
         ]))->assertOk()->assertJsonFragment(['journal_no' => 'OB-AP-REGRESSION']);
     }
 
+    public function test_prior_period_vendor_bill_is_not_hidden_by_a_voided_sales_document_with_the_same_reference()
+    {
+        $apAccount = DB::table('accounts')->where('company_id', 1)->where('code', '2000')->first();
+        $offsetAccount = DB::table('accounts')->where('company_id', 1)->where('id', '<>', $apAccount->id)->first();
+        $bill = DB::table('purchase_documents')->where('company_id', 1)->first();
+        $invoice = (array) DB::table('sales_documents')->where('company_id', 1)->first();
+        unset($invoice['id']);
+        DB::table('sales_documents')->insert(array_merge($invoice, [
+            'document_no' => '21', 'transaction_no' => '21', 'soa_no' => '21', 'status' => 'voided',
+        ]));
+
+        $journalId = DB::table('journal_entries')->insertGetId([
+            'company_id' => 1, 'journal_no' => 'AP-BEG-21', 'journal_date' => '2026-08-20',
+            'source_module' => 'AP', 'source_type' => 'purchase_document', 'source_id' => $bill->id,
+            'reference_no' => '21', 'status' => 'posted', 'posting_type' => 'original',
+        ]);
+        DB::table('journal_entry_lines')->insert([
+            [
+                'journal_entry_id' => $journalId, 'account_id' => $offsetAccount->id,
+                'description' => 'Opening balance equity - 21', 'debit' => 11446.23, 'credit' => 0,
+            ],
+            [
+                'journal_entry_id' => $journalId, 'account_id' => $apAccount->id,
+                'description' => 'Accounts payable - 21', 'debit' => 0, 'credit' => 11446.23,
+            ],
+        ]);
+
+        $rows = $this->get(route('erp.reports.trial-balance', ['period' => '2026-09']))
+            ->assertOk()->original->getData()['rows'];
+        $row = collect($rows)->firstWhere('__account_id', (int) $apAccount->id);
+        $this->assertEquals(-11446.23, $row['BEGINNING BALANCE']);
+        $this->getJson(route('erp.reports.trial-balance.drilldown', [
+            'period' => '2026-09', 'account_id' => $apAccount->id, 'column' => 'BEGINNING BALANCE',
+        ]))->assertOk()->assertJsonFragment(['journal_no' => 'AP-BEG-21']);
+    }
+
     public function test_voided_journals_and_their_reversals_are_hidden_from_all_trial_balance_columns()
     {
         $account = DB::table('accounts')->where('company_id', 1)->where('opening_balance', 0)->first();

@@ -36,6 +36,49 @@ class SalesJournalHistoryTest extends TestCase
         $this->assertEquals(162, $row['A/R TRADE'] + $row['A/R REIMBURSABLE CHARGES']);
     }
 
+    public function test_sales_reports_show_withholding_separately_and_net_it_from_ar_trade()
+    {
+        $invoice = $this->invoice();
+        DB::table('sales_documents')->where('id', $invoice->id)->update(['withholding_tax_amount' => 2]);
+
+        $response = $this->get(route('erp.reports.workbook', ['report' => 'sales-manila', 'period' => '2026-10']))->assertOk();
+        $row = collect($response->original->getData()['rows'])->firstWhere('BILLING INVOICE', $invoice->document_no);
+
+        $this->assertEquals(110, $row['A/R TRADE']);
+        $this->assertEquals(2, $row['CREDITABLE WITHHOLDING TAX']);
+        $this->assertEquals(162, $row['A/R TRADE'] + $row['CREDITABLE WITHHOLDING TAX'] + $row['A/R REIMBURSABLE CHARGES']);
+    }
+
+    public function test_each_report_and_the_full_pack_can_be_downloaded_as_excel()
+    {
+        $invoice = $this->invoice();
+        DB::table('sales_documents')->where('id', $invoice->id)->update(['withholding_tax_amount' => 2]);
+        $single = $this->get(route('erp.reports.workbook-excel', ['report' => 'sales-manila', 'period' => '2026-10']));
+        $single->assertOk();
+        $this->assertSame('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', $single->headers->get('content-type'));
+        $this->assertStringContainsString('sales-manila-2026-10.xlsx', $single->headers->get('content-disposition'));
+        $this->assertSame('PK', substr(file_get_contents($single->getFile()->getPathname()), 0, 2));
+        $zip = new \ZipArchive();
+        $this->assertTrue($zip->open($single->getFile()->getPathname()) === true);
+        $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $this->assertNotFalse(simplexml_load_string($sheetXml));
+        $this->assertStringContainsString('CREDITABLE WITHHOLDING TAX', $sheetXml);
+        $this->assertStringContainsString('<v>110</v>', $sheetXml);
+        $this->assertStringContainsString('<v>2</v>', $sheetXml);
+        $zip->close();
+
+        $pack = $this->get(route('erp.reports.workbook-excel', ['report' => 'all', 'period' => '2026-10']));
+        $pack->assertOk();
+        $this->assertStringContainsString('workbook-report-pack-2026-10.xlsx', $pack->headers->get('content-disposition'));
+        $this->assertSame('PK', substr(file_get_contents($pack->getFile()->getPathname()), 0, 2));
+        $this->assertTrue($zip->open($pack->getFile()->getPathname()) === true);
+        $workbookXml = $zip->getFromName('xl/workbook.xml');
+        $this->assertNotFalse(simplexml_load_string($workbookXml));
+        $this->assertSame(11, substr_count($workbookXml, '<sheet name='));
+        $this->assertNotFalse($zip->getFromName('xl/worksheets/sheet11.xml'));
+        $zip->close();
+    }
+
     public function test_standalone_soa_and_branch_period_void_and_company_filters()
     {
         $invoice = $this->invoice();

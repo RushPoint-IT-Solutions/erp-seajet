@@ -171,6 +171,7 @@ Route::middleware(['auth', 'permission.access'])->group(function () {
     Route::get('/erp/reports/trial-balance/drilldown', 'Erp\ModuleController@trialBalanceDrilldown')->name('erp.reports.trial-balance.drilldown');
     Route::get('/erp/reports/financial-statements', 'Erp\ModuleController@financialStatementsReport')->name('erp.reports.financial-statements');
     Route::get('/erp/reports/sales-history/{invoice}', 'Erp\ModuleController@salesJournalHistory')->name('erp.reports.sales-history');
+    Route::get('/erp/reports/workbook-excel/{report?}', 'Erp\ModuleController@workbookReportExcel')->name('erp.reports.workbook-excel');
     Route::get('/erp/reports/workbook/{report?}', 'Erp\ModuleController@workbookReport')->name('erp.reports.workbook');
     Route::get('/erp/reports/client-statement-of-account', 'Erp\ModuleController@clientStatementOfAccount')->name('erp.reports.client-soa');
     Route::get('/erp/customer-billing/templates', 'Erp\ModuleController@customerBillingTemplates')->name('erp.customer-billing.templates');

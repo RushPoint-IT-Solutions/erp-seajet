@@ -108,6 +108,8 @@
         </div>
         <div class="d-flex flex-wrap gap-2">
             <a href="{{ route('erp.reports.index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Reports</a>
+            <a href="{{ route('erp.reports.workbook-excel', ['report' => $report, 'period' => $period]) }}" class="btn btn-success"><i class="bi bi-file-earmark-excel me-1"></i>Download Excel</a>
+            <a href="{{ route('erp.reports.workbook-excel', ['report' => 'all', 'period' => $period]) }}" class="btn btn-outline-success"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Download All</a>
             <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
         </div>
     </div>
