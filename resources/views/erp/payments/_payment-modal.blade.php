@@ -180,7 +180,8 @@
                         </div>
                     </div>
 
-                    <select name="invoice_no[]" class="payment-invoice-select visually-hidden" multiple tabindex="-1" aria-hidden="true">
+                    <div class="payment-ordered-invoices"></div>
+                    <select class="payment-invoice-select visually-hidden" multiple tabindex="-1" aria-hidden="true">
                         @foreach($invoices as $invoice)
                             <option value="{{ $invoice['document_no'] }}"
                                     data-document-type="{{ $invoice['document_type'] }}"
@@ -208,6 +209,7 @@
                                 <th class="text-end">Invoice Total</th>
                                 <th class="text-end">Selected Balance Due</th>
                                 <th class="text-end">Cash Due</th>
+                                <th class="text-end">Amount Applied</th>
                             </tr>
                             </thead>
                             <tbody>
@@ -245,10 +247,11 @@
                                         @endif
                                     </td>
                                     <td class="text-end fw-semibold"><span class="payment-currency-prefix">{{ $invoice['currency'] }}</span><span class="payment-row-cash">{{ number_format($invoice['balance'], 2) }}</span></td>
+                                    <td class="text-end fw-semibold payment-row-applied">0.00</td>
                                 </tr>
                             @endforeach
                             <tr class="payment-invoice-placeholder">
-                                <td colspan="6" class="text-center text-muted payment-invoice-empty">
+                                <td colspan="7" class="text-center text-muted payment-invoice-empty">
                                     <i class="bi bi-person-lines-fill d-block fs-3 mb-2"></i>Select a client to view their unpaid invoices.
                                 </td>
                             </tr>
@@ -259,6 +262,7 @@
                                 <td class="text-end payment-total-original">0.00</td>
                                 <td class="text-end payment-total-due">0.00</td>
                                 <td class="text-end payment-total-cash">0.00</td>
+                                <td class="text-end payment-total-applied">0.00</td>
                             </tr>
                             </tfoot>
                         </table>
@@ -322,7 +326,41 @@
         (function () {
             function numberValue(value) { return parseFloat(String(value || '0').replace(/,/g, '')) || 0; }
             function money(value) { return numberValue(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-            function selectedOptions(form) { return form.find('.payment-invoice-select option:selected'); }
+            function selectedOptions(form) {
+                var options = form.find('.payment-invoice-select option:selected');
+                var order = form.data('invoice-selection-order') || [];
+                var selected = options.map(function () { return String(this.value); }).get();
+                order = order.filter(function (invoice) { return selected.indexOf(invoice) !== -1; });
+                selected.forEach(function (invoice) {
+                    if (order.indexOf(invoice) === -1) { order.push(invoice); }
+                });
+                form.data('invoice-selection-order', order);
+                var inputs = form.find('.payment-ordered-invoices').empty();
+                order.forEach(function (invoice) {
+                    $('<input>', { type: 'hidden', name: 'invoice_no[]', value: invoice }).appendTo(inputs);
+                });
+                return $(options.get().sort(function (a, b) {
+                    return order.indexOf(String(a.value)) - order.indexOf(String(b.value));
+                }));
+            }
+
+            function syncAllocations(form) {
+                // Match the server: cash plus CWT settles invoices in selection order.
+                var remaining = Math.max(0, Math.round((numberValue(form.find('.payment-amount-input').val()) +
+                    Math.max(0, numberValue(form.find('.payment-cwt-input').val()))) * 100));
+                var appliedTotal = 0;
+                form.find('.payment-row-applied').text(money(0));
+                selectedOptions(form).each(function () {
+                    var applied = Math.min(remaining, Math.max(0, Math.round(numberValue($(this).data('settlement-balance')) * 100)));
+                    remaining -= applied;
+                    appliedTotal += applied;
+                    var invoice = String(this.value);
+                    form.find('.payment-invoice-row').filter(function () {
+                        return String($(this).data('invoice')) === invoice;
+                    }).find('.payment-row-applied').text(money(applied / 100));
+                });
+                form.find('.payment-total-applied').text(money(appliedTotal / 100));
+            }
             function applyPaymentFor(form) {
                 var mode = form.find('.payment-for-select').val() || 'all';
                 form.find('.payment-invoice-select option, .payment-invoice-row').each(function () {
@@ -424,6 +462,7 @@
             }
 
             function checkPaymentBalance(form) {
+                syncAllocations(form);
                 var options = selectedOptions(form);
                 var alertBox = form.find('.payment-balance-alert');
                 var cashBalance = 0, settlementBalance = 0, currencies = {}, customers = {};

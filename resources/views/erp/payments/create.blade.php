@@ -308,6 +308,7 @@
             reentryForm.find('.payment-for-select').val(reentryPayment.payment_for || '').trigger('change');
             reentryForm.find('.payment-customer-select').val(String(reentryPayment.customer_id)).trigger('change');
             reentryForm.find('.payment-class-select').val(reentryPayment.class_code).trigger('change');
+            reentryForm.data('invoice-selection-order', reentryPayment.invoice_numbers);
             reentryForm.find('.payment-invoice-select').val(reentryPayment.invoice_numbers).trigger('change');
             reentryForm.append($('<input>', { type: 'hidden', name: 'reenter_receipt', value: @json(request('reenter_receipt')) }));
             if (paymentModal) { paymentModal.show(); }
