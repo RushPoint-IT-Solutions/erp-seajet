@@ -789,6 +789,49 @@ class RecordPaymentPayableTest extends TestCase
         $this->assertEquals(50, (float) $statementRow->total);
     }
 
+    public function test_partial_payment_is_applied_in_the_submitted_selection_order()
+    {
+        $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
+        $base = (array) $invoice;
+        unset($base['id']);
+        $base = array_merge($base, [
+            'freight_total' => 0, 'withholding_tax_amount' => 0, 'paid_total' => 0,
+            'total_payment' => 0, 'status' => 'posted',
+        ]);
+        // Insert the second selection first to ensure database order is ignored.
+        $secondId = DB::table('sales_documents')->insertGetId(array_merge($base, [
+            'document_no' => 'BI-1283', 'invoice_amount' => 8959.27,
+            'grand_total' => 8959.27, 'balance_due' => 8959.27,
+        ]));
+        $firstId = DB::table('sales_documents')->insertGetId(array_merge($base, [
+            'document_no' => 'BI-1272', 'invoice_amount' => 4357.30,
+            'grand_total' => 4357.30, 'balance_due' => 4357.30,
+        ]));
+
+        $this->post(route('erp.payments.receipt'), [
+            'customer_id' => (string) $invoice->customer_id,
+            'invoice_no' => ['BI-1272', 'BI-1283'], 'payment_for' => 'bi',
+            'payment_date' => '2026-10-26', 'payment_method' => 'Cash',
+            'currency' => 'PHP', 'amount' => '4,537.30', 'cwt_amount' => 0,
+            'receipt_no' => 'OR-PARTIAL-ALLOCATION',
+        ])->assertOk();
+
+        $receipt = DB::table('receipts')->where('receipt_no', 'OR-PARTIAL-ALLOCATION')->first();
+        $this->assertEquals(4537.30, (float) $receipt->amount);
+        foreach ([$firstId => 4357.30, $secondId => 180.00] as $id => $applied) {
+            $this->assertDatabaseHas('receipt_applications', [
+                'receipt_id' => $receipt->id, 'sales_document_id' => $id,
+                'component' => 'bi', 'amount_applied' => $applied,
+            ]);
+        }
+        $this->assertDatabaseHas('sales_documents', [
+            'id' => $firstId, 'paid_total' => 4357.30, 'balance_due' => 0, 'status' => 'paid',
+        ]);
+        $this->assertDatabaseHas('sales_documents', [
+            'id' => $secondId, 'paid_total' => 180, 'balance_due' => 8779.27, 'status' => 'partial',
+        ]);
+    }
+
     public function test_one_payment_can_apply_to_multiple_invoices_and_labels_them_on_the_official_receipt()
     {
         $firstInvoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();

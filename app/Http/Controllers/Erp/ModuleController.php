@@ -12764,12 +12764,19 @@ class ModuleController extends Controller
                     $lines->where(function ($importedOrLegacy) use ($descriptionKey) {
                         $importedOrLegacy->whereExists(function ($encoded) use ($descriptionKey) {
                             $encoded->select(DB::raw(1))->from('opening_balance_import_rows as encoded_balance')
-                                ->join('sales_documents as encoded_document', 'encoded_document.id', '=', 'encoded_balance.sales_document_id')
+                                ->leftJoin('sales_documents as encoded_document', 'encoded_document.id', '=', 'encoded_balance.sales_document_id')
                                 ->where('journal_entries.source_type', 'opening_balance_import')
                                 ->whereColumn('encoded_balance.company_id', 'journal_entries.company_id')
                                 ->whereColumn('encoded_balance.journal_entry_id', 'journal_entries.id')
-                                ->whereColumn('encoded_document.company_id', 'journal_entries.company_id')
-                                ->whereNotIn(DB::raw('LOWER(encoded_document.status)'), ['cancelled', 'voided', 'deleted'])
+                                ->where(function ($activeBalance) {
+                                    // Imported AP balances have no sales document. Their
+                                    // references must not be matched against voided AR.
+                                    $activeBalance->where('encoded_balance.balance_type', 'ap_trade')
+                                        ->orWhere(function ($activeSales) {
+                                            $activeSales->whereColumn('encoded_document.company_id', 'journal_entries.company_id')
+                                                ->whereNotIn(DB::raw('LOWER(encoded_document.status)'), ['cancelled', 'voided', 'deleted']);
+                                        });
+                                })
                                 ->whereRaw("INSTR(COALESCE(journal_entry_lines.description, ''), {$descriptionKey}) > 0");
                         })->orWhere(function ($legacy) {
                             $this->excludeLegacyInactiveBillingInvoiceLines($legacy);

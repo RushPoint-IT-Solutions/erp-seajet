@@ -26,6 +26,12 @@ class TrialBalanceDrilldownTest extends TestCase
 
     public function test_payable_import_is_not_excluded_as_a_missing_sales_invoice()
     {
+        // An unrelated voided sales invoice can occur inside an AP reference.
+        $invoice = (array) DB::table('sales_documents')->where('company_id', 1)->first();
+        unset($invoice['id']);
+        DB::table('sales_documents')->insert(array_merge($invoice, [
+            'document_no' => 'REGRESSION', 'status' => 'voided',
+        ]));
         $account = DB::table('accounts')->where('company_id', 1)->where('code', '2000')->first();
         $journalId = DB::table('journal_entries')->insertGetId([
             'company_id' => 1, 'journal_no' => 'OB-AP-REGRESSION',
