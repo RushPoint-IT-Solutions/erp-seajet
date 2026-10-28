@@ -146,7 +146,7 @@
     @media print {
         html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
         .no-print, .erp-sidebar, .erp-topbar { display: none !important; }
-        .erp-shell, .erp-main, .erp-content, main, section {
+        .erp-shell, .erp-main, .erp-content, .erp-main > section {
             display: block !important;
             margin: 0 !important;
             padding: 0 !important;
