@@ -13936,6 +13936,7 @@ class ModuleController extends Controller
 
     public function agingReport()
     {
+        request()->validate(['as_of' => 'nullable|date_format:Y-m-d']);
         $filters = [
             'as_of' => request('as_of', date('Y-m-d')),
             'class' => request('class', 'All Classes'),
@@ -13943,13 +13944,35 @@ class ModuleController extends Controller
             'vat' => request('vat', 'All VAT'),
         ];
 
-        $rows = $this->agingReportRows($filters);
-        $summary = $this->agingReportSummary($rows);
+        $rows = $this->agingReportRows($filters, true);
+        $companies = collect($rows)->groupBy(function ($row) {
+            return $row['customer_key'].'|'.$row['currency'];
+        })->map(function ($invoices) {
+            return [
+                'name' => $invoices->first()['customer'],
+                'currency' => $invoices->first()['currency'],
+                'invoices' => $invoices,
+                'due' => $invoices->sum('due'),
+                'paid' => $invoices->sum('paid'),
+                'balance' => $invoices->sum('balance'),
+                'buckets' => array_map(function ($index) use ($invoices) {
+                    return $invoices->sum(function ($invoice) use ($index) { return $invoice['buckets'][$index]; });
+                }, range(0, 3)),
+            ];
+        })->sortByDesc('balance');
+        $currencyTotals = collect($rows)->groupBy('currency')->map(function ($invoices) {
+            return [
+                'balance' => $invoices->sum('balance'),
+                'buckets' => array_map(function ($index) use ($invoices) {
+                    return $invoices->sum(function ($invoice) use ($index) { return $invoice['buckets'][$index]; });
+                }, range(0, 3)),
+            ];
+        });
 
-        return view('erp.reports.aging', compact('rows', 'filters', 'summary'));
+        return view('erp.reports.aging', compact('rows', 'filters', 'companies', 'currencyTotals'));
     }
 
-    private function agingReportRows(array $filters)
+    private function agingReportRows(array $filters, $companyReport = false)
     {
         if (!Schema::hasTable('sales_documents')) {
             return [];
@@ -13964,6 +13987,9 @@ class ModuleController extends Controller
                 'customers.customer_id',
                 'customers.code as customer_code',
                 'customers.name as customer_name',
+                'sales_documents.customer_id as customer_key',
+                'sales_documents.id',
+                'sales_documents.document_date',
                 'sales_documents.document_no',
                 'sales_documents.job_shipment_id',
                 'sales_documents.shipment_reference',
@@ -13978,6 +14004,10 @@ class ModuleController extends Controller
             ->whereNotIn('sales_documents.status', ['cancelled', 'voided', 'paid'])
             ->whereIn('sales_documents.document_type', ['invoice', 'billing_invoice', 'statement_of_account_a', 'soa_a', 'debit_note'])
             ->whereRaw($balanceExpression.' > 0')
+            ->when($companyReport, function ($query) use ($asOf) {
+                $query->where('sales_documents.company_id', $this->defaultCompanyId())
+                    ->whereDate('sales_documents.document_date', '<=', $asOf);
+            })
             ->when(($filters['class'] ?? 'All Classes') !== 'All Classes', function ($query) use ($filters) {
                 $aliases = [
                     'MANILA' => ['MANILA', 'MAIN', 'MNL'],
@@ -13996,8 +14026,26 @@ class ModuleController extends Controller
             ->orderBy('customers.name')
             ->orderBy('sales_documents.id')
             ->get()
-            ->map(function ($invoice) use ($asOf) {
+            ->map(function ($invoice) use ($asOf, $companyReport) {
                 $balance = $this->salesDocumentBalance($invoice);
+                if ($companyReport) {
+                    $age = max(0, \Carbon\Carbon::parse($invoice->document_date)->diffInDays(\Carbon\Carbon::parse($asOf), false));
+                    $bucket = $age <= 30 ? 0 : ($age <= 60 ? 1 : ($age <= 90 ? 2 : 3));
+                    $buckets = [0, 0, 0, 0];
+                    $buckets[$bucket] = $balance;
+                    return [
+                        'id' => $invoice->id,
+                        'customer_key' => $invoice->customer_key,
+                        'customer' => $invoice->customer_name ?: 'Guest / Non-tax Client',
+                        'number' => $invoice->document_no,
+                        'date' => $invoice->document_date,
+                        'currency' => $invoice->currency ?: 'PHP',
+                        'due' => $balance + (float) $invoice->paid_total,
+                        'paid' => (float) $invoice->paid_total,
+                        'balance' => $balance,
+                        'buckets' => $buckets,
+                    ];
+                }
                 $daysPastDue = $invoice->due_date ? max(0, \Carbon\Carbon::parse($invoice->due_date)->diffInDays(\Carbon\Carbon::parse($asOf), false)) : 0;
                 $current = $daysPastDue <= 0 ? $balance : 0;
                 $thirty = $daysPastDue > 0 && $daysPastDue <= 30 ? $balance : 0;
