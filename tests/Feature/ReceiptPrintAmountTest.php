@@ -23,6 +23,40 @@ class ReceiptPrintAmountTest extends TestCase
         $this->withoutExceptionHandling();
     }
 
+    public function test_active_payments_include_older_records_beyond_the_latest_hundred()
+    {
+        $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
+        $receipts = [];
+        for ($index = 0; $index < 101; $index++) {
+            $receipts[] = [
+                'company_id' => $invoice->company_id,
+                'customer_id' => $invoice->customer_id,
+                'receipt_no' => 'OLDER-PAYMENT-'.str_pad($index, 3, '0', STR_PAD_LEFT),
+                'receipt_type' => 'collection_receipt',
+                'receipt_date' => '2026-09-08',
+                'payment_method' => 'Check',
+                'currency' => 'PHP',
+                'exchange_rate' => 1,
+                'amount' => 100,
+                'status' => 'posted',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+        foreach (array_chunk($receipts, 50) as $chunk) {
+            DB::table('receipts')->insert($chunk);
+        }
+
+        $this->get(route('erp.payments.create'))->assertOk()
+            ->assertSee('OLDER-PAYMENT-000')
+            ->assertSee('OLDER-PAYMENT-100')
+            ->assertViewHas('payments', function ($payments) {
+                return collect($payments)->filter(function ($payment) {
+                    return strpos($payment['number'], 'OLDER-PAYMENT-') === 0;
+                })->count() === 101;
+            });
+    }
+
     public function test_voided_payments_view_excludes_active_payments()
     {
         $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();

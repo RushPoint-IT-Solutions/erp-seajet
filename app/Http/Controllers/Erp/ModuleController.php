@@ -9831,9 +9831,6 @@ class ModuleController extends Controller
                 )
                 ->orderBy('receipts.receipt_date', 'desc')
                 ->orderBy('receipts.id', 'desc')
-                ->when(!filter_var(request('show_voided'), FILTER_VALIDATE_BOOLEAN), function ($query) {
-                    $query->limit(100);
-                })
                 ->get()
                 ->map(function ($payment) {
                     return [
