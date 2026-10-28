@@ -101,7 +101,6 @@
     }
     .client-soa-table tbody td { border-top: 0; border-bottom: 0; }
     .client-soa-table td:last-child { text-align: center; }
-    .client-soa-table .aging-overdue { color: #c00000; font-weight: 700; }
     .client-soa-table .amount {
         text-align: right;
         font-variant-numeric: tabular-nums;
@@ -263,7 +262,7 @@
                     <td>{{ $invoice->soa_no }}</td>
                     <td class="amount">{{ $invoice->soa_amount > 0 ? $money($invoice->soa_amount) : '-' }}</td>
                     <td class="amount">{{ $money($invoice->total) }}</td>
-                    <td class="{{ $invoice->is_overdue ? 'aging-overdue' : '' }}">{{ $invoice->aging }}</td>
+                    <td>{{ $invoice->aging }}</td>
                 </tr>
             @empty
                 <tr>

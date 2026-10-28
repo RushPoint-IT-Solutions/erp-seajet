@@ -289,8 +289,8 @@ class RecordPaymentPayableTest extends TestCase
         $this->assertFalse($rows['BI-CURRENT']->is_overdue);
         $this->assertSame('2026-11-15', $rows['BI-CURRENT']->due_date);
         $response->assertSee('BI-CURRENT');
-        $response->assertSee('<td class="">5 Days</td>', false);
-        $response->assertSee('<td class="aging-overdue">35 Days</td>', false);
+        $response->assertSee('<td>5 Days</td>', false);
+        $response->assertSee('<td>35 Days</td>', false);
         $this->assertTrue($rows['BI-OVERDUE']->is_overdue);
         $this->assertTrue($rows['BI-EXPLICIT']->is_overdue);
         $this->assertEquals(
