@@ -250,8 +250,10 @@ class RecordPaymentPayableTest extends TestCase
         $sheets = explode('<div class="client-soa-sheet">', $response->getContent());
         $this->assertStringNotContainsString('<tfoot>', $sheets[1]);
         $this->assertStringNotContainsString('OVERDUE ACCOUNTS', $sheets[1]);
+        $this->assertStringNotContainsString('BANK DETAILS:', $sheets[1]);
         $this->assertSame(1, substr_count($sheets[2], '<tfoot>'));
         $this->assertStringContainsString('OVERDUE ACCOUNTS', $sheets[2]);
+        $this->assertStringContainsString('BANK DETAILS:', $sheets[2]);
         $invoices = $response->original->getData()['invoices'];
         $this->assertStringContainsString(
             '<td class="amount">'.number_format($invoices->sum('total'), 2).'</td>',

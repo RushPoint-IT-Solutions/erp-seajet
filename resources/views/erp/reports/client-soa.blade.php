@@ -144,7 +144,7 @@
     }
     @media print {
         @page { size: letter portrait; margin: 0; }
-        body { background: #fff !important; }
+        html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
         .no-print, .erp-sidebar, .erp-topbar { display: none !important; }
         .erp-shell, .erp-main, .erp-content, main, section {
             display: block !important;
@@ -157,11 +157,14 @@
             box-shadow: none;
             width: 215.9mm;
             min-height: 279.4mm;
-            margin: 0;
+            height: 279.4mm;
+            margin: 0 !important;
+            padding-top: 51mm;
             background: #fff url('{{ asset('images/background.jpg') }}') center / 100% 100% no-repeat !important;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
+        .client-soa-sheet::before { inset: 40.5mm 0 55mm; }
         .client-soa-sheet { break-after: page; page-break-after: always; }
         .client-soa-sheet:last-child { break-after: auto; page-break-after: auto; }
         .client-soa-preview { overflow: visible; }
@@ -295,12 +298,14 @@
             @endif
         </table>
 
+        @if($pageIndex === $pages->count() - 1)
         <div class="client-soa-bank">
             <strong>BANK DETAILS:</strong>
             @foreach($bankDetails as $line)
                 <div>{{ $line }}</div>
             @endforeach
         </div>
+        @endif
 
         @if($pageIndex === $pages->count() - 1)
         <div class="client-soa-overdue">
