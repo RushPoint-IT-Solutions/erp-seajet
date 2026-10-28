@@ -286,24 +286,26 @@ class RecordPaymentPayableTest extends TestCase
         $data = $response->original->getData();
         $rows = $data['invoices']->keyBy('document_no');
 
-        $this->assertFalse($rows['BI-CURRENT']->is_overdue);
-        $this->assertSame('2026-11-15', $rows['BI-CURRENT']->due_date);
+        $this->assertFalse($rows->has('BI-CURRENT'));
+        $response->assertDontSee('BI-CURRENT');
         $this->assertTrue($rows['BI-OVERDUE']->is_overdue);
         $this->assertTrue($rows['BI-EXPLICIT']->is_overdue);
         $this->assertEquals(
             $rows['BI-OVERDUE']->total + $rows['BI-EXPLICIT']->total,
-            $data['overdueCurrencyTotals'][$rows['BI-CURRENT']->currency]
+            $data['overdueCurrencyTotals'][$rows['BI-OVERDUE']->currency]
         );
+        $this->assertEquals($data['currencyTotals'], $data['overdueCurrencyTotals']);
 
         $onDueDate = $this->get(route('erp.reports.client-soa', [
             'customer_id' => $source['customer_id'], 'as_of' => '2026-11-15',
         ]))->assertOk()->original->getData();
-        $this->assertFalse($onDueDate['invoices']->keyBy('document_no')['BI-CURRENT']->is_overdue);
+        $this->assertFalse($onDueDate['invoices']->keyBy('document_no')->has('BI-CURRENT'));
 
         $afterDueDate = $this->get(route('erp.reports.client-soa', [
             'customer_id' => $source['customer_id'], 'as_of' => '2026-11-16',
         ]))->assertOk()->original->getData();
         $this->assertTrue($afterDueDate['invoices']->keyBy('document_no')['BI-CURRENT']->is_overdue);
+        $this->assertSame('2026-11-15', $afterDueDate['invoices']->keyBy('document_no')['BI-CURRENT']->due_date);
     }
 
     public function test_overpayment_shows_a_warning_and_cannot_be_saved()

@@ -11699,7 +11699,9 @@ class ModuleController extends Controller
 
         $asOfDate = request('as_of', date('Y-m-d'));
         request()->validate(['as_of' => 'nullable|date_format:Y-m-d']);
-        $invoices = $customer ? $this->clientSoaOpenInvoices($customer->id, $customer) : collect();
+        $invoices = $customer ? $this->clientSoaOpenInvoices($customer->id, $customer)->filter(function ($invoice) {
+            return $invoice->is_overdue;
+        })->values() : collect();
         $currencyTotals = $this->clientSoaCurrencyTotals($invoices);
         $overdueCurrencyTotals = array_fill_keys(array_keys($currencyTotals), 0);
         foreach ($this->clientSoaCurrencyTotals($invoices->filter(function ($invoice) {

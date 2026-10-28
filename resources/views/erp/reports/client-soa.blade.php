@@ -182,7 +182,7 @@
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 no-print">
         <div>
             <h1 class="h3 fw-bold mb-1">Statement of Account per Client</h1>
-            <p class="text-muted mb-0">Active unpaid invoices grouped into a printable client SOA.</p>
+            <p class="text-muted mb-0">Overdue unpaid invoices grouped into a printable client SOA.</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
             <a href="{{ route('erp.reports.index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Reports</a>
@@ -266,7 +266,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7" class="text-center text-muted py-4">No active unpaid invoices found.</td>
+                    <td colspan="7" class="text-center text-muted py-4">No overdue unpaid invoices found.</td>
                 </tr>
             @endforelse
             @for($i = 0; $i < $blankRows; $i++)
