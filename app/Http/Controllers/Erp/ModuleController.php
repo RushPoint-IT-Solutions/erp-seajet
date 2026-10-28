@@ -9813,7 +9813,9 @@ class ModuleController extends Controller
                     $forPaymentAmount
                 )
                 ->where('receipts.company_id', $this->defaultCompanyId())
-                ->when(!filter_var(request('show_voided'), FILTER_VALIDATE_BOOLEAN), function ($query) {
+                ->when(filter_var(request('show_voided'), FILTER_VALIDATE_BOOLEAN), function ($query) {
+                    $query->whereIn('receipts.status', ['voided', 'cancelled']);
+                }, function ($query) {
                     $query->whereNotIn('receipts.status', ['voided', 'cancelled']);
                 })
                 ->groupBy(

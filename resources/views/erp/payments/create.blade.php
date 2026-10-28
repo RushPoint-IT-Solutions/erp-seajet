@@ -60,11 +60,15 @@
     @endif
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
         <div>
-            <h1 class="h3 fw-bold mb-1">Payments</h1>
+            <h1 class="h3 fw-bold mb-1">{{ filter_var(request('show_voided'), FILTER_VALIDATE_BOOLEAN) ? 'Voided Payments' : 'Payments' }}</h1>
             <p class="text-muted mb-0">Receive customer payments, apply them to invoices, and generate receipts.</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
-            <a href="{{ route('erp.payments.create', ['show_voided' => 1]) }}" class="btn btn-outline-secondary">Show voided payments</a>
+            @if(filter_var(request('show_voided'), FILTER_VALIDATE_BOOLEAN))
+                <a href="{{ route('erp.payments.create') }}" class="btn btn-outline-secondary">Show active payments</a>
+            @else
+                <a href="{{ route('erp.payments.create', ['show_voided' => 1]) }}" class="btn btn-outline-secondary">Show voided payments</a>
+            @endif
             <a href="{{ route('erp.accounting.opening-balances.manual') }}" class="btn btn-outline-primary"><i class="bi bi-pencil-square me-1"></i> Manual Opening Balance</a>
             <a href="{{ route('erp.accounting.opening-balances.import') }}" class="btn btn-outline-primary"><i class="bi bi-upload me-1"></i> Import Invoices</a>
             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#paymentModal">

@@ -23,6 +23,48 @@ class ReceiptPrintAmountTest extends TestCase
         $this->withoutExceptionHandling();
     }
 
+    public function test_voided_payments_view_excludes_active_payments()
+    {
+        $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
+        $ids = [];
+        foreach (['posted', 'draft', 'voided', 'cancelled'] as $status) {
+            $ids[$status] = DB::table('receipts')->insertGetId([
+                'company_id' => $invoice->company_id,
+                'customer_id' => $invoice->customer_id,
+                'receipt_no' => 'FILTER-'.strtoupper($status),
+                'receipt_type' => 'collection_receipt',
+                'receipt_date' => '2026-10-28',
+                'payment_method' => 'Cash',
+                'currency' => 'PHP',
+                'exchange_rate' => 1,
+                'amount' => 100,
+                'status' => $status,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $this->get(route('erp.payments.create', ['show_voided' => 1]))->assertOk()
+            ->assertSee('Show active payments')
+            ->assertViewHas('payments', function ($payments) use ($ids) {
+                $rows = collect($payments);
+                return $rows->contains('id', $ids['voided']) && $rows->contains('id', $ids['cancelled'])
+                    && $rows->every(function ($payment) {
+                        return in_array($payment['status'], ['Voided', 'Cancelled'], true);
+                    });
+            });
+
+        foreach ([[], ['show_voided' => '0']] as $query) {
+            $this->get(route('erp.payments.create', $query))->assertOk()
+                ->assertSee('Show voided payments')
+                ->assertViewHas('payments', function ($payments) use ($ids) {
+                    $rows = collect($payments);
+                    return $rows->contains('id', $ids['posted']) && $rows->contains('id', $ids['draft'])
+                        && !$rows->contains('id', $ids['voided']) && !$rows->contains('id', $ids['cancelled']);
+                });
+        }
+    }
+
     public function test_payment_list_shows_the_recorded_receiving_bank()
     {
         $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
