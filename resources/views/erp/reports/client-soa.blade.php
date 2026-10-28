@@ -5,6 +5,7 @@
 
 @push('styles')
 <style>
+    @page { size: letter portrait; margin: 0; }
     .client-soa-sheet {
         position: relative;
         width: 215.9mm;
@@ -143,7 +144,6 @@
         color: transparent;
     }
     @media print {
-        @page { size: letter portrait; margin: 0; }
         html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
         .no-print, .erp-sidebar, .erp-topbar { display: none !important; }
         .erp-shell, .erp-main, .erp-content, main, section {
