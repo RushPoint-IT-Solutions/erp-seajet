@@ -1,7 +1,7 @@
 @extends('erp.layout')
 
-@section('title', 'Non-VAT Acknowledgement Report')
-@section('page-title', 'Non-VAT Acknowledgement Report')
+@section('title', 'Non-VAT Acknowledgement Receipt')
+@section('page-title', 'Non-VAT Acknowledgement Receipt')
 
 @push('styles')
 <style>
@@ -50,7 +50,6 @@
         z-index: 1;
     }
     .nonvat-header { text-align: center; margin-bottom: 12mm; }
-    .nonvat-title-rule { width: 24mm; border-top: .7mm solid var(--nonvat-accent); margin: 4mm auto 0; }
     .nonvat-header .receipt-adjustable-field {
         text-transform: uppercase;
         letter-spacing: 1.4px;
@@ -226,7 +225,7 @@
 
 @if(session('status'))<div class="alert alert-success nonvat-editor-note no-print">{{ session('status') }}</div>@endif
 @if($adjustLayout)
-    <div class="alert alert-info nonvat-editor-note no-print">Edit the report wording below. Select or drag any printable field to change its position, font, size, bold style, or visibility.</div>
+    <div class="alert alert-info nonvat-editor-note no-print">Edit the receipt wording below. Select or drag any printable field to change its position, font, size, bold style, or visibility.</div>
     <div class="erp-card p-3 mb-3 nonvat-content-editor no-print">
         <div class="row g-3">
             @foreach(['report_header' => 'Centered header', 'intro_text' => 'Introduction'] as $field => $label)

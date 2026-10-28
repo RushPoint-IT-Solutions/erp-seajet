@@ -10312,7 +10312,7 @@ class ModuleController extends Controller
                 ['label' => 'VAT Official Receipt', 'route' => route('erp.official-receipt.preview', array_merge($receiptQuery, ['tax_print' => 'vat'])), 'icon' => 'bi-receipt'],
                 ['label' => 'Non-VAT Official Receipt', 'route' => route('erp.official-receipt.preview', array_merge($receiptQuery, ['tax_print' => 'non_vat'])), 'icon' => 'bi-receipt'],
                 ['label' => 'VAT Acknowledgement Receipt', 'route' => route('erp.acknowledgement-receipt.preview', array_merge($receiptQuery, ['tax_print' => 'vat'])), 'icon' => 'bi-receipt-cutoff'],
-                ['label' => 'Non-VAT Acknowledgement Report', 'route' => route('erp.acknowledgement-receipt.preview', array_merge($receiptQuery, ['tax_print' => 'non_vat'])), 'icon' => 'bi-file-earmark-text'],
+                ['label' => 'Non-VAT Acknowledgement Receipt', 'route' => route('erp.acknowledgement-receipt.preview', array_merge($receiptQuery, ['tax_print' => 'non_vat'])), 'icon' => 'bi-file-earmark-text'],
         ];
         if ($paymentFor === 'bi') {
             $receiptDocuments = array_slice($receiptDocuments, 0, 2);
@@ -10794,6 +10794,7 @@ class ModuleController extends Controller
     private function nonVatAcknowledgementView(array $receipt, $sourceDocument = 'ar')
     {
         $receipt['amount'] = (float) ($receipt['collected_amount'] ?? $receipt['amount'] ?? 0);
+        $receipt['amount_words'] = $this->amountToWords($receipt['amount'], $receipt['currency'] ?? 'PHP');
 
         return view('erp.print.non-vat-acknowledgement-report', [
             'receipt' => $receipt,
@@ -10844,7 +10845,7 @@ class ModuleController extends Controller
                 'registered_name' => 'Registered name',
                 'business_address' => 'Business address',
                 'description' => 'Description',
-                'amount' => 'Transaction amount',
+                'amount' => 'Amount in words',
                 'total_amount' => 'Total paid amount',
                 'printed_by' => 'Printed by',
             ];
@@ -10962,7 +10963,7 @@ class ModuleController extends Controller
     private function receiptPrintContentDefaults()
     {
         return [
-            'report_header' => 'ACKNOWLEDGEMENT REPORT',
+            'report_header' => 'ACKNOWLEDGEMENT RECEIPT',
             'intro_text' => 'This is to acknowledge receipt of payment from:',
         ];
     }
@@ -10975,6 +10976,10 @@ class ModuleController extends Controller
 
         $saved = $this->savedReceiptPrintLayout($documentKind);
         $content = isset($saved['content']) && is_array($saved['content']) ? $saved['content'] : [];
+
+        if (strtoupper(trim((string) ($content['report_header'] ?? ''))) === 'ACKNOWLEDGEMENT REPORT') {
+            $content['report_header'] = 'ACKNOWLEDGEMENT RECEIPT';
+        }
 
         return array_merge($this->receiptPrintContentDefaults(), array_intersect_key($content, $this->receiptPrintContentDefaults()));
     }

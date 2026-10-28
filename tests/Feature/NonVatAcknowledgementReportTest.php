@@ -53,8 +53,13 @@ class NonVatAcknowledgementReportTest extends TestCase
 
         $this->get(route('erp.acknowledgement-receipt.preview', ['receipt_no' => 'NONVAT-AR-001']))
             ->assertOk()
-            ->assertSee('Non-VAT Acknowledgement Report')
-            ->assertSee('ACKNOWLEDGEMENT REPORT')
+            ->assertSee('Non-VAT Acknowledgement Receipt')
+            ->assertSee('ACKNOWLEDGEMENT RECEIPT')
+            ->assertDontSee('nonvat-title-rule')
+            ->assertSee('Amount in Words')
+            ->assertSee('One Hundred Sixty Pesos and 00/100 Only')
+            ->assertDontSee('>Amount Received<', false)
+            ->assertSeeInOrder(['Amount in Words', 'Total Amount Received', 'Payment Method', 'Cash'])
             ->assertSee('images/background.jpg')
             ->assertSee('class="nonvat-letterhead-background"', false)
             ->assertDontSee('class="nonvat-logo"', false)
@@ -86,7 +91,7 @@ class NonVatAcknowledgementReportTest extends TestCase
             'tax_print' => 'vat',
         ]))->assertOk()
             ->assertSee('Acknowledgement Receipt')
-            ->assertDontSee('Non-VAT Acknowledgement Report');
+            ->assertDontSee('Non-VAT Acknowledgement Receipt');
     }
 
     public function test_non_vat_content_and_layout_save_separately_from_existing_ar()
@@ -126,7 +131,7 @@ class NonVatAcknowledgementReportTest extends TestCase
 
         $this->get(route('erp.official-receipt.preview', ['tax_print' => 'non_vat']))
             ->assertOk()
-            ->assertSee('Non-VAT Acknowledgement Report')
+            ->assertSee('Non-VAT Acknowledgement Receipt')
             ->assertSee('aria-label="OR tax print type"', false);
 
         $this->get(route('erp.acknowledgement-receipt.preview', ['tax_print' => 'vat']))
@@ -136,7 +141,7 @@ class NonVatAcknowledgementReportTest extends TestCase
 
         $this->get(route('erp.acknowledgement-receipt.preview', ['tax_print' => 'non_vat']))
             ->assertOk()
-            ->assertSee('Non-VAT Acknowledgement Report')
+            ->assertSee('Non-VAT Acknowledgement Receipt')
             ->assertSee('aria-label="AR tax print type"', false);
     }
 }
