@@ -11699,8 +11699,14 @@ class ModuleController extends Controller
 
         $asOfDate = request('as_of', date('Y-m-d'));
         request()->validate(['as_of' => 'nullable|date_format:Y-m-d']);
-        $invoices = $customer ? $this->clientSoaOpenInvoices($customer->id) : collect();
+        $invoices = $customer ? $this->clientSoaOpenInvoices($customer->id, $customer) : collect();
         $currencyTotals = $this->clientSoaCurrencyTotals($invoices);
+        $overdueCurrencyTotals = array_fill_keys(array_keys($currencyTotals), 0);
+        foreach ($this->clientSoaCurrencyTotals($invoices->filter(function ($invoice) {
+            return $invoice->is_overdue;
+        })) as $currency => $amount) {
+            $overdueCurrencyTotals[$currency] = $amount;
+        }
         $soaNo = 'SOA-'.date('Ymd').'-'.str_pad((string) ($customer->id ?? 0), 4, '0', STR_PAD_LEFT);
         $bankDetails = [
             'ACCOUNT NAME: SEA-JET INTERNATIONAL FORWARDERS, INC.',
@@ -11709,7 +11715,7 @@ class ModuleController extends Controller
             'BRANCH: STO. NIÑO PARAÑAQUE CITY',
         ];
 
-        return view('erp.reports.client-soa', compact('company', 'customers', 'customerId', 'customer', 'invoices', 'currencyTotals', 'asOfDate', 'soaNo', 'bankDetails'));
+        return view('erp.reports.client-soa', compact('company', 'customers', 'customerId', 'customer', 'invoices', 'currencyTotals', 'overdueCurrencyTotals', 'asOfDate', 'soaNo', 'bankDetails'));
     }
 
     private function clientSoaCustomerOptions()
@@ -11731,7 +11737,7 @@ class ModuleController extends Controller
             ->get();
     }
 
-    private function clientSoaOpenInvoices($customerId)
+    private function clientSoaOpenInvoices($customerId, $customer)
     {
         if (!Schema::hasTable('sales_documents')) {
             return collect();
@@ -11748,9 +11754,16 @@ class ModuleController extends Controller
             ->orderBy('document_date')
             ->orderBy('id')
             ->get()
-            ->map(function ($invoice) {
+            ->map(function ($invoice) use ($customer) {
                 $amounts = $this->paymentInvoiceAmounts($invoice);
                 $invoicePayable = max(0, $amounts['bi_balance'] - $amounts['cwt_balance']);
+                $dueDate = $invoice->due_date;
+                if (!$dueDate && $invoice->document_date) {
+                    $termDays = (int) ($invoice->credit_term_days ?: ($customer->credit_term_days ?: $this->paymentTermDays($customer->payment_terms ?? '')));
+                    $dueDate = \Carbon\Carbon::parse($invoice->document_date)->addDays($termDays)->toDateString();
+                }
+                $isOverdue = $dueDate && \Carbon\Carbon::parse($dueDate)->startOfDay()
+                    ->lt(\Carbon\Carbon::parse(request('as_of', date('Y-m-d')))->startOfDay());
 
                 return (object) [
                     'source_id' => $invoice->id,
@@ -11762,7 +11775,8 @@ class ModuleController extends Controller
                     'soa_amount' => $amounts['soa_balance'],
                     'total' => $invoicePayable + $amounts['soa_balance'],
                     'aging' => $this->clientSoaAgingLabel($invoice->document_date),
-                    'due_date' => $invoice->due_date,
+                    'due_date' => $dueDate,
+                    'is_overdue' => (bool) $isOverdue,
                     'pair_key' => $invoice->opening_balance_control_account_id
                         ? implode('|', [
                             $invoice->document_date,

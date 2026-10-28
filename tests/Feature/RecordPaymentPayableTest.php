@@ -259,6 +259,53 @@ class RecordPaymentPayableTest extends TestCase
         );
     }
 
+    public function test_client_soa_overdue_total_respects_due_dates_and_payment_terms()
+    {
+        $source = (array) DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
+        DB::table('sales_documents')->where('id', $source['id'])->update(['status' => 'voided']);
+        DB::table('customers')->where('id', $source['customer_id'])->update([
+            'payment_terms' => '30 Days', 'credit_term_days' => 30,
+        ]);
+        unset($source['id']);
+
+        foreach ([
+            ['number' => 'BI-CURRENT', 'date' => '2026-10-16', 'due' => null],
+            ['number' => 'BI-OVERDUE', 'date' => '2026-09-16', 'due' => null],
+            ['number' => 'BI-EXPLICIT', 'date' => '2026-10-16', 'due' => '2026-10-20'],
+        ] as $item) {
+            DB::table('sales_documents')->insert(array_merge($source, [
+                'document_no' => $item['number'], 'document_date' => $item['date'],
+                'due_date' => $item['due'], 'credit_term_days' => 0,
+                'status' => 'posted', 'paid_total' => 0,
+            ]));
+        }
+
+        $response = $this->get(route('erp.reports.client-soa', [
+            'customer_id' => $source['customer_id'], 'as_of' => '2026-10-21',
+        ]))->assertOk();
+        $data = $response->original->getData();
+        $rows = $data['invoices']->keyBy('document_no');
+
+        $this->assertFalse($rows['BI-CURRENT']->is_overdue);
+        $this->assertSame('2026-11-15', $rows['BI-CURRENT']->due_date);
+        $this->assertTrue($rows['BI-OVERDUE']->is_overdue);
+        $this->assertTrue($rows['BI-EXPLICIT']->is_overdue);
+        $this->assertEquals(
+            $rows['BI-OVERDUE']->total + $rows['BI-EXPLICIT']->total,
+            $data['overdueCurrencyTotals'][$rows['BI-CURRENT']->currency]
+        );
+
+        $onDueDate = $this->get(route('erp.reports.client-soa', [
+            'customer_id' => $source['customer_id'], 'as_of' => '2026-11-15',
+        ]))->assertOk()->original->getData();
+        $this->assertFalse($onDueDate['invoices']->keyBy('document_no')['BI-CURRENT']->is_overdue);
+
+        $afterDueDate = $this->get(route('erp.reports.client-soa', [
+            'customer_id' => $source['customer_id'], 'as_of' => '2026-11-16',
+        ]))->assertOk()->original->getData();
+        $this->assertTrue($afterDueDate['invoices']->keyBy('document_no')['BI-CURRENT']->is_overdue);
+    }
+
     public function test_overpayment_shows_a_warning_and_cannot_be_saved()
     {
         $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();

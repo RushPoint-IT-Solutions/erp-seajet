@@ -305,7 +305,7 @@
         @if($pageIndex === $pages->count() - 1)
         <div class="client-soa-overdue">
             <div class="client-soa-overdue-title">OVERDUE ACCOUNTS</div>
-            @forelse($currencyTotals as $currency => $amount)
+            @forelse($overdueCurrencyTotals as $currency => $amount)
                 <div class="client-soa-overdue-row">
                     <strong>{{ $currency }}</strong>
                     <span class="text-end">{{ $money($amount) }}</span>
