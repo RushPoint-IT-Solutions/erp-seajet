@@ -286,26 +286,31 @@ class RecordPaymentPayableTest extends TestCase
         $data = $response->original->getData();
         $rows = $data['invoices']->keyBy('document_no');
 
-        $this->assertFalse($rows->has('BI-CURRENT'));
-        $response->assertDontSee('BI-CURRENT');
+        $this->assertFalse($rows['BI-CURRENT']->is_overdue);
+        $this->assertSame('2026-11-15', $rows['BI-CURRENT']->due_date);
+        $response->assertSee('BI-CURRENT');
+        $response->assertSee('<td class="">5 Days</td>', false);
+        $response->assertSee('<td class="aging-overdue">35 Days</td>', false);
         $this->assertTrue($rows['BI-OVERDUE']->is_overdue);
         $this->assertTrue($rows['BI-EXPLICIT']->is_overdue);
         $this->assertEquals(
             $rows['BI-OVERDUE']->total + $rows['BI-EXPLICIT']->total,
-            $data['overdueCurrencyTotals'][$rows['BI-OVERDUE']->currency]
+            $data['overdueCurrencyTotals'][$rows['BI-CURRENT']->currency]
         );
-        $this->assertEquals($data['currencyTotals'], $data['overdueCurrencyTotals']);
+        $this->assertEquals(
+            $rows['BI-CURRENT']->total + $data['overdueCurrencyTotals'][$rows['BI-CURRENT']->currency],
+            $data['currencyTotals'][$rows['BI-CURRENT']->currency]
+        );
 
         $onDueDate = $this->get(route('erp.reports.client-soa', [
             'customer_id' => $source['customer_id'], 'as_of' => '2026-11-15',
         ]))->assertOk()->original->getData();
-        $this->assertFalse($onDueDate['invoices']->keyBy('document_no')->has('BI-CURRENT'));
+        $this->assertFalse($onDueDate['invoices']->keyBy('document_no')['BI-CURRENT']->is_overdue);
 
         $afterDueDate = $this->get(route('erp.reports.client-soa', [
             'customer_id' => $source['customer_id'], 'as_of' => '2026-11-16',
         ]))->assertOk()->original->getData();
         $this->assertTrue($afterDueDate['invoices']->keyBy('document_no')['BI-CURRENT']->is_overdue);
-        $this->assertSame('2026-11-15', $afterDueDate['invoices']->keyBy('document_no')['BI-CURRENT']->due_date);
     }
 
     public function test_overpayment_shows_a_warning_and_cannot_be_saved()
