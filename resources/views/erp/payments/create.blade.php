@@ -100,7 +100,7 @@
         <div class="payments-toolbar mb-3">
             <div class="payments-search">
                 <i class="bi bi-search"></i>
-                <input type="search" class="form-control" id="paymentSearch" placeholder="Search payments, clients, invoices">
+                <input type="search" class="form-control" id="paymentSearch" placeholder="Search payments, clients, invoices, banks">
             </div>
             <div class="d-flex flex-wrap gap-2">
                 <select class="form-select" id="statusFilter" style="width: 150px">
@@ -131,6 +131,7 @@
                     <th class="client-cell">Client</th>
                     <th>BI / SOA Reference</th>
                     <th>Method</th>
+                    <th>Receiving Bank</th>
                     <th>Reference</th>
                     <th>Date</th>
                     <th class="text-end">For Payment</th>
@@ -167,6 +168,12 @@
                         <td class="client-cell">{{ $payment['client'] }}</td>
                         <td>{{ $payment['document_reference'] ?: '-' }}</td>
                         <td>{{ $payment['payment_method'] ?: '-' }}</td>
+                        <td>
+                            {{ $payment['receiving_bank'] ?: '-' }}
+                            @if($payment['receiving_account'])
+                                <div class="small text-muted">{{ $payment['receiving_account'] }}</div>
+                            @endif
+                        </td>
                         <td>{{ $payment['reference_no'] ?: '-' }}</td>
                         <td>{{ $payment['date'] ? \Carbon\Carbon::parse($payment['date'])->format('d/M/Y') : '-' }}</td>
                         <td class="text-end">{{ $payment['currency'] === 'PHP' ? 'PHP' : $payment['currency'] }} {{ $payment['for_payment'] }}</td>
@@ -213,7 +220,7 @@
                 @endforeach
                 @if(count($payments) === 0)
                     <tr>
-                        <td colspan="11" class="text-center text-muted py-5">No payment records found.</td>
+                        <td colspan="12" class="text-center text-muted py-5">No payment records found.</td>
                     </tr>
                 @endif
                 </tbody>

@@ -23,6 +23,48 @@ class ReceiptPrintAmountTest extends TestCase
         $this->withoutExceptionHandling();
     }
 
+    public function test_payment_list_shows_the_recorded_receiving_bank()
+    {
+        $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
+        $bank = DB::table('bank_accounts')->where('company_id', $invoice->company_id)->first();
+        $this->assertNotNull($bank);
+        DB::table('bank_accounts')->where('id', $bank->id)->update([
+            'bank_name' => 'Receiving Test Bank',
+            'account_name' => 'Customer Collections Account',
+        ]);
+        $receiptId = DB::table('receipts')->insertGetId([
+            'company_id' => $invoice->company_id,
+            'customer_id' => $invoice->customer_id,
+            'bank_account_id' => $bank->id,
+            'receipt_no' => 'BANK-DISPLAY-001',
+            'receipt_type' => 'collection_receipt',
+            'receipt_date' => '2026-09-11',
+            'payment_method' => 'Bank Transfer',
+            'currency' => 'PHP',
+            'exchange_rate' => 1,
+            'amount' => 162,
+            'status' => 'posted',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->get(route('erp.payments.create'))->assertOk()
+            ->assertSee('Receiving Bank')
+            ->assertViewHas('payments', function ($payments) use ($receiptId) {
+                $payment = collect($payments)->firstWhere('id', $receiptId);
+                return $payment && $payment['receiving_bank'] === 'Receiving Test Bank'
+                    && $payment['receiving_account'] === 'Customer Collections Account'
+                    && $payment['amount'] === '162.00';
+            });
+
+        DB::table('receipts')->where('id', $receiptId)->update(['bank_account_id' => null]);
+        $this->get(route('erp.payments.create'))->assertOk()
+            ->assertViewHas('payments', function ($payments) use ($receiptId) {
+                $payment = collect($payments)->firstWhere('id', $receiptId);
+                return $payment && $payment['receiving_bank'] === '' && $payment['receiving_account'] === '';
+            });
+    }
+
     public function test_receipts_print_only_the_amount_for_their_document_type()
     {
         $invoice = DB::table('sales_documents')

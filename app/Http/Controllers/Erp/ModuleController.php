@@ -9786,6 +9786,10 @@ class ModuleController extends Controller
 
             return DB::table('receipts')
                 ->leftJoin('customers', 'customers.id', '=', 'receipts.customer_id')
+                ->leftJoin('bank_accounts as receiving_bank', function ($join) {
+                    $join->on('receiving_bank.id', '=', 'receipts.bank_account_id')
+                        ->on('receiving_bank.company_id', '=', 'receipts.company_id');
+                })
                 ->leftJoin('receipt_applications', 'receipt_applications.receipt_id', '=', 'receipts.id')
                 ->leftJoin('sales_documents', 'sales_documents.id', '=', 'receipt_applications.sales_document_id')
                 ->leftJoinSub($firstApplications, 'first_application', 'first_application.first_id', '=', 'receipt_applications.id')
@@ -9799,6 +9803,8 @@ class ModuleController extends Controller
                     'receipts.payment_method',
                     'receipts.reference_no',
                     'customers.name as customer_name',
+                    DB::raw('MAX(receiving_bank.bank_name) as receiving_bank_name'),
+                    DB::raw('MAX(receiving_bank.account_name) as receiving_account_name'),
                     DB::raw("MAX(CASE WHEN receipt_applications.component = 'bi' THEN 1 ELSE 0 END) as has_bi"),
                     DB::raw("MAX(CASE WHEN receipt_applications.component = 'soa' THEN 1 ELSE 0 END) as has_soa"),
                     DB::raw('MAX(CASE WHEN receipt_applications.component IS NULL THEN 1 ELSE 0 END) as has_legacy'),
@@ -9841,6 +9847,8 @@ class ModuleController extends Controller
                         'paid_for' => $payment->has_bi && !$payment->has_soa ? 'BI' : ($payment->has_soa && !$payment->has_bi ? 'SOA' : 'Legacy'),
                         'date' => $payment->receipt_date,
                         'payment_method' => $payment->payment_method,
+                        'receiving_bank' => $payment->receiving_bank_name ?: '',
+                        'receiving_account' => $payment->receiving_account_name ?: '',
                         'reference_no' => $payment->reference_no,
                         'can_print_or' => (bool) ($payment->has_bi || $payment->has_legacy),
                         'can_print_ar' => (bool) ($payment->has_soa || $payment->has_legacy),
