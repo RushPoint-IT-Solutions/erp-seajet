@@ -13959,7 +13959,9 @@ class ModuleController extends Controller
                     return $invoices->sum(function ($invoice) use ($index) { return $invoice['buckets'][$index]; });
                 }, range(0, 3)),
             ];
-        })->sortByDesc('balance');
+        })->sortBy(function ($company) {
+            return trim($company['name']).'|'.$company['currency'];
+        }, SORT_NATURAL | SORT_FLAG_CASE);
         $currencyTotals = collect($rows)->groupBy('currency')->map(function ($invoices) {
             return [
                 'balance' => $invoices->sum('balance'),

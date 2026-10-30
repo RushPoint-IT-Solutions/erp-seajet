@@ -112,7 +112,7 @@
                         </tr>
                         </thead>
                         <tbody>
-                        @forelse($invoices as $invoice)
+                        @foreach($invoices as $invoice)
                             <tr>
                                 <td>{{ $invoice->document_date }}</td>
                                 <td class="fw-semibold">{{ $invoice->document_no }}</td>
@@ -138,11 +138,7 @@
                                     @endif
                                 </td>
                             </tr>
-                        @empty
-                            <tr>
-                                <td colspan="10" class="text-center text-muted py-4">No invoice history found for this client.</td>
-                            </tr>
-                        @endforelse
+                        @endforeach
                         </tbody>
                     </table>
                 </div>
@@ -157,7 +153,11 @@
         pageLength: 10,
         lengthChange: false,
         order: [[0, 'desc']],
-        language: { search: '', searchPlaceholder: 'Search invoices' }
+        language: {
+            search: '',
+            searchPlaceholder: 'Search invoices',
+            emptyTable: 'No invoice history found for this client.'
+        }
     });
 </script>
 @endpush
