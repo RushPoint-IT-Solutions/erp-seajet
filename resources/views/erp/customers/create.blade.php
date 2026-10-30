@@ -59,7 +59,7 @@
             <div class="col-md-3">
                 <label class="form-label">Credit Terms</label>
                 <select name="payment_terms" class="form-select erp-select">
-                    @foreach(['30 Days', '60 Days', '90 Days'] as $option)
+                    @foreach(['COD', 'No terms', '30 Days', '60 Days', '90 Days'] as $option)
                         <option value="{{ $option }}" {{ old('payment_terms', $isEdit ? $customer->payment_terms : '30 Days') === $option ? 'selected' : '' }}>{{ $option }}</option>
                     @endforeach
                 </select>

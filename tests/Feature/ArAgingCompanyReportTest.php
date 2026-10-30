@@ -14,6 +14,7 @@ class ArAgingCompanyReportTest extends TestCase
         config(['database.default' => 'sqlite', 'database.connections.sqlite.database' => ':memory:']);
         DB::purge('sqlite');
         Artisan::call('migrate:fresh', ['--seed' => true]);
+        $this->seed(\BillingReimbursementSampleSeeder::class);
         $this->actingAsAdmin();
         $this->withoutExceptionHandling();
     }
@@ -32,6 +33,7 @@ class ArAgingCompanyReportTest extends TestCase
                 'due_date' => '2026-12-31',
                 'currency' => 'PHP', 'status' => 'posted', 'class_code' => 'CEBU',
                 'grand_total' => 150, 'paid_total' => 50, 'balance_due' => 100,
+                'invoice_amount' => 150, 'freight_total' => 0, 'withholding_tax_amount' => 0,
             ]);
             DB::table('sales_documents')->insert($invoice);
         }
@@ -56,5 +58,28 @@ class ArAgingCompanyReportTest extends TestCase
             });
         $this->get(route('erp.customer-billing.aging', ['as_of' => '2026-10-28', 'class' => 'MANILA']))
             ->assertOk()->assertSee('No unpaid active invoices found');
+    }
+
+    public function test_aging_deducts_withholding_from_invoice_amount_and_outstanding_balance()
+    {
+        $original = (array) DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
+        unset($original['id']);
+        DB::table('sales_documents')->update(['status' => 'voided']);
+        foreach ([0, 50, 140] as $paid) {
+            DB::table('sales_documents')->insert(array_merge($original, [
+                'document_no' => 'AGING-WHT-'.$paid, 'document_type' => 'billing_invoice',
+                'document_date' => '2026-10-01', 'due_date' => '2026-10-31',
+                'currency' => 'PHP', 'status' => 'posted', 'grand_total' => 150,
+                'invoice_amount' => 150, 'freight_total' => 0, 'withholding_tax_amount' => 10,
+                'paid_total' => $paid, 'balance_due' => 150 - $paid,
+            ]));
+        }
+        $this->get(route('erp.customer-billing.aging', ['as_of' => '2026-10-28']))
+            ->assertOk()->assertDontSee('AGING-WHT-140')
+            ->assertViewHas('companies', function ($companies) {
+                $company = $companies->first();
+                return $company['due'] == 280 && $company['paid'] == 50
+                    && $company['balance'] == 230 && $company['buckets'] === [230.0, 0, 0, 0];
+            });
     }
 }

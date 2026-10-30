@@ -13981,7 +13981,7 @@ class ModuleController extends Controller
         $balanceExpression = $this->salesDocumentBalanceExpression();
         $asOf = $filters['as_of'] ?: date('Y-m-d');
 
-        return DB::table('sales_documents')
+        $invoices = DB::table('sales_documents')
             ->leftJoin('customers', 'customers.id', '=', 'sales_documents.customer_id')
             ->select(
                 'customers.customer_id',
@@ -13995,6 +13995,10 @@ class ModuleController extends Controller
                 'sales_documents.shipment_reference',
                 'sales_documents.currency',
                 'sales_documents.grand_total',
+                'sales_documents.invoice_amount',
+                'sales_documents.freight_total',
+                'sales_documents.document_type',
+                'sales_documents.withholding_tax_amount',
                 'sales_documents.paid_total',
                 'sales_documents.balance_due',
                 'sales_documents.due_date',
@@ -14025,9 +14029,24 @@ class ModuleController extends Controller
             ->orderBy('sales_documents.due_date')
             ->orderBy('customers.name')
             ->orderBy('sales_documents.id')
-            ->get()
-            ->map(function ($invoice) use ($asOf, $companyReport) {
-                $balance = $this->salesDocumentBalance($invoice);
+            ->get();
+
+        $appliedCwt = collect();
+        if (Schema::hasTable('receipt_applications') && Schema::hasTable('receipts') && Schema::hasColumn('receipts', 'cwt_amount')) {
+            $appliedCwt = DB::table('receipt_applications')
+                ->join('receipts', 'receipts.id', '=', 'receipt_applications.receipt_id')
+                ->whereIn('receipt_applications.sales_document_id', $invoices->pluck('id')->all())
+                ->whereNotIn('receipts.status', ['cancelled', 'voided'])
+                ->select('receipt_applications.sales_document_id', 'receipts.id as receipt_id', 'receipts.cwt_amount')
+                ->distinct()->get()->groupBy('sales_document_id')
+                ->map(function ($rows) { return $rows->sum('cwt_amount'); });
+        }
+
+        return $invoices->map(function ($invoice) use ($asOf, $companyReport, $appliedCwt) {
+                $amounts = $this->paymentInvoiceAmounts($invoice, (float) $appliedCwt->get($invoice->id, 0));
+                $balance = $amounts['cash_balance'];
+                $due = max(0, $amounts['invoice_total'] - max(0, (float) $invoice->withholding_tax_amount));
+                $paid = max(0, $due - $balance);
                 if ($companyReport) {
                     $age = max(0, \Carbon\Carbon::parse($invoice->document_date)->diffInDays(\Carbon\Carbon::parse($asOf), false));
                     $bucket = $age <= 30 ? 0 : ($age <= 60 ? 1 : ($age <= 90 ? 2 : 3));
@@ -14040,8 +14059,8 @@ class ModuleController extends Controller
                         'number' => $invoice->document_no,
                         'date' => $invoice->document_date,
                         'currency' => $invoice->currency ?: 'PHP',
-                        'due' => $balance + (float) $invoice->paid_total,
-                        'paid' => (float) $invoice->paid_total,
+                        'due' => $due,
+                        'paid' => $paid,
                         'balance' => $balance,
                         'buckets' => $buckets,
                     ];
@@ -14066,7 +14085,9 @@ class ModuleController extends Controller
                     $ninety,
                 ];
             })
-            ->all();
+            ->filter(function ($row) use ($companyReport) {
+                return $companyReport ? $row['balance'] > 0 : array_sum(array_slice($row, 7)) > 0;
+            })->values()->all();
     }
 
     private function agingReportSummary(array $rows)
