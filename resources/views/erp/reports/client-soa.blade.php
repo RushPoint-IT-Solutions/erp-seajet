@@ -11,7 +11,7 @@
         width: 215.9mm;
         min-height: 279.4mm;
         margin: 0 auto;
-        padding: 46mm 25mm 39mm;
+        padding: 33mm 25mm 39mm;
         background: #fff;
         color: #000;
         border: 1px solid #d8dde6;
@@ -38,18 +38,17 @@
     }
     .client-soa-to {
         display: grid;
-        transform: translateY(-5mm);
         grid-template-columns: 9mm minmax(0, 1fr);
         gap: 6px;
-        min-height: 21mm;
-        margin-top: 2px;
+        min-height: 12mm;
+        margin-top: 0;
         margin-bottom: 0;
         font-size: 9pt;
         line-height: 11pt;
     }
     .client-soa-title {
         text-align: center;
-        margin: 0 0 7mm;
+        margin: 0 0 3mm;
         font-weight: 700;
         letter-spacing: .02em;
     }
@@ -67,6 +66,7 @@
     }
     .client-soa-table {
         width: 100%;
+        height: 138mm;
         border-collapse: collapse;
         table-layout: fixed;
         font-size: 9pt;
@@ -76,7 +76,7 @@
     .client-soa-table th,
     .client-soa-table td {
         border: 1px solid #000;
-        height: 7.8mm;
+        height: 6mm;
         padding: 1px 4px;
         vertical-align: middle;
     }
@@ -94,9 +94,10 @@
     }
     .client-soa-table tfoot td {
         font-weight: 700;
+        height: 6mm;
     }
     .client-soa-bank {
-        margin-top: 12px;
+        margin-top: 6px;
         margin-left: 0;
         font-size: 9pt;
         font-weight: 400;
@@ -107,7 +108,7 @@
         margin-bottom: 0;
     }
     .client-soa-overdue {
-        margin-top: 12px;
+        margin-top: 6px;
         width: 236px;
         font-size: 10pt;
         line-height: 15.75pt;
@@ -126,9 +127,6 @@
     }
     .client-soa-page-number { position: absolute !important; right: 25mm; bottom: 43mm; font-size: 8pt; }
     .client-soa-preview { overflow-x: auto; }
-    .client-soa-empty-row td {
-        color: transparent;
-    }
     @media print {
         html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
         .no-print, .erp-sidebar, .erp-topbar { display: none !important; }
@@ -145,7 +143,7 @@
             min-height: 279.4mm;
             height: 279.4mm;
             margin: 0 !important;
-            padding-top: 46mm;
+            padding-top: 33mm;
             background: #fff !important;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
@@ -164,7 +162,7 @@
     };
     $totalBalance = array_sum($currencyTotals);
     $invoiceRows = $invoices->count();
-    $pages = $invoices->isEmpty() ? collect([collect()]) : $invoices->chunk(12);
+    $pages = $invoices->isEmpty() ? collect([collect()]) : $invoices->chunk(20);
 @endphp
 
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 no-print">
@@ -202,7 +200,6 @@
 
     <div class="client-soa-preview">
     @foreach($pages as $pageIndex => $pageInvoices)
-    @php $blankRows = max(0, 12 - max(1, $pageInvoices->count())); @endphp
     <div class="client-soa-sheet">
         <img src="{{ asset('images/soa-client-letterhead.png') }}" class="client-soa-letterhead" alt="" aria-hidden="true">
 
@@ -256,17 +253,6 @@
                     <td colspan="7" class="text-center text-muted py-4">No active unpaid invoices found.</td>
                 </tr>
             @endforelse
-            @for($i = 0; $i < $blankRows; $i++)
-                <tr class="client-soa-empty-row">
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
-                </tr>
-            @endfor
             </tbody>
             @if($pageIndex === $pages->count() - 1)
             <tfoot>
