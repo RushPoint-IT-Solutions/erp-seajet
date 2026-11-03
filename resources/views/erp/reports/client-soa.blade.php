@@ -66,7 +66,6 @@
     }
     .client-soa-table {
         width: 100%;
-        height: 138mm;
         border-collapse: collapse;
         table-layout: fixed;
         font-size: 9pt;
@@ -250,9 +249,20 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7" class="text-center text-muted py-4">No active unpaid invoices found.</td>
+                    <td colspan="7" class="text-center text-muted">No active unpaid invoices found.</td>
                 </tr>
             @endforelse
+            @for($i = max(1, $pageInvoices->count()); $i < 20; $i++)
+                <tr aria-hidden="true">
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                </tr>
+            @endfor
             </tbody>
             @if($pageIndex === $pages->count() - 1)
             <tfoot>
