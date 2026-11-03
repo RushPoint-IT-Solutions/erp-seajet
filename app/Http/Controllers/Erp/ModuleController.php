@@ -11769,13 +11769,15 @@ class ModuleController extends Controller
             ->map(function ($invoice) use ($customer) {
                 $amounts = $this->paymentInvoiceAmounts($invoice);
                 $invoicePayable = max(0, $amounts['bi_balance'] - $amounts['cwt_balance']);
-                $dueDate = $invoice->due_date;
+                $immediateTerms = in_array(strtolower(trim((string) ($customer->payment_terms ?? ''))), ['no terms', 'cod'], true);
+                $dueDate = $immediateTerms ? $invoice->document_date : $invoice->due_date;
                 if (!$dueDate && $invoice->document_date) {
                     $termDays = (int) ($invoice->credit_term_days ?: ($customer->credit_term_days ?: $this->paymentTermDays($customer->payment_terms ?? '')));
                     $dueDate = \Carbon\Carbon::parse($invoice->document_date)->addDays($termDays)->toDateString();
                 }
-                $isOverdue = $dueDate && \Carbon\Carbon::parse($dueDate)->startOfDay()
-                    ->lt(\Carbon\Carbon::parse(request('as_of', date('Y-m-d')))->startOfDay());
+                $isOverdue = $dueDate && ($immediateTerms
+                    ? \Carbon\Carbon::parse($dueDate)->startOfDay()->lte(\Carbon\Carbon::parse(request('as_of', date('Y-m-d')))->startOfDay())
+                    : \Carbon\Carbon::parse($dueDate)->startOfDay()->lt(\Carbon\Carbon::parse(request('as_of', date('Y-m-d')))->startOfDay()));
 
                 return (object) [
                     'source_id' => $invoice->id,

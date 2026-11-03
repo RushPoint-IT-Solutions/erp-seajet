@@ -315,6 +315,35 @@ class RecordPaymentPayableTest extends TestCase
         $this->assertTrue($afterDueDate['invoices']->keyBy('document_no')['BI-CURRENT']->is_overdue);
     }
 
+    public function test_client_soa_treats_no_terms_and_cod_as_due_on_invoice_date_despite_saved_credit_due_date()
+    {
+        $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
+        DB::table('sales_documents')->where('id', $invoice->id)->update([
+            'document_date' => '2026-10-07',
+            'due_date' => '2026-11-06',
+            'credit_term_days' => 30,
+            'status' => 'posted',
+        ]);
+
+        foreach (['No terms', 'COD'] as $terms) {
+            DB::table('customers')->where('id', $invoice->customer_id)->update([
+                'payment_terms' => $terms,
+                'credit_term_days' => 0,
+            ]);
+
+            $data = $this->get(route('erp.reports.client-soa', [
+                'customer_id' => $invoice->customer_id,
+                'as_of' => '2026-10-07',
+            ]))->assertOk()->original->getData();
+            $row = $data['invoices']->firstWhere('document_no', $invoice->document_no);
+
+            $this->assertNotNull($row);
+            $this->assertSame('2026-10-07', $row->due_date);
+            $this->assertTrue($row->is_overdue);
+            $this->assertEquals($row->total, $data['overdueCurrencyTotals'][$row->currency]);
+        }
+    }
+
     public function test_overpayment_shows_a_warning_and_cannot_be_saved()
     {
         $invoice = DB::table('sales_documents')->where('document_no', 'BI-2026-REIMB')->first();
