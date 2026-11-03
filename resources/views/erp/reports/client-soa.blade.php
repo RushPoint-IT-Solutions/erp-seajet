@@ -11,8 +11,8 @@
         width: 215.9mm;
         min-height: 279.4mm;
         margin: 0 auto;
-        padding: 51mm 25mm 39mm;
-        background: #fff url('{{ asset('images/background.jpg') }}') center / 100% 100% no-repeat;
+        padding: 46mm 25mm 39mm;
+        background: #fff;
         color: #000;
         border: 1px solid #d8dde6;
         box-shadow: 0 14px 36px rgba(15, 23, 42, .08);
@@ -36,16 +36,10 @@
         position: relative;
         z-index: 1;
     }
-    .client-soa-sheet::before {
-        content: '';
-        position: absolute;
-        inset: 40.5mm 0 55mm;
-        background: #fff;
-        z-index: 1;
-    }
     .client-soa-to {
         display: grid;
-        grid-template-columns: 9mm minmax(0, 1fr) 45mm;
+        transform: translateY(-5mm);
+        grid-template-columns: 9mm minmax(0, 1fr);
         gap: 6px;
         min-height: 21mm;
         margin-top: 2px;
@@ -53,15 +47,6 @@
         font-size: 9pt;
         line-height: 11pt;
     }
-    .client-soa-date-box {
-        align-self: center;
-        display: flex;
-        gap: 5mm;
-        text-align: center;
-        padding-bottom: 2px;
-        font-weight: 700;
-    }
-    .client-soa-date-box span { flex: 1; border-bottom: 1px solid #000; }
     .client-soa-title {
         text-align: center;
         margin: 0 0 7mm;
@@ -133,10 +118,11 @@
     }
     .client-soa-overdue-row {
         display: grid;
-        grid-template-columns: 74px 1fr;
+        grid-template-columns: 34px max-content;
         gap: 10px;
         min-height: 15.75pt;
         padding: 0;
+        font-weight: 700;
     }
     .client-soa-page-number { position: absolute !important; right: 25mm; bottom: 43mm; font-size: 8pt; }
     .client-soa-preview { overflow-x: auto; }
@@ -159,12 +145,11 @@
             min-height: 279.4mm;
             height: 279.4mm;
             margin: 0 !important;
-            padding-top: 51mm;
-            background: #fff url('{{ asset('images/background.jpg') }}') center / 100% 100% no-repeat !important;
+            padding-top: 46mm;
+            background: #fff !important;
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
         }
-        .client-soa-sheet::before { inset: 40.5mm 0 55mm; }
         .client-soa-sheet { break-after: page; page-break-after: always; }
         .client-soa-sheet:last-child { break-after: auto; page-break-after: auto; }
         .client-soa-preview { overflow: visible; }
@@ -219,7 +204,7 @@
     @foreach($pages as $pageIndex => $pageInvoices)
     @php $blankRows = max(0, 12 - max(1, $pageInvoices->count())); @endphp
     <div class="client-soa-sheet">
-        <img src="{{ asset('images/background.jpg') }}" class="client-soa-letterhead" alt="" aria-hidden="true">
+        <img src="{{ asset('images/soa-client-letterhead.png') }}" class="client-soa-letterhead" alt="" aria-hidden="true">
 
         <div class="client-soa-to">
             <strong>TO:</strong>
@@ -227,7 +212,6 @@
                 <strong>{{ $customer->name ?? 'No client with unpaid active invoices' }}</strong><br>
                 {!! nl2br(e($customer->billing_address ?? '')) !!}
             </div>
-            <div class="client-soa-date-box"><strong>DATE:</strong><span>{{ date('j-M-y', strtotime($asOfDate)) }}</span></div>
         </div>
 
         <div class="client-soa-title">
