@@ -108,8 +108,8 @@
         </div>
         <div class="d-flex flex-wrap gap-2">
             <a href="{{ route('erp.reports.index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Reports</a>
-            <a href="{{ route('erp.reports.workbook-excel', ['report' => $report, 'period' => $period]) }}" class="btn btn-success"><i class="bi bi-file-earmark-excel me-1"></i>Download Excel</a>
-            <a href="{{ route('erp.reports.workbook-excel', ['report' => 'all', 'period' => $period]) }}" class="btn btn-outline-success"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Download All</a>
+            <a href="{{ route('erp.reports.workbook-excel', ['report' => $report, 'period' => $period, 'bank_account_id' => $selectedBank ? $selectedBank->id : null]) }}" class="btn btn-success"><i class="bi bi-file-earmark-excel me-1"></i>Download Excel</a>
+            <a href="{{ route('erp.reports.workbook-excel', ['report' => 'all', 'period' => $period, 'bank_account_id' => $selectedBank ? $selectedBank->id : null]) }}" class="btn btn-outline-success"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Download All</a>
             <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
         </div>
     </div>
@@ -136,6 +136,17 @@
                 <label class="form-label">Period</label>
                 <input type="month" name="period" class="form-control" value="{{ $period }}">
             </div>
+            @if($report === 'disbursement')
+                <div class="col-md-6">
+                    <label class="form-label" for="report-bank">Bank Account</label>
+                    <select id="report-bank" name="bank_account_id" class="form-select">
+                        <option value="">All Banks</option>
+                        @foreach($bankAccounts as $bank)
+                            <option value="{{ $bank->id }}" {{ $selectedBank && $selectedBank->id == $bank->id ? 'selected' : '' }}>{{ $bank->bank_name }} - {{ $bank->account_no }} ({{ $bank->currency }})</option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
             <div class="col-md-3 d-grid">
                 <button class="btn btn-primary"><i class="bi bi-funnel me-1"></i>Apply</button>
             </div>
@@ -160,6 +171,9 @@
         <div class="workbook-header">
             <div class="workbook-company">{{ $companyName }}</div>
             <div class="workbook-title">{{ $activeReport['title'] }}</div>
+            @if($report === 'disbursement' && $selectedBank)
+                <div class="workbook-subtitle">{{ $selectedBank->bank_name }} - {{ $selectedBank->account_no }} ({{ $selectedBank->currency }})</div>
+            @endif
             <div class="workbook-subtitle">
                 @if(in_array($report, ['bank-recon', 'trial-balance'], true))
                     {{ $activeReport['subtitle'] }}
@@ -185,12 +199,15 @@
                 @forelse($rows as $row)
                     <tr>
                         @foreach($activeReport['columns'] as $column)
-                            @php $value = $row[$column] ?? ''; @endphp
-                            <td class="{{ is_numeric($value) ? 'amount' : '' }}">
+                            @php
+                                $value = $row[$column] ?? '';
+                                $isAmount = is_numeric($value) && !($report === 'disbursement' && in_array($column, ['DATE', 'CV#', 'CHECK#', 'PAYEE', 'PARTICULARS'], true));
+                            @endphp
+                            <td class="{{ $isAmount ? 'amount' : '' }}">
                                 @if(!empty($row['_history_url']) && in_array($column, ['BILLING INVOICE', 'STATEMENT OF ACCOUNT NUMBER'], true) && (string) $value !== '')
                                     <a class="sales-history-link" href="{{ $row['_history_url'] }}" data-bs-toggle="modal" data-bs-target="#salesHistoryModal" data-history-url="{{ $row['_history_url'] }}">{{ $value }}</a>
                                 @else
-                                    {{ is_numeric($value) ? $money($value) : $value }}
+                                    {{ $isAmount ? $money($value) : $value }}
                                 @endif
                             </td>
                         @endforeach

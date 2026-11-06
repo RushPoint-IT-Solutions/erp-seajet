@@ -2980,9 +2980,49 @@ class ModuleController extends Controller
 
     public function apAging()
     {
-        $rows = $this->apAgingRows();
+        request()->validate(['as_of' => 'nullable|date_format:Y-m-d', 'currency' => 'nullable|in:All Currency,PHP,USD']);
+        $filters = ['as_of' => request('as_of') ?: date('Y-m-d'), 'currency' => request('currency') ?: 'All Currency'];
+        $asOf = \Carbon\Carbon::parse($filters['as_of'])->startOfDay();
+        $rows = Schema::hasTable('purchase_documents') ? DB::table('purchase_documents')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_documents.supplier_id')
+            ->where('purchase_documents.company_id', $this->defaultCompanyId())
+            ->whereNotIn('purchase_documents.status', ['paid', 'cancelled', 'voided', 'deleted'])
+            ->whereDate('purchase_documents.document_date', '<=', $filters['as_of'])
+            ->when($filters['currency'] !== 'All Currency', function ($query) use ($filters) {
+                $query->where('purchase_documents.currency', $filters['currency']);
+            })
+            ->orderBy('purchase_documents.document_date')->orderBy('purchase_documents.id')
+            ->get(['purchase_documents.*', 'suppliers.name as supplier_name'])
+            ->map(function ($bill) use ($asOf) {
+                $balance = max(0, (float) $bill->grand_total - (float) $bill->paid_total);
+                $age = \Carbon\Carbon::parse($bill->document_date)->startOfDay()->diffInDays($asOf);
+                $buckets = [0, 0, 0, 0];
+                $buckets[$age <= 30 ? 0 : ($age <= 60 ? 1 : ($age <= 90 ? 2 : 3))] = $balance;
+                return [
+                    'supplier_key' => $bill->supplier_id, 'supplier' => $bill->supplier_name ?: '-',
+                    'currency' => $bill->currency ?: 'PHP', 'id' => $bill->id,
+                    'number' => $bill->document_no, 'date' => $bill->document_date,
+                    'due' => (float) $bill->grand_total, 'paid' => (float) $bill->paid_total,
+                    'balance' => $balance, 'buckets' => $buckets,
+                ];
+            })->filter(function ($row) { return $row['balance'] > .005; })->values() : collect();
+        $summarize = function ($bills) {
+            return [
+                'due' => $bills->sum('due'), 'paid' => $bills->sum('paid'), 'balance' => $bills->sum('balance'),
+                'buckets' => array_map(function ($index) use ($bills) {
+                    return $bills->sum(function ($bill) use ($index) { return $bill['buckets'][$index]; });
+                }, range(0, 3)),
+            ];
+        };
+        $companies = $rows->groupBy(function ($row) { return $row['supplier_key'].'|'.$row['currency']; })
+            ->map(function ($bills) use ($summarize) {
+                return array_merge($summarize($bills), [
+                    'name' => $bills->first()['supplier'], 'currency' => $bills->first()['currency'], 'invoices' => $bills,
+                ]);
+            })->sortBy(function ($supplier) { return $supplier['name'].'|'.$supplier['currency']; }, SORT_NATURAL | SORT_FLAG_CASE);
+        $currencyTotals = $rows->groupBy('currency')->map($summarize);
 
-        return view('erp.payables.aging', compact('rows'));
+        return view('erp.payables.aging', compact('rows', 'filters', 'companies', 'currencyTotals'));
     }
 
     private function apRegisterRows()
@@ -11399,10 +11439,15 @@ class ModuleController extends Controller
         $activeReport = $reports[$report];
         $company = Schema::hasTable('companies') ? DB::table('companies')->where('id', $this->defaultCompanyId())->first() : null;
         $period = request('period', date('Y-m'));
+        $bankAccounts = $this->workbookBankAccounts();
+        $selectedBank = $bankAccounts->firstWhere('id', request('bank_account_id'));
+        if (request('bank_account_id') && !$selectedBank) {
+            abort(422, 'Please select a valid bank account.');
+        }
         $rows = $this->workbookReportRows($report, $period);
         $summaryCards = $this->workbookReportSummaryCards();
 
-        return view('erp.reports.workbook', compact('reports', 'report', 'activeReport', 'company', 'period', 'rows', 'summaryCards'));
+        return view('erp.reports.workbook', compact('reports', 'report', 'activeReport', 'company', 'period', 'rows', 'summaryCards', 'bankAccounts', 'selectedBank'));
     }
 
     public function workbookReportExcel($report = 'all')
@@ -11421,6 +11466,10 @@ class ModuleController extends Controller
         $company = Schema::hasTable('companies') ? DB::table('companies')->where('id', $this->defaultCompanyId())->first() : null;
         $companyName = $company && !empty($company->name) ? $company->name : 'SEA-JET INTERNATIONAL FORWARDERS, INC.';
         $selectedReports = $report === 'all' ? $reports : [$report => $reports[$report]];
+        $selectedBank = $this->workbookBankAccounts()->firstWhere('id', request('bank_account_id'));
+        if (request('bank_account_id') && !$selectedBank) {
+            abort(422, 'Please select a valid bank account.');
+        }
         $sheets = [];
 
         foreach ($selectedReports as $slug => $definition) {
@@ -11432,7 +11481,7 @@ class ModuleController extends Controller
                 'name' => $definition['label'],
                 'company' => $companyName,
                 'title' => $definition['title'],
-                'period' => $subtitle,
+                'period' => $subtitle.($slug === 'disbursement' && $selectedBank ? ' - '.$selectedBank->bank_name.' / '.$selectedBank->account_no : ''),
                 'columns' => $definition['columns'],
                 'rows' => $this->workbookReportRows($slug, $period),
             ];
@@ -12584,29 +12633,50 @@ class ModuleController extends Controller
             ->all();
     }
 
+    private function workbookBankAccounts()
+    {
+        return Schema::hasTable('bank_accounts')
+            ? DB::table('bank_accounts')->where('company_id', $this->defaultCompanyId())
+                ->orderBy('bank_name')->orderBy('account_no')->get()
+            : collect();
+    }
+
     private function disbursementWorkbookRows($period)
     {
         if (!Schema::hasTable('payments')) {
             return [];
         }
 
+        $bank = $this->workbookBankAccounts()->firstWhere('id', request('bank_account_id'));
+        if (request('bank_account_id') && !$bank) {
+            abort(422, 'Please select a valid bank account.');
+        }
+
         return DB::table('payments')
             ->leftJoin('suppliers', 'suppliers.id', '=', 'payments.supplier_id')
+            ->where('payments.company_id', $this->defaultCompanyId())
+            ->when($bank, function ($query) use ($bank) {
+                $query->where('payments.bank_account_id', $bank->id);
+            })
             ->when($period, function ($query) use ($period) {
                 $this->applyMonthFilter($query, 'payments.payment_date', $period);
             })
             ->orderBy('payments.payment_date')
             ->orderBy('payments.id')
-            ->limit(500)
             ->get($this->paymentReportColumns())
             ->map(function ($payment) {
                 $amount = (float) $payment->amount;
+                $particulars = trim((string) $payment->voucher_description);
+                if ($particulars === '' && !empty($payment->bill_no) && Schema::hasTable('purchase_documents')) {
+                    $bill = $this->apBillRecordByNumber($payment->bill_no);
+                    $particulars = $bill ? trim((string) ($bill->memo ?: $bill->remarks)) : '';
+                }
                 return [
                     'DATE' => $payment->payment_date,
                     'CV#' => $payment->payment_no,
-                    'CHECK#' => $payment->check_no ?: $payment->reference_no,
+                    'CHECK#' => (string) ($payment->check_no ?? ''),
                     'PAYEE' => $payment->supplier_name,
-                    'PARTICULARS' => $payment->payment_method,
+                    'PARTICULARS' => $particulars,
                     'CASH IN BANK- PESO' => strtoupper($payment->currency) === 'USD' ? 0 : $amount,
                     'CASH IN BANK-USD' => strtoupper($payment->currency) === 'USD' ? $amount : 0,
                     'ACCOUNTS PAYABLE- TRADE' => $amount,
@@ -12634,6 +12704,10 @@ class ModuleController extends Controller
         $columns[] = Schema::hasColumn('payments', 'reference_no')
             ? 'payments.reference_no'
             : DB::raw('null as reference_no');
+        foreach (['voucher_description', 'bill_no'] as $column) {
+            $columns[] = Schema::hasColumn('payments', $column)
+                ? 'payments.'.$column : DB::raw('null as '.$column);
+        }
 
         return $columns;
     }

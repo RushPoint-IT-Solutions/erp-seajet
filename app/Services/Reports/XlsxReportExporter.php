@@ -70,9 +70,12 @@ class XlsxReportExporter
             $cells = [];
             foreach ($columns as $column) {
                 $value = $row[$column] ?? '';
+                if ($column === 'CHECK#') {
+                    $value = (string) $value;
+                }
                 $cells[] = [
                     'value' => $value,
-                    'style' => $column === 'DATE' && $this->isIsoDate($value) ? 6 : (is_numeric($value) ? 5 : 0),
+                    'style' => $column === 'DATE' && $this->isIsoDate($value) ? 6 : ($column !== 'CHECK#' && is_numeric($value) ? 5 : 0),
                     'date' => $column === 'DATE' && $this->isIsoDate($value),
                 ];
             }
@@ -80,10 +83,11 @@ class XlsxReportExporter
         }
 
         $xml .= '</sheetData>';
+        // SpreadsheetML requires autoFilter before mergeCells in CT_Worksheet.
+        $xml .= '<autoFilter ref="A5:'.$lastColumn.max(5, count($rows) + 5).'"/>';
         if (count($columns) > 1) {
             $xml .= '<mergeCells count="3"><mergeCell ref="A1:'.$lastColumn.'1"/><mergeCell ref="A2:'.$lastColumn.'2"/><mergeCell ref="A3:'.$lastColumn.'3"/></mergeCells>';
         }
-        $xml .= '<autoFilter ref="A5:'.$lastColumn.max(5, count($rows) + 5).'"/>';
         $xml .= '<pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/>';
         $xml .= '<pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/>';
         $xml .= '</worksheet>';
