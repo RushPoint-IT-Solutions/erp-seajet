@@ -16,7 +16,7 @@
     </div>
 </div>
 <p><strong>Bill dates:</strong> {{ $filters['from'] }} to {{ $filters['to'] }} &middot; {{ ucfirst($filters['status']) }} &middot; {{ strtoupper($filters['currency']) }}</p>
-<p class="small text-muted">Based on bill totals and current recorded payments. Partially paid bills are included under Unpaid. Amounts include bill taxes; dates filter the bill date, not the payment date.</p>
+<p class="small text-muted">All amounts are in PHP using the bill's recorded conversion rate. Currency identifies the original bill currency. Based on bill totals and current payments; partially paid bills are included under Unpaid. Dates filter the bill date.</p>
 <form method="get" action="{{ route('erp.expenses.summary') }}" class="erp-card p-3 mb-3 no-print">
     <div class="row g-3 align-items-end">
         <div class="col-md-3"><label class="form-label" for="expense-from">From</label><input id="expense-from" type="date" name="from" value="{{ $filters['from'] }}" class="form-control" required></div>

@@ -1,5 +1,5 @@
 @php
-    $money = function ($value) use ($document) { return $document->currency.' '.number_format((float) $value, 2); };
+    $money = function ($value) { return 'PHP '.number_format((float) $value, 2); };
     $reimbursement = min((float) $document->grand_total, max(0, (float) $document->freight_total));
 @endphp
 <div class="mb-3">
@@ -26,7 +26,7 @@
                 <td>{{ $application->component === 'bi' ? 'Invoice' : ($application->component === 'soa' ? 'SOA' : 'Legacy payment') }}</td>
                 <td>{{ $application->payment_method }}@if($application->reference_no)<br>{{ $application->reference_no }}@endif</td>
                 <td>{{ ucwords(str_replace('_', ' ', $application->status)) }}</td>
-                <td class="text-end">{{ $application->currency }} {{ number_format((float) $application->amount_applied, 2) }}</td>
+                <td class="text-end">PHP {{ number_format((float) $application->amount_applied, 2) }}</td>
             </tr>
         @empty
             <tr><td colspan="6" class="text-muted text-center">No payment applications recorded.</td></tr>

@@ -14,6 +14,7 @@ class SalesJournalHistoryTest extends TestCase
         config(['database.default' => 'sqlite', 'database.connections.sqlite.database' => ':memory:']);
         DB::purge('sqlite');
         Artisan::call('migrate:fresh', ['--seed' => true]);
+        $this->seed(\BillingReimbursementSampleSeeder::class);
         $this->actingAsAdmin();
         $this->withoutExceptionHandling();
     }
@@ -139,6 +140,27 @@ class SalesJournalHistoryTest extends TestCase
         DB::table('sales_documents')->where('id', $invoice->id)->update(['company_id' => $company]);
         $this->withExceptionHandling();
         $this->get(route('erp.reports.sales-history', $invoice->id))->assertNotFound();
+    }
+
+    public function test_usd_sales_columns_use_recorded_php_rate()
+    {
+        $invoice = $this->invoice();
+        DB::table('sales_documents')->where('id', $invoice->id)->update([
+            'currency' => 'USD', 'exchange_rate' => 56, 'posting_status' => 'posted',
+            'vatable_amount' => 100, 'vat_classification' => '12%',
+        ]);
+        $response = $this->get(route('erp.reports.workbook', ['report' => 'sales-manila', 'period' => '2026-10']));
+        $response->assertOk();
+        $row = collect($response->original->getData()['rows'])->firstWhere('BILLING INVOICE', $invoice->document_no);
+        $this->assertEquals(6272, $row['A/R TRADE']);
+        $this->assertEquals(2800, $row['A/R REIMBURSABLE CHARGES']);
+        $this->assertEquals(672, $row['OUTPUT VAT']);
+        $method = new \ReflectionMethod(\App\Http\Controllers\Erp\ModuleController::class, 'salesTaxRows');
+        $method->setAccessible(true);
+        $taxRows = $method->invoke(app(\App\Http\Controllers\Erp\ModuleController::class), '2026-10-01', '2026-10-31');
+        $taxRow = collect($taxRows)->first(function ($row) use ($invoice) { return $row[1] === $invoice->document_no; });
+        $this->assertEquals(5600, $taxRow[6]);
+        $this->assertEquals(672, $taxRow[7]);
     }
 
     private function invoice()

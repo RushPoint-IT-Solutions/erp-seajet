@@ -1,3 +1,4 @@
+<p class="small text-muted">All amounts in PHP. Currency identifies the original transaction currency.</p>
 <div class="table-responsive">
     <table class="table table-hover align-middle summary-tax-table w-100">
         <thead>

@@ -38,7 +38,7 @@ class ArAgingCompanyReportTest extends TestCase
             DB::table('sales_documents')->insert($invoice);
         }
         DB::table('sales_documents')->insert(array_merge($invoice, [
-            'document_no' => 'AGING-USD', 'currency' => 'USD',
+            'document_no' => 'AGING-USD', 'currency' => 'USD', 'exchange_rate' => 56,
         ]));
         DB::table('sales_documents')->insert(array_merge($invoice, [
             'document_no' => 'AGING-FUTURE', 'document_date' => '2026-10-29',
@@ -54,7 +54,7 @@ class ArAgingCompanyReportTest extends TestCase
                     && $php['buckets'] === [200.0, 200.0, 200.0, 100.0];
             })
             ->assertViewHas('currencyTotals', function ($totals) {
-                return $totals['PHP']['balance'] == 700 && $totals['USD']['balance'] == 100;
+                return $totals['PHP']['balance'] == 700 && $totals['USD']['balance'] == 5600;
             });
         $this->get(route('erp.customer-billing.aging', ['as_of' => '2026-10-28', 'class' => 'MANILA']))
             ->assertOk()->assertSee('No unpaid active invoices found');

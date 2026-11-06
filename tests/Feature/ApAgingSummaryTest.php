@@ -25,6 +25,7 @@ class ApAgingSummaryTest extends TestCase
             $table->string('document_no');
             $table->string('document_date');
             $table->string('currency')->default('PHP');
+            $table->decimal('exchange_rate', 18, 6)->default(1);
             $table->string('status')->default('posted');
             $table->decimal('grand_total', 18, 2)->default(150);
             $table->decimal('paid_total', 18, 2)->default(50);
@@ -76,5 +77,14 @@ class ApAgingSummaryTest extends TestCase
         $this->assertEquals(7, $unpaid['totals']['PHP']['Total Bills']);
         $this->assertEquals(350, $unpaid['totals']['PHP']['Paid Amount']);
         $this->assertEquals(700, $unpaid['totals']['PHP']['Unpaid Balance']);
+
+        DB::table('purchase_documents')->where('currency', 'USD')->update(['exchange_rate' => 56]);
+        request()->merge(['currency' => 'USD', 'status' => 'all']);
+        $converted = app(ModuleController::class)->expenseSummary()->getData();
+        $this->assertEquals(8400, $converted['totals']['USD']['Bill Amount']);
+        $this->assertEquals(2800, $converted['totals']['USD']['Paid Amount']);
+        $this->assertEquals(5600, $converted['totals']['USD']['Unpaid Balance']);
+        $aging = app(ModuleController::class)->apAging()->getData();
+        $this->assertEquals(5600, $aging['currencyTotals']['USD']['balance']);
     }
 }

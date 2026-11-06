@@ -33,6 +33,7 @@ class CashReceiptsConsolidationTest extends TestCase
             $table->string('payment_method')->default('Cash');
             $table->integer('bank_account_id')->nullable();
             $table->string('currency')->default('PHP');
+            $table->decimal('exchange_rate', 18, 6)->default(1);
             $table->decimal('amount', 18, 4);
             $table->decimal('cwt_amount', 18, 4)->default(0);
             $table->string('status')->default('posted');
@@ -94,7 +95,7 @@ class CashReceiptsConsolidationTest extends TestCase
         $rows = $this->rows();
         $this->assertCount(6, $rows);
         $this->assertEquals(500, array_sum(array_column($rows, 'CASH (PHP)')));
-        $this->assertEquals(100, array_sum(array_column($rows, 'CASH (USD)')));
+        $this->assertEquals(100, array_sum(array_column($rows, 'CASH (USD, PHP EQUIVALENT)')));
     }
 
     public function test_splits_one_receipt_between_bi_and_soa_and_counts_cwt_once()
@@ -129,6 +130,19 @@ class CashReceiptsConsolidationTest extends TestCase
         $this->assertEquals(0, $row['A/R TRADE']);
         $this->assertEquals(250, $row['A/R REIMBURSABLES CHARGES']);
         $this->assertEquals(250, $row['CASH (PHP)']);
+    }
+
+    public function test_converts_each_usd_receipt_at_its_own_rate_before_consolidating()
+    {
+        DB::table('receipts')->insert([
+            ['receipt_no' => 'USD-1', 'currency' => 'USD', 'amount' => 100, 'cwt_amount' => 10, 'exchange_rate' => 56],
+            ['receipt_no' => 'USD-2', 'currency' => 'USD', 'amount' => 100, 'cwt_amount' => 10, 'exchange_rate' => 57],
+        ]);
+        $rows = $this->rows();
+        $this->assertCount(1, $rows);
+        $this->assertEquals(11300, $rows[0]['CASH (USD, PHP EQUIVALENT)']);
+        $this->assertEquals(1130, $rows[0]['WITHHOLDING-CWT (2307)']);
+        $this->assertEquals(12430, $rows[0]['A/R TRADE']);
     }
 
     private function rows()

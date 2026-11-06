@@ -172,6 +172,9 @@
         <div class="workbook-header">
             <div class="workbook-company">{{ $companyName }}</div>
             <div class="workbook-title">{{ $activeReport['title'] }}</div>
+            @if($report === 'disbursement' || strpos($report, 'sales-') === 0 || strpos($report, 'crb-') === 0)
+                <div class="workbook-subtitle">All amounts in PHP. USD transactions use their recorded exchange rate.</div>
+            @endif
             @if($report === 'disbursement' && $selectedBanks->isNotEmpty())
                 @foreach($selectedBanks as $bank)
                     <div class="workbook-subtitle">{{ $bank->bank_name }} - {{ $bank->account_no }} ({{ $bank->currency }})</div>
@@ -210,7 +213,7 @@
                                 @if(!empty($row['_history_url']) && in_array($column, ['BILLING INVOICE', 'STATEMENT OF ACCOUNT NUMBER'], true) && (string) $value !== '')
                                     <a class="sales-history-link" href="{{ $row['_history_url'] }}" data-bs-toggle="modal" data-bs-target="#salesHistoryModal" data-history-url="{{ $row['_history_url'] }}">{{ $value }}</a>
                                 @else
-                                    {{ $isAmount ? $money($value) : $value }}
+                                    {{ $isAmount && ($row['STATUS'] ?? '') === 'Cancelled' ? number_format((float) $value, 2) : ($isAmount ? $money($value) : $value) }}
                                 @endif
                             </td>
                         @endforeach

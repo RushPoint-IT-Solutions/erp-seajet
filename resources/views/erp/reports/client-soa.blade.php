@@ -163,6 +163,7 @@
     $invoiceRows = $invoices->count();
     $pages = $invoices->isEmpty() ? collect([collect()]) : $invoices->chunk(20);
 @endphp
+    <p class="small text-muted">All amounts are in PHP using the invoice's recorded conversion rate. Currency identifies the original invoice currency.</p>
 
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 no-print">
         <div>

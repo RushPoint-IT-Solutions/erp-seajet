@@ -3002,8 +3002,8 @@ class ModuleController extends Controller
                 $query->where('purchase_documents.currency', $filters['currency']);
             })->get(['purchase_documents.*', 'suppliers.name as supplier_name'])
             ->map(function ($bill) {
-                $total = round(max(0, (float) $bill->grand_total), 2);
-                $paid = round(min($total, max(0, (float) $bill->paid_total)), 2);
+                $total = $this->reportPhpAmount(max(0, (float) $bill->grand_total), $bill);
+                $paid = min($total, $this->reportPhpAmount(max(0, (float) $bill->paid_total), $bill));
                 return [
                     'supplier_id' => $bill->supplier_id, 'Supplier' => $bill->supplier_name ?: '-',
                     'Currency' => $bill->currency ?: 'PHP', 'Total Bills' => 1,
@@ -3032,7 +3032,7 @@ class ModuleController extends Controller
             }
             $path = app(XlsxReportExporter::class)->create([[
                 'name' => 'Expense Summary', 'title' => 'EXPENSE SUMMARY - '.strtoupper($filters['status']),
-                'period' => $filters['from'].' to '.$filters['to'],
+                'period' => $filters['from'].' to '.$filters['to'].' - All amounts in PHP; currency is original bill currency',
                 'columns' => ['Supplier', 'Currency', 'Total Bills', 'Bill Amount', 'Paid Amount', 'Unpaid Balance'],
                 'rows' => $exportRows,
             ]]);
@@ -3059,7 +3059,9 @@ class ModuleController extends Controller
             ->orderBy('purchase_documents.document_date')->orderBy('purchase_documents.id')
             ->get(['purchase_documents.*', 'suppliers.name as supplier_name'])
             ->map(function ($bill) use ($asOf) {
-                $balance = max(0, (float) $bill->grand_total - (float) $bill->paid_total);
+                $due = $this->reportPhpAmount($bill->grand_total, $bill);
+                $paid = $this->reportPhpAmount($bill->paid_total, $bill);
+                $balance = max(0, $due - $paid);
                 $age = \Carbon\Carbon::parse($bill->document_date)->startOfDay()->diffInDays($asOf);
                 $buckets = [0, 0, 0, 0];
                 $buckets[$age <= 30 ? 0 : ($age <= 60 ? 1 : ($age <= 90 ? 2 : 3))] = $balance;
@@ -3067,7 +3069,7 @@ class ModuleController extends Controller
                     'supplier_key' => $bill->supplier_id, 'supplier' => $bill->supplier_name ?: '-',
                     'currency' => $bill->currency ?: 'PHP', 'id' => $bill->id,
                     'number' => $bill->document_no, 'date' => $bill->document_date,
-                    'due' => (float) $bill->grand_total, 'paid' => (float) $bill->paid_total,
+                    'due' => $due, 'paid' => $paid,
                     'balance' => $balance, 'buckets' => $buckets,
                 ];
             })->filter(function ($row) { return $row['balance'] > .005; })->values() : collect();
@@ -6797,7 +6799,7 @@ class ModuleController extends Controller
                 ->whereNotIn('status', ['cancelled', 'voided'])
                 ->when($start, function ($q) use ($start) { $q->where('receipt_date', '>=', $start); })
                 ->when($end, function ($q) use ($end) { $q->where('receipt_date', '<=', $end); })
-                ->sum('amount')
+                ->get()->sum(function ($record) { return $this->reportPhpAmount($record->amount, $record); })
             : 0.0;
         $disbursements = Schema::hasTable('payments')
             ? (float) DB::table('payments')
@@ -6805,7 +6807,7 @@ class ModuleController extends Controller
                 ->whereNotIn('status', ['cancelled', 'voided'])
                 ->when($start, function ($q) use ($start) { $q->where('payment_date', '>=', $start); })
                 ->when($end, function ($q) use ($end) { $q->where('payment_date', '<=', $end); })
-                ->sum('amount')
+                ->get()->sum(function ($record) { return $this->reportPhpAmount($record->amount, $record); })
             : 0.0;
         $otherMovement = $netMovement - $receipts + $disbursements;
 
@@ -6960,6 +6962,8 @@ class ModuleController extends Controller
                     'purchase_documents.shipment_job_id',
                     'purchase_documents.currency',
                     'purchase_documents.gross_amount',
+                    'purchase_documents.exchange_rate',
+                    'purchase_documents.usd_to_php_rate',
                     'purchase_documents.withholding_tax_rate',
                     'purchase_documents.withholding_tax_amount',
                     'purchase_documents.status'
@@ -6972,9 +6976,9 @@ class ModuleController extends Controller
                     $bill->party ?: 'Unknown Supplier',
                     $bill->shipment_job_id ?: '-',
                     $bill->currency ?: 'PHP',
-                    (float) $bill->gross_amount,
+                    $this->reportPhpAmount($bill->gross_amount, $bill),
                     number_format((float) $bill->withholding_tax_rate, 0).'%',
-                    (float) $bill->withholding_tax_amount,
+                    $this->reportPhpAmount($bill->withholding_tax_amount, $bill),
                     $bill->status === 'paid' ? 'Remitted' : 'For Remittance',
                 ];
             }
@@ -6994,6 +6998,7 @@ class ModuleController extends Controller
                     'sales_documents.shipment_reference',
                     'sales_documents.currency',
                     'sales_documents.grand_total',
+                    'sales_documents.exchange_rate',
                     'sales_documents.withholding_tax_rate',
                     'sales_documents.withholding_tax_amount'
                 )
@@ -7005,9 +7010,9 @@ class ModuleController extends Controller
                     $invoice->party ?: 'Unknown Customer',
                     $invoice->shipment_reference ?: '-',
                     $invoice->currency ?: 'PHP',
-                    (float) $invoice->grand_total,
+                    $this->reportPhpAmount($invoice->grand_total, $invoice),
                     number_format((float) $invoice->withholding_tax_rate, 0).'%',
-                    (float) $invoice->withholding_tax_amount,
+                    $this->reportPhpAmount($invoice->withholding_tax_amount, $invoice),
                     'Creditable',
                 ];
             }
@@ -7145,6 +7150,7 @@ class ModuleController extends Controller
                 'sales_documents.shipment_reference',
                 'sales_documents.vat_classification',
                 'sales_documents.currency',
+                'sales_documents.exchange_rate',
                 'sales_documents.vatable_amount',
                 'sales_documents.zero_rated_amount',
                 'sales_documents.vat_exempt_amount',
@@ -7171,8 +7177,8 @@ class ModuleController extends Controller
                     $document->shipment_reference ?: '-',
                     $label,
                     $document->currency ?: 'PHP',
-                    $base,
-                    (float) $document->tax_total,
+                    $this->reportPhpAmount($base, $document),
+                    $this->reportPhpAmount($document->tax_total, $document),
                 ];
             })
             ->all();
@@ -7205,6 +7211,8 @@ class ModuleController extends Controller
                 'suppliers.name as supplier_name',
                 'purchase_documents.shipment_job_id',
                 'purchase_documents.currency',
+                'purchase_documents.exchange_rate',
+                'purchase_documents.usd_to_php_rate',
                 'purchase_documents.vatable_amount',
                 'purchase_documents.zero_rated_amount',
                 'purchase_documents.vat_exempt_amount',
@@ -7233,8 +7241,8 @@ class ModuleController extends Controller
                     $document->shipment_job_id ?: '-',
                     $label,
                     $document->currency ?: 'PHP',
-                    $base,
-                    (float) $document->tax_total,
+                    $this->reportPhpAmount($base, $document),
+                    $this->reportPhpAmount($document->tax_total, $document),
                 ];
             })
             ->all();
@@ -11543,7 +11551,7 @@ class ModuleController extends Controller
                 'name' => $definition['label'],
                 'company' => $companyName,
                 'title' => $definition['title'],
-                'period' => $subtitle.($slug === 'disbursement' && $bankLabel !== '' ? ' - '.$bankLabel : ''),
+                'period' => $subtitle.' - All amounts in PHP'.($slug === 'disbursement' && $bankLabel !== '' ? ' - '.$bankLabel : ''),
                 'columns' => $definition['columns'],
                 'rows' => $this->workbookReportRows($slug, $period),
             ];
@@ -11896,9 +11904,9 @@ class ModuleController extends Controller
                     'document_no' => $invoice->document_no,
                     'soa_no' => $invoice->soa_no ?: ($invoice->template_code && stripos($invoice->template_code, 'SOA') !== false ? $invoice->document_no : ''),
                     'currency' => $invoice->currency ?: 'PHP',
-                    'invoice_amount' => $invoicePayable,
-                    'soa_amount' => $amounts['soa_balance'],
-                    'total' => $invoicePayable + $amounts['soa_balance'],
+                    'invoice_amount' => $this->reportPhpAmount($invoicePayable, $invoice),
+                    'soa_amount' => $this->reportPhpAmount($amounts['soa_balance'], $invoice),
+                    'total' => $this->reportPhpAmount($invoicePayable + $amounts['soa_balance'], $invoice),
                     'aging' => $this->clientSoaAgingLabel($invoice->document_date),
                     'due_date' => $dueDate,
                     'is_overdue' => (bool) $isOverdue,
@@ -12031,7 +12039,7 @@ class ModuleController extends Controller
                 'title' => 'CASH DISBURSEMENT BOOK',
                 'subtitle' => 'For the selected period',
                 'icon' => 'bi-credit-card-2-front',
-                'columns' => ['DATE', 'CV#', 'CHECK#', 'PAYEE', 'PARTICULARS', 'CASH IN BANK- PESO', 'CASH IN BANK-USD', 'ACCOUNTS PAYABLE- TRADE', 'INPUT VAT', 'WITHHOLDING TAX PAYABLE', 'BANK CHARGES', 'OTHER EXPENSE'],
+                'columns' => ['DATE', 'CV#', 'CHECK#', 'STATUS', 'PAYEE', 'PARTICULARS', 'CASH IN BANK- PESO', 'CASH IN BANK-USD (PHP EQUIVALENT)', 'ACCOUNTS PAYABLE- TRADE', 'INPUT VAT', 'WITHHOLDING TAX PAYABLE', 'BANK CHARGES', 'OTHER EXPENSE'],
             ],
             'general-journal' => [
                 'label' => 'GENERAL JOURNAL',
@@ -12046,7 +12054,7 @@ class ModuleController extends Controller
                 'subtitle' => 'MANILA',
                 'icon' => 'bi-receipt',
                 'branch' => 'MANILA',
-                'columns' => ['DATE', 'OFFICIAL RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
+                'columns' => ['DATE', 'OFFICIAL RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD, PHP EQUIVALENT)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
             ],
             'crb-pampanga' => [
                 'label' => 'CRB-PAMPANGA',
@@ -12054,7 +12062,7 @@ class ModuleController extends Controller
                 'subtitle' => 'PAMPANGA',
                 'icon' => 'bi-receipt',
                 'branch' => 'PAMPANGA',
-                'columns' => ['DATE', 'OFFICIAL RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
+                'columns' => ['DATE', 'OFFICIAL RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD, PHP EQUIVALENT)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
             ],
             'crb-cebu' => [
                 'label' => 'CRB-CEBU',
@@ -12062,7 +12070,7 @@ class ModuleController extends Controller
                 'subtitle' => 'CEBU',
                 'icon' => 'bi-receipt',
                 'branch' => 'CEBU',
-                'columns' => ['DATE', 'OFFICIAL RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
+                'columns' => ['DATE', 'OFFICIAL RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD, PHP EQUIVALENT)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
             ],
             'sales-manila' => [
                 'label' => 'SALES-MANILA',
@@ -12124,10 +12132,10 @@ class ModuleController extends Controller
     private function workbookReportSummaryCards()
     {
         $sales = Schema::hasTable('sales_documents')
-            ? (float) DB::table('sales_documents')->whereNotIn('status', ['cancelled', 'voided'])->sum('grand_total')
+            ? (float) DB::table('sales_documents')->where('company_id', $this->defaultCompanyId())->whereNotIn('status', ['cancelled', 'voided'])->get()->sum(function ($record) { return $this->reportPhpAmount($record->grand_total, $record); })
             : 0;
-        $receipts = Schema::hasTable('receipts') ? (float) DB::table('receipts')->sum('amount') : 0;
-        $payments = Schema::hasTable('payments') ? (float) DB::table('payments')->sum('amount') : 0;
+        $receipts = Schema::hasTable('receipts') ? (float) DB::table('receipts')->where('company_id', $this->defaultCompanyId())->get()->sum(function ($record) { return $this->reportPhpAmount($record->amount, $record); }) : 0;
+        $payments = Schema::hasTable('payments') ? (float) DB::table('payments')->where('company_id', $this->defaultCompanyId())->get()->sum(function ($record) { return $this->reportPhpAmount($record->amount, $record); }) : 0;
         $journals = Schema::hasTable('journal_entries') ? DB::table('journal_entries')->count() : 0;
 
         return [
@@ -12695,6 +12703,23 @@ class ModuleController extends Controller
             ->all();
     }
 
+    private function reportPhpAmount($amount, $record)
+    {
+        $rate = 1;
+        if (strtoupper((string) ($record->currency ?? 'PHP')) === 'USD') {
+            $rate = (float) ($record->usd_to_php_rate ?? 0);
+            if ($rate <= 0) {
+                $rate = (float) ($record->exchange_rate ?? 0);
+            }
+            if ($rate <= 0) {
+                $gross = (float) ($record->gross_amount ?? $record->grand_total ?? 0);
+                $rate = $gross > 0 && (float) ($record->php_amount ?? 0) > 0
+                    ? (float) $record->php_amount / $gross : 1;
+            }
+        }
+        return round((float) $amount * $rate, 2);
+    }
+
     private function workbookSelectedBanks()
     {
         $ids = request('bank_account_ids', request('bank_account_id', []));
@@ -12742,7 +12767,11 @@ class ModuleController extends Controller
             ->orderBy('payments.id')
             ->get($this->paymentReportColumns())
             ->map(function ($payment) {
-                $amount = (float) $payment->amount;
+                $cancelledStatuses = ['cancelled', 'canceled', 'voided', 'void'];
+                $cancelled = in_array(strtolower(trim((string) $payment->status)), $cancelledStatuses, true)
+                    || in_array(strtolower(trim((string) $payment->approval_status)), $cancelledStatuses, true)
+                    || !empty($payment->cancelled_check);
+                $amount = $cancelled ? 0 : $this->reportPhpAmount($payment->amount, $payment);
                 $particulars = trim((string) $payment->voucher_description);
                 if ($particulars === '' && !empty($payment->bill_no) && Schema::hasTable('purchase_documents')) {
                     $bill = $this->apBillRecordByNumber($payment->bill_no);
@@ -12752,10 +12781,11 @@ class ModuleController extends Controller
                     'DATE' => $payment->payment_date,
                     'CV#' => $payment->payment_no,
                     'CHECK#' => (string) ($payment->check_no ?? ''),
+                    'STATUS' => $cancelled ? 'Cancelled' : ucwords(str_replace('_', ' ', (string) ($payment->status ?: 'Active'))),
                     'PAYEE' => $payment->supplier_name,
                     'PARTICULARS' => $particulars,
                     'CASH IN BANK- PESO' => strtoupper($payment->currency) === 'USD' ? 0 : $amount,
-                    'CASH IN BANK-USD' => strtoupper($payment->currency) === 'USD' ? $amount : 0,
+                    'CASH IN BANK-USD (PHP EQUIVALENT)' => strtoupper($payment->currency) === 'USD' ? $amount : 0,
                     'ACCOUNTS PAYABLE- TRADE' => $amount,
                     'INPUT VAT' => 0,
                     'WITHHOLDING TAX PAYABLE' => 0,
@@ -12781,10 +12811,13 @@ class ModuleController extends Controller
         $columns[] = Schema::hasColumn('payments', 'reference_no')
             ? 'payments.reference_no'
             : DB::raw('null as reference_no');
-        foreach (['voucher_description', 'bill_no'] as $column) {
+        foreach (['voucher_description', 'bill_no', 'exchange_rate', 'status', 'approval_status'] as $column) {
             $columns[] = Schema::hasColumn('payments', $column)
                 ? 'payments.'.$column : DB::raw('null as '.$column);
         }
+        $columns[] = Schema::hasTable('check_issuances')
+            ? DB::raw("EXISTS (SELECT 1 FROM check_issuances WHERE check_issuances.payment_id = payments.id AND check_issuances.company_id = payments.company_id AND check_issuances.check_no = payments.check_no AND LOWER(check_issuances.status) IN ('cancelled', 'canceled', 'voided', 'void')) as cancelled_check")
+            : DB::raw('0 as cancelled_check');
 
         return $columns;
     }
@@ -13042,7 +13075,7 @@ class ModuleController extends Controller
             $reimbursableAmount = 0;
             $cwtAmount = 0;
             foreach ($group as $item) {
-                $cwtAmount += (float) ($item->cwt_amount ?? 0);
+                $cwtAmount += $this->reportPhpAmount($item->cwt_amount ?? 0, $item);
                 if ($item->receipt_type === 'acknowledgement_receipt') {
                     $acknowledgementNumbers[] = $item->receipt_no;
                 } else {
@@ -13054,15 +13087,15 @@ class ModuleController extends Controller
                         || (empty($application->component) && strpos((string) $application->template_code, 'SOA') !== false);
                     if ($isSoa) {
                         $soaNumbers[] = $application->soa_no ?: $application->document_no;
-                        $reimbursableAmount += (float) $application->amount_applied;
+                        $reimbursableAmount += $this->reportPhpAmount($application->amount_applied, $item);
                     } else {
                         $billingNumbers[] = $application->document_no;
-                        $tradeAmount += (float) $application->amount_applied;
+                        $tradeAmount += $this->reportPhpAmount($application->amount_applied, $item);
                     }
                 }
                 // Unapplied receipts retain their receipt-type classification.
                 if ($receiptApplications->isEmpty()) {
-                    $settlement = (float) $item->amount + (float) ($item->cwt_amount ?? 0);
+                    $settlement = $this->reportPhpAmount((float) $item->amount + (float) ($item->cwt_amount ?? 0), $item);
                     if ($item->receipt_type === 'acknowledgement_receipt') {
                         $reimbursableAmount += $settlement;
                     } else {
@@ -13070,7 +13103,7 @@ class ModuleController extends Controller
                     }
                 }
             }
-            $amount = (float) $group->sum('amount');
+            $amount = $group->sum(function ($item) { return $this->reportPhpAmount($item->amount, $item); });
             return [
                 'DATE' => $receipt->receipt_date,
                 'OFFICIAL RECEIPT NUMBER' => implode(', ', array_unique($officialNumbers)),
@@ -13080,7 +13113,7 @@ class ModuleController extends Controller
                 'A/R REIMBURSABLES CHARGES' => $reimbursableAmount,
                 'WITHHOLDING-CWT (2307)' => $cwtAmount,
                 'CASH (PHP)' => strtoupper($receipt->currency) === 'USD' ? 0 : $amount,
-                'CASH (USD)' => strtoupper($receipt->currency) === 'USD' ? $amount : 0,
+                'CASH (USD, PHP EQUIVALENT)' => strtoupper($receipt->currency) === 'USD' ? $amount : 0,
                 'BILLING INVOICE NUMBER' => implode(', ', array_unique(array_filter($billingNumbers))),
                 'STATEMENT OF ACCOUNT NUMBER' => implode(', ', array_unique(array_filter($soaNumbers))),
             ];
@@ -13099,13 +13132,24 @@ class ModuleController extends Controller
             ->where('receipts.company_id', $document->company_id)
             ->orderBy('receipts.receipt_date')->orderBy('receipt_applications.id')
             ->get(['receipts.receipt_date', 'receipts.receipt_no', 'receipts.status', 'receipts.currency',
-                'receipts.payment_method', 'receipts.reference_no', 'receipt_applications.component', 'receipt_applications.amount_applied']);
+                'receipts.exchange_rate', 'receipts.payment_method', 'receipts.reference_no', 'receipt_applications.component', 'receipt_applications.amount_applied']);
         $history = Schema::hasTable('activity_logs') ? DB::table('activity_logs')
             ->where('company_id', $document->company_id)->where('auditable_type', 'sales_document')
             ->where('auditable_id', $document->id)->orderBy('created_at')->orderBy('id')
             ->get(['action', 'created_at', 'old_values', 'new_values']) : collect();
         $amounts = $this->paymentInvoiceAmounts($document);
 
+        foreach ($amounts as $field => $value) {
+            if (is_numeric($value)) {
+                $amounts[$field] = $this->reportPhpAmount($value, $document);
+            }
+        }
+        foreach (['grand_total', 'freight_total', 'paid_total'] as $field) {
+            $document->$field = $this->reportPhpAmount($document->$field, $document);
+        }
+        foreach ($applications as $application) {
+            $application->amount_applied = $this->reportPhpAmount($application->amount_applied, $application);
+        }
         return response()->view('erp.reports.sales-history', compact('document', 'customer', 'applications', 'history', 'amounts'))
             ->header('Cache-Control', 'no-store');
     }
@@ -13143,9 +13187,14 @@ class ModuleController extends Controller
                 'sales_documents.subtotal',
                 'sales_documents.tax_total',
                 'sales_documents.withholding_tax_amount',
+                'sales_documents.currency',
+                'sales_documents.exchange_rate',
                 'customers.name as customer_name',
             ])
             ->map(function ($document) {
+                foreach (['grand_total', 'freight_total', 'withholding_tax_amount', 'tax_total', 'subtotal'] as $field) {
+                    $document->$field = $this->reportPhpAmount($document->$field, $document);
+                }
                 $reimbursement = min((float) $document->grand_total, max(0, (float) $document->freight_total));
                 $billing = max(0, (float) $document->grand_total - $reimbursement);
                 $withholding = min($billing, max(0, (float) $document->withholding_tax_amount));
@@ -13263,7 +13312,7 @@ class ModuleController extends Controller
 
     private function incomeStatementBudgetSummary($period, $currency)
     {
-        $currency = str_replace(' Consolidated', '', $currency ?: 'PHP');
+        $currency = $currency ?: 'PHP';
         $serviceRevenue = $this->statementSalesActual($currency);
         $directCosts = $this->statementPurchaseActual($currency);
 
@@ -13375,9 +13424,9 @@ class ModuleController extends Controller
         }
 
         return (float) DB::table('sales_documents')
-            ->where('currency', $currency)
+            ->where('company_id', $this->defaultCompanyId())->when($currency !== 'PHP Consolidated', function ($query) use ($currency) { $query->where('currency', $currency); })
             ->whereNotIn('status', ['cancelled', 'voided'])
-            ->sum('grand_total');
+            ->get()->sum(function ($record) { return $this->reportPhpAmount($record->grand_total, $record); });
     }
 
     private function statementPurchaseActual($currency)
@@ -13387,9 +13436,9 @@ class ModuleController extends Controller
         }
 
         return (float) DB::table('purchase_documents')
-            ->where('currency', $currency)
+            ->where('company_id', $this->defaultCompanyId())->when($currency !== 'PHP Consolidated', function ($query) use ($currency) { $query->where('currency', $currency); })
             ->whereNotIn('status', ['cancelled', 'voided'])
-            ->sum('grand_total');
+            ->get()->sum(function ($record) { return $this->reportPhpAmount($record->grand_total, $record); });
     }
 
     public function resetTransactionData()
@@ -14151,6 +14200,7 @@ class ModuleController extends Controller
                 'sales_documents.currency',
                 'sales_documents.grand_total',
                 'sales_documents.invoice_amount',
+                'sales_documents.exchange_rate',
                 'sales_documents.freight_total',
                 'sales_documents.document_type',
                 'sales_documents.withholding_tax_amount',
@@ -14202,6 +14252,9 @@ class ModuleController extends Controller
                 $balance = $amounts['cash_balance'];
                 $due = max(0, $amounts['invoice_total'] - max(0, (float) $invoice->withholding_tax_amount));
                 $paid = max(0, $due - $balance);
+                $balance = $this->reportPhpAmount($balance, $invoice);
+                $due = $this->reportPhpAmount($due, $invoice);
+                $paid = $this->reportPhpAmount($paid, $invoice);
                 if ($companyReport) {
                     $age = max(0, \Carbon\Carbon::parse($invoice->document_date)->diffInDays(\Carbon\Carbon::parse($asOf), false));
                     $bucket = $age <= 30 ? 0 : ($age <= 60 ? 1 : ($age <= 90 ? 2 : 3));

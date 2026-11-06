@@ -44,6 +44,9 @@ class DisbursementWorkbookTest extends TestCase
             $table->decimal('amount', 18, 2)->default(6600);
             $table->string('currency')->default('PHP');
             $table->string('payment_method')->default('Cheque');
+            $table->string('status')->default('released');
+            $table->string('approval_status')->default('Released');
+            $table->decimal('exchange_rate', 18, 6)->default(1);
             $table->text('voucher_description')->nullable();
             $table->string('bill_no')->nullable();
         });
@@ -113,15 +116,16 @@ class DisbursementWorkbookTest extends TestCase
     {
         DB::table('bank_accounts')->insert(['id' => 3, 'bank_name' => 'BDO', 'account_no' => '333', 'currency' => 'USD']);
         DB::table('payments')->insert([
-            ['bank_account_id' => 1, 'currency' => 'PHP'],
-            ['bank_account_id' => 2, 'currency' => 'PHP'],
-            ['bank_account_id' => 3, 'currency' => 'USD'],
+            ['bank_account_id' => 1, 'currency' => 'PHP', 'exchange_rate' => 1],
+            ['bank_account_id' => 2, 'currency' => 'PHP', 'exchange_rate' => 1],
+            ['bank_account_id' => 3, 'currency' => 'USD', 'exchange_rate' => 56],
         ]);
         request()->merge(['bank_account_ids' => ['1', '3']]);
         $rows = $this->rows();
         $this->assertCount(2, $rows);
         $this->assertEquals(6600, array_sum(array_column($rows, 'CASH IN BANK- PESO')));
-        $this->assertEquals(6600, array_sum(array_column($rows, 'CASH IN BANK-USD')));
+        $this->assertEquals(369600, array_sum(array_column($rows, 'CASH IN BANK-USD (PHP EQUIVALENT)')));
+        $this->assertEquals(376200, array_sum(array_column($rows, 'ACCOUNTS PAYABLE- TRADE')));
     }
 
     public function test_invalid_bank_selection_is_rejected()
@@ -129,6 +133,46 @@ class DisbursementWorkbookTest extends TestCase
         request()->merge(['bank_account_ids' => ['1', '999']]);
         $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
         $this->rows();
+    }
+
+    public function test_cancelled_and_voided_vouchers_remain_visible_with_zero_amounts()
+    {
+        foreach (['cancelled', 'voided', 'CANCELED'] as $status) {
+            DB::table('payments')->insert(['status' => $status, 'currency' => 'USD', 'exchange_rate' => 56]);
+        }
+        DB::table('payments')->insert(['approval_status' => 'Voided']);
+        $rows = $this->rows();
+        $this->assertCount(4, $rows);
+        foreach ($rows as $row) {
+            $this->assertSame('Cancelled', $row['STATUS']);
+            $this->assertSame('000471072', $row['CHECK#']);
+            foreach (['CASH IN BANK- PESO', 'CASH IN BANK-USD (PHP EQUIVALENT)', 'ACCOUNTS PAYABLE- TRADE', 'INPUT VAT', 'WITHHOLDING TAX PAYABLE', 'BANK CHARGES', 'OTHER EXPENSE'] as $column) {
+                $this->assertEquals(0, $row[$column]);
+            }
+        }
+        $this->assertEquals(6600, DB::table('payments')->first()->amount);
+    }
+
+    public function test_voided_check_is_zero_even_when_payment_status_is_still_active()
+    {
+        Schema::create('check_issuances', function (Blueprint $table) {
+            $table->increments('id');
+            $table->integer('company_id');
+            $table->integer('payment_id');
+            $table->string('check_no');
+            $table->string('status');
+        });
+        $id = DB::table('payments')->insertGetId(['voucher_description' => 'Cancelled check']);
+        DB::table('check_issuances')->insert([
+            'company_id' => 1, 'payment_id' => $id, 'check_no' => '000471072', 'status' => 'voided',
+        ]);
+        $row = $this->rows()[0];
+        $this->assertSame('Cancelled', $row['STATUS']);
+        $this->assertEquals(0, $row['ACCOUNTS PAYABLE- TRADE']);
+        DB::table('check_issuances')->update(['check_no' => 'OLD-CHECK']);
+        $row = $this->rows()[0];
+        $this->assertNotSame('Cancelled', $row['STATUS']);
+        $this->assertEquals(6600, $row['ACCOUNTS PAYABLE- TRADE']);
     }
 
     private function rows()

@@ -188,6 +188,7 @@
                 <div class="statement-company">{{ $companyName }}</div>
                 <div class="statement-title">{{ $incomeStatement['title'] }}</div>
                 <div class="statement-subtitle">{{ $incomeStatement['subtitle'] }}</div>
+                <div class="statement-subtitle">All amounts in PHP. Currency filter selects original transaction currency.</div>
             </div>
 
             <table class="statement-table">
