@@ -108,8 +108,8 @@
         </div>
         <div class="d-flex flex-wrap gap-2">
             <a href="{{ route('erp.reports.index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Reports</a>
-            <a href="{{ route('erp.reports.workbook-excel', ['report' => $report, 'period' => $period, 'bank_account_id' => $selectedBank ? $selectedBank->id : null]) }}" class="btn btn-success"><i class="bi bi-file-earmark-excel me-1"></i>Download Excel</a>
-            <a href="{{ route('erp.reports.workbook-excel', ['report' => 'all', 'period' => $period, 'bank_account_id' => $selectedBank ? $selectedBank->id : null]) }}" class="btn btn-outline-success"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Download All</a>
+            <a href="{{ route('erp.reports.workbook-excel', ['report' => $report, 'period' => $period, 'bank_account_ids' => $selectedBanks->pluck('id')->all()]) }}" class="btn btn-success"><i class="bi bi-file-earmark-excel me-1"></i>Download Excel</a>
+            <a href="{{ route('erp.reports.workbook-excel', ['report' => 'all', 'period' => $period, 'bank_account_ids' => $selectedBanks->pluck('id')->all()]) }}" class="btn btn-outline-success"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Download All</a>
             <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
         </div>
     </div>
@@ -138,13 +138,14 @@
             </div>
             @if($report === 'disbursement')
                 <div class="col-md-6">
-                    <label class="form-label" for="report-bank">Bank Account</label>
-                    <select id="report-bank" name="bank_account_id" class="form-select">
-                        <option value="">All Banks</option>
+                    <label class="form-label">Bank Accounts</label>
+                    <details class="border rounded p-2">
+                        <summary>{{ $selectedBanks->isEmpty() ? 'All Banks' : $selectedBanks->count().' bank accounts selected' }}</summary>
+                        <div class="small text-muted my-2">Select one or more accounts. Leave all unchecked for All Banks.</div>
                         @foreach($bankAccounts as $bank)
-                            <option value="{{ $bank->id }}" {{ $selectedBank && $selectedBank->id == $bank->id ? 'selected' : '' }}>{{ $bank->bank_name }} - {{ $bank->account_no }} ({{ $bank->currency }})</option>
+                            <label class="d-block py-1"><input type="checkbox" name="bank_account_ids[]" value="{{ $bank->id }}" {{ $selectedBanks->contains('id', $bank->id) ? 'checked' : '' }}> {{ $bank->bank_name }} - {{ $bank->account_no }} ({{ $bank->currency }})</label>
                         @endforeach
-                    </select>
+                    </details>
                 </div>
             @endif
             <div class="col-md-3 d-grid">
@@ -171,8 +172,10 @@
         <div class="workbook-header">
             <div class="workbook-company">{{ $companyName }}</div>
             <div class="workbook-title">{{ $activeReport['title'] }}</div>
-            @if($report === 'disbursement' && $selectedBank)
-                <div class="workbook-subtitle">{{ $selectedBank->bank_name }} - {{ $selectedBank->account_no }} ({{ $selectedBank->currency }})</div>
+            @if($report === 'disbursement' && $selectedBanks->isNotEmpty())
+                @foreach($selectedBanks as $bank)
+                    <div class="workbook-subtitle">{{ $bank->bank_name }} - {{ $bank->account_no }} ({{ $bank->currency }})</div>
+                @endforeach
             @endif
             <div class="workbook-subtitle">
                 @if(in_array($report, ['bank-recon', 'trial-balance'], true))

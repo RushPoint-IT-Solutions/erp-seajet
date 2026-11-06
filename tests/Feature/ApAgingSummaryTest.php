@@ -57,5 +57,24 @@ class ApAgingSummaryTest extends TestCase
         $filtered = app(ModuleController::class)->apAging()->getData();
         $this->assertCount(1, $filtered['rows']);
         $this->assertEquals('USD', $filtered['companies']->first()['currency']);
+
+        request()->merge(['from' => '2026-07-01', 'to' => '2026-10-28', 'currency' => 'all', 'status' => 'all']);
+        $summary = app(ModuleController::class)->expenseSummary()->getData();
+        $this->assertContains('/erp/expenses/summary', route('erp.expenses.summary'));
+        $this->assertCount(2, $summary['rows']);
+        $this->assertEquals(1200, $summary['totals']['PHP']['Bill Amount']);
+        $this->assertEquals(500, $summary['totals']['PHP']['Paid Amount']);
+        $this->assertEquals(700, $summary['totals']['PHP']['Unpaid Balance']);
+        $this->assertEquals(100, $summary['totals']['USD']['Unpaid Balance']);
+        request()->merge(['status' => 'paid']);
+        $paid = app(ModuleController::class)->expenseSummary()->getData();
+        $this->assertCount(1, $paid['rows']);
+        $this->assertEquals(150, $paid['totals']['PHP']['Paid Amount']);
+        $this->assertEquals(0, $paid['totals']['PHP']['Unpaid Balance']);
+        request()->merge(['status' => 'unpaid', 'currency' => 'PHP']);
+        $unpaid = app(ModuleController::class)->expenseSummary()->getData();
+        $this->assertEquals(7, $unpaid['totals']['PHP']['Total Bills']);
+        $this->assertEquals(350, $unpaid['totals']['PHP']['Paid Amount']);
+        $this->assertEquals(700, $unpaid['totals']['PHP']['Unpaid Balance']);
     }
 }

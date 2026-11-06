@@ -64,6 +64,7 @@ Route::middleware(['auth', 'permission.access'])->group(function () {
     Route::delete('/erp/payables/vendor-bills/{bill}', 'Erp\ModuleController@deleteVendorBill')->name('erp.payables.vendor-bills.delete');
     Route::post('/erp/payables/vendor-bills/review', 'Erp\ModuleController@vendorBillReview')->name('erp.payables.vendor-bills.review');
     Route::get('/erp/expenses', 'Erp\ModuleController@expensesIndex')->name('erp.expenses.index');
+    Route::get('/erp/expenses/summary', 'Erp\ModuleController@expenseSummary')->name('erp.expenses.summary');
     Route::get('/erp/payables/payments/create', 'Erp\ModuleController@apPaymentCreate')->name('erp.payables.payments.create');
     Route::post('/erp/payables/payments/review', 'Erp\ModuleController@apPaymentReview')->name('erp.payables.payments.review');
     Route::get('/erp/payables/payment-approvals', 'Erp\ModuleController@paymentApprovals')->name('erp.payables.approvals');

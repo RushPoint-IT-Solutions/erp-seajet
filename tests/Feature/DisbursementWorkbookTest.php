@@ -109,6 +109,28 @@ class DisbursementWorkbookTest extends TestCase
         $this->assertSame('', $rows[1]['PARTICULARS']);
     }
 
+    public function test_multiple_bank_accounts_include_both_currencies_and_exclude_other_banks()
+    {
+        DB::table('bank_accounts')->insert(['id' => 3, 'bank_name' => 'BDO', 'account_no' => '333', 'currency' => 'USD']);
+        DB::table('payments')->insert([
+            ['bank_account_id' => 1, 'currency' => 'PHP'],
+            ['bank_account_id' => 2, 'currency' => 'PHP'],
+            ['bank_account_id' => 3, 'currency' => 'USD'],
+        ]);
+        request()->merge(['bank_account_ids' => ['1', '3']]);
+        $rows = $this->rows();
+        $this->assertCount(2, $rows);
+        $this->assertEquals(6600, array_sum(array_column($rows, 'CASH IN BANK- PESO')));
+        $this->assertEquals(6600, array_sum(array_column($rows, 'CASH IN BANK-USD')));
+    }
+
+    public function test_invalid_bank_selection_is_rejected()
+    {
+        request()->merge(['bank_account_ids' => ['1', '999']]);
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        $this->rows();
+    }
+
     private function rows()
     {
         $method = new \ReflectionMethod(ModuleController::class, 'disbursementWorkbookRows');

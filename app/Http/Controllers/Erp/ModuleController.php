@@ -2978,6 +2978,71 @@ class ModuleController extends Controller
         return response()->json(['status' => 'Print request recorded.', 'event' => $event]);
     }
 
+    public function expenseSummary()
+    {
+        request()->validate([
+            'from' => 'nullable|date_format:Y-m-d', 'to' => 'nullable|date_format:Y-m-d|after_or_equal:from',
+            'status' => 'nullable|in:all,paid,unpaid', 'currency' => 'nullable|in:all,PHP,USD',
+            'format' => 'nullable|in:excel',
+        ]);
+        $filters = [
+            'from' => request('from') ?: date('Y-m-01'), 'to' => request('to') ?: date('Y-m-d'),
+            'status' => request('status') ?: 'all', 'currency' => request('currency') ?: 'all',
+        ];
+        if ($filters['to'] < $filters['from']) {
+            abort(422, 'The end date must be on or after the start date.');
+        }
+        $bills = Schema::hasTable('purchase_documents') ? DB::table('purchase_documents')
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_documents.supplier_id')
+            ->where('purchase_documents.company_id', $this->defaultCompanyId())
+            ->whereNotIn(DB::raw('LOWER(purchase_documents.status)'), ['cancelled', 'canceled', 'voided', 'void', 'deleted'])
+            ->whereDate('purchase_documents.document_date', '>=', $filters['from'])
+            ->whereDate('purchase_documents.document_date', '<=', $filters['to'])
+            ->when($filters['currency'] !== 'all', function ($query) use ($filters) {
+                $query->where('purchase_documents.currency', $filters['currency']);
+            })->get(['purchase_documents.*', 'suppliers.name as supplier_name'])
+            ->map(function ($bill) {
+                $total = round(max(0, (float) $bill->grand_total), 2);
+                $paid = round(min($total, max(0, (float) $bill->paid_total)), 2);
+                return [
+                    'supplier_id' => $bill->supplier_id, 'Supplier' => $bill->supplier_name ?: '-',
+                    'Currency' => $bill->currency ?: 'PHP', 'Total Bills' => 1,
+                    'Bill Amount' => $total, 'Paid Amount' => $paid, 'Unpaid Balance' => round($total - $paid, 2),
+                ];
+            })->filter(function ($bill) use ($filters) {
+                return $filters['status'] === 'all' || ($filters['status'] === 'paid'
+                    ? $bill['Unpaid Balance'] < .005 : $bill['Unpaid Balance'] >= .005);
+            }) : collect();
+        $sum = function ($items) {
+            $result = [];
+            foreach (['Total Bills', 'Bill Amount', 'Paid Amount', 'Unpaid Balance'] as $column) {
+                $result[$column] = $items->sum($column);
+            }
+            return $result;
+        };
+        $rows = $bills->groupBy(function ($bill) { return $bill['supplier_id'].'|'.$bill['Currency']; })
+            ->map(function ($items) use ($sum) {
+                return array_merge(['Supplier' => $items->first()['Supplier'], 'Currency' => $items->first()['Currency']], $sum($items));
+            })->sortBy('Supplier')->values();
+        $totals = $bills->groupBy('Currency')->map($sum);
+        if (request('format') === 'excel') {
+            $exportRows = $rows->all();
+            foreach ($totals as $currency => $total) {
+                $exportRows[] = array_merge(['Supplier' => 'TOTAL', 'Currency' => $currency], $total);
+            }
+            $path = app(XlsxReportExporter::class)->create([[
+                'name' => 'Expense Summary', 'title' => 'EXPENSE SUMMARY - '.strtoupper($filters['status']),
+                'period' => $filters['from'].' to '.$filters['to'],
+                'columns' => ['Supplier', 'Currency', 'Total Bills', 'Bill Amount', 'Paid Amount', 'Unpaid Balance'],
+                'rows' => $exportRows,
+            ]]);
+            return response()->download($path, 'expense-summary-'.$filters['status'].'-'.$filters['to'].'.xlsx', [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ])->deleteFileAfterSend(true);
+        }
+        return view('erp.payables.expense-summary', compact('filters', 'rows', 'totals'));
+    }
+
     public function apAging()
     {
         request()->validate(['as_of' => 'nullable|date_format:Y-m-d', 'currency' => 'nullable|in:All Currency,PHP,USD']);
@@ -11440,14 +11505,11 @@ class ModuleController extends Controller
         $company = Schema::hasTable('companies') ? DB::table('companies')->where('id', $this->defaultCompanyId())->first() : null;
         $period = request('period', date('Y-m'));
         $bankAccounts = $this->workbookBankAccounts();
-        $selectedBank = $bankAccounts->firstWhere('id', request('bank_account_id'));
-        if (request('bank_account_id') && !$selectedBank) {
-            abort(422, 'Please select a valid bank account.');
-        }
+        $selectedBanks = $this->workbookSelectedBanks();
         $rows = $this->workbookReportRows($report, $period);
         $summaryCards = $this->workbookReportSummaryCards();
 
-        return view('erp.reports.workbook', compact('reports', 'report', 'activeReport', 'company', 'period', 'rows', 'summaryCards', 'bankAccounts', 'selectedBank'));
+        return view('erp.reports.workbook', compact('reports', 'report', 'activeReport', 'company', 'period', 'rows', 'summaryCards', 'bankAccounts', 'selectedBanks'));
     }
 
     public function workbookReportExcel($report = 'all')
@@ -11466,10 +11528,10 @@ class ModuleController extends Controller
         $company = Schema::hasTable('companies') ? DB::table('companies')->where('id', $this->defaultCompanyId())->first() : null;
         $companyName = $company && !empty($company->name) ? $company->name : 'SEA-JET INTERNATIONAL FORWARDERS, INC.';
         $selectedReports = $report === 'all' ? $reports : [$report => $reports[$report]];
-        $selectedBank = $this->workbookBankAccounts()->firstWhere('id', request('bank_account_id'));
-        if (request('bank_account_id') && !$selectedBank) {
-            abort(422, 'Please select a valid bank account.');
-        }
+        $selectedBanks = $this->workbookSelectedBanks();
+        $bankLabel = $selectedBanks->map(function ($bank) {
+            return $bank->bank_name.' / '.$bank->account_no.' ('.$bank->currency.')';
+        })->implode(', ');
         $sheets = [];
 
         foreach ($selectedReports as $slug => $definition) {
@@ -11481,7 +11543,7 @@ class ModuleController extends Controller
                 'name' => $definition['label'],
                 'company' => $companyName,
                 'title' => $definition['title'],
-                'period' => $subtitle.($slug === 'disbursement' && $selectedBank ? ' - '.$selectedBank->bank_name.' / '.$selectedBank->account_no : ''),
+                'period' => $subtitle.($slug === 'disbursement' && $bankLabel !== '' ? ' - '.$bankLabel : ''),
                 'columns' => $definition['columns'],
                 'rows' => $this->workbookReportRows($slug, $period),
             ];
@@ -12633,6 +12695,24 @@ class ModuleController extends Controller
             ->all();
     }
 
+    private function workbookSelectedBanks()
+    {
+        $ids = request('bank_account_ids', request('bank_account_id', []));
+        $ids = is_array($ids) ? $ids : [$ids];
+        $ids = array_values(array_filter($ids, function ($id) { return $id !== '' && $id !== null; }));
+        foreach ($ids as $id) {
+            if (!is_scalar($id) || !ctype_digit((string) $id)) {
+                abort(422, 'Please select valid bank accounts.');
+            }
+        }
+        $ids = array_values(array_unique($ids));
+        $banks = $this->workbookBankAccounts()->whereIn('id', $ids)->values();
+        if ($banks->count() !== count($ids)) {
+            abort(422, 'Please select valid bank accounts.');
+        }
+        return $banks;
+    }
+
     private function workbookBankAccounts()
     {
         return Schema::hasTable('bank_accounts')
@@ -12647,16 +12727,13 @@ class ModuleController extends Controller
             return [];
         }
 
-        $bank = $this->workbookBankAccounts()->firstWhere('id', request('bank_account_id'));
-        if (request('bank_account_id') && !$bank) {
-            abort(422, 'Please select a valid bank account.');
-        }
+        $banks = $this->workbookSelectedBanks();
 
         return DB::table('payments')
             ->leftJoin('suppliers', 'suppliers.id', '=', 'payments.supplier_id')
             ->where('payments.company_id', $this->defaultCompanyId())
-            ->when($bank, function ($query) use ($bank) {
-                $query->where('payments.bank_account_id', $bank->id);
+            ->when($banks->isNotEmpty(), function ($query) use ($banks) {
+                $query->whereIn('payments.bank_account_id', $banks->pluck('id')->all());
             })
             ->when($period, function ($query) use ($period) {
                 $this->applyMonthFilter($query, 'payments.payment_date', $period);
