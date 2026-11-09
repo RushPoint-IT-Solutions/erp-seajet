@@ -176,6 +176,32 @@ class ControlledCheckLifecycleTest extends TestCase
         ]);
     }
 
+    public function test_voucher_financial_edits_sync_check_and_application_and_require_an_updated_print()
+    {
+        list($bill, $bank) = $this->billAndBank();
+        $this->post(route('erp.payables.payments.review'), $this->paymentPayload($bill, $bank))->assertOk();
+        $payment = DB::table('payments')->where('payment_no', 'PV-CONTROL-1001')->first();
+        $this->post(route('erp.payables.payments.approve', $payment->id))->assertSessionHasNoErrors();
+        $this->postJson(route('erp.payables.check-voucher.print.event', $payment->id))->assertOk();
+        $otherBank = (array) $bank;
+        unset($otherBank['id']);
+        $otherBankId = DB::table('bank_accounts')->insertGetId(array_merge($otherBank, ['account_no' => 'EDIT-REGRESSION-BANK']));
+        $fields = ['document_date' => date('Y-m-d'), 'description' => 'Updated voucher', 'bank_account_id' => $otherBankId, 'amount' => 5, 'check_no' => 'EDIT-REGRESSION-001'];
+        $this->post(route('erp.payables.check-voucher.update', $payment->id), array_merge($fields, ['amount' => $bill->grand_total + 1]))->assertSessionHasErrors('amount');
+        $this->post(route('erp.payables.check-voucher.update', $payment->id), array_merge($fields, ['bank_account_id' => 999999]))->assertSessionHasErrors('bank_account_id');
+        $this->post(route('erp.payables.check-voucher.update', $payment->id), $fields)->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('payments', ['id' => $payment->id, 'bank_account_id' => $otherBankId, 'amount' => 5, 'check_no' => 'EDIT-REGRESSION-001']);
+        $this->assertDatabaseHas('check_issuances', ['payment_id' => $payment->id, 'bank_account_id' => $otherBankId, 'amount' => 5, 'check_no' => 'EDIT-REGRESSION-001']);
+        $this->assertDatabaseHas('payment_applications', ['payment_id' => $payment->id, 'amount_applied' => 5]);
+        $this->assertEquals(1, DB::table('check_voucher_print_events')->where('payment_id', $payment->id)->count());
+        $this->get(route('erp.payables.check-print', $payment->id))->assertSessionHasErrors('check');
+        $this->postJson(route('erp.payables.check-voucher.print.event', $payment->id))->assertOk();
+        $this->postJson(route('erp.payables.check-print.event', $payment->id))->assertOk();
+        $fields['amount'] = 6;
+        $this->post(route('erp.payables.check-voucher.update', $payment->id), $fields)->assertSessionHasErrors('voucher');
+        $this->assertDatabaseHas('payments', ['id' => $payment->id, 'amount' => 5]);
+    }
+
     public function test_overpayment_and_duplicate_bank_check_number_are_rejected()
     {
         list($bill, $bank) = $this->billAndBank();
@@ -746,6 +772,7 @@ class ControlledCheckLifecycleTest extends TestCase
         $this->assertNotNull($replacement);
         $this->assertSame('assigned', $replacement->status);
         $this->assertSame('CONTROL-REPLACEMENT', DB::table('payments')->where('id', $payment->id)->value('check_no'));
+        $this->postJson(route('erp.payables.check-voucher.print.event', $payment->id))->assertOk();
 
         $this->postJson(route('erp.payables.check-print.event', $payment->id), [])->assertOk();
         $this->post(route('erp.payables.payments.release', $payment->id));

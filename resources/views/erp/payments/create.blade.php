@@ -187,12 +187,7 @@
                                 @if(in_array($payment['status'], ['Voided', 'Cancelled'], true))
                                 <a class="btn btn-sm btn-outline-primary" href="{{ route('erp.payments.create', ['reenter_receipt' => $payment['id']]) }}">Record Again</a>
                                 @else
-                                <button type="button" class="btn btn-sm btn-outline-primary correct-payment"
-                                        data-bs-toggle="modal" data-bs-target="#correctPaymentModal"
-                                        data-url="{{ route('erp.payments.correct', $payment['id']) }}"
-                                        data-receipt="{{ $payment['number'] }}" title="Correct posted payment">
-                                    <i class="bi bi-arrow-counterclockwise"></i>
-                                </button>
+                                <a class="btn btn-sm btn-outline-primary" href="{{ route('erp.payments.create', ['edit_receipt' => $payment['id']]) }}" title="Edit payment"><i class="bi bi-pencil"></i> Edit</a>
                                 <button type="button" class="btn btn-sm btn-outline-danger delete-payment"
                                         data-bs-toggle="modal" data-bs-target="#deletePaymentModal"
                                         data-url="{{ route('erp.payments.delete', $payment['id']) }}"
@@ -232,7 +227,7 @@
         </div>
     </div>
 
-    @include('erp.payments._payment-modal', ['paymentModalId' => 'paymentModal', 'paymentModalTitle' => 'Receive Payment'])
+    @include('erp.payments._payment-modal', ['paymentModalId' => 'paymentModal', 'paymentModalTitle' => request('edit_receipt') ? 'Edit Payment' : 'Receive Payment'])
 
     <div class="modal fade" id="correctPaymentModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
@@ -321,9 +316,9 @@
             reentryForm.find('.payment-class-select').val(reentryPayment.class_code).trigger('change');
             reentryForm.data('invoice-selection-order', reentryPayment.invoice_numbers);
             reentryForm.find('.payment-invoice-select').val(reentryPayment.invoice_numbers).trigger('change');
-            reentryForm.append($('<input>', { type: 'hidden', name: 'reenter_receipt', value: @json(request('reenter_receipt')) }));
+            reentryForm.append($('<input>', { type: 'hidden', name: @json(request('edit_receipt') ? 'edit_receipt' : 'reenter_receipt'), value: @json(request('edit_receipt') ?: request('reenter_receipt')) }));
             if (paymentModal) { paymentModal.show(); }
-            $.each(['payment_date', 'payment_method', 'currency', 'exchange_rate', 'reference_no', 'bank_account_id', 'amount', 'cwt_amount'], function (_, name) {
+            $.each(['payment_date', 'payment_method', 'currency', 'exchange_rate', 'reference_no', 'bank_account_id', 'amount', 'cwt_amount', 'receipt_no'], function (_, name) {
                 reentryForm.find('[name="' + name + '"]').val(reentryPayment[name] == null ? '' : reentryPayment[name]);
             });
             reentryForm.find('.payment-amount-input').trigger('input');

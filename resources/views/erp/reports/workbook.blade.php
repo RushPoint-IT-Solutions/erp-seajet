@@ -108,8 +108,8 @@
         </div>
         <div class="d-flex flex-wrap gap-2">
             <a href="{{ route('erp.reports.index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Reports</a>
-            <a href="{{ route('erp.reports.workbook-excel', ['report' => $report, 'period' => $period, 'bank_account_ids' => $selectedBanks->pluck('id')->all()]) }}" class="btn btn-success"><i class="bi bi-file-earmark-excel me-1"></i>Download Excel</a>
-            <a href="{{ route('erp.reports.workbook-excel', ['report' => 'all', 'period' => $period, 'bank_account_ids' => $selectedBanks->pluck('id')->all()]) }}" class="btn btn-outline-success"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Download All</a>
+            <a href="{{ route('erp.reports.workbook-excel', ['report' => $report, 'period' => $period, 'bank' => request('bank'), 'bank_account_ids' => $selectedBanks->pluck('id')->all()]) }}" class="btn btn-success"><i class="bi bi-file-earmark-excel me-1"></i>Download Excel</a>
+            <a href="{{ route('erp.reports.workbook-excel', ['report' => 'all', 'period' => $period, 'bank' => request('bank'), 'bank_account_ids' => $selectedBanks->pluck('id')->all()]) }}" class="btn btn-outline-success"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Download All</a>
             <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
         </div>
     </div>
@@ -136,6 +136,9 @@
                 <label class="form-label">Period</label>
                 <input type="month" name="period" class="form-control" value="{{ $period }}">
             </div>
+            @if($report === 'trial-balance' || $report === 'soa')
+            <div class="col-md-3"><label class="form-label">Bank</label><select name="bank" class="form-select"><option value="">All Banks</option><option value="BDO" {{ request('bank') === 'BDO' ? 'selected' : '' }}>BDO</option><option value="METROBANK" {{ request('bank') === 'METROBANK' ? 'selected' : '' }}>Metrobank</option></select></div>
+            @endif
             @if($report === 'disbursement')
                 <div class="col-md-6">
                     <label class="form-label">Bank Accounts</label>
@@ -159,7 +162,7 @@
             <ul class="nav nav-pills flex-nowrap gap-1">
                 @foreach($reports as $slug => $item)
                     <li class="nav-item">
-                        <a class="nav-link {{ $slug === $report ? 'active' : '' }}" href="{{ route('erp.reports.workbook', ['report' => $slug, 'period' => $period]) }}">
+                        <a class="nav-link {{ $slug === $report ? 'active' : '' }}" href="{{ route('erp.reports.workbook', ['report' => $slug, 'period' => $period, 'bank' => request('bank')]) }}">
                             <i class="bi {{ $item['icon'] }} me-1"></i>{{ $item['label'] }}
                         </a>
                     </li>
@@ -172,6 +175,8 @@
         <div class="workbook-header">
             <div class="workbook-company">{{ $companyName }}</div>
             <div class="workbook-title">{{ $activeReport['title'] }}</div>
+            @if(strpos($report, 'sales-') === 0)<div class="workbook-subtitle">CWT is recognized at collection in the Cash Receipts Book.</div>@endif
+            @if(in_array($report, ['trial-balance', 'soa'], true))<div class="workbook-subtitle">{{ request('bank') ?: 'All Banks' }} · Amounts in PHP</div>@endif
             @if($report === 'disbursement' || strpos($report, 'sales-') === 0 || strpos($report, 'crb-') === 0)
                 <div class="workbook-subtitle">All amounts in PHP. USD transactions use their recorded exchange rate.</div>
             @endif

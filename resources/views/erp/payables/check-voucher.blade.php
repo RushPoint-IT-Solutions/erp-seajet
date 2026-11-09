@@ -174,7 +174,20 @@
                             <div>
                                 <label class="form-label fw-semibold">Description</label>
                                 <textarea name="description" class="form-control" rows="4" maxlength="2000">{{ old('description', $voucher['description'] ?? '') }}</textarea>
-                                <div class="form-text">CV number, amount, bank, and accounting entries remain locked.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Bank</label>
+                                <select name="bank_account_id" class="form-select" required>
+                                    @foreach($voucherBanks as $bank)
+                                        @if($bank->is_active && strcasecmp($bank->currency, $voucherRecord->currency ?: 'PHP') === 0)
+                                        <option value="{{ $bank->id }}" {{ (string) old('bank_account_id', $voucherRecord->bank_account_id) === (string) $bank->id ? 'selected' : '' }}>{{ $bank->bank_name }} - {{ $bank->account_no }}</option>
+                                        @endif
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="mb-3"><label class="form-label">Amount ({{ $voucherRecord->currency }})</label><input type="number" name="amount" class="form-control" step="0.01" min="0.01" value="{{ old('amount', $voucherRecord->amount) }}" required></div>
+                            <div class="mb-3"><label class="form-label">Check Number</label><input type="text" name="check_no" class="form-control" maxlength="100" value="{{ old('check_no', $voucherRecord->check_no) }}">
+                                <div class="form-text">Bank, amount, and check number can be changed before check printing. Save and print the updated voucher before printing the check.</div>
                             </div>
                         </div>
                         <div class="modal-footer">

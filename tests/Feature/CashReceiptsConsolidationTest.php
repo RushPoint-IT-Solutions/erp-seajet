@@ -17,6 +17,8 @@ class CashReceiptsConsolidationTest extends TestCase
         parent::setUp();
         config(['database.default' => 'sqlite', 'database.connections.sqlite.database' => ':memory:']);
         DB::purge('sqlite');
+        Schema::create('companies', function (Blueprint $table) { $table->increments('id'); });
+        DB::table('companies')->insert(['id' => 1]);
         Schema::create('customers', function (Blueprint $table) {
             $table->increments('id');
             $table->string('name');
@@ -143,6 +145,18 @@ class CashReceiptsConsolidationTest extends TestCase
         $this->assertEquals(11300, $rows[0]['CASH (USD, PHP EQUIVALENT)']);
         $this->assertEquals(1130, $rows[0]['WITHHOLDING-CWT (2307)']);
         $this->assertEquals(12430, $rows[0]['A/R TRADE']);
+    }
+
+    public function test_soa_a_collection_credits_trade_receivable_and_preserves_soa_reference()
+    {
+        $documentId = DB::table('sales_documents')->insertGetId(['document_no' => 'SOAA-001', 'soa_no' => 'SOAA-001', 'template_code' => 'SOA_A']);
+        $receiptId = DB::table('receipts')->insertGetId(['receipt_no' => 'AR-SOAA-001', 'receipt_type' => 'acknowledgement_receipt', 'amount' => 100]);
+        DB::table('receipt_applications')->insert(['receipt_id' => $receiptId, 'sales_document_id' => $documentId, 'component' => 'soa', 'amount_applied' => 100]);
+        $row = $this->rows()[0];
+        $this->assertEquals(100, $row['A/R TRADE']);
+        $this->assertEquals(0, $row['A/R REIMBURSABLES CHARGES']);
+        $this->assertSame('SOAA-001', $row['STATEMENT OF ACCOUNT NUMBER']);
+        $this->assertSame('', $row['BILLING INVOICE NUMBER']);
     }
 
     private function rows()

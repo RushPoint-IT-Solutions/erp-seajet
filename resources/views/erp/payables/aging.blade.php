@@ -19,14 +19,15 @@
 <button class="btn btn-primary" onclick="printAging('all')">Print All</button>
 </div></div>
 <div class="aging-print-heading"><strong>SEA-JET INTERNATIONAL FORWARDERS, INC.</strong></div>
-<p>As of: <strong>{{ $filters['as_of'] ?: date('Y-m-d') }}</strong> · {{ $filters['currency'] }}</p>
+<p>As of: <strong>{{ $filters['as_of'] ?: date('Y-m-d') }}</strong> · {{ $filters['currency'] }} · {{ $selectedAccount ? $selectedAccount->name : 'All A/P Accounts' }} · Amounts in PHP</p>
 <p class="small text-muted">All amounts are in PHP using the bill's recorded conversion rate. Currency identifies the original bill currency. Balances reflect current payments. The selected date controls bill inclusion and age; this is not a historical balance reconstruction. Same-day bills are included in 1–30 days.</p>
 <form method="get" class="erp-card p-3 mb-3 aging-controls" action="{{ route('erp.payables.aging') }}">
 <div class="row g-3 align-items-end"><div class="col-md-3"><label class="form-label">As of Date</label><input type="date" name="as_of" class="form-control" value="{{ $filters['as_of'] }}"></div>
 @foreach(['currency' => ['All Currency','PHP','USD']] as $field => $options)
 <div class="col-md-2"><label class="form-label">{{ $field === 'vat' ? 'VAT' : ucfirst($field) }}</label><select name="{{ $field }}" class="form-select">@foreach($options as $option)<option value="{{ $option }}" {{ $filters[$field] === $option ? 'selected' : '' }}>{{ $option }}</option>@endforeach</select></div>
 @endforeach
-<div class="col-md-3"><button class="btn btn-primary">Apply Filters</button></div></div></form>
+<div class="col-md-4"><label class="form-label">A/P Account</label><select name="ap_account_id" class="form-select"><option value="">All A/P Accounts</option>@foreach($apAccounts as $account)<option value="{{ $account->id }}" {{ (string) $filters['ap_account_id'] === (string) $account->id ? 'selected' : '' }}>{{ $account->code }} - {{ $account->name }}</option>@endforeach</select></div>
+<div class="col-md-3"><button class="btn btn-primary">Apply Filters</button> <button class="btn btn-outline-success" name="format" value="excel">Export Excel</button></div></div></form>
 @foreach($currencyTotals as $currency => $totals)
 <div class="row g-2 mb-3">@foreach($bucketLabels as $index => $label)<div class="col"><div class="erp-card p-3"><div class="small text-muted">{{ $label }} (PHP, {{ $currency }} bills)</div><strong>{{ number_format($totals['buckets'][$index],2) }}</strong></div></div>@endforeach
 <div class="col"><div class="erp-card p-3"><div class="small text-muted">Total Payable (PHP, {{ $currency }} bills)</div><strong>{{ number_format($totals['balance'],2) }}</strong></div></div></div>

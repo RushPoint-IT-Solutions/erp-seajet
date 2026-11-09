@@ -135,6 +135,15 @@ class DisbursementWorkbookTest extends TestCase
         $this->rows();
     }
 
+    public function test_draft_and_approved_but_unreleased_vouchers_are_not_cash_disbursements()
+    {
+        DB::table('payments')->insert([
+            ['status' => 'draft', 'approval_status' => 'For Approval'],
+            ['status' => 'approved', 'approval_status' => 'Approved'],
+        ]);
+        $this->assertCount(0, $this->rows());
+    }
+
     public function test_cancelled_and_voided_vouchers_remain_visible_with_zero_amounts()
     {
         foreach (['cancelled', 'voided', 'CANCELED'] as $status) {

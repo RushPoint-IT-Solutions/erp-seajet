@@ -56,6 +56,8 @@ class PostingService
             $currency = strtoupper($document->currency ?: 'PHP');
             $rate = $this->rate($currency, $document->exchange_rate ?? 1);
             $tax = max(0, (float) $document->tax_total);
+            $isSoaA = in_array(strtolower((string) $document->document_type), ['soa', 'soa_a', 'statement_of_account_a'], true)
+                || strtoupper((string) ($document->template_code ?? '')) === 'SOA_A';
             $reimbursement = max(0, (float) $document->freight_total);
             $total = max(0, (float) $document->grand_total);
             $billing = max(0, $total - $reimbursement);
@@ -91,8 +93,6 @@ class PostingService
                 );
             }
             if ($serviceRevenue > 0) {
-                $isSoaA = in_array(strtolower((string) $document->document_type), ['soa_a', 'statement_of_account_a'], true)
-                    || ($document->template_code ?? '') === 'SOA_A';
                 if ($isSoaA) {
                     $incomeAmounts = ['Service Income-SOA A' => $serviceRevenue];
                 } elseif (strtolower((string) $document->document_type) === 'debit_note') {
@@ -356,7 +356,7 @@ class PostingService
                 ->get();
             $lines = [
                 $this->line(
-                    $this->cashOrBankAccount($receipt->company_id, $receipt->payment_method, null),
+                    $this->cashOrBankAccount($receipt->company_id, $receipt->payment_method, $receipt->bank_account_id ?? null),
                     'Collection '.$receipt->receipt_no,
                     $amount,
                     0,
@@ -370,7 +370,7 @@ class PostingService
             ];
             if ($cwtAmount > 0) {
                 $lines[] = $this->line(
-                    $this->controlAccount($receipt->company_id, 'cwt_receivable'),
+                    $this->cwtReceivableAccount($receipt->company_id),
                     'Creditable withholding tax - '.$receipt->receipt_no,
                     $cwtAmount,
                     0,
@@ -768,6 +768,10 @@ class PostingService
             'AR_TRADE_DN' => 'ar_debit_note',
         ];
         $mappingCode = $document->ar_account_code ?? 'AR_TRADE_BI';
+        if (in_array(strtolower((string) $document->document_type), ['soa', 'soa_a', 'statement_of_account_a'], true)
+            || strtoupper((string) ($document->template_code ?? '')) === 'SOA_A') {
+            $mappingCode = 'AR_TRADE_SOAA';
+        }
         $currency = strtoupper($document->currency ?: 'PHP');
 
         if ($mappingCode === 'AR_TRADE_BI') {
@@ -823,6 +827,15 @@ class PostingService
             ->value('id');
 
         return $accountId ?: $this->controlAccount($companyId, 'ar_reimbursable');
+    }
+
+    private function cwtReceivableAccount($companyId)
+    {
+        $accountId = DB::table('accounts')->where('company_id', $companyId)->where('is_active', true)
+            ->whereIn('name', ['Creditable Withholding Tax', 'Creditable Withholding Tax Receivable'])
+            ->orderByRaw("CASE WHEN code = '1330' THEN 0 ELSE 1 END")->value('id');
+
+        return $accountId ?: $this->controlAccount($companyId, 'cwt_receivable');
     }
 
     private function salesIncomeAccount($companyId, $name)

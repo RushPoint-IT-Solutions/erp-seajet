@@ -122,11 +122,12 @@
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 no-print">
         <div>
             <h1 class="h3 fw-bold mb-1">Trial Balance</h1>
-            <p class="text-muted mb-0">Format copied from REPORTS.xlsx, account titles from Chart of Accounts.</p>
+            <p class="text-muted mb-0">Posted transactions by book, with account titles from Chart of Accounts. All amounts in PHP.</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
             <a href="{{ route('erp.reports.index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Reports</a>
-            <a href="{{ route('erp.reports.workbook', ['report' => 'trial-balance', 'period' => $period]) }}" class="btn btn-outline-secondary"><i class="bi bi-folder-check me-1"></i>Workbook</a>
+            <a href="{{ route('erp.reports.workbook', ['report' => 'trial-balance', 'period' => $period, 'bank' => $bank]) }}" class="btn btn-outline-secondary"><i class="bi bi-folder-check me-1"></i>Workbook</a>
+            <a href="{{ route('erp.reports.workbook-excel', ['report' => 'trial-balance', 'period' => $period, 'bank' => $bank]) }}" class="btn btn-outline-success">Download Excel</a>
             <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
         </div>
     </div>
@@ -137,6 +138,7 @@
                 <label class="form-label">Period</label>
                 <input type="month" name="period" class="form-control" value="{{ $period }}">
             </div>
+            <div class="col-md-3"><label class="form-label">Bank</label><select name="bank" class="form-select"><option value="">All Banks</option><option value="BDO" {{ $bank === 'BDO' ? 'selected' : '' }}>BDO</option><option value="METROBANK" {{ $bank === 'METROBANK' ? 'selected' : '' }}>Metrobank</option></select></div>
             <div class="col-md-3 d-grid">
                 <button class="btn btn-primary"><i class="bi bi-funnel me-1"></i>Apply</button>
             </div>
@@ -148,6 +150,8 @@
             <div class="trial-company">{{ $companyName }}</div>
             <div class="trial-title">TRIAL BALANCE</div>
             <div class="trial-subtitle">AS OF {{ $periodLabel }}</div>
+            <div class="trial-subtitle">{{ $bank ?: 'All Banks' }} · Amounts in PHP</div>
+            @if($bank)<div class="small text-muted">Includes journals linked to this bank. Opening balances without a bank allocation are excluded.</div>@endif
         </div>
 
         <div class="table-responsive">
@@ -257,6 +261,7 @@
             var total = document.getElementById('trialDrilldownTotal');
             var endpoint = @json(route('erp.reports.trial-balance.drilldown'));
             var period = @json($period);
+            var bank = @json($bank);
 
             function money(value) {
                 var amount = Number(value) || 0;
@@ -286,7 +291,8 @@
                 var params = new URLSearchParams({
                     period: period,
                     account_id: button.dataset.accountId,
-                    column: button.dataset.column
+                    column: button.dataset.column,
+                    bank: bank || ''
                 });
 
                 fetch(endpoint + '?' + params.toString(), {headers: {'Accept': 'application/json'}})

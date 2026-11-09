@@ -44,6 +44,13 @@ class TrialBalanceDrilldownTest extends TestCase
             'debit' => 0, 'credit' => 500,
         ]);
         $hash = str_repeat('b', 64);
+        $bill = (array) DB::table('purchase_documents')->where('company_id', 1)->first();
+        unset($bill['id']);
+        $billId = DB::table('purchase_documents')->insertGetId(array_merge($bill, [
+            'document_no' => 'AP-REGRESSION', 'document_date' => '2026-08-31',
+            'status' => 'posted', 'paid_total' => 0, 'grand_total' => 500,
+            'journal_entry_id' => $journalId,
+        ]));
         $batchId = DB::table('opening_balance_import_batches')->insertGetId([
             'company_id' => 1, 'original_filename' => 'ap.xlsx',
             'file_hash' => $hash, 'posting_date' => '2026-08-31', 'journal_entry_id' => $journalId,
@@ -53,7 +60,7 @@ class TrialBalanceDrilldownTest extends TestCase
             'sheet_name' => 'AP', 'row_number' => 2, 'balance_type' => 'ap_trade',
             'branch_name' => 'Main', 'party_name' => 'Vendor', 'source_date' => '2026-08-31',
             'reference_no' => 'AP-REGRESSION', 'subledger_document_no' => 'AP-REGRESSION',
-            'sales_document_id' => null, 'currency' => 'PHP', 'exchange_rate' => 1,
+            'sales_document_id' => null, 'purchase_document_id' => $billId, 'currency' => 'PHP', 'exchange_rate' => 1,
             'base_amount' => 500, 'journal_entry_id' => $journalId,
         ]);
         $rows = $this->get(route('erp.reports.trial-balance', ['period' => '2026-09']))
@@ -63,6 +70,14 @@ class TrialBalanceDrilldownTest extends TestCase
         $this->getJson(route('erp.reports.trial-balance.drilldown', [
             'period' => '2026-09', 'account_id' => $account->id, 'column' => 'BEGINNING BALANCE',
         ]))->assertOk()->assertJsonFragment(['journal_no' => 'OB-AP-REGRESSION']);
+
+        $this->delete(route('erp.payables.vendor-bills.delete', $billId))->assertSessionHasNoErrors();
+        $rows = $this->get(route('erp.reports.trial-balance', ['period' => '2026-09']))->assertOk()->original->getData()['rows'];
+        $row = collect($rows)->firstWhere('__account_id', (int) $account->id);
+        $this->assertEquals(0, $row['BEGINNING BALANCE']);
+        $this->getJson(route('erp.reports.trial-balance.drilldown', [
+            'period' => '2026-09', 'account_id' => $account->id, 'column' => 'BEGINNING BALANCE',
+        ]))->assertOk()->assertJsonMissing(['journal_no' => 'OB-AP-REGRESSION']);
     }
 
     public function test_prior_period_vendor_bill_is_not_hidden_by_a_voided_sales_document_with_the_same_reference()

@@ -306,7 +306,7 @@ class AccountingPostingFlowTest extends TestCase
         $this->assertEquals(10.0, (float) DB::table('journal_entry_lines')
             ->join('accounts', 'accounts.id', '=', 'journal_entry_lines.account_id')
             ->where('journal_entry_lines.journal_entry_id', $journal->id)
-            ->where('accounts.code', '1260')->value('journal_entry_lines.debit'));
+            ->where('accounts.name', 'Creditable Withholding Tax')->value('journal_entry_lines.debit'));
         $this->assertEquals($openingBalance + 90, (float) DB::table('bank_accounts')->where('id', $bank->id)->value('book_balance'));
 
         $posting->reverseSource('receipt', $receiptId, 'Collection correction');

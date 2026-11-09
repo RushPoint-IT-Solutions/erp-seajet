@@ -71,6 +71,10 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
+                @if(request('edit_receipt'))
+                <div class="alert alert-info">Saving reverses the original receipt and posts the corrected payment. Cancelling keeps the original unchanged.</div>
+                <div class="mb-3"><label class="form-label">Reason for correction</label><textarea name="correction_reason" class="form-control" minlength="5" maxlength="1000" required>{{ old('correction_reason') }}</textarea></div>
+                @endif
                 <div class="payment-section mb-3">
                     <div class="payment-section-title">
                         <h6><i class="bi bi-person-check me-2 text-primary"></i>Client and payment details</h6>

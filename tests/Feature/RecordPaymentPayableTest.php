@@ -786,7 +786,7 @@ class RecordPaymentPayableTest extends TestCase
         $this->assertSame('paid', DB::table('sales_documents')->where('id', $invoice->id)->value('status'));
 
         $this->get(route('erp.payments.create'))->assertOk()
-            ->assertSee(route('erp.payments.correct', $wrongReceipt->id))
+            ->assertSee(route('erp.payments.create', ['edit_receipt' => $wrongReceipt->id]))
             ->assertDontSee('edit-payment');
         $this->post(route('erp.payments.correct', $wrongReceipt->id), [
             'reason' => 'Client settled BI only',
