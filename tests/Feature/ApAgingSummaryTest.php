@@ -10,8 +10,9 @@ use Tests\TestCase;
 
 class ApAgingSummaryTest extends TestCase
 {
-    public function test_summary_matches_details_and_separates_currencies_with_date_filters()
+    protected function setUp()
     {
+        parent::setUp();
         config(['database.default' => 'sqlite', 'database.connections.sqlite.database' => ':memory:']);
         DB::purge('sqlite');
         Schema::create('companies', function (Blueprint $table) { $table->increments('id'); });
@@ -32,6 +33,10 @@ class ApAgingSummaryTest extends TestCase
         });
         DB::table('companies')->insert(['id' => 1]);
         DB::table('suppliers')->insert(['id' => 1, 'name' => 'Supplier One']);
+    }
+
+    public function test_summary_matches_details_and_separates_currencies_with_date_filters()
+    {
         $asOf = \Carbon\Carbon::parse('2026-10-28');
         foreach ([0, 30, 31, 60, 61, 90, 91] as $age) {
             DB::table('purchase_documents')->insert([
@@ -86,5 +91,37 @@ class ApAgingSummaryTest extends TestCase
         $this->assertEquals(5600, $converted['totals']['USD']['Unpaid Balance']);
         $aging = app(ModuleController::class)->apAging()->getData();
         $this->assertEquals(5600, $aging['currencyTotals']['USD']['balance']);
+    }
+
+    public function test_settled_bills_are_excluded_before_currency_conversion_and_supplier_totals()
+    {
+        foreach ([
+            ['document_no' => 'FULLY-PAID', 'paid_total' => 150],
+            ['document_no' => 'OVERPAID', 'paid_total' => 160],
+            ['document_no' => 'PAID-STATUS', 'status' => ' Paid '],
+            ['document_no' => 'VOID-STATUS', 'status' => ' VOIDED '],
+            ['document_no' => 'ROUNDING', 'grand_total' => 150.004, 'paid_total' => 150],
+            ['document_no' => 'PARTIAL', 'paid_total' => 100],
+            ['document_no' => 'UNPAID', 'paid_total' => 0],
+        ] as $variant) {
+            DB::table('purchase_documents')->insert(array_merge([
+                'document_date' => '2026-10-01', 'currency' => 'USD', 'exchange_rate' => 56,
+            ], $variant));
+        }
+
+        request()->merge(['as_of' => '2026-10-28', 'currency' => 'All Currency']);
+        $data = app(ModuleController::class)->apAging()->getData();
+        $this->assertSame(['PARTIAL', 'UNPAID'], $data['rows']->pluck('number')->all());
+        $this->assertCount(1, $data['companies']);
+        $this->assertEquals(11200, $data['companies']->first()['balance']);
+        $this->assertEquals(11200, $data['currencyTotals']['USD']['balance']);
+        $this->assertEquals([11200, 0, 0, 0], $data['currencyTotals']['USD']['buckets']);
+
+        DB::table('purchase_documents')->whereIn('document_no', ['PARTIAL', 'UNPAID'])
+            ->update(['paid_total' => 150]);
+        $settled = app(ModuleController::class)->apAging()->getData();
+        $this->assertCount(0, $settled['rows']);
+        $this->assertCount(0, $settled['companies']);
+        $this->assertCount(0, $settled['currencyTotals']);
     }
 }

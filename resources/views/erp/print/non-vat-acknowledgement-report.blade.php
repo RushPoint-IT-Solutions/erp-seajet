@@ -17,8 +17,9 @@
         width: 215.9mm;
         min-height: 279.4mm;
         margin: 0 auto;
-        padding: 42mm 18mm 18mm;
-        background: #fff url('{{ asset('images/background.jpg') }}') center / 100% 100% no-repeat;
+        padding: 48mm 18mm 39mm;
+        box-sizing: border-box;
+        background: #fff;
         border: 1px solid #cbd5e1;
         box-shadow: 0 12px 32px rgba(15, 23, 42, .14);
         color: var(--nonvat-ink);
@@ -49,7 +50,8 @@
     .nonvat-document-footer {
         z-index: 1;
     }
-    .nonvat-header { text-align: center; margin-bottom: 12mm; }
+    .nonvat-header { text-align: center; margin-bottom: 8mm; }
+    .nonvat-receipt-number { margin-top: 3mm; font-size: 10pt; }
     .nonvat-header .receipt-adjustable-field {
         text-transform: uppercase;
         letter-spacing: 1.4px;
@@ -146,10 +148,8 @@
     }
     .nonvat-sheet.is-adjusting .receipt-adjustable-field.is-active { outline: 2px solid #2563eb; background: rgba(239, 246, 255, .92); }
     .nonvat-sheet.is-adjusting.show-grid {
-        background-image: linear-gradient(rgba(37, 99, 235, .1) 1px, transparent 1px), linear-gradient(90deg, rgba(37, 99, 235, .1) 1px, transparent 1px), url('{{ asset('images/background.jpg') }}');
-        background-size: 5mm 5mm, 5mm 5mm, 100% 100%;
-        background-position: 0 0, 0 0, center;
-        background-repeat: repeat, repeat, no-repeat;
+        background-image: linear-gradient(rgba(37, 99, 235, .1) 1px, transparent 1px), linear-gradient(90deg, rgba(37, 99, 235, .1) 1px, transparent 1px);
+        background-size: 5mm 5mm, 5mm 5mm;
     }
     .nonvat-sheet.fields-locked .receipt-adjustable-field { cursor: default; }
     @media print {

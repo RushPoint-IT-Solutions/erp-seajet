@@ -1,7 +1,8 @@
 <div class="nonvat-sheet {{ $copyClass }} {{ $editableCopy && $adjustLayout ? 'is-adjusting' : '' }}" @if($editableCopy) id="receiptLayoutSheet" data-sheet-width-mm="215.9" @endif>
-    <img class="nonvat-letterhead-background" src="{{ asset('images/background.jpg') }}" alt="" aria-hidden="true">
+    <img class="nonvat-letterhead-background" src="{{ asset('images/soa-client-letterhead.png') }}" alt="" aria-hidden="true">
     <div class="nonvat-header">
         <span class="receipt-adjustable-field" @if($editableCopy) tabindex="0" data-field-key="report_header" data-field-label="Report header" @endif style="{{ $fieldStyle('report_header') }}">{{ $receiptContent['report_header'] }}</span>
+        <div class="nonvat-receipt-number">AR No.: <span class="receipt-adjustable-field" @if($editableCopy) tabindex="0" data-field-key="receipt_no" data-field-label="AR number" @endif style="{{ $fieldStyle('receipt_no') }}">{{ $receipt['receipt_no'] ?? '' }}</span></div>
     </div>
     <div class="nonvat-intro"><span class="receipt-adjustable-field receipt-field-block" @if($editableCopy) tabindex="0" data-field-key="intro_text" data-field-label="Introduction text" @endif style="{{ $fieldStyle('intro_text') }}">{{ $receiptContent['intro_text'] }}</span></div>
 

@@ -3108,7 +3108,7 @@ class ModuleController extends Controller
         $rows = Schema::hasTable('purchase_documents') ? DB::table('purchase_documents')
             ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_documents.supplier_id')
             ->where('purchase_documents.company_id', $this->defaultCompanyId())
-            ->whereNotIn(DB::raw('LOWER(purchase_documents.status)'), ['paid', 'cancelled', 'canceled', 'voided', 'void', 'deleted'])
+            ->whereNotIn(DB::raw('LOWER(TRIM(purchase_documents.status))'), ['paid', 'cancelled', 'canceled', 'voided', 'void', 'deleted'])
             ->whereDate('purchase_documents.document_date', '<=', $filters['as_of'])
             ->when($filters['currency'] !== 'All Currency', function ($query) use ($filters) {
                 $query->where('purchase_documents.currency', $filters['currency']);
@@ -3116,6 +3116,11 @@ class ModuleController extends Controller
             ->orderBy('purchase_documents.document_date')->orderBy('purchase_documents.id')
             ->get(['purchase_documents.*', 'suppliers.name as supplier_name'])
             ->filter(function ($bill) use ($selectedAccount, $apAccounts) {
+                // Settle at bill-currency precision before PHP conversion. Otherwise
+                // sub-cent rounding left on a paid foreign bill can appear in aging.
+                if (round(max(0, (float) $bill->grand_total - (float) $bill->paid_total), 2) <= 0) {
+                    return false;
+                }
                 if (!$selectedAccount) { return true; }
                 $accountId = $bill->opening_balance_control_account_id ?? null;
                 if (!$accountId) {
@@ -11116,6 +11121,7 @@ class ModuleController extends Controller
         if ($documentKind === 'ar_non_vat') {
             return [
                 'report_header' => 'Report header',
+                'receipt_no' => 'AR number',
                 'intro_text' => 'Introduction text',
                 'payment_date' => 'Payment date',
                 'registered_name' => 'Registered name',
@@ -11222,6 +11228,7 @@ class ModuleController extends Controller
         if ($documentKind === 'ar_non_vat') {
             return [
                 'report_header' => 18,
+                'receipt_no' => 10,
                 'intro_text' => 11,
                 'payment_date' => $defaults['payment_date'],
                 'registered_name' => $defaults['registered_name'],
