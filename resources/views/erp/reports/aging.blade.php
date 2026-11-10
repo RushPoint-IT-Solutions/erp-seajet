@@ -20,7 +20,7 @@
 </div></div>
 <div class="aging-print-heading"><strong>SEA-JET INTERNATIONAL FORWARDERS, INC.</strong></div>
 <p>As of: <strong>{{ $filters['as_of'] ?: date('Y-m-d') }}</strong> · {{ $filters['class'] }} · {{ $filters['currency'] }} · {{ $filters['vat'] }}</p>
-<p class="small text-muted">All amounts are in PHP using each invoice's recorded rate. Currency identifies the original invoice currency. Balances reflect current payments. The selected date controls invoice inclusion and age; this is not a historical balance reconstruction. Same-day invoices are included in 1–30 days.</p>
+<p class="small text-muted">All amounts are in the original invoice currency (USD invoices remain in USD; PHP invoices remain in PHP). Balances reflect current payments. The selected date controls invoice inclusion and age; this is not a historical balance reconstruction. Same-day invoices are included in 1–30 days.</p>
 <form method="get" class="erp-card p-3 mb-3 aging-controls" action="{{ route('erp.customer-billing.aging') }}">
 <div class="row g-3 align-items-end"><div class="col-md-3"><label class="form-label">As of Date</label><input type="date" name="as_of" class="form-control" value="{{ $filters['as_of'] }}"></div>
 @foreach(['class' => ['All Classes','MANILA','PAMPANGA','CEBU'], 'currency' => ['All Currency','PHP','USD'], 'vat' => ['All VAT','12%','zero-rated','exempt']] as $field => $options)
@@ -28,8 +28,8 @@
 @endforeach
 <div class="col-md-3"><button class="btn btn-primary">Apply Filters</button></div></div></form>
 @foreach($currencyTotals as $currency => $totals)
-<div class="row g-2 mb-3">@foreach($bucketLabels as $index => $label)<div class="col"><div class="erp-card p-3"><div class="small text-muted">{{ $label }} (PHP, {{ $currency }} invoices)</div><strong>{{ number_format($totals['buckets'][$index],2) }}</strong></div></div>@endforeach
-<div class="col"><div class="erp-card p-3"><div class="small text-muted">Total Receivable (PHP, {{ $currency }} invoices)</div><strong>{{ number_format($totals['balance'],2) }}</strong></div></div></div>
+<div class="row g-2 mb-3">@foreach($bucketLabels as $index => $label)<div class="col"><div class="erp-card p-3"><div class="small text-muted">{{ $label }} ({{ $currency }})</div><strong>{{ number_format($totals['buckets'][$index],2) }}</strong></div></div>@endforeach
+<div class="col"><div class="erp-card p-3"><div class="small text-muted">Total Receivable ({{ $currency }})</div><strong>{{ number_format($totals['balance'],2) }}</strong></div></div></div>
 @endforeach
 <section class="erp-card p-3 mb-4 aging-summary"><h2 class="h6 fw-bold mb-3">Summary by Company</h2><div class="table-responsive"><table class="aging-table">
 <thead><tr><th>Company</th><th>Currency</th>@foreach($bucketLabels as $label)<th class="aging-number">{{ $label }}</th>@endforeach<th class="aging-number">Total</th></tr></thead><tbody>

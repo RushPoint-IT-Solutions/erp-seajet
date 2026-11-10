@@ -46,15 +46,19 @@ class ArAgingCompanyReportTest extends TestCase
         $this->get(route('erp.customer-billing.aging', ['as_of' => '2026-10-28']))
             ->assertOk()->assertSee('Summary by Company')->assertSee('Detail by Company / Invoice')
             ->assertSee('Print Summary')->assertSee('Print Detail')->assertSee('Print All')
+            ->assertSee('Total Receivable (USD)')->assertDontSee('All amounts are in PHP')
             ->assertDontSee('AGING-FUTURE')->assertSee('AGING-TEST-91')
             ->assertViewHas('companies', function ($companies) {
                 $php = $companies->firstWhere('currency', 'PHP');
+                $usd = $companies->firstWhere('currency', 'USD');
                 return $companies->count() === 2 && $php['balance'] == 700
+                    && $usd['due'] == 150 && $usd['paid'] == 50 && $usd['balance'] == 100
+                    && $usd['buckets'] === [0, 0, 0, 100.0]
                     && $php['due'] == 1050 && $php['paid'] == 350
                     && $php['buckets'] === [200.0, 200.0, 200.0, 100.0];
             })
             ->assertViewHas('currencyTotals', function ($totals) {
-                return $totals['PHP']['balance'] == 700 && $totals['USD']['balance'] == 5600;
+                return $totals['PHP']['balance'] == 700 && $totals['USD']['balance'] == 100;
             });
         $this->get(route('erp.customer-billing.aging', ['as_of' => '2026-10-28', 'class' => 'MANILA']))
             ->assertOk()->assertSee('No unpaid active invoices found');

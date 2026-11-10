@@ -14479,9 +14479,6 @@ class ModuleController extends Controller
                 $balance = $amounts['cash_balance'];
                 $due = max(0, $amounts['invoice_total'] - max(0, (float) $invoice->withholding_tax_amount));
                 $paid = max(0, $due - $balance);
-                $balance = $this->reportPhpAmount($balance, $invoice);
-                $due = $this->reportPhpAmount($due, $invoice);
-                $paid = $this->reportPhpAmount($paid, $invoice);
                 if ($companyReport) {
                     $age = max(0, \Carbon\Carbon::parse($invoice->document_date)->diffInDays(\Carbon\Carbon::parse($asOf), false));
                     $bucket = $age <= 30 ? 0 : ($age <= 60 ? 1 : ($age <= 90 ? 2 : 3));
@@ -14500,6 +14497,7 @@ class ModuleController extends Controller
                         'buckets' => $buckets,
                     ];
                 }
+                $balance = $this->reportPhpAmount($balance, $invoice);
                 $daysPastDue = $invoice->due_date ? max(0, \Carbon\Carbon::parse($invoice->due_date)->diffInDays(\Carbon\Carbon::parse($asOf), false)) : 0;
                 $current = $daysPastDue <= 0 ? $balance : 0;
                 $thirty = $daysPastDue > 0 && $daysPastDue <= 30 ? $balance : 0;
