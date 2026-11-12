@@ -36,6 +36,18 @@
     @php
         $approvalStatusCounts = collect($approvals)->groupBy('status_group')->map->count();
     @endphp
+    <form method="get" action="{{ route('erp.payables.approvals') }}" class="erp-card p-3 mb-3 d-flex flex-wrap align-items-end gap-2">
+        <div><label for="checkMonth" class="form-label">Payment / Check Month</label><input id="checkMonth" type="month" name="month" value="{{ request('month') }}" class="form-control"></div>
+        <input type="hidden" name="status" id="checkStatusFilter" value="{{ request('status', 'for_approval') }}">
+        <button class="btn btn-primary" type="submit">Apply Filter</button>
+        <a href="{{ route('erp.payables.approvals', ['status' => request('status', 'for_approval')]) }}" class="btn btn-outline-secondary">All Months</a>
+    </form>
+    <form method="post" action="{{ route('erp.payables.payments.release-selected') }}" id="bulkReleaseForm" class="mb-3">
+        @csrf
+        <input type="hidden" name="month" value="{{ request('month') }}">
+        <button type="submit" id="releaseSelectedButton" class="btn btn-success" disabled>Release Selected (0)</button>
+        <span class="text-muted small ms-2">Select eligible CVs. If any selected CV fails validation, none will be released.</span>
+    </form>
     <ul class="nav nav-tabs mb-3 check-preparation-status-tabs" role="tablist" aria-label="Check preparation status filter">
         <li class="nav-item" role="presentation">
             <button class="nav-link" type="button" data-status-group="approved">Approved <span class="badge text-bg-light ms-1">{{ $approvalStatusCounts->get('approved', 0) }}</span></button>
@@ -51,10 +63,11 @@
     <div class="erp-card p-3">
         <div class="table-responsive">
             <table class="table table-hover align-middle module-table w-100">
-                <thead><tr><th>Payment / Check Date</th><th>Payment</th><th>Check Voucher</th><th>Supplier</th><th>Method</th><th>Check No.</th><th>Currency</th><th class="text-end">Amount</th><th>Status</th><th>Check Control</th><th>Reason / Next Step</th><th class="text-end">Actions</th></tr></thead>
+                <thead><tr><th><input type="checkbox" id="selectAllRelease" class="form-check-input" aria-label="Select all eligible filtered CVs"></th><th>Payment / Check Date</th><th>Payment</th><th>Check Voucher</th><th>Supplier</th><th>Method</th><th>Check No.</th><th>Currency</th><th class="text-end">Amount</th><th>Status</th><th>Check Control</th><th>Reason / Next Step</th><th class="text-end">Actions</th></tr></thead>
                 <tbody>
                 @foreach($approvals as $row)
                     <tr data-status-group="{{ $row['status_group'] }}">
+                        <td>@if($row['can_release'])<input type="checkbox" class="release-cv-checkbox form-check-input" value="{{ $row['id'] }}" aria-label="Select {{ $row['check_voucher'] }} for release">@else<span class="text-muted">-</span>@endif</td>
                         <td class="text-nowrap" data-order="{{ $row['payment_date'] ?: '' }}">{{ $row['payment_date'] ? \Carbon\Carbon::parse($row['payment_date'])->format('M d, Y') : '-' }}</td>
                         <td><div class="fw-semibold">{{ $row['payment_no'] }}</div><small class="text-muted">{{ $row['shipment_job_id'] }}</small></td>
                         <td><a href="{{ route('erp.payables.check-voucher', $row['id']) }}" class="fw-semibold text-decoration-none">{{ $row['check_voucher'] }}</a></td>
@@ -169,17 +182,51 @@
 @push('scripts')
 <script>
     var checkPreparationTableElement = document.querySelector('.module-table');
-    var activeCheckPreparationStatus = 'for_approval';
+    var activeCheckPreparationStatus = @json(request('status', 'for_approval'));
     $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
         if (settings.nTable !== checkPreparationTableElement) {
             return true;
         }
         return $(settings.aoData[dataIndex].nTr).data('status-group') === activeCheckPreparationStatus;
     });
-    var checkPreparationTable = $('.module-table').DataTable({ pageLength: 10, lengthChange: false, order: [] });
+    var checkPreparationTable = $('.module-table').DataTable({ pageLength: 10, lengthChange: false, order: [], columnDefs: [{ targets: 0, orderable: false, searchable: false }] });
+    var selectedReleaseIds = new Set();
+    function updateReleaseSelection() {
+        var boxes = checkPreparationTable.rows({ search: 'applied' }).nodes().to$().find('.release-cv-checkbox');
+        var selectedCount = boxes.filter(':checked').length;
+        $('#selectAllRelease').prop('checked', boxes.length > 0 && selectedCount === boxes.length).prop('indeterminate', selectedCount > 0 && selectedCount < boxes.length);
+        $('#releaseSelectedButton').prop('disabled', selectedReleaseIds.size === 0).text('Release Selected (' + selectedReleaseIds.size + ')');
+    }
+    function clearReleaseSelection() {
+        selectedReleaseIds.clear();
+        checkPreparationTable.rows().nodes().to$().find('.release-cv-checkbox').prop('checked', false);
+        updateReleaseSelection();
+    }
+    $('.module-table').on('change', '.release-cv-checkbox', function () {
+        if (this.checked) { selectedReleaseIds.add(this.value); } else { selectedReleaseIds.delete(this.value); }
+        updateReleaseSelection();
+    });
+    $('#selectAllRelease').on('change', function () {
+        var checked = this.checked;
+        var boxes = checkPreparationTable.rows({ search: 'applied' }).nodes().to$().find('.release-cv-checkbox');
+        if (checked && boxes.length > 100) { alert('Select up to 100 CVs at a time. Narrow your search first.'); this.checked = false; return; }
+        boxes.each(function () { this.checked = checked; if (checked) { selectedReleaseIds.add(this.value); } else { selectedReleaseIds.delete(this.value); } });
+        updateReleaseSelection();
+    });
+    checkPreparationTable.on('search.dt', clearReleaseSelection).on('draw.dt', updateReleaseSelection);
+    $('#bulkReleaseForm').on('submit', function (event) {
+        if (selectedReleaseIds.size === 0 || selectedReleaseIds.size > 100 || !confirm('Release and post ' + selectedReleaseIds.size + ' selected CV(s) to the ledger?')) { event.preventDefault(); return; }
+        $(this).find('input[name="payment_ids[]"]').remove();
+        var form = this;
+        selectedReleaseIds.forEach(function (id) { $('<input>', { type: 'hidden', name: 'payment_ids[]', value: id }).appendTo(form); });
+        $('#releaseSelectedButton').prop('disabled', true);
+    });
+    $('.check-preparation-status-tabs .nav-link').removeClass('active').filter('[data-status-group="' + activeCheckPreparationStatus + '"]').addClass('active');
     checkPreparationTable.draw();
     $('.check-preparation-status-tabs [data-status-group]').on('click', function () {
         activeCheckPreparationStatus = $(this).data('status-group');
+        $('#checkStatusFilter').val(activeCheckPreparationStatus);
+        clearReleaseSelection();
         $('.check-preparation-status-tabs .nav-link').removeClass('active');
         $(this).addClass('active');
         checkPreparationTable.draw();

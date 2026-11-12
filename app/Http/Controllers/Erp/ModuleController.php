@@ -2152,7 +2152,8 @@ class ModuleController extends Controller
 
     public function paymentApprovals()
     {
-        $approvals = $this->apPaymentRows();
+        request()->validate(['month' => 'nullable|date_format:Y-m', 'status' => 'nullable|in:approved,for_approval,cancelled_voided']);
+        $approvals = $this->apPaymentRows(request('month'));
 
         return view('erp.payables.approvals', [
             'approvals' => $approvals,
@@ -2304,12 +2305,45 @@ class ModuleController extends Controller
     public function releaseApPayment($payment)
     {
         $this->authorizeAccountingPosting('payables', 'release');
+        $this->releaseApPaymentRecord($payment);
+
+        return redirect()->route('erp.payables.approvals')->with('status', 'Payment released and posted to the ledger.');
+    }
+
+    public function releaseSelectedApPayments()
+    {
+        $this->authorizeAccountingPosting('payables', 'release');
+        $data = request()->validate([
+            'payment_ids' => 'required|array|min:1|max:100',
+            'payment_ids.*' => 'required|integer|distinct',
+            'month' => 'nullable|date_format:Y-m',
+        ]);
+        $ids = array_map('intval', $data['payment_ids']);
+        sort($ids);
+        DB::transaction(function () use ($ids, $data) {
+            foreach ($ids as $id) {
+                $this->releaseApPaymentRecord($id, $data['month'] ?? null);
+            }
+        });
+
+        return redirect()->route('erp.payables.approvals', ['month' => $data['month'] ?? null, 'status' => 'approved'])
+            ->with('status', count($ids).' CV(s) released and posted to the ledger.');
+    }
+
+    private function releaseApPaymentRecord($payment, $month = null)
+    {
         $companyId = $this->defaultCompanyId();
 
-        DB::transaction(function () use ($payment, $companyId) {
+        DB::transaction(function () use ($payment, $companyId, $month) {
             $record = DB::table('payments')->where('company_id', $companyId)
                 ->where('id', $payment)->lockForUpdate()->first();
             abort_unless($record, 404);
+
+            if (($month && substr($record->payment_date, 0, 7) !== $month) || $record->payment_date > date('Y-m-d')) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'payment_ids' => 'CV '.($record->voucher_no ?: $record->payment_no).' is outside the selected month or is post-dated. No selected CVs were released.',
+                ]);
+            }
 
             if (strtolower($this->apWorkflowStatus($record)) !== 'approved') {
                 throw \Illuminate\Validation\ValidationException::withMessages([
@@ -2370,7 +2404,6 @@ class ModuleController extends Controller
             ], $companyId);
         });
 
-        return redirect()->route('erp.payables.approvals')->with('status', 'Payment released and posted to the ledger.');
     }
 
     public function voidApPayment($payment)
@@ -3988,7 +4021,7 @@ class ModuleController extends Controller
         ]);
     }
 
-    private function apPaymentRows()
+    private function apPaymentRows($month = null)
     {
         if (!Schema::hasTable('payments')) {
             return [];
@@ -4002,6 +4035,9 @@ class ModuleController extends Controller
             ->leftJoin('suppliers', 'suppliers.id', '=', 'payments.supplier_id')
             ->select('payments.*', 'suppliers.name as supplier_name')
             ->where('payments.company_id', $this->defaultCompanyId())
+            ->when($month, function ($query) use ($month) {
+                $this->applyMonthFilter($query, 'payments.payment_date', $month);
+            })
             ->orderBy('payments.payment_date', 'desc')
             ->orderBy('payments.id', 'desc')
             ->get()
@@ -4029,6 +4065,9 @@ class ModuleController extends Controller
                 } elseif ($statusKey === 'approved') {
                     if (!$canControlChecks) {
                         $workflowMessage = 'Blocked: your role cannot print or release payments.';
+                        $workflowTone = 'text-bg-danger';
+                    } elseif ($isPostDated) {
+                        $workflowMessage = 'Blocked until '.date('M d, Y', strtotime($payment->payment_date)).': the payment is post-dated.';
                         $workflowTone = 'text-bg-danger';
                     } elseif ($isCheque && (!$issuance || (int) $issuance->print_count < 1)) {
                         if (!$voucherPrinted) {
@@ -4083,6 +4122,7 @@ class ModuleController extends Controller
                         && in_array($statusKey, ['for approval', 'pending'], true),
                     'can_release' => $canControlChecks
                         && $statusKey === 'approved'
+                        && !$isPostDated
                         && !$isPreparer
                         && (!$isCheque || ($issuance && (int) $issuance->print_count > 0)),
                     'can_print' => $canControlChecks && $isCheque

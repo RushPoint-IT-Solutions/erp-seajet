@@ -819,6 +819,99 @@ class ControlledCheckLifecycleTest extends TestCase
         ]);
     }
 
+    public function test_month_filter_limits_all_status_tabs_by_payment_date()
+    {
+        $payment = $this->approvedBatchPayment('FILTER');
+        DB::table('payments')->where('id', $payment->id)->update(['payment_date' => '2026-10-15']);
+        $this->get(route('erp.payables.approvals', ['month' => '2026-10', 'status' => 'approved']))
+            ->assertOk()->assertSee('Payment / Check Month')->assertSee('Release Selected')
+            ->assertViewHas('approvals', function ($rows) use ($payment) {
+                return collect($rows)->contains('id', $payment->id)
+                    && collect($rows)->every(function ($row) { return substr($row['payment_date'], 0, 7) === '2026-10'; });
+            });
+        $this->get(route('erp.payables.approvals', ['month' => '2026-09']))
+            ->assertViewHas('approvals', function ($rows) use ($payment) { return !collect($rows)->contains('id', $payment->id); });
+    }
+
+    public function test_bulk_release_posts_every_selected_cv_and_updates_bill_balances()
+    {
+        $first = $this->approvedBatchPayment('BULK-1');
+        $second = $this->approvedBatchPayment('BULK-2');
+        $this->post(route('erp.payables.payments.release-selected'), [
+            'payment_ids' => [$first->id, $second->id], 'month' => date('Y-m'),
+        ])->assertRedirect(route('erp.payables.approvals', ['month' => date('Y-m'), 'status' => 'approved']));
+        foreach ([$first, $second] as $payment) {
+            $this->assertDatabaseHas('payments', ['id' => $payment->id, 'status' => 'released', 'posting_status' => 'posted']);
+            $this->assertDatabaseHas('journal_entries', ['source_type' => 'payment', 'source_id' => $payment->id, 'status' => 'posted']);
+        }
+        $paidAfter = DB::table('purchase_documents')->where('document_no', $first->bill_no)->value('paid_total');
+        $this->post(route('erp.payables.payments.release-selected'), ['payment_ids' => [$first->id]])->assertSessionHasErrors('approval_status');
+        $this->assertEquals($paidAfter, DB::table('purchase_documents')->where('document_no', $first->bill_no)->value('paid_total'));
+    }
+
+    public function test_bulk_release_rolls_back_all_postings_when_one_cv_is_blocked()
+    {
+        $first = $this->approvedBatchPayment('ROLLBACK-1');
+        $second = $this->approvedBatchPayment('ROLLBACK-2');
+        DB::table('payments')->where('id', $second->id)->update(['created_by' => 900]);
+        $paidBefore = DB::table('purchase_documents')->where('document_no', $first->bill_no)->value('paid_total');
+        $this->post(route('erp.payables.payments.release-selected'), ['payment_ids' => [$first->id, $second->id]])
+            ->assertSessionHasErrors('approval_status');
+        $this->assertDatabaseHas('payments', ['id' => $first->id, 'status' => 'approved', 'posting_status' => 'unposted']);
+        $this->assertDatabaseMissing('journal_entries', ['source_type' => 'payment', 'source_id' => $first->id]);
+        $this->assertEquals($paidBefore, DB::table('purchase_documents')->where('document_no', $first->bill_no)->value('paid_total'));
+    }
+
+    public function test_bulk_release_rejects_unprinted_cheques_and_out_of_month_or_future_dates()
+    {
+        $payment = $this->approvedBatchPayment('BLOCKED');
+        DB::table('payments')->where('id', $payment->id)->update(['payment_method' => 'Cheque']);
+        $this->post(route('erp.payables.payments.release-selected'), ['payment_ids' => [$payment->id]])->assertSessionHasErrors('check');
+        DB::table('payments')->where('id', $payment->id)->update(['payment_method' => 'Bank', 'payment_date' => '2026-10-15']);
+        $this->post(route('erp.payables.payments.release-selected'), ['payment_ids' => [$payment->id], 'month' => '2026-09'])->assertSessionHasErrors('payment_ids');
+        DB::table('payments')->where('id', $payment->id)->update(['payment_date' => date('Y-m-d', strtotime('+1 day'))]);
+        $this->post(route('erp.payables.payments.release-selected'), ['payment_ids' => [$payment->id]])->assertSessionHasErrors('payment_ids');
+        $this->assertDatabaseHas('payments', ['id' => $payment->id, 'posting_status' => 'unposted']);
+    }
+
+    public function test_bulk_release_enforces_company_and_role_permissions()
+    {
+        $payment = $this->approvedBatchPayment('ACCESS');
+        $otherCompany = (array) DB::table('companies')->where('id', $payment->company_id)->first();
+        unset($otherCompany['id']);
+        $otherCompany['code'] = 'QA-OTHER';
+        $otherCompanyId = DB::table('companies')->insertGetId($otherCompany);
+        DB::table('payments')->where('id', $payment->id)->update(['company_id' => $otherCompanyId]);
+        $this->post(route('erp.payables.payments.release-selected'), ['payment_ids' => [$payment->id]])->assertStatus(404);
+        DB::table('payments')->where('id', $payment->id)->update(['company_id' => $payment->company_id]);
+        $user = new User();
+        $user->id = 901;
+        $user->company_id = $payment->company_id;
+        $user->role = 'accounts_receivable';
+        $this->actingAs($user);
+        $this->post(route('erp.payables.payments.release-selected'), ['payment_ids' => [$payment->id]])->assertStatus(403);
+        $this->assertDatabaseHas('payments', ['id' => $payment->id, 'posting_status' => 'unposted']);
+    }
+
+    private function approvedBatchPayment($suffix)
+    {
+        $this->actingAsAdmin();
+        $billData = (array) DB::table('purchase_documents')->where('currency', 'PHP')->where('grand_total', '>', 20)->first();
+        unset($billData['id']);
+        $billId = DB::table('purchase_documents')->insertGetId(array_merge($billData, [
+            'document_no' => 'BILL-'.$suffix, 'paid_total' => 0, 'status' => 'posted', 'journal_entry_id' => null,
+        ]));
+        $bill = DB::table('purchase_documents')->where('id', $billId)->first();
+        $bank = DB::table('bank_accounts')->where('company_id', $bill->company_id)->where('currency', 'PHP')->first();
+        $this->post(route('erp.payables.payments.review'), $this->paymentPayload($bill, $bank, [
+            'payment_no' => 'PV-'.$suffix, 'payment_method' => 'Bank', 'amount' => '1.25',
+        ]))->assertOk();
+        $payment = DB::table('payments')->where('payment_no', 'PV-'.$suffix)->first();
+        $this->actingAsFinance($bill->company_id);
+        $this->post(route('erp.payables.payments.approve', $payment->id))->assertRedirect();
+        return DB::table('payments')->where('id', $payment->id)->first();
+    }
+
     private function actingAsFinance($companyId)
     {
         $user = new User();
