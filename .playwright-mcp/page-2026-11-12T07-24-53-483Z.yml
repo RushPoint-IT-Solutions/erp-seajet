@@ -1,0 +1,127 @@
+- generic [ref=f8e2]:
+  - complementary [ref=f8e3]:
+    - img "SeaJet ERP logo" [ref=f8e5]
+    - navigation [ref=f8e6]:
+      - link " Dashboard" [ref=f8e8] [cursor=pointer]:
+        - /url: http://localhost/seajet/public
+        - generic [ref=f8e9]: 
+        - generic [ref=f8e10]: Dashboard
+      - link " Clients" [ref=f8e12] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/customers
+        - generic [ref=f8e13]: 
+        - generic [ref=f8e14]: Clients
+      - link " AR Invoices" [ref=f8e16] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/invoices
+        - generic [ref=f8e17]: 
+        - generic [ref=f8e18]: AR Invoices
+      - link " AR Collections" [ref=f8e20] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/payments/create
+        - generic [ref=f8e21]: 
+        - generic [ref=f8e22]: AR Collections
+      - link " Vendors" [ref=f8e24] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/suppliers
+        - generic [ref=f8e25]: 
+        - generic [ref=f8e26]: Vendors
+      - link " Accounts Payable (AP)" [ref=f8e28] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/expenses
+        - generic [ref=f8e29]: 
+        - generic [ref=f8e30]: Accounts Payable (AP)
+      - link " Check Preparation" [ref=f8e32] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/payables/payment-approvals
+        - generic [ref=f8e33]: 
+        - generic [ref=f8e34]: Check Preparation
+      - link " Journal Entries" [ref=f8e36] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/accounting/journal-entries
+        - generic [ref=f8e37]: 
+        - generic [ref=f8e38]: Journal Entries
+      - generic [ref=f8e39]:
+        - button " Reports " [ref=f8e40] [cursor=pointer]:
+          - generic [ref=f8e41]: 
+          - generic [ref=f8e42]: Reports
+          - generic [ref=f8e43]: 
+        - text:      
+      - link " User Access Control" [ref=f8e45] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/users
+        - generic [ref=f8e46]: 
+        - generic [ref=f8e47]: User Access Control
+      - link " Finance Settings" [ref=f8e49] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/settings
+        - generic [ref=f8e50]: 
+        - generic [ref=f8e51]: Finance Settings
+  - main [ref=f8e52]:
+    - generic [ref=f8e53]:
+      - generic [ref=f8e54]:
+        - generic [ref=f8e55]: Review AP Payment
+        - text: Multi-company | Multi-branch | Multi-currency ready
+      - generic [ref=f8e56]:
+        - link " System Update" [ref=f8e57] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/system-update
+          - generic [ref=f8e58]: 
+          - text: System Update
+        - link "" [ref=f8e59] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/notifications
+        - link " Quick Entry" [ref=f8e61] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/invoices/create
+          - generic [ref=f8e62]: 
+          - text: Quick Entry
+        - generic [ref=f8e63]:
+          - button " ERP Admin" [ref=f8e64] [cursor=pointer]:
+            - generic [ref=f8e65]: 
+            - text: ERP Admin
+          - text: 
+    - generic [ref=f8e66]:
+      - generic [ref=f8e67]:
+        - generic [ref=f8e68]:
+          - heading "AP Payment Ready" [level=1] [ref=f8e69]
+          - paragraph [ref=f8e70]: Payment details captured for approval, voucher printing, and check processing.
+        - generic [ref=f8e71]:
+          - link " Check Voucher" [ref=f8e72] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/358
+            - generic [ref=f8e73]: 
+            - text: Check Voucher
+          - link " Approval Queue" [ref=f8e74] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/payment-approvals
+            - generic [ref=f8e75]: 
+            - text: Approval Queue
+      - generic [ref=f8e77]:
+        - generic [ref=f8e78]:
+          - generic [ref=f8e79]: Id
+          - generic [ref=f8e80]: "358"
+        - generic [ref=f8e81]:
+          - generic [ref=f8e82]: Payment No
+          - generic [ref=f8e83]: CV-89015
+        - generic [ref=f8e84]:
+          - generic [ref=f8e85]: Voucher No
+          - generic [ref=f8e86]: CV-MB-08029
+        - generic [ref=f8e87]:
+          - generic [ref=f8e88]: Supplier Id
+          - generic [ref=f8e89]: VND-0001
+        - generic [ref=f8e90]:
+          - generic [ref=f8e91]: Supplier Name
+          - generic [ref=f8e92]: 1988 GOLDEN CHEF CORPORATION
+        - generic [ref=f8e93]:
+          - generic [ref=f8e94]: Payee Name
+          - generic [ref=f8e95]: QA TEST ONLY - CDB visibility
+        - generic [ref=f8e96]: Shipment Job Id
+        - generic [ref=f8e98]:
+          - generic [ref=f8e99]: Bill No
+          - generic [ref=f8e100]: BILL-M06058
+        - generic [ref=f8e101]:
+          - generic [ref=f8e102]: Payment Date
+          - generic [ref=f8e103]: 2026-10-15
+        - generic [ref=f8e104]:
+          - generic [ref=f8e105]: Payment Method
+          - generic [ref=f8e106]: Bank
+        - generic [ref=f8e107]:
+          - generic [ref=f8e108]: Bank Account
+          - generic [ref=f8e109]: "1647164003554"
+        - generic [ref=f8e110]: Check No
+        - generic [ref=f8e112]:
+          - generic [ref=f8e113]: Currency
+          - generic [ref=f8e114]: PHP
+        - generic [ref=f8e115]:
+          - generic [ref=f8e116]: Amount
+          - generic [ref=f8e117]: "123.45"
+        - generic [ref=f8e118]:
+          - generic [ref=f8e119]: Approval Status
+          - generic [ref=f8e120]: For Approval

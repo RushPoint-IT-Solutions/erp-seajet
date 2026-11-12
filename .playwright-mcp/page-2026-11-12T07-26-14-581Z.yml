@@ -1,0 +1,49 @@
+- main [ref=f12e2]:
+  - generic [ref=f12e3]:
+    - complementary [ref=f12e4]:
+      - generic [ref=f12e5]:
+        - generic [ref=f12e6]:
+          - img "SeaJet ERP logo" [ref=f12e8]
+          - generic [ref=f12e9]:
+            - generic [ref=f12e10]: 
+            - text: Secure ERP
+        - generic [ref=f12e11]:
+          - heading "SeaJet ERP" [level=1] [ref=f12e12]
+          - paragraph [ref=f12e13]: Finance, billing, collections, banking, and reporting in one controlled workspace.
+      - generic [ref=f12e14]:
+        - generic [ref=f12e15]:
+          - generic [ref=f12e16]:
+            - generic [ref=f12e17]: SeaJet Holdings
+            - text: Primary company workspace
+          - generic [ref=f12e18]: Ready
+        - generic [ref=f12e19]:
+          - generic [ref=f12e20]:
+            - generic [ref=f12e21]: Access Control
+            - text: Role-based permissions active
+          - generic [ref=f12e22]: Live
+    - generic [ref=f12e24]:
+      - generic [ref=f12e25]:
+        - generic [ref=f12e26]: Welcome Back
+        - heading "Sign in to your account" [level=2] [ref=f12e27]
+        - paragraph [ref=f12e28]: Use your ERP credentials to continue.
+      - generic [ref=f12e29]:
+        - generic [ref=f12e30]:
+          - generic [ref=f12e31]: Email address
+          - generic [ref=f12e32]:
+            - generic: 
+            - textbox "Email address" [active] [ref=f12e33]: finance@seajet.test
+          - generic [ref=f12e34]: These credentials do not match our records.
+        - generic [ref=f12e35]:
+          - generic [ref=f12e36]: Password
+          - generic [ref=f12e37]:
+            - generic: 
+            - textbox "Password" [ref=f12e38]
+        - generic [ref=f12e40]:
+          - checkbox "Remember me" [ref=f12e41]
+          - generic [ref=f12e42]: Remember me
+        - button " Sign in" [ref=f12e43] [cursor=pointer]:
+          - generic [ref=f12e44]: 
+          - text: Sign in
+      - generic [ref=f12e45]:
+        - generic [ref=f12e46]: SeaJet ERP
+        - generic [ref=f12e47]: November 12, 2026

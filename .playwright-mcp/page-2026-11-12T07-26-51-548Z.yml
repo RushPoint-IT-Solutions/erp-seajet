@@ -1,0 +1,143 @@
+- generic [ref=f14e2]:
+  - complementary [ref=f14e3]:
+    - img "SeaJet ERP logo" [ref=f14e5]
+    - navigation [ref=f14e6]:
+      - link " Dashboard" [ref=f14e8] [cursor=pointer]:
+        - /url: http://localhost/seajet/public
+        - generic [ref=f14e9]: 
+        - generic [ref=f14e10]: Dashboard
+      - link " Clients" [ref=f14e12] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/customers
+        - generic [ref=f14e13]: 
+        - generic [ref=f14e14]: Clients
+      - link " AR Invoices" [ref=f14e16] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/invoices
+        - generic [ref=f14e17]: 
+        - generic [ref=f14e18]: AR Invoices
+      - link " AR Collections" [ref=f14e20] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/payments/create
+        - generic [ref=f14e21]: 
+        - generic [ref=f14e22]: AR Collections
+      - link " Vendors" [ref=f14e24] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/suppliers
+        - generic [ref=f14e25]: 
+        - generic [ref=f14e26]: Vendors
+      - link " Accounts Payable (AP)" [ref=f14e28] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/expenses
+        - generic [ref=f14e29]: 
+        - generic [ref=f14e30]: Accounts Payable (AP)
+      - link " Check Preparation" [ref=f14e32] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/payables/payment-approvals
+        - generic [ref=f14e33]: 
+        - generic [ref=f14e34]: Check Preparation
+      - link " Journal Entries" [ref=f14e36] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/accounting/journal-entries
+        - generic [ref=f14e37]: 
+        - generic [ref=f14e38]: Journal Entries
+      - generic [ref=f14e39]:
+        - button " Reports " [ref=f14e40] [cursor=pointer]:
+          - generic [ref=f14e41]: 
+          - generic [ref=f14e42]: Reports
+          - generic [ref=f14e43]: 
+        - text:      
+      - link " User Access Control" [ref=f14e45] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/users
+        - generic [ref=f14e46]: 
+        - generic [ref=f14e47]: User Access Control
+      - link " Finance Settings" [ref=f14e49] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/settings
+        - generic [ref=f14e50]: 
+        - generic [ref=f14e51]: Finance Settings
+  - main [ref=f14e52]:
+    - generic [ref=f14e53]:
+      - generic [ref=f14e54]:
+        - generic [ref=f14e55]: AP Payment Approvals
+        - text: Multi-company | Multi-branch | Multi-currency ready
+      - generic [ref=f14e56]:
+        - link " System Update" [ref=f14e57] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/system-update
+          - generic [ref=f14e58]: 
+          - text: System Update
+        - link "" [ref=f14e59] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/notifications
+        - link " Quick Entry" [ref=f14e61] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/invoices/create
+          - generic [ref=f14e62]: 
+          - text: Quick Entry
+        - generic [ref=f14e63]:
+          - button " ERP Admin" [ref=f14e64] [cursor=pointer]:
+            - generic [ref=f14e65]: 
+            - text: ERP Admin
+          - text: 
+    - generic [ref=f14e66]:
+      - generic [ref=f14e67]:
+        - generic [ref=f14e68]:
+          - heading "Controlled Payment Queue" [level=1] [ref=f14e69]
+          - paragraph [ref=f14e70]: Preparation, approval, check printing, and release are separate accountable steps.
+        - generic [ref=f14e71]:
+          - link " Check Register" [ref=f14e72] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/check-register
+            - generic [ref=f14e73]: 
+            - text: Check Register
+          - link " New Payment" [ref=f14e74] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/payments/create?method=Cheque
+            - generic [ref=f14e75]: 
+            - text: New Payment
+      - generic [ref=f14e76]:
+        - strong [ref=f14e77]: "Control sequence:"
+        - text: another authorized user approves the preparer's payment; cheque payments must then be printed and recorded; release performs the accounting posting.
+      - tablist "Check preparation status filter" [ref=f14e78]:
+        - button "Approved 332" [ref=f14e79] [cursor=pointer]:
+          - text: Approved
+          - generic [ref=f14e80]: "332"
+        - button "For Approval 0" [ref=f14e81] [cursor=pointer]:
+          - text: For Approval
+          - generic [ref=f14e82]: "0"
+        - button "Cancelled / Voided 9" [ref=f14e83] [cursor=pointer]:
+          - text: Cancelled / Voided
+          - generic [ref=f14e84]: "9"
+      - generic [ref=f14e87]:
+        - generic [ref=f14e91]:
+          - generic [ref=f14e92]: "Search:"
+          - searchbox "Search:" [ref=f14e93]
+        - table [ref=f14e96]:
+          - rowgroup [ref=f14e109]:
+            - row [ref=f14e110]:
+              - 'columnheader "Payment: Activate to sort" [ref=f14e111] [cursor=pointer]':
+                - button "Payment" [ref=f14e112]
+              - 'columnheader "Check Voucher: Activate to sort" [ref=f14e114] [cursor=pointer]':
+                - button "Check Voucher" [ref=f14e115]
+              - 'columnheader "Supplier: Activate to sort" [ref=f14e117] [cursor=pointer]':
+                - button "Supplier" [ref=f14e118]
+              - 'columnheader "Method: Activate to sort" [ref=f14e120] [cursor=pointer]':
+                - button "Method" [ref=f14e121]
+              - 'columnheader "Check No.: Activate to sort" [ref=f14e123] [cursor=pointer]':
+                - button "Check No." [ref=f14e124]
+              - 'columnheader "Currency: Activate to sort" [ref=f14e126] [cursor=pointer]':
+                - button "Currency" [ref=f14e127]
+              - 'columnheader "Amount: Activate to sort" [ref=f14e129] [cursor=pointer]':
+                - button "Amount" [ref=f14e130]
+              - 'columnheader "Status: Activate to sort" [ref=f14e132] [cursor=pointer]':
+                - button "Status" [ref=f14e133]
+              - 'columnheader "Check Control: Activate to sort" [ref=f14e135] [cursor=pointer]':
+                - button "Check Control" [ref=f14e136]
+              - 'columnheader "Reason / Next Step: Activate to sort" [ref=f14e138] [cursor=pointer]':
+                - button "Reason / Next Step" [ref=f14e139]
+              - 'columnheader "Actions: Activate to sort" [ref=f14e141] [cursor=pointer]':
+                - button "Actions" [ref=f14e142]
+          - rowgroup [ref=f14e144]:
+            - row [ref=f14e145]:
+              - cell "No matching records found" [ref=f14e146]
+          - rowgroup
+        - generic [ref=f14e147]:
+          - status [ref=f14e149]: Showing 0 to 0 of 0 entries (filtered from 341 total entries)
+          - list [ref=f14e152]:
+            - listitem [ref=f14e153]:
+              - generic "First": «
+            - listitem [ref=f14e154]:
+              - generic "Previous": ‹
+            - listitem [ref=f14e155]:
+              - generic "Next": ›
+            - listitem [ref=f14e156]:
+              - generic "Last": »
+      - text:   

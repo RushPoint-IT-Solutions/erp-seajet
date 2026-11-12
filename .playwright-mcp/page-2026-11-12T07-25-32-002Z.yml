@@ -1,0 +1,410 @@
+- generic [ref=f10e2]:
+  - complementary [ref=f10e3]:
+    - img "SeaJet ERP logo" [ref=f10e5]
+    - navigation [ref=f10e6]:
+      - link " Dashboard" [ref=f10e8] [cursor=pointer]:
+        - /url: http://localhost/seajet/public
+        - generic [ref=f10e9]: 
+        - generic [ref=f10e10]: Dashboard
+      - link " Clients" [ref=f10e12] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/customers
+        - generic [ref=f10e13]: 
+        - generic [ref=f10e14]: Clients
+      - link " AR Invoices" [ref=f10e16] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/invoices
+        - generic [ref=f10e17]: 
+        - generic [ref=f10e18]: AR Invoices
+      - link " AR Collections" [ref=f10e20] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/payments/create
+        - generic [ref=f10e21]: 
+        - generic [ref=f10e22]: AR Collections
+      - link " Vendors" [ref=f10e24] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/suppliers
+        - generic [ref=f10e25]: 
+        - generic [ref=f10e26]: Vendors
+      - link " Accounts Payable (AP)" [ref=f10e28] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/expenses
+        - generic [ref=f10e29]: 
+        - generic [ref=f10e30]: Accounts Payable (AP)
+      - link " Check Preparation" [ref=f10e32] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/payables/payment-approvals
+        - generic [ref=f10e33]: 
+        - generic [ref=f10e34]: Check Preparation
+      - link " Journal Entries" [ref=f10e36] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/accounting/journal-entries
+        - generic [ref=f10e37]: 
+        - generic [ref=f10e38]: Journal Entries
+      - generic [ref=f10e39]:
+        - button " Reports " [ref=f10e40] [cursor=pointer]:
+          - generic [ref=f10e41]: 
+          - generic [ref=f10e42]: Reports
+          - generic [ref=f10e43]: 
+        - text:      
+      - link " User Access Control" [ref=f10e45] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/users
+        - generic [ref=f10e46]: 
+        - generic [ref=f10e47]: User Access Control
+      - link " Finance Settings" [ref=f10e49] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/settings
+        - generic [ref=f10e50]: 
+        - generic [ref=f10e51]: Finance Settings
+  - main [ref=f10e52]:
+    - generic [ref=f10e53]:
+      - generic [ref=f10e54]:
+        - generic [ref=f10e55]: AP Payment Approvals
+        - text: Multi-company | Multi-branch | Multi-currency ready
+      - generic [ref=f10e56]:
+        - link " System Update" [ref=f10e57] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/system-update
+          - generic [ref=f10e58]: 
+          - text: System Update
+        - link "" [ref=f10e59] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/notifications
+        - link " Quick Entry" [ref=f10e61] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/invoices/create
+          - generic [ref=f10e62]: 
+          - text: Quick Entry
+        - generic [ref=f10e63]:
+          - button " ERP Admin" [ref=f10e64] [cursor=pointer]:
+            - generic [ref=f10e65]: 
+            - text: ERP Admin
+          - text: 
+    - generic [ref=f10e66]:
+      - generic [ref=f10e67]:
+        - generic [ref=f10e68]:
+          - heading "Controlled Payment Queue" [level=1] [ref=f10e69]
+          - paragraph [ref=f10e70]: Preparation, approval, check printing, and release are separate accountable steps.
+        - generic [ref=f10e71]:
+          - link " Check Register" [ref=f10e72] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/check-register
+            - generic [ref=f10e73]: 
+            - text: Check Register
+          - link " New Payment" [ref=f10e74] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/payments/create?method=Cheque
+            - generic [ref=f10e75]: 
+            - text: New Payment
+      - generic [ref=f10e76]: Payment approved. It has not been posted or released yet.
+      - generic [ref=f10e77]:
+        - strong [ref=f10e78]: "Control sequence:"
+        - text: another authorized user approves the preparer's payment; cheque payments must then be printed and recorded; release performs the accounting posting.
+      - tablist "Check preparation status filter" [ref=f10e79]:
+        - button "Approved 332" [active] [ref=f10e80] [cursor=pointer]:
+          - text: Approved
+          - generic [ref=f10e81]: "332"
+        - button "For Approval 0" [ref=f10e82] [cursor=pointer]:
+          - text: For Approval
+          - generic [ref=f10e83]: "0"
+        - button "Cancelled / Voided 9" [ref=f10e84] [cursor=pointer]:
+          - text: Cancelled / Voided
+          - generic [ref=f10e85]: "9"
+      - generic [ref=f10e88]:
+        - generic [ref=f10e92]:
+          - generic [ref=f10e93]: "Search:"
+          - searchbox "Search:" [ref=f10e94]
+        - table [ref=f10e97]:
+          - rowgroup [ref=f10e110]:
+            - row [ref=f10e111]:
+              - 'columnheader "Payment: Activate to sort" [ref=f10e112] [cursor=pointer]':
+                - button "Payment" [ref=f10e113]
+              - 'columnheader "Check Voucher: Activate to sort" [ref=f10e115] [cursor=pointer]':
+                - button "Check Voucher" [ref=f10e116]
+              - 'columnheader "Supplier: Activate to sort" [ref=f10e118] [cursor=pointer]':
+                - button "Supplier" [ref=f10e119]
+              - 'columnheader "Method: Activate to sort" [ref=f10e121] [cursor=pointer]':
+                - button "Method" [ref=f10e122]
+              - 'columnheader "Check No.: Activate to sort" [ref=f10e124] [cursor=pointer]':
+                - button "Check No." [ref=f10e125]
+              - 'columnheader "Currency: Activate to sort" [ref=f10e127] [cursor=pointer]':
+                - button "Currency" [ref=f10e128]
+              - 'columnheader "Amount: Activate to sort" [ref=f10e130] [cursor=pointer]':
+                - button "Amount" [ref=f10e131]
+              - 'columnheader "Status: Activate to sort" [ref=f10e133] [cursor=pointer]':
+                - button "Status" [ref=f10e134]
+              - 'columnheader "Check Control: Activate to sort" [ref=f10e136] [cursor=pointer]':
+                - button "Check Control" [ref=f10e137]
+              - 'columnheader "Reason / Next Step: Activate to sort" [ref=f10e139] [cursor=pointer]':
+                - button "Reason / Next Step" [ref=f10e140]
+              - 'columnheader "Actions: Activate to sort" [ref=f10e142] [cursor=pointer]':
+                - button "Actions" [ref=f10e143]
+          - rowgroup [ref=f10e145]:
+            - row [ref=f10e158]:
+              - cell "CV-89015 -" [ref=f10e159]:
+                - generic [ref=f10e160]: CV-89015
+                - text: "-"
+              - cell [ref=f10e161]:
+                - link "CV-MB-08029" [ref=f10e162] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/358
+              - cell "QA TEST ONLY - CDB visibility" [ref=f10e163]
+              - cell "Bank" [ref=f10e164]
+              - cell "-" [ref=f10e165]
+              - cell "PHP" [ref=f10e166]
+              - cell "123.45" [ref=f10e167]
+              - cell "Approved" [ref=f10e168]
+              - cell "Not applicable" [ref=f10e170]
+              - 'cell "Blocked: the payment preparer cannot release it. Another authorized user must release it." [ref=f10e171]'
+              - cell [ref=f10e173]:
+                - generic [ref=f10e174]:
+                  - link "Voucher" [ref=f10e175] [cursor=pointer]:
+                    - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/358
+                  - button "Void" [ref=f10e176] [cursor=pointer]
+            - row [ref=f10e177]:
+              - cell "CV-89010 -" [ref=f10e178]:
+                - generic [ref=f10e179]: CV-89010
+                - text: "-"
+              - cell [ref=f10e180]:
+                - link "CV-89007" [ref=f10e181] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/353
+              - cell "BTDT REALTY CORPORATION" [ref=f10e182]
+              - cell "Cheque" [ref=f10e183]
+              - cell "588967" [ref=f10e184]
+              - cell "PHP" [ref=f10e185]
+              - cell "16,371.00" [ref=f10e186]
+              - cell "Approved" [ref=f10e187]
+              - 'cell "Assigned Prints: 0" [ref=f10e189]':
+                - generic [ref=f10e190]: Assigned
+                - generic [ref=f10e191]: "Prints: 0"
+              - 'cell "Next step: print and record the Check." [ref=f10e192]'
+              - cell [ref=f10e194]:
+                - generic [ref=f10e195]:
+                  - link "Print Check" [ref=f10e196] [cursor=pointer]:
+                    - /url: http://localhost/seajet/public/erp/payables/check/print/353
+                  - link "Voucher" [ref=f10e197] [cursor=pointer]:
+                    - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/353
+                  - button "Void" [ref=f10e198] [cursor=pointer]
+            - row [ref=f10e199]:
+              - cell "CV-89007 -" [ref=f10e200]:
+                - generic [ref=f10e201]: CV-89007
+                - text: "-"
+              - cell [ref=f10e202]:
+                - link "CV-89006" [ref=f10e203] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/346
+              - cell "SINOTRANS CONTAINER LINES (PHILIPPINES), INC." [ref=f10e204]
+              - cell "Cheque" [ref=f10e205]
+              - cell "588966" [ref=f10e206]
+              - cell "PHP" [ref=f10e207]
+              - cell "70,792.93" [ref=f10e208]
+              - cell "Approved" [ref=f10e209]
+              - 'cell "Printed Prints: 1" [ref=f10e211]':
+                - generic [ref=f10e212]: Printed
+                - generic [ref=f10e213]: "Prints: 1"
+              - cell "Ready for release." [ref=f10e214]
+              - cell [ref=f10e216]:
+                - generic [ref=f10e217]:
+                  - link "Reprint Check" [ref=f10e218] [cursor=pointer]:
+                    - /url: http://localhost/seajet/public/erp/payables/check/print/346
+                  - button "Release" [ref=f10e220] [cursor=pointer]
+                  - link "Voucher" [ref=f10e221] [cursor=pointer]:
+                    - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/346
+                  - button "Void" [ref=f10e222] [cursor=pointer]
+            - row [ref=f10e223]:
+              - cell "CV-89006 -" [ref=f10e224]:
+                - generic [ref=f10e225]: CV-89006
+                - text: "-"
+              - cell [ref=f10e226]:
+                - link "CV-89005" [ref=f10e227] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/345
+              - cell "INTERNATIONAL CONTAINER TERMINAL SERVICES" [ref=f10e228]
+              - cell "Cheque" [ref=f10e229]
+              - cell "588965" [ref=f10e230]
+              - cell "PHP" [ref=f10e231]
+              - cell "6,737.19" [ref=f10e232]
+              - cell "Approved" [ref=f10e233]
+              - 'cell "Printed Prints: 1" [ref=f10e235]':
+                - generic [ref=f10e236]: Printed
+                - generic [ref=f10e237]: "Prints: 1"
+              - cell "Ready for release." [ref=f10e238]
+              - cell [ref=f10e240]:
+                - generic [ref=f10e241]:
+                  - link "Reprint Check" [ref=f10e242] [cursor=pointer]:
+                    - /url: http://localhost/seajet/public/erp/payables/check/print/345
+                  - button "Release" [ref=f10e244] [cursor=pointer]
+                  - link "Voucher" [ref=f10e245] [cursor=pointer]:
+                    - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/345
+                  - button "Void" [ref=f10e246] [cursor=pointer]
+            - row [ref=f10e247]:
+              - cell "CV-89005 -" [ref=f10e248]:
+                - generic [ref=f10e249]: CV-89005
+                - text: "-"
+              - cell [ref=f10e250]:
+                - link "CV-89004" [ref=f10e251] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/344
+              - cell "INTERNATIONAL CONTAINER TERMINAL SERVICES" [ref=f10e252]
+              - cell "Cheque" [ref=f10e253]
+              - cell "588964" [ref=f10e254]
+              - cell "PHP" [ref=f10e255]
+              - cell "20,806.24" [ref=f10e256]
+              - cell "Approved" [ref=f10e257]
+              - 'cell "Printed Prints: 1" [ref=f10e259]':
+                - generic [ref=f10e260]: Printed
+                - generic [ref=f10e261]: "Prints: 1"
+              - cell "Ready for release." [ref=f10e262]
+              - cell [ref=f10e264]:
+                - generic [ref=f10e265]:
+                  - link "Reprint Check" [ref=f10e266] [cursor=pointer]:
+                    - /url: http://localhost/seajet/public/erp/payables/check/print/344
+                  - button "Release" [ref=f10e268] [cursor=pointer]
+                  - link "Voucher" [ref=f10e269] [cursor=pointer]:
+                    - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/344
+                  - button "Void" [ref=f10e270] [cursor=pointer]
+            - row [ref=f10e271]:
+              - cell "CV-89004 -" [ref=f10e272]:
+                - generic [ref=f10e273]: CV-89004
+                - text: "-"
+              - cell [ref=f10e274]:
+                - link "CV-89003" [ref=f10e275] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/343
+              - cell "FM GLOBAL LOGISTICS (PHILS) INC." [ref=f10e276]
+              - cell "Cheque" [ref=f10e277]
+              - cell "588963" [ref=f10e278]
+              - cell "PHP" [ref=f10e279]
+              - cell "70,700.22" [ref=f10e280]
+              - cell "Approved" [ref=f10e281]
+              - 'cell "Printed Prints: 1" [ref=f10e283]':
+                - generic [ref=f10e284]: Printed
+                - generic [ref=f10e285]: "Prints: 1"
+              - cell "Ready for release." [ref=f10e286]
+              - cell [ref=f10e288]:
+                - generic [ref=f10e289]:
+                  - link "Reprint Check" [ref=f10e290] [cursor=pointer]:
+                    - /url: http://localhost/seajet/public/erp/payables/check/print/343
+                  - button "Release" [ref=f10e292] [cursor=pointer]
+                  - link "Voucher" [ref=f10e293] [cursor=pointer]:
+                    - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/343
+                  - button "Void" [ref=f10e294] [cursor=pointer]
+            - row [ref=f10e295]:
+              - cell "CV-89003 -" [ref=f10e296]:
+                - generic [ref=f10e297]: CV-89003
+                - text: "-"
+              - cell [ref=f10e298]:
+                - link "CV-89002" [ref=f10e299] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/342
+              - cell "PEOPLE'S AIR CARGO & WAREHOUSING CO. INC." [ref=f10e300]
+              - cell "Cheque" [ref=f10e301]
+              - cell "588962" [ref=f10e302]
+              - cell "PHP" [ref=f10e303]
+              - cell "37,184.10" [ref=f10e304]
+              - cell "Approved" [ref=f10e305]
+              - 'cell "Printed Prints: 1" [ref=f10e307]':
+                - generic [ref=f10e308]: Printed
+                - generic [ref=f10e309]: "Prints: 1"
+              - cell "Ready for release." [ref=f10e310]
+              - cell [ref=f10e312]:
+                - generic [ref=f10e313]:
+                  - link "Reprint Check" [ref=f10e314] [cursor=pointer]:
+                    - /url: http://localhost/seajet/public/erp/payables/check/print/342
+                  - button "Release" [ref=f10e316] [cursor=pointer]
+                  - link "Voucher" [ref=f10e317] [cursor=pointer]:
+                    - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/342
+                  - button "Void" [ref=f10e318] [cursor=pointer]
+            - row [ref=f10e319]:
+              - cell "CV-89001 -" [ref=f10e320]:
+                - generic [ref=f10e321]: CV-89001
+                - text: "-"
+              - cell [ref=f10e322]:
+                - link "CV-89001" [ref=f10e323] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/340
+              - cell "UTS LOGISTICS AND DISTRIBUTION CO. INC." [ref=f10e324]
+              - cell "Cheque" [ref=f10e325]
+              - cell "588961" [ref=f10e326]
+              - cell "PHP" [ref=f10e327]
+              - cell "80,072.96" [ref=f10e328]
+              - cell "Approved" [ref=f10e329]
+              - 'cell "Printed Prints: 1" [ref=f10e331]':
+                - generic [ref=f10e332]: Printed
+                - generic [ref=f10e333]: "Prints: 1"
+              - cell "Ready for release." [ref=f10e334]
+              - cell [ref=f10e336]:
+                - generic [ref=f10e337]:
+                  - link "Reprint Check" [ref=f10e338] [cursor=pointer]:
+                    - /url: http://localhost/seajet/public/erp/payables/check/print/340
+                  - button "Release" [ref=f10e340] [cursor=pointer]
+                  - link "Voucher" [ref=f10e341] [cursor=pointer]:
+                    - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/340
+                  - button "Void" [ref=f10e342] [cursor=pointer]
+            - row [ref=f10e343]:
+              - cell "CV-89000 -" [ref=f10e344]:
+                - generic [ref=f10e345]: CV-89000
+                - text: "-"
+              - cell [ref=f10e346]:
+                - link "CV-89000" [ref=f10e347] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/339
+              - cell "ANGELES ELECTRIC CORPORATION" [ref=f10e348]
+              - cell "Cheque" [ref=f10e349]
+              - cell "588960" [ref=f10e350]
+              - cell "PHP" [ref=f10e351]
+              - cell "5,580.23" [ref=f10e352]
+              - cell "Approved" [ref=f10e353]
+              - 'cell "Printed Prints: 1" [ref=f10e355]':
+                - generic [ref=f10e356]: Printed
+                - generic [ref=f10e357]: "Prints: 1"
+              - cell "Ready for release." [ref=f10e358]
+              - cell [ref=f10e360]:
+                - generic [ref=f10e361]:
+                  - link "Reprint Check" [ref=f10e362] [cursor=pointer]:
+                    - /url: http://localhost/seajet/public/erp/payables/check/print/339
+                  - button "Release" [ref=f10e364] [cursor=pointer]
+                  - link "Voucher" [ref=f10e365] [cursor=pointer]:
+                    - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/339
+                  - button "Void" [ref=f10e366] [cursor=pointer]
+            - row [ref=f10e367]:
+              - cell "CV-88999 -" [ref=f10e368]:
+                - generic [ref=f10e369]: CV-88999
+                - text: "-"
+              - cell [ref=f10e370]:
+                - link "CV-88999" [ref=f10e371] [cursor=pointer]:
+                  - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/338
+              - cell "INTERNATIONAL CONTAINER TERMINAL SERVICES" [ref=f10e372]
+              - cell "Cheque" [ref=f10e373]
+              - cell "588959" [ref=f10e374]
+              - cell "PHP" [ref=f10e375]
+              - cell "41,255.04" [ref=f10e376]
+              - cell "Approved" [ref=f10e377]
+              - 'cell "Printed Prints: 1" [ref=f10e379]':
+                - generic [ref=f10e380]: Printed
+                - generic [ref=f10e381]: "Prints: 1"
+              - cell "Ready for release." [ref=f10e382]
+              - cell [ref=f10e384]:
+                - generic [ref=f10e385]:
+                  - link "Reprint Check" [ref=f10e386] [cursor=pointer]:
+                    - /url: http://localhost/seajet/public/erp/payables/check/print/338
+                  - button "Release" [ref=f10e388] [cursor=pointer]
+                  - link "Voucher" [ref=f10e389] [cursor=pointer]:
+                    - /url: http://localhost/seajet/public/erp/payables/check-voucher/preview/338
+                  - button "Void" [ref=f10e390] [cursor=pointer]
+          - rowgroup
+        - generic [ref=f10e148]:
+          - status [ref=f10e150]: Showing 1 to 10 of 332 entries (filtered from 341 total entries)
+          - list [ref=f10e391]:
+            - listitem [ref=f10e392]:
+              - generic "First": «
+            - listitem [ref=f10e393]:
+              - generic "Previous": ‹
+            - listitem [ref=f10e394]:
+              - link "1" [ref=f10e395] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=f10e396]:
+              - link "2" [ref=f10e397] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=f10e398]:
+              - link "3" [ref=f10e399] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=f10e400]:
+              - link "4" [ref=f10e401] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=f10e402]:
+              - link "5" [ref=f10e403] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=f10e404]:
+              - generic: …
+            - listitem [ref=f10e405]:
+              - link "34" [ref=f10e406] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=f10e407]:
+              - link "Next" [ref=f10e408] [cursor=pointer]:
+                - /url: "#"
+                - text: ›
+            - listitem [ref=f10e409]:
+              - link "Last" [ref=f10e410] [cursor=pointer]:
+                - /url: "#"
+                - text: »
+      - text:   

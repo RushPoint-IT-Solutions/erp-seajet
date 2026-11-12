@@ -1,0 +1,162 @@
+- generic [ref=f4e2]:
+  - complementary [ref=f4e3]:
+    - img "SeaJet ERP logo" [ref=f4e5]
+    - navigation [ref=f4e6]:
+      - link " Dashboard" [ref=f4e8] [cursor=pointer]:
+        - /url: http://localhost/seajet/public
+        - generic [ref=f4e9]: 
+        - generic [ref=f4e10]: Dashboard
+      - link " Clients" [ref=f4e12] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/customers
+        - generic [ref=f4e13]: 
+        - generic [ref=f4e14]: Clients
+      - link " AR Invoices" [ref=f4e16] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/invoices
+        - generic [ref=f4e17]: 
+        - generic [ref=f4e18]: AR Invoices
+      - link " AR Collections" [ref=f4e20] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/payments/create
+        - generic [ref=f4e21]: 
+        - generic [ref=f4e22]: AR Collections
+      - link " Vendors" [ref=f4e24] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/suppliers
+        - generic [ref=f4e25]: 
+        - generic [ref=f4e26]: Vendors
+      - link " Accounts Payable (AP)" [ref=f4e28] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/expenses
+        - generic [ref=f4e29]: 
+        - generic [ref=f4e30]: Accounts Payable (AP)
+      - link " Check Preparation" [ref=f4e32] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/payables/payment-approvals
+        - generic [ref=f4e33]: 
+        - generic [ref=f4e34]: Check Preparation
+      - link " Journal Entries" [ref=f4e36] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/accounting/journal-entries
+        - generic [ref=f4e37]: 
+        - generic [ref=f4e38]: Journal Entries
+      - generic [ref=f4e39]:
+        - button " Reports " [ref=f4e40] [cursor=pointer]:
+          - generic [ref=f4e41]: 
+          - generic [ref=f4e42]: Reports
+          - generic [ref=f4e43]: 
+        - text:      
+      - link " User Access Control" [ref=f4e45] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/users
+        - generic [ref=f4e46]: 
+        - generic [ref=f4e47]: User Access Control
+      - link " Finance Settings" [ref=f4e49] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/settings
+        - generic [ref=f4e50]: 
+        - generic [ref=f4e51]: Finance Settings
+  - main [ref=f4e52]:
+    - generic [ref=f4e53]:
+      - generic [ref=f4e54]:
+        - generic [ref=f4e55]: AP Payment Processing
+        - text: Multi-company | Multi-branch | Multi-currency ready
+      - generic [ref=f4e56]:
+        - link " System Update" [ref=f4e57] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/system-update
+          - generic [ref=f4e58]: 
+          - text: System Update
+        - link "" [ref=f4e59] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/notifications
+        - link " Quick Entry" [ref=f4e61] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/invoices/create
+          - generic [ref=f4e62]: 
+          - text: Quick Entry
+        - generic [ref=f4e63]:
+          - button " ERP Admin" [ref=f4e64] [cursor=pointer]:
+            - generic [ref=f4e65]: 
+            - text: ERP Admin
+          - text: 
+    - generic [ref=f4e66]:
+      - generic [ref=f4e67]:
+        - generic [ref=f4e68]:
+          - heading "Payment Processing" [level=1] [ref=f4e69]
+          - paragraph [ref=f4e70]: Process approved supplier bills by bank, cheque, or online transfer in PHP or USD.
+        - generic [ref=f4e71]:
+          - link " Manual A/P Opening Balance" [ref=f4e72] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/accounting/opening-balances/manual?balance_type=ap_trade
+            - generic [ref=f4e73]: 
+            - text: Manual A/P Opening Balance
+          - link " Import Bills" [ref=f4e74] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/accounting/opening-balances/import
+            - generic [ref=f4e75]: 
+            - text: Import Bills
+          - link " Approvals" [ref=f4e76] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/payment-approvals
+            - generic [ref=f4e77]: 
+            - text: Approvals
+      - generic [ref=f4e78]:
+        - generic [ref=f4e79]:
+          - generic [ref=f4e80]:
+            - generic [ref=f4e81]: CV No
+            - textbox "Select a bank account" [ref=f4e82]
+          - generic [ref=f4e83]:
+            - generic [ref=f4e84]: Payment Date
+            - textbox [ref=f4e85]: 2026-11-12
+          - generic [ref=f4e86]:
+            - generic [ref=f4e87]: Bill No
+            - combobox [aria-hidden] [ref=f4e88]
+            - combobox [ref=f4e91] [cursor=pointer]:
+              - textbox "Select bill..." [ref=f4e92]
+          - generic [ref=f4e93]:
+            - generic [ref=f4e94]: Shipment Job ID
+            - textbox [ref=f4e95]
+          - generic [ref=f4e96]:
+            - generic [ref=f4e97]: Supplier ID
+            - combobox [aria-hidden] [ref=f4e98]
+            - combobox [ref=f4e101] [cursor=pointer]:
+              - textbox "VND-0001" [ref=f4e102]
+          - generic [ref=f4e103]:
+            - generic [ref=f4e104]: Supplier Name
+            - combobox [aria-hidden] [ref=f4e105]
+            - combobox [ref=f4e108] [cursor=pointer]:
+              - textbox "1988 GOLDEN CHEF CORPORATION" [ref=f4e109]
+          - generic [ref=f4e110]:
+            - generic [ref=f4e111]: Payee Name
+            - textbox [ref=f4e112]
+            - generic [ref=f4e113]: Editable when the check must be issued to a name other than the supplier.
+          - generic [ref=f4e114]:
+            - generic [ref=f4e115]: Payment Method
+            - combobox [aria-hidden] [ref=f4e116]
+            - combobox [ref=f4e119] [cursor=pointer]:
+              - textbox "Bank" [ref=f4e120]
+          - generic [ref=f4e121]:
+            - generic [ref=f4e122]: Bank Account
+            - combobox [aria-hidden] [ref=f4e123]
+            - combobox [ref=f4e126] [cursor=pointer]:
+              - textbox "Select account..." [ref=f4e127]
+          - generic [ref=f4e128]:
+            - generic [ref=f4e129]: Check No
+            - textbox [ref=f4e130]
+            - generic [ref=f4e131]: The next number is assigned automatically from this bank account's last check number.
+          - generic [ref=f4e132]:
+            - generic [ref=f4e133]: Currency
+            - combobox [aria-hidden] [ref=f4e134]
+            - combobox [ref=f4e137] [cursor=pointer]:
+              - textbox "PHP" [ref=f4e138]
+          - generic [ref=f4e139]:
+            - generic [ref=f4e140]: Amount
+            - textbox [ref=f4e141]
+          - generic [ref=f4e142]:
+            - generic [ref=f4e143]: USD to PHP Rate
+            - spinbutton [ref=f4e144]: "1"
+            - generic [ref=f4e145]: Required for USD payments; PHP payments use 1.000000.
+          - generic [ref=f4e146]:
+            - generic [ref=f4e147]: Workflow Status
+            - textbox [ref=f4e148]: For Approval
+            - generic [ref=f4e149]: This payment will enter the approval queue before release.
+          - generic [ref=f4e150]:
+            - generic [ref=f4e151]: Attach Documents
+            - button "Choose File" [ref=f4e152] [cursor=pointer]
+        - generic [ref=f4e153]:
+          - link "Cancel" [ref=f4e154] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables
+          - link " Clear Form" [ref=f4e155] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/payments/create?method=Bank
+            - generic [ref=f4e156]: 
+            - text: Clear Form
+          - button " Review Payment" [ref=f4e157] [cursor=pointer]:
+            - generic [ref=f4e158]: 
+            - text: Review Payment

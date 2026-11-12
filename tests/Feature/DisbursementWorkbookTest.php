@@ -144,25 +144,43 @@ class DisbursementWorkbookTest extends TestCase
         $this->assertCount(0, $this->rows());
     }
 
-    public function test_cancelled_and_voided_vouchers_remain_visible_with_zero_amounts()
+    public function test_cancelled_and_voided_vouchers_are_excluded()
     {
-        foreach (['cancelled', 'voided', 'CANCELED'] as $status) {
+        foreach (['cancelled', 'voided', 'CANCELED', ' Cancelled ', 'void', 'deleted'] as $status) {
             DB::table('payments')->insert(['status' => $status, 'currency' => 'USD', 'exchange_rate' => 56]);
         }
         DB::table('payments')->insert(['approval_status' => 'Voided']);
         $rows = $this->rows();
-        $this->assertCount(4, $rows);
-        foreach ($rows as $row) {
-            $this->assertSame('Cancelled', $row['STATUS']);
-            $this->assertSame('000471072', $row['CHECK#']);
-            foreach (['CASH IN BANK- PESO', 'CASH IN BANK-USD (PHP EQUIVALENT)', 'ACCOUNTS PAYABLE- TRADE', 'INPUT VAT', 'WITHHOLDING TAX PAYABLE', 'BANK CHARGES', 'OTHER EXPENSE'] as $column) {
-                $this->assertEquals(0, $row[$column]);
-            }
-        }
+        $this->assertCount(0, $rows);
         $this->assertEquals(6600, DB::table('payments')->first()->amount);
     }
 
-    public function test_voided_check_is_zero_even_when_payment_status_is_still_active()
+    public function test_excel_excludes_cancelled_vouchers_and_preserves_released_vouchers()
+    {
+        DB::table('payments')->insert([
+            ['payment_no' => 'CV-CANCELLED-QA', 'status' => 'cancelled'],
+            ['payment_no' => 'CV-RELEASED-QA', 'status' => 'released'],
+        ]);
+        $rows = $this->rows();
+        $this->assertCount(1, $rows);
+        $this->assertSame('CV-RELEASED-QA', $rows[0]['CV#']);
+        $this->assertEquals(6600, $rows[0]['CASH IN BANK- PESO']);
+        $path = app(XlsxReportExporter::class)->create([[
+            'columns' => array_keys($rows[0]), 'rows' => $rows,
+        ]]);
+        try {
+            $zip = new \ZipArchive();
+            $this->assertTrue($zip->open($path) === true);
+            $xml = $zip->getFromName('xl/worksheets/sheet1.xml');
+            $this->assertContains('CV-RELEASED-QA', $xml);
+            $this->assertNotContains('CV-CANCELLED-QA', $xml);
+            $zip->close();
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    public function test_voided_check_is_excluded_even_when_payment_status_is_still_active()
     {
         Schema::create('check_issuances', function (Blueprint $table) {
             $table->increments('id');
@@ -175,9 +193,7 @@ class DisbursementWorkbookTest extends TestCase
         DB::table('check_issuances')->insert([
             'company_id' => 1, 'payment_id' => $id, 'check_no' => '000471072', 'status' => 'voided',
         ]);
-        $row = $this->rows()[0];
-        $this->assertSame('Cancelled', $row['STATUS']);
-        $this->assertEquals(0, $row['ACCOUNTS PAYABLE- TRADE']);
+        $this->assertCount(0, $this->rows());
         DB::table('check_issuances')->update(['check_no' => 'OLD-CHECK']);
         $row = $this->rows()[0];
         $this->assertNotSame('Cancelled', $row['STATUS']);

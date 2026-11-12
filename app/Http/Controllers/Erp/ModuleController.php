@@ -12967,8 +12967,10 @@ class ModuleController extends Controller
             ->orderBy('payments.id')
             ->get($this->paymentReportColumns())
             ->filter(function ($payment) {
-                $statuses = [strtolower((string) $payment->status), strtolower((string) $payment->approval_status)];
-                return !empty($payment->cancelled_check) || count(array_intersect($statuses, ['released', 'posted', 'cancelled', 'canceled', 'voided', 'void'])) > 0;
+                $statuses = [strtolower(trim((string) $payment->status)), strtolower(trim((string) $payment->approval_status))];
+                return empty($payment->cancelled_check)
+                    && count(array_intersect($statuses, ['cancelled', 'canceled', 'voided', 'void', 'deleted'])) === 0
+                    && count(array_intersect($statuses, ['released', 'posted'])) > 0;
             })
             ->map(function ($payment) use ($bookLines) {
                 $cancelledStatuses = ['cancelled', 'canceled', 'voided', 'void'];
@@ -13009,7 +13011,7 @@ class ModuleController extends Controller
                     'CASH IN BANK-USD (PHP EQUIVALENT)' => strtoupper($payment->currency) === 'USD' ? $amount : 0,
                 ], $ledger);
             })
-            ->all();
+            ->values()->all();
     }
 
     private function paymentReportColumns()

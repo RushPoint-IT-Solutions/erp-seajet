@@ -1,0 +1,286 @@
+- generic [ref=f5e2]:
+  - complementary [ref=f5e3]:
+    - img "SeaJet ERP logo" [ref=f5e5]
+    - navigation [ref=f5e6]:
+      - link " Dashboard" [ref=f5e8] [cursor=pointer]:
+        - /url: http://localhost/seajet/public
+        - generic [ref=f5e9]: 
+        - generic [ref=f5e10]: Dashboard
+      - link " Clients" [ref=f5e12] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/customers
+        - generic [ref=f5e13]: 
+        - generic [ref=f5e14]: Clients
+      - link " AR Invoices" [ref=f5e16] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/invoices
+        - generic [ref=f5e17]: 
+        - generic [ref=f5e18]: AR Invoices
+      - link " AR Collections" [ref=f5e20] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/payments/create
+        - generic [ref=f5e21]: 
+        - generic [ref=f5e22]: AR Collections
+      - link " Vendors" [ref=f5e24] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/suppliers
+        - generic [ref=f5e25]: 
+        - generic [ref=f5e26]: Vendors
+      - link " Accounts Payable (AP)" [ref=f5e28] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/expenses
+        - generic [ref=f5e29]: 
+        - generic [ref=f5e30]: Accounts Payable (AP)
+      - link " Check Preparation" [ref=f5e32] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/payables/payment-approvals
+        - generic [ref=f5e33]: 
+        - generic [ref=f5e34]: Check Preparation
+      - link " Journal Entries" [ref=f5e36] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/accounting/journal-entries
+        - generic [ref=f5e37]: 
+        - generic [ref=f5e38]: Journal Entries
+      - generic [ref=f5e39]:
+        - button " Reports " [ref=f5e40] [cursor=pointer]:
+          - generic [ref=f5e41]: 
+          - generic [ref=f5e42]: Reports
+          - generic [ref=f5e43]: 
+        - text:      
+      - link " User Access Control" [ref=f5e45] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/users
+        - generic [ref=f5e46]: 
+        - generic [ref=f5e47]: User Access Control
+      - link " Finance Settings" [ref=f5e49] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/settings
+        - generic [ref=f5e50]: 
+        - generic [ref=f5e51]: Finance Settings
+  - main [ref=f5e52]:
+    - generic [ref=f5e53]:
+      - generic [ref=f5e54]:
+        - generic [ref=f5e55]: Enter Bill
+        - text: Multi-company | Multi-branch | Multi-currency ready
+      - generic [ref=f5e56]:
+        - link " System Update" [ref=f5e57] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/system-update
+          - generic [ref=f5e58]: 
+          - text: System Update
+        - link "" [ref=f5e59] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/notifications
+        - link " Quick Entry" [ref=f5e61] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/invoices/create
+          - generic [ref=f5e62]: 
+          - text: Quick Entry
+        - generic [ref=f5e63]:
+          - button " ERP Admin" [ref=f5e64] [cursor=pointer]:
+            - generic [ref=f5e65]: 
+            - text: ERP Admin
+          - text: 
+    - generic [ref=f5e68]:
+      - generic [ref=f5e69]:
+        - generic [ref=f5e70]:
+          - link " Find" [ref=f5e71] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/expenses
+            - generic [ref=f5e72]: 
+            - text: Find
+          - link " New" [ref=f5e73] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/vendor-bills/create
+            - generic [ref=f5e74]: 
+            - text: New
+          - link " Clear Form" [ref=f5e75] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/vendor-bills/create
+            - generic [ref=f5e76]: 
+            - text: Clear Form
+          - button " Save" [ref=f5e77] [cursor=pointer]:
+            - generic [ref=f5e78]: 
+            - text: Save
+          - link " Cancel" [ref=f5e79] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/expenses
+            - generic [ref=f5e80]: 
+            - text: Cancel
+          - button " Print" [ref=f5e81] [cursor=pointer]:
+            - generic [ref=f5e82]: 
+            - text: Print
+          - generic [ref=f5e83] [cursor=pointer]:
+            - generic [ref=f5e84]: 
+            - text: Attach File
+          - link " Select Vendor" [ref=f5e85] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/suppliers
+            - generic [ref=f5e86]: 
+            - text: Select Vendor
+          - button " Recalculate" [ref=f5e87] [cursor=pointer]:
+            - generic [ref=f5e88]: 
+            - text: Recalculate
+          - link " Pay Bill" [ref=f5e89] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/payments/create
+            - generic [ref=f5e90]: 
+            - text: Pay Bill
+        - link " Vendors" [ref=f5e91] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/suppliers
+          - generic [ref=f5e92]: 
+          - text: Vendors
+      - generic [ref=f5e93]:
+        - generic [ref=f5e94]:
+          - generic [ref=f5e95]:
+            - radio "Bill" [checked] [ref=f5e96]
+            - text: Bill
+          - generic [ref=f5e97]:
+            - radio "Credit" [ref=f5e98]
+            - text: Credit
+        - generic [ref=f5e99]:
+          - generic [ref=f5e100]: A/P Account
+          - combobox [ref=f5e101]:
+            - option "Select BDO or Metrobank A/P account..." [selected]
+            - option "A/P-Trade (BDO - PHP)"
+            - option "A/P-Trade (BDO - USD)" [disabled]
+            - option "A/P-Trade (Metro-PHP)"
+            - option "A/P-Trade (Metro-USD)" [disabled]
+        - generic [ref=f5e102]:
+          - checkbox "Bill Received" [ref=f5e103]
+          - text: Bill Received
+      - generic [ref=f5e104]:
+        - generic [ref=f5e105]:
+          - img "SeaJet logo" [ref=f5e106]
+          - generic [ref=f5e107]:
+            - generic [ref=f5e108]: Sea-Jet International Forwarders, Inc.
+            - generic [ref=f5e109]: Unit 18 & 19 Bldg. B, Cargo Village Complex
+            - generic [ref=f5e110]: Paranaque City 1704, Philippines
+          - generic [ref=f5e111]: Vendor Bill
+        - generic [ref=f5e113]:
+          - generic [ref=f5e114]:
+            - generic [ref=f5e115]: Bill
+            - generic [ref=f5e116]:
+              - generic [ref=f5e117]: Vendor
+              - combobox [aria-hidden] [ref=f5e118]
+              - combobox [ref=f5e121] [cursor=pointer]:
+                - textbox "Select vendor..." [ref=f5e122]
+            - generic [ref=f5e123]:
+              - generic [ref=f5e124]: Address
+              - textbox [ref=f5e125]
+            - generic [ref=f5e126]:
+              - generic [ref=f5e127]:
+                - generic [ref=f5e128]: Terms
+                - combobox [ref=f5e129]:
+                  - option [selected]
+                  - option "30 Days"
+                  - option "60 Days"
+                  - option "90 Days"
+              - generic [ref=f5e130]:
+                - generic [ref=f5e131]: Bill No (Automatic)
+                - textbox [ref=f5e132]: BILL-17596
+          - generic [ref=f5e134]:
+            - generic [ref=f5e135]:
+              - generic [ref=f5e136]: Date
+              - textbox [ref=f5e137]: 2026-11-12
+            - generic [ref=f5e138]:
+              - generic [ref=f5e139]: Ref. No
+              - textbox [ref=f5e140]
+            - generic [ref=f5e141]:
+              - generic [ref=f5e142]: Currency
+              - combobox [ref=f5e143]:
+                - option "USD"
+                - option "PHP" [selected]
+            - generic [ref=f5e144]:
+              - generic [ref=f5e145]: Amount Due
+              - textbox [ref=f5e146]
+            - generic [ref=f5e147]:
+              - generic [ref=f5e148]: PHP Amount
+              - textbox [ref=f5e149]
+            - generic [ref=f5e150]:
+              - generic [ref=f5e151]: Bill Due
+              - textbox [ref=f5e152]
+            - generic [ref=f5e153]:
+              - generic [ref=f5e154]: Bill Memo
+              - textbox [ref=f5e155]
+            - generic [ref=f5e156]:
+              - generic [ref=f5e157]: Shipment Job ID
+              - textbox [ref=f5e158]
+            - generic [ref=f5e159]:
+              - generic [ref=f5e160]: Client Tag
+              - combobox [aria-hidden] [ref=f5e161]
+              - combobox [ref=f5e164] [cursor=pointer]:
+                - textbox
+          - generic [ref=f5e166]:
+            - generic [ref=f5e167]: Net Payable
+            - generic [ref=f5e168]: PHP 0.00
+            - generic [ref=f5e169]:
+              - generic [ref=f5e171]:
+                - checkbox "VAT 12%" [ref=f5e172]
+                - generic [ref=f5e173]: VAT 12%
+              - generic [ref=f5e174]:
+                - generic [ref=f5e175]: Input VAT
+                - textbox [ref=f5e176]
+            - generic [ref=f5e177]:
+              - generic [ref=f5e178]:
+                - generic [ref=f5e179]: WHT %
+                - combobox [ref=f5e180]:
+                  - option "0%" [selected]
+                  - option "2%"
+                  - option "5%"
+                  - option "10%"
+              - generic [ref=f5e181]:
+                - generic [ref=f5e182]: WHT Amt
+                - textbox [ref=f5e183]
+        - tablist [ref=f5e184]:
+          - button "Expenses PHP 0.00" [ref=f5e185] [cursor=pointer]
+          - button "Items USD 0.00" [ref=f5e186] [cursor=pointer]
+        - table [ref=f5e188]:
+          - rowgroup [ref=f5e189]:
+            - row [ref=f5e190]:
+              - columnheader "Account" [ref=f5e191]
+              - columnheader "Tax" [ref=f5e192]
+              - columnheader "ATC / WC" [ref=f5e193]
+              - columnheader "WHT %" [ref=f5e194]
+              - columnheader "Amount" [ref=f5e195]
+              - columnheader "Customer:Job" [ref=f5e196]
+              - columnheader "Billable?" [ref=f5e197]
+              - columnheader "Class" [ref=f5e198]
+              - columnheader [ref=f5e199]
+          - rowgroup [ref=f5e200]:
+            - row [ref=f5e201]:
+              - cell [ref=f5e202]:
+                - combobox [aria-hidden] [ref=f5e203]
+                - combobox [ref=f5e206] [cursor=pointer]:
+                  - textbox "Search account" [ref=f5e207]
+              - cell "VAT 12%" [ref=f5e208]:
+                - generic [ref=f5e209]:
+                  - checkbox "VAT 12%" [ref=f5e210]
+                  - generic [ref=f5e211]: VAT 12%
+                - combobox "Expense line tax classification" [ref=f5e212]:
+                  - option [selected]
+                  - option "VAT12"
+                  - option "ZERO"
+                  - option "EXEMPT"
+              - cell [ref=f5e213]:
+                - textbox "WC160" [ref=f5e214]
+              - cell [ref=f5e215]:
+                - spinbutton [ref=f5e216]
+              - cell [ref=f5e217]:
+                - textbox [ref=f5e218]
+              - cell [ref=f5e219]:
+                - combobox [aria-hidden] [ref=f5e220]
+                - combobox [ref=f5e223] [cursor=pointer]:
+                  - textbox "Search customer" [ref=f5e224]
+              - cell [ref=f5e225]:
+                - checkbox [ref=f5e226]
+              - cell "MANILA" [ref=f5e227]:
+                - combobox [ref=f5e228]:
+                  - option
+                  - option "MANILA" [selected]
+                  - option "PAMPANGA"
+                  - option "CEBU"
+              - cell [ref=f5e229]:
+                - button "" [ref=f5e230] [cursor=pointer]
+        - button " Add Expense Line" [ref=f5e232] [cursor=pointer]:
+          - generic [ref=f5e233]: 
+          - text: Add Expense Line
+        - generic [ref=f5e234]:
+          - generic [ref=f5e235]:
+            - generic [ref=f5e236]: Exchange Rate 1 USD =
+            - textbox [ref=f5e237]: "61.393"
+            - generic [ref=f5e238]: PHP
+          - generic [ref=f5e239]:
+            - link "Clear" [ref=f5e240] [cursor=pointer]:
+              - /url: http://localhost/seajet/public/erp/expenses
+            - button " Save & Close" [ref=f5e241] [cursor=pointer]:
+              - generic [ref=f5e242]: 
+              - text: Save & Close
+            - button " Save & New" [ref=f5e243] [cursor=pointer]:
+              - generic [ref=f5e244]: 
+              - text: Save & New
+            - button " Approve & Post" [ref=f5e245] [cursor=pointer]:
+              - generic [ref=f5e246]: 
+              - text: Approve & Post

@@ -1,0 +1,238 @@
+- generic [ref=f6e2]:
+  - complementary [ref=f6e3]:
+    - img "SeaJet ERP logo" [ref=f6e5]
+    - navigation [ref=f6e6]:
+      - link " Dashboard" [ref=f6e8] [cursor=pointer]:
+        - /url: http://localhost/seajet/public
+        - generic [ref=f6e9]: 
+        - generic [ref=f6e10]: Dashboard
+      - link " Clients" [ref=f6e12] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/customers
+        - generic [ref=f6e13]: 
+        - generic [ref=f6e14]: Clients
+      - link " AR Invoices" [ref=f6e16] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/invoices
+        - generic [ref=f6e17]: 
+        - generic [ref=f6e18]: AR Invoices
+      - link " AR Collections" [ref=f6e20] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/payments/create
+        - generic [ref=f6e21]: 
+        - generic [ref=f6e22]: AR Collections
+      - link " Vendors" [ref=f6e24] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/suppliers
+        - generic [ref=f6e25]: 
+        - generic [ref=f6e26]: Vendors
+      - link " Accounts Payable (AP)" [ref=f6e28] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/expenses
+        - generic [ref=f6e29]: 
+        - generic [ref=f6e30]: Accounts Payable (AP)
+      - link " Check Preparation" [ref=f6e32] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/payables/payment-approvals
+        - generic [ref=f6e33]: 
+        - generic [ref=f6e34]: Check Preparation
+      - link " Journal Entries" [ref=f6e36] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/accounting/journal-entries
+        - generic [ref=f6e37]: 
+        - generic [ref=f6e38]: Journal Entries
+      - generic [ref=f6e39]:
+        - button " Reports " [ref=f6e40] [cursor=pointer]:
+          - generic [ref=f6e41]: 
+          - generic [ref=f6e42]: Reports
+          - generic [ref=f6e43]: 
+        - text:      
+      - link " User Access Control" [ref=f6e45] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/users
+        - generic [ref=f6e46]: 
+        - generic [ref=f6e47]: User Access Control
+      - link " Finance Settings" [ref=f6e49] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/settings
+        - generic [ref=f6e50]: 
+        - generic [ref=f6e51]: Finance Settings
+  - main [ref=f6e52]:
+    - generic [ref=f6e53]:
+      - generic [ref=f6e54]:
+        - generic [ref=f6e55]: Review Vendor Bill
+        - text: Multi-company | Multi-branch | Multi-currency ready
+      - generic [ref=f6e56]:
+        - link " System Update" [ref=f6e57] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/system-update
+          - generic [ref=f6e58]: 
+          - text: System Update
+        - link "" [ref=f6e59] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/notifications
+        - link " Quick Entry" [ref=f6e61] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/invoices/create
+          - generic [ref=f6e62]: 
+          - text: Quick Entry
+        - generic [ref=f6e63]:
+          - button " ERP Admin" [ref=f6e64] [cursor=pointer]:
+            - generic [ref=f6e65]: 
+            - text: ERP Admin
+          - text: 
+    - generic [ref=f6e66]:
+      - generic [ref=f6e67]:
+        - generic [ref=f6e68]:
+          - heading "Vendor Bill Ready for Approval" [level=1] [ref=f6e69]
+          - paragraph [ref=f6e70]: Shipment-linked AP bill captured with withholding tax and multi-currency details.
+        - generic [ref=f6e71]:
+          - link " Print Bill" [ref=f6e72] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/vendor-bills/print/BILL-M06058
+            - generic [ref=f6e73]: 
+            - text: Print Bill
+          - link " Print 2307" [ref=f6e74] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/vendor-bills/print-2307/BILL-M06058
+            - generic [ref=f6e75]: 
+            - text: Print 2307
+          - link " Check Voucher" [ref=f6e76] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/check-voucher/bill/BILL-M06058
+            - generic [ref=f6e77]: 
+            - text: Check Voucher
+          - link " Voucher Layout" [ref=f6e78] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/check-voucher/print-layout
+            - generic [ref=f6e79]: 
+            - text: Voucher Layout
+          - link " Send for Approval" [ref=f6e80] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/payment-approvals
+            - generic [ref=f6e81]: 
+            - text: Send for Approval
+      - generic [ref=f6e82]:
+        - generic [ref=f6e83]:
+          - generic [ref=f6e84]:
+            - generic [ref=f6e85]: Id
+            - generic [ref=f6e86]: "392"
+          - generic [ref=f6e87]:
+            - generic [ref=f6e88]: Transaction Type
+            - generic [ref=f6e89]: Bill
+          - generic [ref=f6e90]:
+            - generic [ref=f6e91]: Ap Account
+            - generic [ref=f6e92]: A/P-Trade (Metro-PHP)
+          - generic [ref=f6e93]:
+            - generic [ref=f6e94]: Bill Received
+            - generic [ref=f6e95]: "No"
+          - generic [ref=f6e96]:
+            - generic [ref=f6e97]: Supplier Id
+            - generic [ref=f6e98]: VND-0001
+          - generic [ref=f6e99]:
+            - generic [ref=f6e100]: Supplier Name
+            - generic [ref=f6e101]: 1988 GOLDEN CHEF CORPORATION
+          - generic [ref=f6e102]:
+            - generic [ref=f6e103]: Supplier Address
+            - generic [ref=f6e104]: NO. 8278 DR. A SANTOS AVE. BRGY. SAN ISIDRO, PARANAQUE CITY
+          - generic [ref=f6e105]: Client Customer Id
+          - generic [ref=f6e107]: Shipment Job Id
+          - generic [ref=f6e109]:
+            - generic [ref=f6e110]: Bill No
+            - generic [ref=f6e111]: BILL-M06058
+          - generic [ref=f6e112]:
+            - generic [ref=f6e113]: Bill Date
+            - generic [ref=f6e114]: 2026-10-15
+          - generic [ref=f6e115]:
+            - generic [ref=f6e116]: Reference No
+            - generic [ref=f6e117]: QA-CDB-20261112-01
+          - generic [ref=f6e118]:
+            - generic [ref=f6e119]: Due Date
+            - generic [ref=f6e120]: 2026-10-31
+          - generic [ref=f6e121]:
+            - generic [ref=f6e122]: Terms
+            - generic [ref=f6e123]: 30 Days
+          - generic [ref=f6e124]:
+            - generic [ref=f6e125]: Currency
+            - generic [ref=f6e126]: PHP
+          - generic [ref=f6e127]:
+            - generic [ref=f6e128]: Exchange Rate
+            - generic [ref=f6e129]: "61.393000"
+          - generic [ref=f6e130]:
+            - generic [ref=f6e131]: Usd To Php Rate
+            - generic [ref=f6e132]: "61.393000"
+          - generic [ref=f6e133]:
+            - generic [ref=f6e134]: Gross Amount
+            - generic [ref=f6e135]: "123.45"
+          - generic [ref=f6e136]:
+            - generic [ref=f6e137]: Php Amount
+            - generic [ref=f6e138]: "123.45"
+          - generic [ref=f6e139]:
+            - generic [ref=f6e140]: Withholding Tax Rate
+            - generic [ref=f6e141]: "0.0000"
+          - generic [ref=f6e142]:
+            - generic [ref=f6e143]: Withholding Tax Amount
+            - generic [ref=f6e144]: "0.00"
+          - generic [ref=f6e145]:
+            - generic [ref=f6e146]: Net Amount
+            - generic [ref=f6e147]: "123.45"
+          - generic [ref=f6e148]:
+            - generic [ref=f6e149]: Expense Total
+            - generic [ref=f6e150]: "123.45"
+          - generic [ref=f6e151]:
+            - generic [ref=f6e152]: Expense Balance
+            - generic [ref=f6e153]: "123.45"
+          - generic [ref=f6e154]:
+            - generic [ref=f6e155]: Line Amounts Exclude Vat
+            - generic [ref=f6e156]: "1"
+          - generic [ref=f6e157]:
+            - generic [ref=f6e158]: Memo
+            - generic [ref=f6e159]: QA TEST ONLY - cash disbursement visibility
+          - generic [ref=f6e160]:
+            - generic [ref=f6e161]: Approval Status
+            - generic [ref=f6e162]: Approved
+        - separator [ref=f6e163]
+        - heading "Expense Lines" [level=2] [ref=f6e164]
+        - table [ref=f6e166]:
+          - rowgroup [ref=f6e167]:
+            - row [ref=f6e168]:
+              - columnheader "Account" [ref=f6e169]
+              - columnheader "Tax" [ref=f6e170]
+              - columnheader "ATC / WC" [ref=f6e171]
+              - columnheader "WHT %" [ref=f6e172]
+              - columnheader "Amount" [ref=f6e173]
+              - columnheader "Customer:Job" [ref=f6e174]
+              - columnheader "Billable" [ref=f6e175]
+              - columnheader "Class" [ref=f6e176]
+          - rowgroup [ref=f6e177]:
+            - row [ref=f6e178]:
+              - cell "1170 - Advances to Suppliers" [ref=f6e179]
+              - cell "EXEMPT" [ref=f6e180]
+              - cell [ref=f6e181]
+              - cell "0.00%" [ref=f6e182]
+              - cell "123.45" [ref=f6e183]
+              - cell [ref=f6e184]
+              - cell "No" [ref=f6e185]
+              - cell "MANILA" [ref=f6e186]
+        - separator [ref=f6e187]
+        - generic [ref=f6e188]:
+          - generic [ref=f6e189]:
+            - heading "Attached Documents" [level=2] [ref=f6e190]
+            - generic [ref=f6e191]: No documents attached yet.
+          - generic [ref=f6e192]:
+            - button "Choose File" [ref=f6e193] [cursor=pointer]
+            - button " Upload" [ref=f6e194] [cursor=pointer]:
+              - generic [ref=f6e195]: 
+              - text: Upload
+        - generic [ref=f6e196]:
+          - link " Expense List" [ref=f6e197] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/expenses
+            - generic [ref=f6e198]: 
+            - text: Expense List
+          - link " Edit Bill" [ref=f6e199] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/vendor-bills/create?bill=BILL-M06058
+            - generic [ref=f6e200]: 
+            - text: Edit Bill
+          - link " Enter Another Bill" [ref=f6e201] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/vendor-bills/create
+            - generic [ref=f6e202]: 
+            - text: Enter Another Bill
+          - link " Print Bill" [ref=f6e203] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/vendor-bills/print/BILL-M06058
+            - generic [ref=f6e204]: 
+            - text: Print Bill
+          - link " Print 2307" [ref=f6e205] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/vendor-bills/print-2307/BILL-M06058
+            - generic [ref=f6e206]: 
+            - text: Print 2307
+          - link " Check Voucher" [ref=f6e207] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/check-voucher/bill/BILL-M06058
+            - generic [ref=f6e208]: 
+            - text: Check Voucher
+          - link " Pay Bill" [ref=f6e209] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/payables/payments/create?bill=BILL-M06058
+            - generic [ref=f6e210]: 
+            - text: Pay Bill

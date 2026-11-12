@@ -1,0 +1,237 @@
+- generic [ref=f3e2]:
+  - complementary [ref=f3e3]:
+    - img "SeaJet ERP logo" [ref=f3e5]
+    - navigation [ref=f3e6]:
+      - link " Dashboard" [ref=f3e8] [cursor=pointer]:
+        - /url: http://localhost/seajet/public
+        - generic [ref=f3e9]: 
+        - generic [ref=f3e10]: Dashboard
+      - link " Clients" [ref=f3e12] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/customers
+        - generic [ref=f3e13]: 
+        - generic [ref=f3e14]: Clients
+      - link " AR Invoices" [ref=f3e16] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/invoices
+        - generic [ref=f3e17]: 
+        - generic [ref=f3e18]: AR Invoices
+      - link " AR Collections" [ref=f3e20] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/payments/create
+        - generic [ref=f3e21]: 
+        - generic [ref=f3e22]: AR Collections
+      - link " Vendors" [ref=f3e24] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/suppliers
+        - generic [ref=f3e25]: 
+        - generic [ref=f3e26]: Vendors
+      - link " Accounts Payable (AP)" [ref=f3e28] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/expenses
+        - generic [ref=f3e29]: 
+        - generic [ref=f3e30]: Accounts Payable (AP)
+      - link " Check Preparation" [ref=f3e32] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/payables/payment-approvals
+        - generic [ref=f3e33]: 
+        - generic [ref=f3e34]: Check Preparation
+      - link " Journal Entries" [ref=f3e36] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/accounting/journal-entries
+        - generic [ref=f3e37]: 
+        - generic [ref=f3e38]: Journal Entries
+      - generic [ref=f3e39]:
+        - button " Reports " [expanded] [ref=f3e40] [cursor=pointer]:
+          - generic [ref=f3e41]: 
+          - generic [ref=f3e42]: Reports
+          - generic [ref=f3e43]: 
+        - generic [ref=f3e44]:
+          - link " Report Library" [ref=f3e45] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports
+            - generic [ref=f3e46]: 
+            - generic [ref=f3e47]: Report Library
+          - link " Trial Balance" [ref=f3e48] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports/trial-balance
+            - generic [ref=f3e49]: 
+            - generic [ref=f3e50]: Trial Balance
+          - link " Workbook Reports" [ref=f3e51] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports/workbook
+            - generic [ref=f3e52]: 
+            - generic [ref=f3e53]: Workbook Reports
+          - link " Financial Statements" [ref=f3e54] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports/financial-statements
+            - generic [ref=f3e55]: 
+            - generic [ref=f3e56]: Financial Statements
+          - link " Client SOA" [ref=f3e57] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports/client-statement-of-account
+            - generic [ref=f3e58]: 
+            - generic [ref=f3e59]: Client SOA
+          - link " AR Aging" [ref=f3e60] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/customer-billing/aging
+            - generic [ref=f3e61]: 
+            - generic [ref=f3e62]: AR Aging
+      - link " User Access Control" [ref=f3e64] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/users
+        - generic [ref=f3e65]: 
+        - generic [ref=f3e66]: User Access Control
+      - link " Finance Settings" [ref=f3e68] [cursor=pointer]:
+        - /url: http://localhost/seajet/public/erp/settings
+        - generic [ref=f3e69]: 
+        - generic [ref=f3e70]: Finance Settings
+  - main [ref=f3e71]:
+    - generic [ref=f3e72]:
+      - generic [ref=f3e73]:
+        - generic [ref=f3e74]: Workbook Reports
+        - text: Multi-company | Multi-branch | Multi-currency ready
+      - generic [ref=f3e75]:
+        - link " System Update" [ref=f3e76] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/system-update
+          - generic [ref=f3e77]: 
+          - text: System Update
+        - link "" [ref=f3e78] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/notifications
+        - link " Quick Entry" [ref=f3e80] [cursor=pointer]:
+          - /url: http://localhost/seajet/public/erp/invoices/create
+          - generic [ref=f3e81]: 
+          - text: Quick Entry
+        - generic [ref=f3e82]:
+          - button " ERP Admin" [ref=f3e83] [cursor=pointer]:
+            - generic [ref=f3e84]: 
+            - text: ERP Admin
+          - text: 
+    - generic [ref=f3e85]:
+      - generic [ref=f3e86]:
+        - generic [ref=f3e87]:
+          - heading "Workbook Reports" [level=1] [ref=f3e88]
+          - paragraph [ref=f3e89]: Report tabs copied from REPORTS.xlsx and connected to live ERP data.
+        - generic [ref=f3e90]:
+          - link " Reports" [ref=f3e91] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports
+            - generic [ref=f3e92]: 
+            - text: Reports
+          - link " Download Excel" [ref=f3e93] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports/workbook-excel/disbursement?period=2026-10&bank_account_ids%5B0%5D=4&bank_account_ids%5B1%5D=2
+            - generic [ref=f3e94]: 
+            - text: Download Excel
+          - link " Download All" [ref=f3e95] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports/workbook-excel/all?period=2026-10&bank_account_ids%5B0%5D=4&bank_account_ids%5B1%5D=2
+            - generic [ref=f3e96]: 
+            - text: Download All
+          - button " Print" [ref=f3e97] [cursor=pointer]:
+            - generic [ref=f3e98]: 
+            - text: Print
+      - generic [ref=f3e99]:
+        - generic [ref=f3e102]:
+          - generic [ref=f3e103]:
+            - generic [ref=f3e104]: Sales Book
+            - generic [ref=f3e105]: PHP 34,813,142.09
+          - generic [ref=f3e106]: 
+        - generic [ref=f3e110]:
+          - generic [ref=f3e111]:
+            - generic [ref=f3e112]: Official Receipts
+            - generic [ref=f3e113]: PHP 12,560,648.66
+          - generic [ref=f3e114]: 
+        - generic [ref=f3e118]:
+          - generic [ref=f3e119]:
+            - generic [ref=f3e120]: Disbursements
+            - generic [ref=f3e121]: PHP 13,618,524.31
+          - generic [ref=f3e122]: 
+        - generic [ref=f3e126]:
+          - generic [ref=f3e127]:
+            - generic [ref=f3e128]: Journal Entries
+            - generic [ref=f3e129]: "613"
+          - generic [ref=f3e130]: 
+      - generic [ref=f3e133]:
+        - generic [ref=f3e134]:
+          - generic [ref=f3e135]: Period
+          - textbox [ref=f3e136]: 2026-10
+        - generic [ref=f3e137]:
+          - generic [ref=f3e138]: Bank Accounts
+          - group [ref=f3e139]:
+            - generic "2 bank accounts selected" [ref=f3e140] [cursor=pointer]
+        - button " Apply" [ref=f3e142] [cursor=pointer]:
+          - generic [ref=f3e143]: 
+          - text: Apply
+      - list [ref=f3e146]:
+        - listitem [ref=f3e147]:
+          - link " TRIAL BALANCE" [ref=f3e148] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports/workbook/trial-balance?period=2026-10
+            - generic [ref=f3e149]: 
+            - text: TRIAL BALANCE
+        - listitem [ref=f3e150]:
+          - link " GENERAL LEDGER" [ref=f3e151] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports/workbook/general-ledger?period=2026-10
+            - generic [ref=f3e152]: 
+            - text: GENERAL LEDGER
+        - listitem [ref=f3e153]:
+          - link " BANK RECON" [ref=f3e154] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports/workbook/bank-recon?period=2026-10
+            - generic [ref=f3e155]: 
+            - text: BANK RECON
+        - listitem [ref=f3e156]:
+          - link " DISBURSEMENT" [ref=f3e157] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports/workbook/disbursement?period=2026-10
+            - generic [ref=f3e158]: 
+            - text: DISBURSEMENT
+        - listitem [ref=f3e159]:
+          - link " GENERAL JOURNAL" [ref=f3e160] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports/workbook/general-journal?period=2026-10
+            - generic [ref=f3e161]: 
+            - text: GENERAL JOURNAL
+        - listitem [ref=f3e162]:
+          - link " SOA" [ref=f3e163] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports/workbook/soa?period=2026-10
+            - generic [ref=f3e164]: 
+            - text: SOA
+        - listitem [ref=f3e165]:
+          - link " CRB-MANILA" [ref=f3e166] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports/workbook/crb-manila?period=2026-10
+            - generic [ref=f3e167]: 
+            - text: CRB-MANILA
+        - listitem [ref=f3e168]:
+          - link " CRB-PAMPANGA" [ref=f3e169] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports/workbook/crb-pampanga?period=2026-10
+            - generic [ref=f3e170]: 
+            - text: CRB-PAMPANGA
+        - listitem [ref=f3e171]:
+          - link " CRB-CEBU" [ref=f3e172] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports/workbook/crb-cebu?period=2026-10
+            - generic [ref=f3e173]: 
+            - text: CRB-CEBU
+        - listitem [ref=f3e174]:
+          - link " SALES-MANILA" [ref=f3e175] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports/workbook/sales-manila?period=2026-10
+            - generic [ref=f3e176]: 
+            - text: SALES-MANILA
+        - listitem [ref=f3e177]:
+          - link " SALES-PAMPANGA" [ref=f3e178] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports/workbook/sales-pampanga?period=2026-10
+            - generic [ref=f3e179]: 
+            - text: SALES-PAMPANGA
+        - listitem [ref=f3e180]:
+          - link " SALES CEBU" [ref=f3e181] [cursor=pointer]:
+            - /url: http://localhost/seajet/public/erp/reports/workbook/sales-cebu?period=2026-10
+            - generic [ref=f3e182]: 
+            - text: SALES CEBU
+      - generic [ref=f3e183]:
+        - generic [ref=f3e184]:
+          - generic [ref=f3e185]: SEA-JET INTERNATIONAL FORWARDERS INC.
+          - generic [ref=f3e186]: CASH DISBURSEMENT BOOK
+          - generic [ref=f3e187]: All amounts in PHP. USD transactions use their recorded exchange rate.
+          - generic [ref=f3e188]: Metrobank - 1647164003554 (PHP)
+          - generic [ref=f3e189]: Metrobank - USD-8821900 (USD)
+          - generic [ref=f3e190]: FOR THE PERIOD ENDED OCTOBER 31, 2026 - For the selected period
+        - table [ref=f3e192]:
+          - rowgroup [ref=f3e193]:
+            - row [ref=f3e194]:
+              - columnheader "DATE" [ref=f3e195]
+              - columnheader "CV#" [ref=f3e196]
+              - columnheader "CHECK#" [ref=f3e197]
+              - columnheader "STATUS" [ref=f3e198]
+              - columnheader "PAYEE" [ref=f3e199]
+              - columnheader "PARTICULARS" [ref=f3e200]
+              - columnheader "CASH IN BANK- PESO" [ref=f3e201]
+              - columnheader "CASH IN BANK-USD (PHP EQUIVALENT)" [ref=f3e202]
+              - columnheader "ACCOUNTS PAYABLE- TRADE" [ref=f3e203]
+              - columnheader "ADVANCES TO SUPPLIERS" [ref=f3e204]
+              - columnheader "INPUT VAT" [ref=f3e205]
+              - columnheader "WITHHOLDING TAX PAYABLE" [ref=f3e206]
+              - columnheader "BANK CHARGES" [ref=f3e207]
+              - columnheader "OTHER EXPENSE" [ref=f3e208]
+          - rowgroup [ref=f3e209]:
+            - row [ref=f3e210]:
+              - cell "No database records found for this report and period." [ref=f3e211]
