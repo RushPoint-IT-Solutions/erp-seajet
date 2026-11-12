@@ -3105,6 +3105,22 @@ class ModuleController extends Controller
         $selectedAccount = $filters['ap_account_id'] ? $apAccounts->firstWhere('id', (int) $filters['ap_account_id']) : null;
         abort_if($filters['ap_account_id'] && !$selectedAccount, 422, 'Select a company A/P account.');
         $asOf = \Carbon\Carbon::parse($filters['as_of'])->startOfDay();
+        $releasedPayments = collect();
+        if (Schema::hasTable('payments') && Schema::hasColumn('payments', 'bill_no')) {
+            $paymentQuery = DB::table('payments')->where('company_id', $this->defaultCompanyId())
+                ->whereNotIn(DB::raw('LOWER(TRIM(status))'), ['cancelled', 'canceled', 'voided', 'void', 'deleted']);
+            if (Schema::hasColumn('payments', 'approval_status')) {
+                $paymentQuery->whereNotIn(DB::raw("LOWER(TRIM(COALESCE(approval_status, '')))"), ['cancelled', 'canceled', 'voided', 'void']);
+            }
+            $releasedPayments = $paymentQuery->where(function ($query) {
+                $query->whereIn(DB::raw('LOWER(TRIM(status))'), ['released', 'posted']);
+                if (Schema::hasColumn('payments', 'approval_status')) {
+                    $query->orWhereRaw("LOWER(TRIM(approval_status)) = 'released'");
+                }
+            })->get()->groupBy(function ($payment) {
+                return $payment->supplier_id.'|'.$payment->bill_no.'|'.strtoupper($payment->currency ?: 'PHP');
+            })->map(function ($payments) { return $payments->sum('amount'); });
+        }
         $rows = Schema::hasTable('purchase_documents') ? DB::table('purchase_documents')
             ->leftJoin('suppliers', 'suppliers.id', '=', 'purchase_documents.supplier_id')
             ->where('purchase_documents.company_id', $this->defaultCompanyId())
@@ -3115,6 +3131,13 @@ class ModuleController extends Controller
             })
             ->orderBy('purchase_documents.document_date')->orderBy('purchase_documents.id')
             ->get(['purchase_documents.*', 'suppliers.name as supplier_name'])
+            ->map(function ($bill) use ($releasedPayments) {
+                $key = $bill->supplier_id.'|'.$bill->document_no.'|'.strtoupper($bill->currency ?: 'PHP');
+                // Released payments may predate synchronization of the bill's saved total.
+                // Use the larger total so synchronized payments are never deducted twice.
+                $bill->paid_total = max((float) $bill->paid_total, (float) $releasedPayments->get($key, 0));
+                return $bill;
+            })
             ->filter(function ($bill) use ($selectedAccount, $apAccounts) {
                 // Settle at bill-currency precision before PHP conversion. Otherwise
                 // sub-cent rounding left on a paid foreign bill can appear in aging.
@@ -12224,7 +12247,7 @@ class ModuleController extends Controller
                 'subtitle' => 'MANILA',
                 'icon' => 'bi-receipt',
                 'branch' => 'MANILA',
-                'columns' => ['DATE', 'OFFICIAL RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD, PHP EQUIVALENT)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
+                'columns' => ['DATE', 'OFFICIAL RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'CASH (PHP)', 'CASH (USD, PHP EQUIVALENT)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
             ],
             'crb-pampanga' => [
                 'label' => 'CRB-PAMPANGA',
@@ -12232,7 +12255,7 @@ class ModuleController extends Controller
                 'subtitle' => 'PAMPANGA',
                 'icon' => 'bi-receipt',
                 'branch' => 'PAMPANGA',
-                'columns' => ['DATE', 'OFFICIAL RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD, PHP EQUIVALENT)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
+                'columns' => ['DATE', 'OFFICIAL RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'CASH (PHP)', 'CASH (USD, PHP EQUIVALENT)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
             ],
             'crb-cebu' => [
                 'label' => 'CRB-CEBU',
@@ -12240,7 +12263,7 @@ class ModuleController extends Controller
                 'subtitle' => 'CEBU',
                 'icon' => 'bi-receipt',
                 'branch' => 'CEBU',
-                'columns' => ['DATE', 'OFFICIAL RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'WITHHOLDING-CWT (2307)', 'CASH (PHP)', 'CASH (USD, PHP EQUIVALENT)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
+                'columns' => ['DATE', 'OFFICIAL RECEIPT NUMBER', 'ACKNOWLEDGEMENT RECEIPT NUMBER', 'CUSTOMER NAME', 'A/R TRADE', 'A/R REIMBURSABLES CHARGES', 'CASH (PHP)', 'CASH (USD, PHP EQUIVALENT)', 'BILLING INVOICE NUMBER', 'STATEMENT OF ACCOUNT NUMBER'],
             ],
             'sales-manila' => [
                 'label' => 'SALES-MANILA',
@@ -13260,15 +13283,8 @@ class ModuleController extends Controller
                 Schema::hasColumn('sales_documents', 'document_type') ? 'sales_documents.document_type' : DB::raw('null as document_type')])
             ->groupBy('receipt_id');
 
-        // Presentation-only daily consolidation; count cash once per receipt,
-        // even when the receipt settles multiple invoices.
-        return $receipts->groupBy(function ($receipt) {
-            return json_encode([
-                $receipt->company_id, $receipt->customer_id, $receipt->receipt_date,
-                strtoupper($receipt->currency), trim((string) $receipt->reference_no),
-                $receipt->payment_method, $receipt->bank_account_id ?? null,
-            ]);
-        })->map(function ($group) use ($applications) {
+        // Keep separate receipts separate, including receipts issued on the same date.
+        return $receipts->groupBy('id')->map(function ($group) use ($applications) {
             $receipt = $group->first();
             $officialNumbers = [];
             $acknowledgementNumbers = [];
@@ -13318,9 +13334,8 @@ class ModuleController extends Controller
                 'OFFICIAL RECEIPT NUMBER' => implode(', ', array_unique($officialNumbers)),
                 'ACKNOWLEDGEMENT RECEIPT NUMBER' => implode(', ', array_unique($acknowledgementNumbers)),
                 'CUSTOMER NAME' => $receipt->customer_name,
-                'A/R TRADE' => $tradeAmount,
+                'A/R TRADE' => max(0, $tradeAmount - $cwtAmount),
                 'A/R REIMBURSABLES CHARGES' => $reimbursableAmount,
-                'WITHHOLDING-CWT (2307)' => $cwtAmount,
                 'CASH (PHP)' => strtoupper($receipt->currency) === 'USD' ? 0 : $amount,
                 'CASH (USD, PHP EQUIVALENT)' => strtoupper($receipt->currency) === 'USD' ? $amount : 0,
                 'BILLING INVOICE NUMBER' => implode(', ', array_unique(array_filter($billingNumbers))),
@@ -13433,14 +13448,14 @@ class ModuleController extends Controller
                     'BILLING INVOICE' => $isSoa ? '' : $document->document_no,
                     'STATEMENT OF ACCOUNT NUMBER' => trim((string) $document->soa_no) !== '' ? $document->soa_no : ($isSoa ? $document->document_no : ''),
                     'NAME OF COMPANY' => $document->customer_name,
-                    'A/R TRADE' => $billing,
+                    'A/R TRADE' => max(0, $billing - (float) $document->withholding_tax_amount),
                     'A/R REIMBURSABLE CHARGES' => $reimbursement,
                     'SERVICE INCOME ZERO RATED' => $income['zero_rated'],
                     'SERVICE INCOME VATABLE' => $income['vatable'],
                     'SERVICE INCOME VAT EXEMPT' => $income['vat_exempt'],
                     'SERVICE INCOME SOA A' => $income['soa_a'],
                     'OUTPUT VAT' => (float) $document->tax_total,
-                    'CREDITABLE WITHHOLDING TAX' => 0,
+                    'CREDITABLE WITHHOLDING TAX' => (float) $document->withholding_tax_amount,
                     'REIMBURSABLE CHARGES (CR)' => $reimbursement,
                 ];
             })

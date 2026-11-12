@@ -1,0 +1,28 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - img "Agenture" [ref=e4]
+    - heading "Agenture ERP" [level=1] [ref=e5]
+    - paragraph [ref=e6]: Order to Cash → Purchase Order → Inventory
+  - generic [ref=e7]:
+    - heading "Sign in" [level=2] [ref=e8]
+    - paragraph [ref=e9]: Enter your credentials to access your workspace.
+    - generic [ref=e10]:
+      - generic [ref=e11]:
+        - generic [ref=e12]: Email Address
+        - textbox "Email Address" [active] [ref=e13]:
+          - /placeholder: you@agenturecorp.com
+      - generic [ref=e14]:
+        - generic [ref=e15]: Password
+        - textbox "Password" [ref=e16]:
+          - /placeholder: ••••••••
+      - generic [ref=e17]:
+        - generic [ref=e18] [cursor=pointer]:
+          - checkbox "Remember me" [ref=e19]
+          - text: Remember me
+        - link "Forgot password?" [ref=e20] [cursor=pointer]:
+          - /url: https://erp.agenturecorp.com/password/reset
+      - button "Sign In →" [ref=e21] [cursor=pointer]
+  - generic [ref=e22]:
+    - link "View public Transaction FAQ" [ref=e23] [cursor=pointer]:
+      - /url: https://erp.agenturecorp.com/faq
+    - text: © 2026 Agenture Corporation — Order to Cash, Purchase Order & Inventory ERP

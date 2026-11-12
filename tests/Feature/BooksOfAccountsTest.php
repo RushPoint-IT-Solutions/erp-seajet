@@ -66,7 +66,7 @@ class BooksOfAccountsTest extends TestCase
         $this->assertEquals(60, $row['SERVICE INCOME VATABLE']);
         $this->assertEquals(25, $row['SERVICE INCOME ZERO RATED']);
         $this->assertEquals(15, $row['SERVICE INCOME VAT EXEMPT']);
-        $this->assertEquals(0, $row['CREDITABLE WITHHOLDING TAX']);
+        $this->assertEquals(2, $row['CREDITABLE WITHHOLDING TAX']);
     }
 
     public function test_import_batch_bank_filter_retains_only_the_selected_balances_debit_credit_pair()

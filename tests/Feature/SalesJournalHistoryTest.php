@@ -37,7 +37,7 @@ class SalesJournalHistoryTest extends TestCase
         $this->assertEquals(162, $row['A/R TRADE'] + $row['A/R REIMBURSABLE CHARGES']);
     }
 
-    public function test_sales_reports_leave_cwt_recognition_at_collection()
+    public function test_sales_reports_show_invoice_withholding_and_net_amount_due()
     {
         $invoice = $this->invoice();
         DB::table('sales_documents')->where('id', $invoice->id)->update(['withholding_tax_amount' => 2]);
@@ -45,8 +45,8 @@ class SalesJournalHistoryTest extends TestCase
         $response = $this->get(route('erp.reports.workbook', ['report' => 'sales-manila', 'period' => '2026-10']))->assertOk();
         $row = collect($response->original->getData()['rows'])->firstWhere('BILLING INVOICE', $invoice->document_no);
 
-        $this->assertEquals(112, $row['A/R TRADE']);
-        $this->assertEquals(0, $row['CREDITABLE WITHHOLDING TAX']);
+        $this->assertEquals(110, $row['A/R TRADE']);
+        $this->assertEquals(2, $row['CREDITABLE WITHHOLDING TAX']);
         $this->assertEquals(162, $row['A/R TRADE'] + $row['CREDITABLE WITHHOLDING TAX'] + $row['A/R REIMBURSABLE CHARGES']);
     }
 
@@ -64,7 +64,7 @@ class SalesJournalHistoryTest extends TestCase
         $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
         $this->assertNotFalse(simplexml_load_string($sheetXml));
         $this->assertStringContainsString('CREDITABLE WITHHOLDING TAX', $sheetXml);
-        $this->assertStringContainsString('<v>112</v>', $sheetXml);
+        $this->assertStringContainsString('<v>110</v>', $sheetXml);
         $this->assertStringContainsString('<v>0</v>', $sheetXml);
         $zip->close();
 

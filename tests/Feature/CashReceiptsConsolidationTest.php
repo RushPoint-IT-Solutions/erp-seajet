@@ -56,7 +56,7 @@ class CashReceiptsConsolidationTest extends TestCase
         DB::table('customers')->insert(['id' => 1, 'name' => 'FIRMA']);
     }
 
-    public function test_combines_or_ar_without_multiplying_cash_for_multiple_applications()
+    public function test_keeps_same_date_receipts_separate_without_multiplying_cash()
     {
         DB::table('receipts')->insert([
             ['id' => 1, 'receipt_no' => 'OR-6234', 'receipt_type' => 'collection_receipt', 'amount' => 34771.93],
@@ -72,14 +72,14 @@ class CashReceiptsConsolidationTest extends TestCase
             ['receipt_id' => 2, 'sales_document_id' => 1, 'component' => 'soa', 'amount_applied' => 9969.33],
         ]);
         $rows = $this->rows();
-        $this->assertCount(1, $rows);
-        $this->assertEquals(44741.26, $rows[0]['CASH (PHP)']);
+        $this->assertCount(2, $rows);
+        $this->assertEquals(34771.93, $rows[0]['CASH (PHP)']);
         $this->assertEquals(34771.93, $rows[0]['A/R TRADE']);
-        $this->assertEquals(9969.33, $rows[0]['A/R REIMBURSABLES CHARGES']);
+        $this->assertEquals(9969.33, $rows[1]['A/R REIMBURSABLES CHARGES']);
         $this->assertSame('OR-6234', $rows[0]['OFFICIAL RECEIPT NUMBER']);
-        $this->assertSame('AR-7624', $rows[0]['ACKNOWLEDGEMENT RECEIPT NUMBER']);
+        $this->assertSame('AR-7624', $rows[1]['ACKNOWLEDGEMENT RECEIPT NUMBER']);
         $this->assertSame('BI-197, BI-198', $rows[0]['BILLING INVOICE NUMBER']);
-        $this->assertSame('SOA-197', $rows[0]['STATEMENT OF ACCOUNT NUMBER']);
+        $this->assertSame('SOA-197', $rows[1]['STATEMENT OF ACCOUNT NUMBER']);
         $this->assertSame(2, DB::table('receipts')->count());
     }
 
@@ -114,12 +114,12 @@ class CashReceiptsConsolidationTest extends TestCase
         ]);
 
         $row = $this->rows()[0];
-        $this->assertEquals(389309.68, $row['A/R TRADE']);
+        $this->assertEquals(369309.68, $row['A/R TRADE']);
         $this->assertEquals(928200.47, $row['A/R REIMBURSABLES CHARGES']);
-        $this->assertEquals(20000, $row['WITHHOLDING-CWT (2307)']);
+        $this->assertArrayNotHasKey('WITHHOLDING-CWT (2307)', $row);
         $this->assertEquals(1297510.15, $row['CASH (PHP)']);
         $this->assertEquals($row['A/R TRADE'] + $row['A/R REIMBURSABLES CHARGES'],
-            $row['CASH (PHP)'] + $row['WITHHOLDING-CWT (2307)']);
+            $row['CASH (PHP)']);
     }
 
     public function test_unapplied_acknowledgement_receipt_is_reimbursable()
@@ -141,10 +141,11 @@ class CashReceiptsConsolidationTest extends TestCase
             ['receipt_no' => 'USD-2', 'currency' => 'USD', 'amount' => 100, 'cwt_amount' => 10, 'exchange_rate' => 57],
         ]);
         $rows = $this->rows();
-        $this->assertCount(1, $rows);
-        $this->assertEquals(11300, $rows[0]['CASH (USD, PHP EQUIVALENT)']);
-        $this->assertEquals(1130, $rows[0]['WITHHOLDING-CWT (2307)']);
-        $this->assertEquals(12430, $rows[0]['A/R TRADE']);
+        $this->assertCount(2, $rows);
+        $this->assertEquals(5600, $rows[0]['CASH (USD, PHP EQUIVALENT)']);
+        $this->assertEquals(5700, $rows[1]['CASH (USD, PHP EQUIVALENT)']);
+        $this->assertEquals(5600, $rows[0]['A/R TRADE']);
+        $this->assertEquals(5700, $rows[1]['A/R TRADE']);
     }
 
     public function test_soa_a_collection_credits_trade_receivable_and_preserves_soa_reference()

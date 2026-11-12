@@ -93,6 +93,33 @@ class ApAgingSummaryTest extends TestCase
         $this->assertEquals(5600, $aging['currencyTotals']['USD']['balance']);
     }
 
+    public function test_released_payments_reduce_stale_bill_totals_without_double_deduction()
+    {
+        Schema::create('payments', function (Blueprint $table) {
+            $table->increments('id');
+            $table->integer('company_id')->default(1);
+            $table->integer('supplier_id')->default(1);
+            $table->string('bill_no');
+            $table->string('currency')->default('PHP');
+            $table->string('status')->default('released');
+            $table->string('approval_status')->default('Released');
+            $table->decimal('amount', 18, 2);
+        });
+        DB::table('purchase_documents')->insert(['document_no' => 'STALE', 'document_date' => '2026-10-01']);
+        DB::table('payments')->insert(['bill_no' => 'STALE', 'amount' => 100]);
+        request()->merge(['as_of' => '2026-10-28']);
+        $data = app(ModuleController::class)->apAging()->getData();
+        $this->assertEquals(50, $data['rows']->first()['balance']);
+        DB::table('purchase_documents')->update(['paid_total' => 100]);
+        $data = app(ModuleController::class)->apAging()->getData();
+        $this->assertEquals(50, $data['rows']->first()['balance']);
+        DB::table('payments')->insert(['bill_no' => 'STALE', 'amount' => 50, 'status' => 'voided']);
+        $data = app(ModuleController::class)->apAging()->getData();
+        $this->assertEquals(50, $data['rows']->first()['balance']);
+        DB::table('payments')->insert(['bill_no' => 'STALE', 'amount' => 50]);
+        $this->assertCount(0, app(ModuleController::class)->apAging()->getData()['rows']);
+    }
+
     public function test_settled_bills_are_excluded_before_currency_conversion_and_supplier_totals()
     {
         foreach ([
