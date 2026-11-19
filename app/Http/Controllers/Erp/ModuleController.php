@@ -2192,6 +2192,7 @@ class ModuleController extends Controller
                 ]);
             }
 
+            app(\App\Services\Accounting\VoucherSettlementService::class)->remove($record->id);
             $bill = $this->apBillRecordByNumber($data['bill_no']);
             if (!$bill) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
@@ -2252,6 +2253,8 @@ class ModuleController extends Controller
                     'updated_at' => now(),
                 ]));
             }
+
+            app(\App\Services\Accounting\VoucherSettlementService::class)->apply($record->id);
 
             app(ActivityLogger::class)->log('updated', 'payment', $record->id, $before, [
                 'payment_date' => $data['payment_date'],
@@ -2358,7 +2361,7 @@ class ModuleController extends Controller
 
             $bill = $this->apBillRecordByNumber($record->bill_no);
             abort_unless($bill, 422, 'The supplier bill linked to this payment no longer exists.');
-            $balanceCents = (int) round(max(0, (float) $bill->grand_total - (float) $bill->paid_total) * 100);
+            $balanceCents = (int) round(max(0, (float) $bill->grand_total - (float) $bill->paid_total + app(\App\Services\Accounting\VoucherSettlementService::class)->appliedAmount($record)) * 100);
             $balance = $balanceCents / 100;
             if ((int) round((float) $record->amount * 100) > $balanceCents) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
@@ -2375,6 +2378,8 @@ class ModuleController extends Controller
                     ]);
                 }
             }
+
+            app(\App\Services\Accounting\VoucherSettlementService::class)->apply($record->id);
 
             DB::table('payments')->where('id', $record->id)->update([
                 'status' => 'released',
@@ -2394,7 +2399,8 @@ class ModuleController extends Controller
             }
 
             app(PostingService::class)->postSupplierPayment($record->id);
-            $this->applyReleasedPaymentToBill($record, $bill);
+            DB::table('purchase_documents')->where('company_id', $companyId)->where('id', $bill->id)
+                ->update(['approval_status' => 'Released', 'updated_at' => now()]);
 
             app(ActivityLogger::class)->log('released', 'payment', $record->id, [
                 'approval_status' => $record->approval_status,
@@ -2429,8 +2435,9 @@ class ModuleController extends Controller
             }
             if ($wasReleased && $record->posting_status === 'posted') {
                 app(PostingService::class)->reverseSource('payment', $record->id, $data['reason']);
-                $this->reverseReleasedPaymentFromBill($record);
             }
+
+            app(\App\Services\Accounting\VoucherSettlementService::class)->remove($record->id);
 
             DB::table('payments')->where('id', $record->id)->update([
                 'status' => 'voided',
@@ -2677,6 +2684,7 @@ class ModuleController extends Controller
             if ($financialChange && $issuance && (int) $issuance->print_count > 0) {
                 throw \Illuminate\Validation\ValidationException::withMessages(['voucher' => 'This check has been printed. Void or replace it before changing bank, amount, or check number.']);
             }
+            app(\App\Services\Accounting\VoucherSettlementService::class)->remove($record->id);
             $bill = DB::table('purchase_documents')->where('company_id', $companyId)
                 ->where('document_no', $record->bill_no)->lockForUpdate()->first();
             if (!$bill || in_array(strtolower($bill->status), ['voided', 'void', 'cancelled', 'canceled', 'deleted'], true)
@@ -2728,6 +2736,8 @@ class ModuleController extends Controller
             if ($amountChanged) {
                 DB::table('payment_applications')->where('payment_id', $record->id)->update(['amount_applied' => $amount, 'updated_at' => now()]);
             }
+
+            app(\App\Services\Accounting\VoucherSettlementService::class)->apply($record->id);
 
             app(ActivityLogger::class)->log('updated', 'check_voucher', $record->id, $before, [
                 'document_date' => $data['document_date'],
@@ -3805,6 +3815,8 @@ class ModuleController extends Controller
                 ], $companyId);
             }
 
+            app(\App\Services\Accounting\VoucherSettlementService::class)->apply($paymentId);
+
             return $this->paymentArrayById($paymentId);
         });
     }
@@ -3988,37 +4000,6 @@ class ModuleController extends Controller
         }
 
         return $query->first();
-    }
-
-    private function applyReleasedPaymentToBill($payment, $bill = null)
-    {
-        $bill = $bill ?: $this->apBillRecordByNumber($payment->bill_no);
-        if (!$bill) {
-            return;
-        }
-
-        $paidTotal = min((float) $bill->grand_total, (float) $bill->paid_total + (float) $payment->amount);
-        DB::table('purchase_documents')->where('company_id', $payment->company_id)->where('id', $bill->id)->update([
-            'paid_total' => $paidTotal,
-            'status' => $paidTotal >= (float) $bill->grand_total ? 'paid' : 'partially_paid',
-            'approval_status' => 'Released',
-            'updated_at' => now(),
-        ]);
-    }
-
-    private function reverseReleasedPaymentFromBill($payment)
-    {
-        $bill = $this->apBillRecordByNumber($payment->bill_no);
-        if (!$bill) {
-            return;
-        }
-
-        $paidTotal = max(0, (float) $bill->paid_total - (float) $payment->amount);
-        DB::table('purchase_documents')->where('company_id', $payment->company_id)->where('id', $bill->id)->update([
-            'paid_total' => $paidTotal,
-            'status' => $paidTotal <= 0 ? 'for_payment' : 'partially_paid',
-            'updated_at' => now(),
-        ]);
     }
 
     private function apPaymentRows($month = null)

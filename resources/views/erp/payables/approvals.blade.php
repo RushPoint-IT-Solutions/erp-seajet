@@ -63,7 +63,7 @@
     <div class="erp-card p-3">
         <div class="table-responsive">
             <table class="table table-hover align-middle module-table w-100">
-                <thead><tr><th><input type="checkbox" id="selectAllRelease" class="form-check-input" aria-label="Select all eligible filtered CVs"></th><th>Payment / Check Date</th><th>Payment</th><th>Check Voucher</th><th>Supplier</th><th>Method</th><th>Check No.</th><th>Currency</th><th class="text-end">Amount</th><th>Status</th><th>Check Control</th><th>Reason / Next Step</th><th class="text-end">Actions</th></tr></thead>
+                <thead><tr><th><input type="checkbox" id="selectAllRelease" class="form-check-input" aria-label="Select all eligible filtered CVs"></th><th>Payment / Check Date</th><th>Payment</th><th>Check Voucher</th><th>Bill #</th><th>Supplier</th><th>Method</th><th>Check No.</th><th>Currency</th><th class="text-end">Amount</th><th>Status</th><th>Check Control</th><th>Reason / Next Step</th><th class="text-end">Actions</th></tr></thead>
                 <tbody>
                 @foreach($approvals as $row)
                     <tr data-status-group="{{ $row['status_group'] }}">
@@ -71,6 +71,7 @@
                         <td class="text-nowrap" data-order="{{ $row['payment_date'] ?: '' }}">{{ $row['payment_date'] ? \Carbon\Carbon::parse($row['payment_date'])->format('M d, Y') : '-' }}</td>
                         <td><div class="fw-semibold">{{ $row['payment_no'] }}</div><small class="text-muted">{{ $row['shipment_job_id'] }}</small></td>
                         <td><a href="{{ route('erp.payables.check-voucher', $row['id']) }}" class="fw-semibold text-decoration-none">{{ $row['check_voucher'] }}</a></td>
+                        <td class="text-nowrap">{{ $row['bill_no'] ?: '-' }}</td>
                         <td>{{ $row['supplier'] }}</td>
                         <td>{{ $row['payment_method'] }}</td>
                         <td class="fw-semibold">{{ $row['check_no'] }}</td>

@@ -80,6 +80,28 @@ class MetrobankVoucherNumberSeriesTest extends TestCase
 
         $payment = DB::table('payments')->where('bill_no', $bill['document_no'])->first();
         $this->assertSame('CV-MB-00001', $payment->voucher_no);
+        $this->assertDatabaseHas('purchase_documents', [
+            'document_no' => $bill['document_no'], 'paid_total' => 100, 'status' => 'paid',
+        ]);
+        $this->assertSame('unposted', $payment->posting_status);
+        app(\App\Services\Accounting\VoucherSettlementService::class)->apply($payment->id);
+        $this->assertDatabaseHas('purchase_documents', [
+            'document_no' => $bill['document_no'], 'paid_total' => 100,
+        ]);
+
+        $this->post(route('erp.payables.check-voucher.update', $payment->id), [
+            'document_date' => '2026-10-13', 'amount' => 60, 'bank_account_id' => $bank->id,
+        ])->assertSessionHasNoErrors()->assertRedirect();
+        $this->assertDatabaseHas('purchase_documents', [
+            'document_no' => $bill['document_no'], 'paid_total' => 60, 'status' => 'partially_paid',
+        ]);
+
+        $this->post(route('erp.payables.payments.void', $payment->id), [
+            'reason' => 'Cancel prepared voucher',
+        ])->assertSessionHasNoErrors()->assertRedirect();
+        $this->assertDatabaseHas('purchase_documents', [
+            'document_no' => $bill['document_no'], 'paid_total' => 0, 'status' => 'for_payment',
+        ]);
         $this->assertSame(1, (int) DB::table('number_series')
             ->where('company_id', $sourceBill->company_id)
             ->where('document_type', 'check_voucher')
